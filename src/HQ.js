@@ -2,8 +2,9 @@ import * as THREE from 'three';
 
 class HQ {
   constructor(id, position, ownerID) {
-    this.id = id; // Add an id field
-    this.type = 'HQ'; // Add a type field
+    this.id = id; // identifier for this HQ
+    this.type = 'HQ';
+    this.hp = 100; // hit points for ground strikes
     this.sphere = this.createMesh(position);
     const spherical = new THREE.Spherical().setFromVector3(position);
     this.latitude = THREE.MathUtils.radToDeg(spherical.phi);
@@ -11,6 +12,16 @@ class HQ {
     this.position = position;
     this.ownerID = ownerID;
     this.neighbors = new Set(); // Initialize neighbors for graph representation
+  }
+
+  /**
+   * Apply damage to this HQ.
+   * @param {number} amount
+   * @returns {number} Remaining HP
+   */
+  applyDamage(amount) {
+    this.hp = Math.max(0, this.hp - amount);
+    return this.hp;
   }
 
   createMesh(position) {
@@ -33,10 +44,14 @@ class HQ {
     this.neighbors.delete(id);
   }
     
+    /**
+     * Check if a world-space position is within range of this HQ.
+     */
     isInRange(position) {
-        const maxRange = 3000; // Use the range value used in communication lines
-        const distance = this.sphere.position.distanceTo(position);
-        console.log("hqDist: ", distance);
+        const maxRange = 3000;
+        const hqWorld = new THREE.Vector3();
+        this.sphere.getWorldPosition(hqWorld);
+        const distance = hqWorld.distanceTo(position);
         return distance <= maxRange;
       }
 

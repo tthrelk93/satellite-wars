@@ -6,6 +6,11 @@ import Earth from './Earth';
 import HQ from './HQ';
 import Player from './Player';
 
+import { EventBus } from './EventBus';
+import { TurnManager, AP_MAX } from './TurnManager';
+import { DetectionLog } from './DetectionLog';
+import { ActionRegistry } from './ActionRegistry';
+
 import {
   Button,
   IconButton,
@@ -54,11 +59,64 @@ const App = () => {
   const cameraRef = useRef(null);
   const rendererRef = useRef(null);
     
-    const [launchCost, setLaunchCost] = useState(0);
+  const [launchCost, setLaunchCost] = useState(0);
+
+  // Core game system instances
+  const eventBusRef = useRef(null);
+  const turnManagerRef = useRef(null);
+  const detectionLogRef = useRef(null);
+  const actionRegistryRef = useRef(null);
+
+  // UI state for turn and action points
+  const [activePlayerId, setActivePlayerId] = useState(null);
+  const [currentTurn, setCurrentTurn] = useState(0);
+  const [actionPoints, setActionPoints] = useState(AP_MAX);
 
 
   // Initialize the scene, camera, renderer, controls, and lights
   useEffect(() => {
+    // Core systems setup
+    const eventBus = new EventBus();
+    const turnManager = new TurnManager(eventBus);
+    const detectionLog = new DetectionLog(eventBus);
+    const playersMap = {};
+    const actionRegistry = new ActionRegistry({ eventBus, turnManager, players: playersMap });
+    eventBusRef.current = eventBus;
+    turnManagerRef.current = turnManager;
+    detectionLogRef.current = detectionLog;
+    actionRegistryRef.current = actionRegistry;
+    // Subscribe to turn and AP events for UI updates
+    eventBus.on('TURN_STARTED', ({ playerId, turnNumber }) => {
+      setActivePlayerId(playerId);
+      setCurrentTurn(turnNumber);
+    });
+    eventBus.on('AP_CHANGED', ({ playerId, ap }) => {
+      setActionPoints(ap);
+    });
+
+    // Economy tick: apply income and upkeep after a turn ends
+    eventBus.on('ECONOMY_TICK', ({ playerId }) => {
+      const player = playersMap[playerId];
+      if (!player) return;
+      const sats = player.getSatellites();
+      const inLink = sats.filter(sat => sat.inHqRange);
+      const imagingCount = inLink.filter(sat => sat.type === 'imaging').length;
+      const commCount = inLink.filter(sat => sat.type === 'communication').length;
+      const totalCount = sats.length;
+      const income = imagingCount * INCOME_PER_IMAGING_IN_LINK + commCount * INCOME_PER_COMM_IN_LINK;
+      const upkeep = totalCount * UPKEEP_PER_SAT;
+      player.funds += income - upkeep;
+    });
+
+    // Handle ground strike resolution and victory
+    eventBus.on('ACTION_STRIKE_RESOLVED', ({ attackerId, targetId, remainingHp }) => {
+      console.log(`Ground strike resolved on ${targetId} by ${attackerId}, remaining HP: ${remainingHp}`);
+    });
+    eventBus.on('VICTORY', ({ winner }) => {
+      console.log(`Game over: winner is ${winner}`);
+      // TODO: disable inputs and show victory UI
+    });
+
     const scene = new THREE.Scene();
     sceneRef.current = scene;
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.7, 100000);
@@ -85,12 +143,27 @@ const App = () => {
     const player1 = new Player('player1');
     const player2 = new Player('player2');
     setPlayers([player1, player2]);
-    currentPlayerRef.current = player1; // Set the current player
+    // Map of playerId to Player
+    playersMap[player1.id] = player1;
+    playersMap[player2.id] = player2;
+    // Start the turn cycle
+    // Start the turn cycle (initial TURN_STARTED will fire once earth is ready)
+    // turnManager.startGame will be called after Earth is created below
 
     // Create Earth
-    const earth = new Earth(camera, [player1, player2]); // Pass the camera and players reference
+    const earth = new Earth(camera, [player1, player2]);
     earth.render(scene);
     earthRef.current = earth;
+
+    // Sync view and objects on turn start (after Earth exists)
+    eventBus.on('TURN_STARTED', ({ playerId }) => {
+      currentPlayerRef.current = playersMap[playerId];
+      earthRef.current.setCurrentPlayer(playerId);
+      renderPlayerObjects();
+    });
+    // Now that Earth is ready, start the turn cycle, emitting initial TURN_STARTED
+    turnManager.startGame([player1.id, player2.id]);
+
 
     // Set up camera and orbit controls
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -119,8 +192,8 @@ const App = () => {
 
     window.addEventListener('mousedown', handleMouseClick);
 
-    // Initial player objects rendering
-    renderPlayerObjects();
+    // Initial player objects rendering is handled via TURN_STARTED event
+    // renderPlayerObjects();
 
     // Cleanup on component unmount
     return () => {
@@ -202,12 +275,14 @@ const App = () => {
 
   const handleCommSatDetections = () => {
     const commSats = satellitesRef.current.filter(sat => sat.type === 'communication' && sat.ownerId === currentPlayerRef.current.id);
-    const imagingSats = satellitesRef.current.filter(sat => sat.type === 'imaging' && sat.ownerId === currentPlayerRef.current.id);
-    const allSats = [...commSats, ...imagingSats];
     const groundStations = hqSpheresRef.current.filter(hq => hq.ownerID === currentPlayerRef.current.id);
+    // Use the neighbor graph (range + LoS in updateNeighbors) as the SR-CRT for links
+    const byId = id =>
+      satellitesRef.current.find(s => s.id === id) ||
+      hqSpheresRef.current.find(h => h.id === id);
 
-    allSats.forEach(sat => {
-      const targets = sat.detectCommTargets(allSats, groundStations);
+    commSats.forEach(sat => {
+      const targets = Array.from(sat.neighbors).map(byId).filter(Boolean);
       drawCommLines(sat, targets);
     });
   };
@@ -223,48 +298,43 @@ const App = () => {
 
     const earthRadius = earthRef.current.earthRadiusKm;
 
-    // Function to check if the line intersects with the Earth
-    const lineIntersectsEarth = (start, end, isGroundStation) => {
-      const direction = new THREE.Vector3().subVectors(end, start).normalize();
-      const ray = new THREE.Ray(start, direction);
-      const distanceToCenter = ray.distanceToPoint(new THREE.Vector3(0, 0, 0));
-
-      const intersects = distanceToCenter < earthRadius;
-
-      // Allow intersection at the end point if it's a ground station
-      if (intersects && isGroundStation) {
-        const distanceToEnd = start.distanceTo(end);
-        const intersectionPoint = start.clone().add(direction.clone().multiplyScalar(distanceToEnd));
-        const intersectionDistance = intersectionPoint.distanceTo(start);
-         // console.log("intersectDist: ", intersectionDistance);
-          let intersectThresh = 3000;
-          if(sat.type === "communication"){
-              intersectThresh = 40000;
-          }
-        if (intersectionDistance < intersectThresh) { // Allow small tolerance for intersection at end point
-          return false;
-        }
-      }
-
-      return intersects;
-    };
+    /**
+     * Returns true if the segment from start->end passes through the sphere (excluding endpoints).
+     * Sphere at origin with given radius.
+     */
+    function segmentOccludedBySphere(start, end, sphereRadius, epsilon = 1e-3) {
+      const d = new THREE.Vector3().subVectors(end, start);
+      const f = start.clone();
+      const a = d.dot(d);
+      const b = 2 * f.dot(d);
+      const c = f.dot(f) - sphereRadius * sphereRadius;
+      const disc = b * b - 4 * a * c;
+      if (disc < 0) return false;
+      const sqrtDisc = Math.sqrt(disc);
+      const t1 = (-b - sqrtDisc) / (2 * a);
+      const t2 = (-b + sqrtDisc) / (2 * a);
+      return (t1 > epsilon && t1 < 1 - epsilon) || (t2 > epsilon && t2 < 1 - epsilon);
+    }
 
       // Draw new lines
-        targets.forEach(target => {
-          const material = new THREE.LineBasicMaterial({ color: 0xff00ff });
-          const points = [];
-          const startPos = sat.mesh.position.clone();
-          const endPos = target instanceof HQ ? target.sphere.position.clone() : (target.position || target.mesh.position).clone();
-
-          if (!lineIntersectsEarth(startPos, endPos, target instanceof HQ)) {
-            points.push(startPos);
-            points.push(endPos);
-            const geometry = new THREE.BufferGeometry().setFromPoints(points);
-            const line = new THREE.Line(geometry, material);
-            sceneRef.current.add(line);
-            sat.commLines.push(line);
-          }
-        });
+    targets.forEach(target => {
+      let endPos;
+      if (target.type === 'HQ') {
+        endPos = new THREE.Vector3();
+        target.sphere.getWorldPosition(endPos);
+      } else {
+        endPos = target.mesh.position.clone();
+      }
+      const startPos = sat.mesh.position.clone();
+      const eps = (target.type === 'HQ') ? 1e-2 : 1e-3;
+      if (!segmentOccludedBySphere(startPos, endPos, earthRef.current.earthRadiusKm, eps)) {
+        const material = new THREE.LineBasicMaterial({ color: 0xff00ff });
+        const geometry = new THREE.BufferGeometry().setFromPoints([startPos, endPos]);
+        const line = new THREE.Line(geometry, material);
+        sceneRef.current.add(line);
+        sat.commLines.push(line);
+      }
+    });
   };
 
   // Animation loop
@@ -380,13 +450,14 @@ const App = () => {
               if(currentPlayerRef.current.funds >= costToLaunchFromHQ){
                   
                   const newSatellite = new Satellite(
-                                                     'sat' + Math.floor(Math.random() * 1000),
-                                                     currentPlayerRef.current.id, // Set the player ID
-                                                     satelliteType,
-                                                     orbit,
-                                                     earthRef.current,
-                                                     fieldOfView
-                                                     );
+                    'sat' + Math.floor(Math.random() * 1000),
+                    currentPlayerRef.current.id, // player ID
+                    satelliteType,
+                    orbit,
+                    earthRef.current,
+                    fieldOfView,
+                    eventBusRef.current
+                  );
                   newSatellite.render(sceneRef.current);
                   
                   currentPlayerRef.current.addSatellite(newSatellite);
@@ -451,7 +522,13 @@ const App = () => {
     const addNeighborsInRange = (satelliteOrHQ, neighbors) => {
 
       neighbors.forEach(neighbor => {
-        const neighborPosition = neighbor instanceof Satellite ? neighbor.mesh.position : neighbor.sphere.position;
+        let neighborPosition;
+        if (neighbor instanceof Satellite) {
+          neighborPosition = neighbor.mesh.position.clone();
+        } else {
+          neighborPosition = new THREE.Vector3();
+          neighbor.sphere.getWorldPosition(neighborPosition);
+        }
          
           let isHQ = false;
           if(satelliteOrHQ.type === "HQ"){
@@ -510,11 +587,6 @@ const App = () => {
 
   
 
-    const switchPlayer = () => {
-      currentPlayerRef.current = currentPlayerRef.current.id === 'player1' ? players[1] : players[0];
-      earthRef.current.setCurrentPlayer(currentPlayerRef.current.id);
-      renderPlayerObjects();
-    }
 
     function renderPlayerObjects() {
       // Remove all objects from the scene
@@ -523,19 +595,25 @@ const App = () => {
         if (satellite.viewCone) sceneRef.current.remove(satellite.viewCone);
         satellite.commLines.forEach(line => sceneRef.current.remove(line));
       });
+      // Keep ALL HQs parented to the rotating Earth; just toggle visibility per owner.
       hqSpheresRef.current.forEach(hq => {
-        earthRef.current.parentObject.remove(hq.sphere);
+        if (hq.sphere.parent !== earthRef.current.parentObject) {
+          earthRef.current.parentObject.add(hq.sphere);
+        }
+        hq.sphere.visible = (hq.ownerID === currentPlayer.id);
       });
 
       // Add only the current player's objects
       const currentPlayer = currentPlayerRef.current;
       currentPlayer.getSatellites().forEach(satellite => {
         sceneRef.current.add(satellite.mesh);
-        if (satellite.viewCone) sceneRef.current.add(satellite.viewCone);
+        // Only imaging sats render view cones
+        if (satellite.type === 'imaging' && satellite.viewCone) {
+          sceneRef.current.add(satellite.viewCone);
+        }
         satellite.commLines.forEach(line => sceneRef.current.add(line));
         satellite.checkInHqRange(hqSpheresRef.current, currentPlayerRef, satellitesRef.current); // Update inHqRange status
       });
-      currentPlayer.getHQs().forEach(hq => earthRef.current.parentObject.add(hq.sphere));
       earthRef.current.currentPlayerID = currentPlayer.id;
       // Update the fog map for the current player
       earthRef.current.updateFogMapForCurrentPlayer();
@@ -592,13 +670,26 @@ const App = () => {
 
   return (
           <div>
-            <button onClick={switchPlayer}>Switch Player</button>
+            {/* End Turn button controlled by TurnManager */}
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => turnManagerRef.current && turnManagerRef.current.endTurn()}
+              style={{ position: 'absolute', top: 20, left: 10, zIndex: 1000 }}
+            >
+              End Turn
+            </Button>
             <div ref={mountRef} style={{ width: '100vw', height: '100vh' }} />
             
             <Typography
               variant="h6"
               style={{ position: 'absolute', top: 20, right: 430, zIndex: 1000, color: 'white' }}>
               Funds: {currentPlayerRef.current ? currentPlayerRef.current.funds : 0}
+            </Typography>
+            <Typography
+              variant="h6"
+              style={{ position: 'absolute', top: 20, right: 250, zIndex: 1000, color: 'white' }}>
+              Turn: {currentTurn} | AP: {actionPoints}
             </Typography>
 
             <IconButton
@@ -700,3 +791,7 @@ const App = () => {
 };
 
 export default App;
+// Economy constants
+const INCOME_PER_IMAGING_IN_LINK = 1_000_000;
+const INCOME_PER_COMM_IN_LINK    =   300_000;
+const UPKEEP_PER_SAT             =   200_000;

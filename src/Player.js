@@ -3,7 +3,8 @@ class Player {
     this.id = id;
     this.hqs = [];
     this.satellites = [];
-    this.funds = 5000000000;
+    this.funds = 250000000; // starting funds for game economy
+    this.knownEnemyHQPosition = null; // store detected enemy HQ position
   }
 
   addHQ(hq) {
@@ -24,4 +25,3 @@ class Player {
 }
 
 export default Player;
-

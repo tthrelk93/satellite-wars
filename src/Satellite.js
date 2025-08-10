@@ -1,13 +1,32 @@
 import * as THREE from 'three';
 
+/**
+ * Returns true if the segment from start->end passes through the sphere (excluding endpoints).
+ * Sphere centered at origin with radius = sphereRadius.
+ */
+function segmentOccludedBySphere(start, end, sphereRadius, epsilon = 1e-3) {
+  const d = new THREE.Vector3().subVectors(end, start);
+  const f = start.clone();
+  const a = d.dot(d);
+  const b = 2 * f.dot(d);
+  const c = f.dot(f) - sphereRadius * sphereRadius;
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return false;
+  const sqrtDisc = Math.sqrt(disc);
+  const t1 = (-b - sqrtDisc) / (2 * a);
+  const t2 = (-b + sqrtDisc) / (2 * a);
+  return (t1 > epsilon && t1 < 1 - epsilon) || (t2 > epsilon && t2 < 1 - epsilon);
+}
+
 class Satellite {
-  constructor(id, ownerId, type, orbit, earth, fov) {
+  constructor(id, ownerId, type, orbit, earth, fov, eventBus) {
     this.id = id;
     this.ownerId = ownerId;
     this.type = type;
     this.orbit = orbit;
     this.earth = earth;
     this.fov = fov;
+    this.eventBus = eventBus;
     this.color = this.getColorByType(type);
     this.mesh = this.createMesh();
     this.viewCone = this.createViewCone();
@@ -118,14 +137,16 @@ class Satellite {
   }
     
     updateNeighbors(satellites, hqSpheres) {
-        // Update satellite neighbors
+        // Update satellite neighbors with range + LoS
         satellites.forEach(satellite => {
             if (satellite !== this && satellite.ownerId === this.ownerId) {
-                const distance = this.mesh.position.distanceTo(satellite.mesh.position);
-                const maxRange = 40000; // Use the range value used in communication lines
-                const isInRange = distance <= maxRange;
+                const p1 = this.mesh.position;
+                const p2 = satellite.mesh.position;
+                const distance = p1.distanceTo(p2);
+                const maxRange = 40000;
+                const hasLoS = !segmentOccludedBySphere(p1, p2, this.earth.earthRadiusKm);
 
-                if (isInRange) {
+                if (distance <= maxRange && hasLoS) {
                     if (!this.neighbors.has(satellite.id)) {
                         this.addNeighbor(satellite.id);
                         satellite.addNeighbor(this.id);
@@ -139,18 +160,16 @@ class Satellite {
             }
         });
 
-        // Update HQ neighbors
+        // Update HQ neighbors with range + LoS
         hqSpheres.forEach(hq => {
             if (hq.ownerID === this.ownerId) {
-                const distance = this.mesh.position.distanceTo(hq.sphere.position);
-                let maxRange = 40000; // Use the range value used in communication lines
-                // console.log("intersectDist: ", intersectionDistance);
-                 if(this.type === "communication"){
-                     maxRange = 40000;
-                 }
-                const isInRange = distance <= maxRange;
+                const hqWorld = new THREE.Vector3();
+                hq.sphere.getWorldPosition(hqWorld);
+                const distance = this.mesh.position.distanceTo(hqWorld);
+                const maxRange = 3000;
+                const hasLoS = !segmentOccludedBySphere(hqWorld, this.mesh.position, this.earth.earthRadiusKm, 1e-2);
 
-                if (isInRange) {
+                if (distance <= maxRange && hasLoS) {
                     if (!this.neighbors.has(hq.id)) {
                         this.addNeighbor(hq.id);
                         hq.addNeighbor(this.id);
@@ -177,13 +196,21 @@ class Satellite {
     let detectedSpheres = [];
 
     hqSpheres.current.forEach(hq => {
-      const spherePosition = hq.sphere.position.clone();
+      const spherePosition = new THREE.Vector3();
+      hq.sphere.getWorldPosition(spherePosition);
       const coneBaseCenter = this.viewCone.position.clone();
       const coneTip = coneBaseCenter.clone().add(coneDirection.clone().multiplyScalar(coneHeight));
       const distanceToConeAxis = new THREE.Line3(coneBaseCenter, coneTip).closestPointToPoint(spherePosition, true, new THREE.Vector3()).distanceTo(spherePosition);
 
       if (distanceToConeAxis <= coneRadius) {
-        console.log("HQ Detected");
+        // Emit detection event for HQ
+        if (this.eventBus) {
+          this.eventBus.emit('DETECTION_HQ', {
+            ownerId: this.ownerId,
+            enemyId: hq.ownerID,
+            position: spherePosition.clone(),
+          });
+        }
         detectedSpheres.push(hq.sphere);
       }
     });
@@ -209,8 +236,10 @@ class Satellite {
     });
 
     groundStations.forEach(station => {
-      if (station.sphere.position) {
-        const distance = this.mesh.position.distanceTo(station.sphere.position);
+      if (station.sphere) {
+        const gsWorld = new THREE.Vector3();
+        station.sphere.getWorldPosition(gsWorld);
+        const distance = this.mesh.position.distanceTo(gsWorld);
         if (distance <= maxRange) {
           targets.push(station);
         }
@@ -232,9 +261,22 @@ class Satellite {
         return;
       }
     const myHqs = hqSpheres.current.filter(hq => hq.ownerID === this.ownerId);
-    const commSats = satellites.filter(sat => sat.type === 'communication' && sat.ownerId === this.ownerId);
-    this.inHqRange = myHqs.some(hq => this.isInRange(hq.sphere.position, true)) ||
-      commSats.some(commSat => this.isInRange(commSat.mesh.position, false) && commSat.canTransmitToHQ(satellites, myHqs));
+    // Check connectivity via neighbor graph instead of direct range-only test
+    const byId = id => satellites.find(s => s.id === id) || myHqs.find(h => h.id === id);
+    const hqIds = new Set(myHqs.map(h => h.id));
+    const visited = new Set();
+    const stack = [this.id];
+    let reachable = false;
+    while (stack.length) {
+      const id = stack.pop();
+      if (visited.has(id)) continue;
+      visited.add(id);
+      if (hqIds.has(id)) { reachable = true; break; }
+      const node = byId(id);
+      if (!node || !node.neighbors) continue;
+      node.neighbors.forEach(nid => { if (!visited.has(nid)) stack.push(nid); });
+    }
+    this.inHqRange = reachable;
   }
 
   canTransmitToHQ(satellites, myHqs) {
