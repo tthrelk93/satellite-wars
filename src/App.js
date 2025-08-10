@@ -46,6 +46,8 @@ const App = () => {
 
   const [players, setPlayers] = useState([]);
   const currentPlayerRef = useRef(null);
+  // Reference for minimap (fog-of-war overlay)
+  const miniRef = useRef(null);
 
   const sceneRef = useRef(null);
   const earthRef = useRef(null);
@@ -163,7 +165,24 @@ const App = () => {
         const cost = calculateLaunchCost(satelliteType, curPlayerMainHQ.latitude, orbit);
         setLaunchCost(cost);
       }
-    }, [satelliteType, altitude, speed, angle, inclination]);
+}, [satelliteType, altitude, speed, angle, inclination]);
+
+  // Minimap overlay: continuously draw fog-of-war canvas from Earth
+  useEffect(() => {
+    let frameId;
+    const drawMini = () => {
+      const mini = miniRef.current;
+      const earth = earthRef.current;
+      if (mini && earth && earth.canvas) {
+        const ctx = mini.getContext('2d');
+        ctx.clearRect(0, 0, mini.width, mini.height);
+        ctx.drawImage(earth.canvas, 0, 0, mini.width, mini.height);
+      }
+      frameId = requestAnimationFrame(drawMini);
+    };
+    drawMini();
+    return () => cancelAnimationFrame(frameId);
+  }, []);
     
 
   const slerp = (start, end, t) => {
@@ -278,7 +297,7 @@ const App = () => {
     animate();
   }, [satellites]);
 
-  const handleMouseMove = (event) => {
+  function handleMouseMove(event) {
     if (!showHQSphereRef.current || !hqSphereRef.current) return;
 
     const mouse = new THREE.Vector2(
@@ -300,7 +319,7 @@ const App = () => {
       const pos = cameraRef.current.position.clone().add(vector.multiplyScalar(distance));
       hqSphereRef.current.position.copy(pos);
     }
-  };
+  }
 
 
 
@@ -446,7 +465,7 @@ const App = () => {
       });
     };
     
-    const handleMouseClick = (event) => {
+    function handleMouseClick(event) {
       if (!showHQSphereRef.current) return;
 
       const mouse = new THREE.Vector2(
@@ -473,9 +492,9 @@ const App = () => {
         const neighbors = satellitesRef.current.filter(sat => sat.ownerId === currentPlayerRef.current.id);
         addNeighborsInRange(newHQ, neighbors);
       }
-    };
+    }
 
-  const handleSphereDetections = (detections) => {
+    function handleSphereDetections(detections) {
     // Reset all sphere colors to default
     hqSpheresRef.current.forEach(hq => {
       hq.sphere.material.color.set(0xff0000);
@@ -495,9 +514,9 @@ const App = () => {
       currentPlayerRef.current = currentPlayerRef.current.id === 'player1' ? players[1] : players[0];
       earthRef.current.setCurrentPlayer(currentPlayerRef.current.id);
       renderPlayerObjects();
-    };
+    }
 
-    const renderPlayerObjects = () => {
+    function renderPlayerObjects() {
       // Remove all objects from the scene
       satellitesRef.current.forEach(satellite => {
         sceneRef.current.remove(satellite.mesh);
@@ -520,7 +539,7 @@ const App = () => {
       earthRef.current.currentPlayerID = currentPlayer.id;
       // Update the fog map for the current player
       earthRef.current.updateFogMapForCurrentPlayer();
-    };
+    }
 
     const renderSatellitesPanel = () => {
         const currentPlayer = currentPlayerRef.current;
@@ -595,7 +614,6 @@ const App = () => {
                 <Button onClick={handleHQButtonClick}>HQ</Button>
               </Paper>
             )}
-
             {showSatPanel && (
               <Paper style={{ position: 'absolute', top: 100, left: 10, padding: 10, width: 200, zIndex: 1000, backgroundColor: 'white' }}>
                 <Typography variant="h6">Create Satellite</Typography>
@@ -661,6 +679,20 @@ const App = () => {
                               </Button>
               </Paper>
             )}
+            {/* Minimap overlay */}
+            <canvas
+              ref={miniRef}
+              width={200}
+              height={100}
+              style={{
+                position: 'absolute',
+                bottom: 10,
+                right: 10,
+                border: '1px solid white',
+                zIndex: 1000,
+                backgroundColor: 'black'
+              }}
+            />
 
             {renderSatellitesPanel()}
           </div>

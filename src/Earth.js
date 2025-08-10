@@ -176,12 +176,8 @@ class Earth {
           offscreenContext.globalCompositeOperation = 'source-over';
 
           this.revealedPositions[playerID.current].add(positionKey);
-         // console.log(`Updated fog map for player ${playerID.current}`);
-
-          // If the player is the current player, update the main canvas in real-time
-          if (playerID.current === this.currentPlayerID) {
-            this.updateFogMapForCurrentPlayer();
-          }
+          // Immediately update the main fog texture so the new reveal is visible
+          this.updateFogMapForCurrentPlayer();
         }
       }
 
