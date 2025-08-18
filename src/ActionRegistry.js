@@ -26,17 +26,26 @@ export class ActionRegistry {
    * Check whether an action can be performed by the given player.
    * @param {string} actionType
    * @param {string} playerId
+   * @param {object} [payload] - optional per-call data (e.g., moneyCost override)
    * @returns {boolean}
    */
-  canPerform(actionType, playerId) {
+  canPerform(actionType, playerId, payload = {}) {
     const action = this._actions()[actionType];
     if (!action) return false;
+
+    // Must be the active player and have enough AP
     if (this.turnManager.currentPlayerId !== playerId) return false;
     if (this.turnManager.ap < action.apCost) return false;
+
+    // Funds: allow per-call override (e.g., computed launch cost)
     const player = this.players[playerId];
-    if (player.funds < action.moneyCost) return false;
-    return action.preconditions(playerId);
+    const moneyCost = (payload.moneyCost !== undefined) ? payload.moneyCost : action.moneyCost;
+    if (player.funds < moneyCost) return false;
+
+    // Pass payload into preconditions in case they need context
+    return action.preconditions(playerId, payload);
   }
+
 
   /**
    * Perform an action if preconditions and costs are met.
@@ -46,19 +55,23 @@ export class ActionRegistry {
    * @returns {boolean} True if action was started, false otherwise
    */
   perform(actionType, playerId, payload = {}) {
-    if (!this.canPerform(actionType, playerId)) {
-      return false;
-    }
     const action = this._actions()[actionType];
+    if (!action) return false;
+
+    // Gate by turn/AP/funds using the same dynamic money cost
+    if (!this.canPerform(actionType, playerId, payload)) return false;
+
     // Deduct AP and funds
     this.turnManager.spendAP(action.apCost);
     const player = this.players[playerId];
-    player.funds -= action.moneyCost;
-    // Execute action
+    const moneyCost = (payload.moneyCost !== undefined) ? payload.moneyCost : action.moneyCost;
+    player.funds -= moneyCost;
+
+    // Execute the action
     action.perform(playerId, payload);
     this.eventBus.emit('ACTION_PERFORMED', { actionType, playerId, payload });
     return true;
-  }
+}
 
   /**
    * Define the available actions and their logic.

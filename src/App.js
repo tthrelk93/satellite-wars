@@ -5,6 +5,7 @@ import Satellite from './Satellite';
 import Earth from './Earth';
 import HQ from './HQ';
 import Player from './Player';
+import { COMM_RANGE_KM, HQ_RANGE_KM, SPACE_LOS_EPS, GROUND_LOS_EPS } from './constants';
 
 import { EventBus } from './EventBus';
 import { TurnManager, AP_MAX } from './TurnManager';
@@ -72,7 +73,22 @@ const App = () => {
   const [currentTurn, setCurrentTurn] = useState(0);
   const [actionPoints, setActionPoints] = useState(AP_MAX);
 
+    const [showStrikePad, setShowStrikePad] = useState(false);
 
+  // Enemy intel & warnings
+  const knownEnemyHQsRef = useRef({});          // { [playerId]: Set<enemyPlayerId> }
+  const compromisedHQIdsRef = useRef(new Set()); // Set<hqId> flagged as detected
+  const pendingWarningsRef = useRef({});        // { [playerId]: true } => toast next turn
+  const [selectedTargetHQ, setSelectedTargetHQ] = useState(null);
+
+// --- Toasts (player-facing warnings/info) ---
+    const [toasts, setToasts] = useState([]);
+    const notify = (severity, message, ttl = 4500) => {
+      const id = Date.now() + Math.random();
+      setToasts(t => [...t, { id, severity, message, ttl }]);
+      // auto-remove after ttl
+      setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), ttl + 200);
+    };
   // Initialize the scene, camera, renderer, controls, and lights
   useEffect(() => {
     // Core systems setup
@@ -89,6 +105,10 @@ const App = () => {
     eventBus.on('TURN_STARTED', ({ playerId, turnNumber }) => {
       setActivePlayerId(playerId);
       setCurrentTurn(turnNumber);
+      if (pendingWarningsRef.current[playerId]) {
+       notify('warning', `Your HQ has been detected!`);
+       pendingWarningsRef.current[playerId] = false;
+     }
     });
     eventBus.on('AP_CHANGED', ({ playerId, ap }) => {
       setActionPoints(ap);
@@ -108,12 +128,28 @@ const App = () => {
       player.funds += income - upkeep;
     });
 
+   // Enemy HQ detection -> reveal to attacker; warn defender
+   eventBus.on('DETECTION_HQ', ({ ownerId, enemyId, hqId, position }) => {
+     // mark intel for attacker
+     if (!knownEnemyHQsRef.current[ownerId]) knownEnemyHQsRef.current[ownerId] = new Set();
+     knownEnemyHQsRef.current[ownerId].add(enemyId);
+     if (hqId) compromisedHQIdsRef.current.add(hqId);
+     pendingWarningsRef.current[enemyId] = true;
+
+     // attacker toast
+     const latDeg = THREE.MathUtils.radToDeg(Math.asin(position.clone().normalize().y)).toFixed(1);
+     notify('success', `Enemy HQ detected (≈lat ${latDeg}°). You can ground-strike when you have enough AP & comms.`);
+
+     // If attacker is the active view, immediately reveal
+     if (currentPlayerRef.current?.id === ownerId) renderPlayerObjects();
+   });
+
     // Handle ground strike resolution and victory
     eventBus.on('ACTION_STRIKE_RESOLVED', ({ attackerId, targetId, remainingHp }) => {
-      console.log(`Ground strike resolved on ${targetId} by ${attackerId}, remaining HP: ${remainingHp}`);
+      notify('info', `Ground strike resolved on ${targetId} by ${attackerId} — remaining HP: ${remainingHp}`);
     });
     eventBus.on('VICTORY', ({ winner }) => {
-      console.log(`Game over: winner is ${winner}`);
+      notify('success', `Game over — winner: ${winner}`);
       // TODO: disable inputs and show victory UI
     });
 
@@ -131,11 +167,11 @@ const App = () => {
     // Handle WebGL context lost and restore
     renderer.domElement.addEventListener('webglcontextlost', (event) => {
       event.preventDefault();
-      console.error('WebGL context lost');
+      notify('error', 'WebGL context lost. If graphics freeze, try reloading or reducing load.');
     }, false);
 
     renderer.domElement.addEventListener('webglcontextrestored', () => {
-      console.log('WebGL context restored');
+      notify('info', 'WebGL context restored.');
       // Reinitialize the scene or handle the context restoration as needed
     }, false);
 
@@ -146,6 +182,8 @@ const App = () => {
     // Map of playerId to Player
     playersMap[player1.id] = player1;
     playersMap[player2.id] = player2;
+    knownEnemyHQsRef.current[player1.id] = new Set();
+    knownEnemyHQsRef.current[player2.id] = new Set();
     // Start the turn cycle
     // Start the turn cycle (initial TURN_STARTED will fire once earth is ready)
     // turnManager.startGame will be called after Earth is created below
@@ -273,19 +311,28 @@ const App = () => {
     return result;
   };
 
-  const handleCommSatDetections = () => {
-    const commSats = satellitesRef.current.filter(sat => sat.type === 'communication' && sat.ownerId === currentPlayerRef.current.id);
-    const groundStations = hqSpheresRef.current.filter(hq => hq.ownerID === currentPlayerRef.current.id);
-    // Use the neighbor graph (range + LoS in updateNeighbors) as the SR-CRT for links
-    const byId = id =>
-      satellitesRef.current.find(s => s.id === id) ||
-      hqSpheresRef.current.find(h => h.id === id);
+    const handleCommSatDetections = () => {
+      if (!currentPlayerRef.current) return;
 
-    commSats.forEach(sat => {
-      const targets = Array.from(sat.neighbors).map(byId).filter(Boolean);
-      drawCommLines(sat, targets);
-    });
-  };
+      const mySats = satellitesRef.current.filter(
+        s => s.ownerId === currentPlayerRef.current.id
+      );
+
+      const byId = id =>
+        satellitesRef.current.find(s => s.id === id) ||
+        hqSpheresRef.current.find(h => h.id === id);
+
+      mySats.forEach(sat => {
+        let targets = Array.from(sat.neighbors).map(byId).filter(Boolean);
+
+        // keep the view clean: only show imaging→HQ edges
+        if (sat.type !== 'communication') {
+          targets = targets.filter(t => t.type === 'HQ');
+        }
+
+        drawCommLines(sat, targets);
+      });
+    };
 
   const drawCommLines = (sat, targets) => {
       // Clear existing lines
@@ -356,7 +403,7 @@ const App = () => {
         
 
       // Handle sphere detections
-      handleSphereDetections(detectedSpheres);
+//      handleSphereDetections(detectedSpheres);
       handleCommSatDetections();
 
       if (sceneRef.current && cameraRef.current) {
@@ -422,63 +469,188 @@ const App = () => {
     }
   };
 
+const handleAddSatellite = () => {
+  if (!earthRef.current || !actionRegistryRef.current || !currentPlayerRef.current) return;
 
-    const handleAddSatellite = () => {
-      if (earthRef.current) {
-        const kmToMeters = 1000;
-        const hoursToSeconds = 3600;
-        const degreesToRadians = Math.PI / 180;
-        const earthRadiusKm = 6371; // Earth's radius in kilometers
+  const kmToMeters = 1000;
+  const hoursToSeconds = 3600;
+  const earthRadiusKm = 6371;
 
-        // Convert the speed from km/h to radians per second
-        const orbitalSpeedKmPerH = parseFloat(speed);
-        const orbitalSpeedMPerS = (orbitalSpeedKmPerH * kmToMeters) / hoursToSeconds;
-        const orbitRadiusMeters = (parseFloat(altitude) + earthRadiusKm) * kmToMeters; // Altitude + Earth's radius in meters
-        const orbitalCircumference = 2 * Math.PI * orbitRadiusMeters;
-        const speedInRadiansPerSecond = orbitalSpeedMPerS / orbitalCircumference;
+  // 1) Orbit numbers from UI (unchanged math)
+  const orbitalSpeedKmPerH   = parseFloat(speed);
+  const orbitalSpeedMPerS    = (orbitalSpeedKmPerH * kmToMeters) / hoursToSeconds;
+  const orbitRadiusMeters    = (parseFloat(altitude) + earthRadiusKm) * kmToMeters;
+  const orbitalCircumference = 2 * Math.PI * orbitRadiusMeters;
+  const speedInRadPerSec     = orbitalSpeedMPerS / orbitalCircumference;
 
-        const orbit = {
-          radius: orbitRadiusMeters / kmToMeters, // Convert back to kilometers
-          speed: speedInRadiansPerSecond, // Speed in radians per second
-          angle: THREE.MathUtils.degToRad(parseFloat(angle)), // Convert degrees to radians
-          inclination: THREE.MathUtils.degToRad(parseFloat(inclination)), // Convert degrees to radians
-        };
-          if(currentPlayerRef.current.getHQs().length > 0){
-              
-              let curPlayerMainHQ = currentPlayerRef.current.getHQs()[0];
-              const costToLaunchFromHQ = calculateLaunchCost(satelliteType, curPlayerMainHQ.latitude, orbit);
-              if(currentPlayerRef.current.funds >= costToLaunchFromHQ){
-                  
-                  const newSatellite = new Satellite(
-                    'sat' + Math.floor(Math.random() * 1000),
-                    currentPlayerRef.current.id, // player ID
-                    satelliteType,
-                    orbit,
-                    earthRef.current,
-                    fieldOfView,
-                    eventBusRef.current
-                  );
-                  newSatellite.render(sceneRef.current);
-                  
-                  currentPlayerRef.current.addSatellite(newSatellite);
-                  setSatellites((prevSatellites) => {
-                      const updatedSatellites = [...prevSatellites, newSatellite];
-                      satellitesRef.current = updatedSatellites;
-                      return updatedSatellites;
-                      
-                      
-                  });
-                  currentPlayerRef.current.funds -= costToLaunchFromHQ; //subtract cost to launch from funds
-              } else {
-                  //Show error message that not enough funds
-              }
-          } else {
-              //show error message that no HQs have been placed
-          }
+  const orbit = {
+    radius: orbitRadiusMeters / kmToMeters,                         // km
+    speed:  speedInRadPerSec,                                       // rad/s
+    angle:  0,                                                      // true anomaly ν (solved below)
+    inclination: THREE.MathUtils.degToRad(parseFloat(inclination)), // rad
+    raan:   0                                                       // Ω (solved below)
+  };
+    const player = currentPlayerRef.current;
 
+     // Need an HQ to launch from
+    if (player.getHQs().length === 0) {
+      notify('warning', 'No HQ placed yet — cannot launch.');
+      return;
+    }
+  const mainHQ = player.getHQs()[0];
 
+  // 3) Solve RAAN (Ω) and true anomaly (ν) so the sat starts directly above HQ
+  const hqWorld = new THREE.Vector3();
+  mainHQ.sphere.getWorldPosition(hqWorld);
+
+  // Target unit vector from Earth center to the HQ in world space
+  const t = hqWorld.clone().normalize();
+
+  const i   = orbit.inclination;
+  const lat = Math.asin(t.y);              // geocentric latitude φ
+  const lon = Math.atan2(t.z, t.x);        // longitude λ
+
+    // Feasibility: |latitude| <= inclination
+    if (Math.abs(lat) > i + 1e-6) {
+      const latDeg = THREE.MathUtils.radToDeg(lat).toFixed(2);
+      const incDeg = THREE.MathUtils.radToDeg(i).toFixed(2);
+      notify('warning',
+        `Inclination ${incDeg}° < |site latitude| ${latDeg}°. This orbit plane cannot pass over the HQ (realistic).`
+      );
+      // return; // uncomment to hard-block infeasible launches
+    }
+
+  // We want the plane normal n ⟂ t. With your update order p = Ry(Ω)·Rx(i)·[cosν,0,sinν],
+  // the plane normal is n = Ry(Ω)·Rx(i)·ŷ. Enforcing n·t = 0 yields:
+  //   A·sinΩ + B·cosΩ = C, with A = t.x, B = t.z, C = -cot(i)*t.y
+  const sinI = Math.sin(i);
+  const cosI = Math.cos(i);
+  const EPS  = 1e-8;
+
+  let solved = false;
+  let best = { err: Number.POSITIVE_INFINITY, raan: 0, nu: 0 };
+
+  if (Math.abs(sinI) < 1e-6) {
+    // Equatorial case (i ≈ 0): only sites near the equator are possible.
+    if (Math.abs(lat) <= 1e-3) {
+      // Use Ω = λ; then compute ν from projection
+      const Rx = new THREE.Matrix4().makeRotationX(i);
+      const Ry = new THREE.Matrix4().makeRotationY(lon);
+      const a  = new THREE.Vector3(1,0,0).applyMatrix4(Rx).applyMatrix4(Ry);
+      const b  = new THREE.Vector3(0,0,1).applyMatrix4(Rx).applyMatrix4(Ry);
+      const nu = Math.atan2(t.dot(b), t.dot(a));
+      const p  = a.clone().multiplyScalar(Math.cos(nu)).add(b.clone().multiplyScalar(Math.sin(nu)));
+      const err = p.angleTo(t);
+      best = { err, raan: lon, nu };
+      solved = true;
+      } else {
+      notify('warning', 'Equatorial orbit cannot overfly a non-equatorial HQ (realistic).');
+      // fall through; we’ll still try the general path which will likely be infeasible
+    }
+  }
+
+  if (!solved) {
+    const A = t.x;
+    const B = t.z;
+    const M = Math.hypot(A, B);
+
+    if (M < EPS) {
+      // HQ at (near) the pole. If i≈90° (polar), any Ω works; pick Ω = −λ.
+      if (Math.abs(cosI) < 1e-6) {
+        const Omega = -lon;
+        const Rx = new THREE.Matrix4().makeRotationX(i);
+        const Ry = new THREE.Matrix4().makeRotationY(Omega);
+        const a  = new THREE.Vector3(1,0,0).applyMatrix4(Rx).applyMatrix4(Ry);
+        const b  = new THREE.Vector3(0,0,1).applyMatrix4(Rx).applyMatrix4(Ry);
+        const nu = Math.atan2(t.dot(b), t.dot(a));
+        const p  = a.clone().multiplyScalar(Math.cos(nu)).add(b.clone().multiplyScalar(Math.sin(nu)));
+        const err = p.angleTo(t);
+        best = { err, raan: Omega, nu };
+        solved = true;
+        } else {
+          notify('warning', 'Non-polar inclination cannot pass exactly over the pole.');
+        }
+    } else {
+      // General solution
+      const C = - (cosI / Math.max(sinI, EPS)) * t.y;  // -cot(i)*t.y
+      const ratio = C / M;
+
+  // No RAAN solution for chosen i / latitude
+    if (ratio < -1 - 1e-9 || ratio > 1 + 1e-9) {
+      notify('warning', 'Latitude outside the reach of this inclination (no RAAN solution).');
+    } else {
+        const clamp = Math.max(-1, Math.min(1, ratio));
+        const psi   = Math.atan2(A, B);               // phase for A*sinΩ + B*cosΩ
+        const delta = Math.acos(clamp);               // two symmetric RAAN solutions
+
+        const candidates = [psi + delta, psi - delta];
+
+        // For each RAAN candidate, compute ν = atan2(t·b , t·a) and pick the better match.
+        const Rx = new THREE.Matrix4().makeRotationX(i);
+        for (const Omega of candidates) {
+          const Ry = new THREE.Matrix4().makeRotationY(Omega);
+          const a  = new THREE.Vector3(1,0,0).applyMatrix4(Rx).applyMatrix4(Ry);
+          const b  = new THREE.Vector3(0,0,1).applyMatrix4(Rx).applyMatrix4(Ry);
+
+          const nu = Math.atan2(t.dot(b), t.dot(a));
+          const p  = a.clone().multiplyScalar(Math.cos(nu)).add(b.clone().multiplyScalar(Math.sin(nu)));
+          const err = p.angleTo(t);
+
+          if (err < best.err) best = { err, raan: Omega, nu };
+        }
+        solved = true;
       }
-    };
+    }
+  }
+
+    if (!solved) {
+      // Nothing viable found — bail out gracefully.
+      notify('warning', 'Launch aborted: no valid orbital alignment found for this HQ and inclination.');
+      return;
+    }
+
+  orbit.raan  = best.raan;
+  orbit.angle = best.nu;
+
+  // 4) Launch cost (unchanged)
+  const costToLaunchFromHQ = calculateLaunchCost(satelliteType, mainHQ.latitude, orbit);
+
+  // 5) Launch (unchanged)
+  const launchFn = () => {
+    const newSatellite = new Satellite(
+      'sat' + Math.floor(Math.random() * 1000),
+      player.id,
+      satelliteType,
+      orbit,
+      earthRef.current,
+      fieldOfView,
+      eventBusRef.current
+    );
+
+    newSatellite.render(sceneRef.current);
+    player.addSatellite(newSatellite);
+
+    setSatellites(prev => {
+      const updated = [...prev, newSatellite];
+      satellitesRef.current = updated;
+      return updated;
+    });
+  };
+
+  // 6) Gate via ActionRegistry (turn, AP, funds)
+  const ok = actionRegistryRef.current.perform('LAUNCH_SAT', player.id, {
+    moneyCost: Math.round(costToLaunchFromHQ),
+    launchFn,
+    launchArgs: []
+  });
+
+    if (!ok) {
+      notify('warning', 'Launch blocked: not your turn, insufficient AP, or insufficient funds.');
+    }
+};
+
+
+
     
     function calculateLaunchCost(satelliteType, latitude, orbit) {
       const baseCosts = {
@@ -534,8 +706,13 @@ const App = () => {
           if(satelliteOrHQ.type === "HQ"){
               isHQ = true;
           }
-          console.log("neighborPos: ", neighborPosition, satelliteOrHQ.isInRange(neighborPosition));
-        if (satelliteOrHQ.isInRange(neighborPosition, isHQ)) {
+         const inRange = satelliteOrHQ.isInRange(neighborPosition, isHQ);
+        if (inRange) {
+          const lhs = satelliteOrHQ.type === 'HQ' ? `HQ ${satelliteOrHQ.id}` : `Sat ${satelliteOrHQ.id}`;
+          const rhs = neighbor instanceof Satellite ? `Sat ${neighbor.id}` : `HQ ${neighbor.id}`;
+          notify('info', `Link in range: ${lhs} ↔ ${rhs}`);
+        }
+        if (inRange) {
           satelliteOrHQ.addNeighbor(neighbor.id);
           neighbor.addNeighbor(satelliteOrHQ.id);
         }
@@ -543,81 +720,114 @@ const App = () => {
     };
     
     function handleMouseClick(event) {
-      if (!showHQSphereRef.current) return;
+          if (!showHQSphereRef.current) return;
 
-      const mouse = new THREE.Vector2(
-        (event.clientX / window.innerWidth) * 2 - 1,
-        -(event.clientY / window.innerHeight) * 2 + 1
-      );
+          const mouse = new THREE.Vector2(
+            (event.clientX / window.innerWidth) * 2 - 1,
+            -(event.clientY / window.innerHeight) * 2 + 1
+          );
 
-      const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(mouse, cameraRef.current);
+          const raycaster = new THREE.Raycaster();
+          raycaster.setFromCamera(mouse, cameraRef.current);
 
-      const intersects = raycaster.intersectObject(earthRef.current.mesh);
-      if (intersects.length > 0) {
-        const intersectPoint = intersects[0].point;
-        console.log("intersect point: ", intersectPoint);
-        const newHQ = earthRef.current.addHQSphere(intersectPoint, hqSpheresRef, currentPlayerRef); // Directly add the sphere
-        console.log("hqSpheresRef after addHQSphere:", hqSpheresRef.current);
-        showHQSphereRef.current = false;
-        if (hqSphereRef.current) {
-          sceneRef.current.remove(hqSphereRef.current);
-          hqSphereRef.current = null;
-        }
+          const earth = earthRef.current;
+          if (!earth?.mesh) {
+            notify('error', 'Earth not ready yet.');
+            return;
+          }
 
-        // Add neighbors to the new HQ
-        const neighbors = satellitesRef.current.filter(sat => sat.ownerId === currentPlayerRef.current.id);
-        addNeighborsInRange(newHQ, neighbors);
-      }
+          const intersects = raycaster.intersectObject(earth.mesh);
+          if (intersects.length === 0) {
+            notify('warning', 'Click the Earth surface to place an HQ.');
+            return;
+          }
+
+          // Place the HQ at the clicked point on Earth
+          const intersectPoint = intersects[0].point;
+          const newHQ = earth.addHQSphere(intersectPoint, hqSpheresRef, currentPlayerRef);
+
+          // Player-facing confirmation
+          notify(
+            'success',
+            `HQ placed at lat ${newHQ.latitude.toFixed(1)}°, lon ${newHQ.longitude.toFixed(1)}°`
+          );
+
+          // Turn off placement preview + remove the draggable ghost sphere
+          showHQSphereRef.current = false;
+          if (hqSphereRef.current) {
+            sceneRef.current.remove(hqSphereRef.current);
+            hqSphereRef.current = null;
+          }
+
+          // Link this HQ to any of the current player's satellites that are in range (and have LoS)
+          const neighbors = satellitesRef.current.filter(
+            sat => sat.ownerId === currentPlayerRef.current.id
+          );
+          addNeighborsInRange(newHQ, neighbors);
     }
 
-    function handleSphereDetections(detections) {
-    // Reset all sphere colors to default
-    hqSpheresRef.current.forEach(hq => {
-      hq.sphere.material.color.set(0xff0000);
-      hq.sphere.material.needsUpdate = true;
-    });
 
-    // Update detected spheres to the detection color
-    detections.forEach(sphere => {
-      sphere.material.color.set(0x00ff00);
-      sphere.material.needsUpdate = true;
-    });
-  };
-
-  
-
+//    function handleSphereDetections(detections) {
+//    // Reset all sphere colors to default
+//    hqSpheresRef.current.forEach(hq => {
+//      hq.sphere.material.color.set(0xff0000);
+//      hq.sphere.material.needsUpdate = true;
+//    });
+//
+//    // Update detected spheres to the detection color
+//    detections.forEach(sphere => {
+//      sphere.material.color.set(0x00ff00);
+//      sphere.material.needsUpdate = true;
+//    });
+//  };
 
     function renderPlayerObjects() {
-      // Remove all objects from the scene
+      const earth = earthRef.current;
+      const scene = sceneRef.current;
+      const currentPlayer = currentPlayerRef.current;
+      if (!earth || !scene || !currentPlayer) return;
+
+      // Remove all satellites/cones/lines from the scene
       satellitesRef.current.forEach(satellite => {
-        sceneRef.current.remove(satellite.mesh);
-        if (satellite.viewCone) sceneRef.current.remove(satellite.viewCone);
-        satellite.commLines.forEach(line => sceneRef.current.remove(line));
-      });
-      // Keep ALL HQs parented to the rotating Earth; just toggle visibility per owner.
-      hqSpheresRef.current.forEach(hq => {
-        if (hq.sphere.parent !== earthRef.current.parentObject) {
-          earthRef.current.parentObject.add(hq.sphere);
-        }
-        hq.sphere.visible = (hq.ownerID === currentPlayer.id);
+        scene.remove(satellite.mesh);
+        if (satellite.viewCone) scene.remove(satellite.viewCone);
+        satellite.commLines.forEach(line => scene.remove(line));
       });
 
-      // Add only the current player's objects
-      const currentPlayer = currentPlayerRef.current;
-      currentPlayer.getSatellites().forEach(satellite => {
-        sceneRef.current.add(satellite.mesh);
-        // Only imaging sats render view cones
-        if (satellite.type === 'imaging' && satellite.viewCone) {
-          sceneRef.current.add(satellite.viewCone);
+      // Keep ALL HQs parented; visible if it's mine OR I have intel on that enemy
+      hqSpheresRef.current.forEach(hq => {
+        if (hq.sphere.parent !== earth.parentObject) earth.parentObject.add(hq.sphere);
+        const isMine = (hq.ownerID === currentPlayer.id);
+        const IKnowEnemy = knownEnemyHQsRef.current[currentPlayer.id]?.has(hq.ownerID);
+        hq.sphere.visible = isMine || !!IKnowEnemy;
+
+        // colors:
+        // - my HQ: red (or yellow if compromised)
+        // - known enemy HQ: cyan
+        if (isMine) {
+          const compromised = compromisedHQIdsRef.current.has(hq.id);
+          hq.sphere.material.color.set(compromised ? 0xffff00 : 0xff0000);
+        } else if (IKnowEnemy) {
+          hq.sphere.material.color.set(0x00ffff);
         }
-        satellite.commLines.forEach(line => sceneRef.current.add(line));
-        satellite.checkInHqRange(hqSpheresRef.current, currentPlayerRef, satellitesRef.current); // Update inHqRange status
+        hq.sphere.material.needsUpdate = true;
       });
-      earthRef.current.currentPlayerID = currentPlayer.id;
-      // Update the fog map for the current player
-      earthRef.current.updateFogMapForCurrentPlayer();
+
+      // Add only the current player's satellites back (cones for imaging only)
+      currentPlayer.getSatellites().forEach(satellite => {
+        scene.add(satellite.mesh);
+        if (satellite.type === 'imaging' && satellite.viewCone) {
+          scene.add(satellite.viewCone);
+        }
+        satellite.commLines.forEach(line => scene.add(line));
+        // keep inHqRange updated for economy/fog
+        satellite.checkInHqRange(hqSpheresRef, currentPlayerRef, satellitesRef.current);
+      });
+
+      earth.currentPlayerID = currentPlayer.id;
+      earth.updateFogMapForCurrentPlayer();
     }
+
 
     const renderSatellitesPanel = () => {
         const currentPlayer = currentPlayerRef.current;
@@ -669,125 +879,228 @@ const App = () => {
 
 
   return (
-          <div>
-            {/* End Turn button controlled by TurnManager */}
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => turnManagerRef.current && turnManagerRef.current.endTurn()}
-              style={{ position: 'absolute', top: 20, left: 10, zIndex: 1000 }}
-            >
-              End Turn
-            </Button>
-            <div ref={mountRef} style={{ width: '100vw', height: '100vh' }} />
-            
-            <Typography
-              variant="h6"
-              style={{ position: 'absolute', top: 20, right: 430, zIndex: 1000, color: 'white' }}>
-              Funds: {currentPlayerRef.current ? currentPlayerRef.current.funds : 0}
-            </Typography>
-            <Typography
-              variant="h6"
-              style={{ position: 'absolute', top: 20, right: 250, zIndex: 1000, color: 'white' }}>
-              Turn: {currentTurn} | AP: {actionPoints}
-            </Typography>
+  <div>
+    {/* End Turn button controlled by TurnManager */}
+    <Button
+      variant="contained"
+      color="primary"
+      onClick={() => turnManagerRef.current && turnManagerRef.current.endTurn()}
+      style={{ position: 'absolute', top: 20, left: 10, zIndex: 1000 }}
+    >
+      End Turn
+    </Button>
 
-            <IconButton
-              onClick={() => setShowMenu(!showMenu)}
-              style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000, backgroundColor: 'white' }}
-            >
-              {showMenu ? <RemoveIcon /> : <AddIcon />}
-            </IconButton>
+    <div ref={mountRef} style={{ width: '100vw', height: '100vh' }} />
 
-            {showMenu && (
-              <Paper style={{ position: 'absolute', top: 50, left: 10, padding: 10, zIndex: 1000, backgroundColor: 'white' }}>
-                <Button onClick={() => setShowSatPanel(!showSatPanel)}>Sat</Button>
-                <Button onClick={handleHQButtonClick}>HQ</Button>
-              </Paper>
-            )}
-            {showSatPanel && (
-              <Paper style={{ position: 'absolute', top: 100, left: 10, padding: 10, width: 200, zIndex: 1000, backgroundColor: 'white' }}>
-                <Typography variant="h6">Create Satellite</Typography>
-                <FormControl fullWidth style={{ marginBottom: 10 }}>
-                  <InputLabel>Type</InputLabel>
-                  <Select
-                    value={satelliteType}
-                    onChange={(e) => setSatelliteType(e.target.value)}
-                  >
-                    <MenuItem value="communication">Communication</MenuItem>
-                    <MenuItem value="imaging">Imaging</MenuItem>
-                  </Select>
-                </FormControl>
-                <TextField
-                  label="Altitude"
-                  type="number"
-                  fullWidth
-                  value={altitude}
-                  onChange={(e) => setAltitude(e.target.value)}
-                  style={{ marginBottom: 10 }}
-                />
-                <TextField
-                  label="Speed"
-                  type="number"
-                  fullWidth
-                  value={speed}
-                  onChange={(e) => setSpeed(e.target.value)}
-                  style={{ marginBottom: 10 }}
-                />
-                <Box style={{ marginBottom: 10 }}>
-                  <Typography>Field of View</Typography>
-                  <Slider
-                    value={fieldOfView}
-                    onChange={(e, val) => setFieldOfView(val)}
-                    step={0.01}
-                    min={1.69}
-                    max={7.95}
-                    valueLabelDisplay="auto"
-                  />
-                </Box>
-                <TextField
-                  label="Initial Angle"
-                  type="number"
-                  fullWidth
-                  value={angle}
-                  onChange={(e) => setAngle(e.target.value)}
-                  style={{ marginBottom: 10 }}
-                />
-                <TextField
-                  label="Inclination"
-                  type="number"
-                  fullWidth
-                  value={inclination}
-                  onChange={(e) => setInclination(e.target.value)}
-                  style={{ marginBottom: 10 }}
-                />
-                              <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={handleAddSatellite}
-                              >
-                                Launch (${launchCost}M)
-                              </Button>
-              </Paper>
-            )}
-            {/* Minimap overlay */}
-            <canvas
-              ref={miniRef}
-              width={200}
-              height={100}
-              style={{
-                position: 'absolute',
-                bottom: 10,
-                right: 10,
-                border: '1px solid white',
-                zIndex: 1000,
-                backgroundColor: 'black'
-              }}
-            />
+    <Typography
+      variant="h6"
+      style={{ position: 'absolute', top: 20, right: 430, zIndex: 1000, color: 'white' }}>
+      Funds: {currentPlayerRef.current ? currentPlayerRef.current.funds : 0}
+    </Typography>
+    <Typography
+      variant="h6"
+      style={{ position: 'absolute', top: 20, right: 250, zIndex: 1000, color: 'white' }}>
+      Turn: {currentTurn} | AP: {actionPoints}
+    </Typography>
 
-            {renderSatellitesPanel()}
-          </div>
-  );
+    <IconButton
+      onClick={() => setShowMenu(!showMenu)}
+      style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000, backgroundColor: 'white' }}
+    >
+      {showMenu ? <RemoveIcon /> : <AddIcon />}
+    </IconButton>
+
+    {showMenu && (
+      <Paper style={{ position: 'absolute', top: 50, left: 10, padding: 10, zIndex: 1000, backgroundColor: 'white' }}>
+        <Button onClick={handleHQButtonClick}>HQ</Button>
+        <Button onClick={() => setShowSatPanel(!showSatPanel)}>Sat</Button>
+        <Button onClick={() => setShowStrikePad(v => !v)}>Strike</Button>
+      </Paper>
+    )}
+
+    {showSatPanel && (
+      <Paper style={{ position: 'absolute', top: 100, left: 10, padding: 10, width: 200, zIndex: 1000, backgroundColor: 'white' }}>
+        <Typography variant="h6">Create Satellite</Typography>
+        <FormControl fullWidth style={{ marginBottom: 10 }}>
+          <InputLabel>Type</InputLabel>
+          <Select
+            value={satelliteType}
+            onChange={(e) => setSatelliteType(e.target.value)}
+          >
+            <MenuItem value="communication">Communication</MenuItem>
+            <MenuItem value="imaging">Imaging</MenuItem>
+          </Select>
+        </FormControl>
+        <TextField
+          label="Altitude"
+          type="number"
+          fullWidth
+          value={altitude}
+          onChange={(e) => setAltitude(e.target.value)}
+          style={{ marginBottom: 10 }}
+        />
+        <TextField
+          label="Speed"
+          type="number"
+          fullWidth
+          value={speed}
+          onChange={(e) => setSpeed(e.target.value)}
+          style={{ marginBottom: 10 }}
+        />
+        <Box style={{ marginBottom: 10 }}>
+          <Typography>Field of View</Typography>
+          <Slider
+            value={fieldOfView}
+            onChange={(e, val) => setFieldOfView(val)}
+            step={0.01}
+            min={1.69}
+            max={7.95}
+            valueLabelDisplay="auto"
+          />
+        </Box>
+        <TextField
+          label="Initial Angle"
+          type="number"
+          fullWidth
+          value={angle}
+          onChange={(e) => setAngle(e.target.value)}
+          style={{ marginBottom: 10 }}
+        />
+        <TextField
+          label="Inclination"
+          type="number"
+          fullWidth
+          value={inclination}
+          onChange={(e) => setInclination(e.target.value)}
+          style={{ marginBottom: 10 }}
+        />
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleAddSatellite}
+        >
+          Launch (${launchCost}M)
+        </Button>
+      </Paper>
+    )}
+
+    {/* Strike Pad */}
+    {showStrikePad && (
+      <Paper style={{ position: 'absolute', top: 100, left: 230, padding: 12, width: 280, zIndex: 1000, backgroundColor: 'white' }}>
+        <Typography variant="h6" gutterBottom>Strike Pad</Typography>
+
+        {(() => {
+          const me = currentPlayerRef.current;
+          if (!me) return <Typography variant="body2">No active player.</Typography>;
+
+          const log = detectionLogRef.current?.forPlayer?.(me.id) || [];
+          const knownIds = new Set(log.filter(e => e.type === 'HQ_DETECTED').map(e => e.targetId));
+          const knownHQs = hqSpheresRef.current.filter(h => knownIds.has(h.id) && h.ownerID !== me.id);
+
+          if (knownHQs.length === 0) {
+            return <Typography variant="body2">No known enemy HQs yet.</Typography>;
+          }
+
+          // simple comms gate: any of my satellites currently reachable from HQ
+          const hasComms = satellitesRef.current.some(s => s.ownerId === me.id && s.inHqRange === true);
+
+          return (
+            <div>
+              {!hasComms && (
+                <Typography variant="caption" color="error" style={{ display: 'block', marginBottom: 8 }}>
+                  No comms link to your HQ — strikes are disabled.
+                </Typography>
+              )}
+
+              {knownHQs.map(hq => {
+                const canAPFunds = !!actionRegistryRef.current?.canPerform?.('GROUND_STRIKE', me.id);
+                const canStrike = hasComms && canAPFunds;
+
+                return (
+                  <Box key={hq.id} style={{ border: '1px solid #ddd', borderRadius: 6, padding: 8, marginBottom: 8 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Enemy HQ ({hq.ownerID}) — {hq.id}
+                    </Typography>
+                    <Typography variant="caption" display="block" gutterBottom>
+                      HP: {hq.hp}
+                    </Typography>
+                    <Box display="flex" gap={8}>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        color="error"
+                        disabled={!canStrike}
+                        onClick={() => {
+                          const ok = actionRegistryRef.current.perform('GROUND_STRIKE', me.id, { targetHQ: hq });
+                          if (ok) {
+                            notify('success', 'Strike launched. Impact in ~90s.');
+                          } else {
+                            notify('error', 'Cannot launch strike (AP/funds/turn).');
+                          }
+                        }}
+                      >
+                        Launch Strike
+                      </Button>
+                      {!canAPFunds && (
+                        <Typography variant="caption" color="textSecondary" style={{ alignSelf: 'center' }}>
+                          Need more AP/funds
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </Paper>
+    )}
+
+    {/* Minimap overlay */}
+    <canvas
+      ref={miniRef}
+      width={200}
+      height={100}
+      style={{
+        position: 'absolute',
+        bottom: 10,
+        right: 10,
+        border: '1px solid white',
+        zIndex: 1000,
+        backgroundColor: 'black'
+      }}
+    />
+
+    {/* Toasts (player-facing notifications) */}
+    {toasts.map((t, i) => (
+      <div
+        key={t.id}
+        style={{
+          position: 'fixed',
+          top: 16 + i * 64,
+          right: 16,
+          zIndex: 2000
+        }}
+      >
+        <Paper
+          elevation={6}
+          style={{
+            padding: '8px 12px',
+            background: '#1f1f1f',
+            color: 'white',
+            maxWidth: 360
+          }}
+        >
+          <strong style={{ textTransform: 'capitalize' }}>{t.severity}</strong>: {t.message}
+        </Paper>
+      </div>
+    ))}
+
+    {renderSatellitesPanel()}
+  </div>
+);
+
+
 };
 
 export default App;
