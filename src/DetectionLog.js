@@ -6,17 +6,22 @@ export class DetectionLog {
     eventBus.on('AREA_REVEALED', this._handleArea.bind(this));
   }
 
-  _handleHQ({ ownerId, enemyId, position }) {
+  _handleHQ({ ownerId, enemyId, hqId, position }) {
     this.record(ownerId, {
       type: 'HQ_DETECTED',
       ownerId,
-      targetId: enemyId,
+      targetId: hqId,      // store the specific HQ that was seen
+      enemyId,
       position,
       timestamp: Date.now(),
       read: false,
     });
   }
 
+  /** Return all events recorded for a player (most-recent first). */
+  forPlayer(playerId) {
+    return (this.logs[playerId] || []).slice().sort((a,b) => b.timestamp - a.timestamp);
+  }
   _handleArea({ ownerId, position }) {
     this.record(ownerId, {
       type: 'AREA_REVEALED',

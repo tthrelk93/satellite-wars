@@ -123,7 +123,7 @@ const App = () => {
       const imagingCount = inLink.filter(sat => sat.type === 'imaging').length;
       const commCount = inLink.filter(sat => sat.type === 'communication').length;
       const totalCount = sats.length;
-      const income = imagingCount * INCOME_PER_IMAGING_IN_LINK + commCount * INCOME_PER_COMM_IN_LINK;
+      const income = BASE_INCOME_PER_TURN + imagingCount * INCOME_PER_IMAGING_IN_LINK + commCount * INCOME_PER_COMM_IN_LINK;
       const upkeep = totalCount * UPKEEP_PER_SAT;
       player.funds += income - upkeep;
     });
@@ -136,10 +136,11 @@ const App = () => {
      if (hqId) compromisedHQIdsRef.current.add(hqId);
      pendingWarningsRef.current[enemyId] = true;
 
-     // attacker toast
-     const latDeg = THREE.MathUtils.radToDeg(Math.asin(position.clone().normalize().y)).toFixed(1);
-     notify('success', `Enemy HQ detected (≈lat ${latDeg}°). You can ground-strike when you have enough AP & comms.`);
-
+     // attacker toast (only if currently viewing the attacker)
+    const latDeg = THREE.MathUtils.radToDeg(Math.asin(position.clone().normalize().y)).toFixed(1);
+    if (currentPlayerRef.current?.id === ownerId) {
+     notify('success', `You detected an enemy HQ (≈lat ${latDeg}°). You can ground‑strike when you have enough AP & comms.`);
+    }
      // If attacker is the active view, immediately reveal
      if (currentPlayerRef.current?.id === ownerId) renderPlayerObjects();
    });
@@ -311,78 +312,118 @@ const App = () => {
     return result;
   };
 
-    const handleCommSatDetections = () => {
-      if (!currentPlayerRef.current) return;
+    // Keep comm-lines & FoW perfectly in sync:
+// - For IMAGING sats: draw the BFS path to any friendly HQ (if reachable).
+// - For COMM sats: draw simple neighbor edges (network view).
+const handleCommSatDetections = () => {
+  if (!currentPlayerRef.current) return;
 
-      const mySats = satellitesRef.current.filter(
-        s => s.ownerId === currentPlayerRef.current.id
-      );
+  const mySats = satellitesRef.current.filter(
+    s => s.ownerId === currentPlayerRef.current.id
+  );
 
-      const byId = id =>
-        satellitesRef.current.find(s => s.id === id) ||
-        hqSpheresRef.current.find(h => h.id === id);
+  mySats.forEach(sat => {
+    drawCommLines(sat); // we compute everything from the neighbor graph
+  });
+};
 
-      mySats.forEach(sat => {
-        let targets = Array.from(sat.neighbors).map(byId).filter(Boolean);
+const drawCommLines = (sat /*, targets (unused) */) => {
+  // Clear existing lines
+  sat.commLines.forEach(line => {
+    if (sceneRef.current) sceneRef.current.remove(line);
+    if (line.geometry) line.geometry.dispose();
+    if (line.material) line.material.dispose();
+  });
+  sat.commLines = [];
 
-        // keep the view clean: only show imaging→HQ edges
-        if (sat.type !== 'communication') {
-          targets = targets.filter(t => t.type === 'HQ');
+  const scene = sceneRef.current;
+  if (!scene) return;
+
+  // Helper: resolve an ID to a node (Satellite or HQ)
+  const byId = (id) =>
+    satellitesRef.current.find(s => s.id === id) ||
+    hqSpheresRef.current.find(h => h.id === id);
+
+  // ---- IMAGING: draw the actual path to HQ (if any) ----
+  if (sat.type === 'imaging') {
+    const myHqs = hqSpheresRef.current.filter(h => h.ownerID === sat.ownerId);
+    if (myHqs.length === 0) return;
+
+    const hqIds = new Set(myHqs.map(h => h.id));
+
+    // BFS over the same neighbor graph maintained in Satellite.updateNeighbors
+    const prev = new Map();      // childId -> parentId (for path reconstruction)
+    const visited = new Set([sat.id]);
+    const queue = [sat.id];
+    let foundHq = null;
+
+    while (queue.length) {
+      const id = queue.shift();
+      if (hqIds.has(id)) { foundHq = id; break; }
+      const node = byId(id);
+      if (!node || !node.neighbors) continue;
+      node.neighbors.forEach(nid => {
+        if (!visited.has(nid)) {
+          visited.add(nid);
+          prev.set(nid, id);
+          queue.push(nid);
         }
-
-        drawCommLines(sat, targets);
       });
-    };
-
-  const drawCommLines = (sat, targets) => {
-      // Clear existing lines
-        sat.commLines.forEach(line => {
-          sceneRef.current.remove(line);
-          if (line.geometry) line.geometry.dispose();
-          if (line.material) line.material.dispose();
-        });
-        sat.commLines = [];
-
-    const earthRadius = earthRef.current.earthRadiusKm;
-
-    /**
-     * Returns true if the segment from start->end passes through the sphere (excluding endpoints).
-     * Sphere at origin with given radius.
-     */
-    function segmentOccludedBySphere(start, end, sphereRadius, epsilon = 1e-3) {
-      const d = new THREE.Vector3().subVectors(end, start);
-      const f = start.clone();
-      const a = d.dot(d);
-      const b = 2 * f.dot(d);
-      const c = f.dot(f) - sphereRadius * sphereRadius;
-      const disc = b * b - 4 * a * c;
-      if (disc < 0) return false;
-      const sqrtDisc = Math.sqrt(disc);
-      const t1 = (-b - sqrtDisc) / (2 * a);
-      const t2 = (-b + sqrtDisc) / (2 * a);
-      return (t1 > epsilon && t1 < 1 - epsilon) || (t2 > epsilon && t2 < 1 - epsilon);
     }
 
-      // Draw new lines
-    targets.forEach(target => {
-      let endPos;
-      if (target.type === 'HQ') {
-        endPos = new THREE.Vector3();
-        target.sphere.getWorldPosition(endPos);
-      } else {
-        endPos = target.mesh.position.clone();
-      }
-      const startPos = sat.mesh.position.clone();
-      const eps = (target.type === 'HQ') ? 1e-2 : 1e-3;
-      if (!segmentOccludedBySphere(startPos, endPos, earthRef.current.earthRadiusKm, eps)) {
-        const material = new THREE.LineBasicMaterial({ color: 0xff00ff });
-        const geometry = new THREE.BufferGeometry().setFromPoints([startPos, endPos]);
-        const line = new THREE.Line(geometry, material);
-        sceneRef.current.add(line);
-        sat.commLines.push(line);
-      }
-    });
-  };
+    // Not reachable => no path => no lines
+    if (!foundHq) return;
+
+    // Reconstruct path sat -> ... -> HQ
+    const pathIds = [];
+    for (let at = foundHq; at !== undefined; at = prev.get(at)) {
+      pathIds.push(at);
+      if (at === sat.id) break;
+    }
+    pathIds.reverse();
+
+    // Draw segments along the path
+    for (let i = 0; i < pathIds.length - 1; i++) {
+      const a = byId(pathIds[i]);
+      const b = byId(pathIds[i + 1]);
+      if (!a || !b) continue;
+
+      const aPos = a.type === 'HQ'
+        ? a.sphere.getWorldPosition(new THREE.Vector3())
+        : a.mesh.position.clone();
+
+      const bPos = b.type === 'HQ'
+        ? b.sphere.getWorldPosition(new THREE.Vector3())
+        : b.mesh.position.clone();
+
+      const geometry = new THREE.BufferGeometry().setFromPoints([aPos, bPos]);
+      const material = new THREE.LineBasicMaterial({ color: 0xff00ff });
+      const line = new THREE.Line(geometry, material);
+      scene.add(line);
+      sat.commLines.push(line);
+    }
+
+    return; // imaging handled fully
+  }
+
+  // ---- COMM: draw neighbor edges (network view) ----
+  const targets = Array.from(sat.neighbors)
+    .map(id => byId(id))
+    .filter(Boolean);
+
+  targets.forEach(target => {
+    const startPos = sat.mesh.position.clone();
+    const endPos = target.type === 'HQ'
+      ? target.sphere.getWorldPosition(new THREE.Vector3())
+      : target.mesh.position.clone();
+
+    const geometry = new THREE.BufferGeometry().setFromPoints([startPos, endPos]);
+    const material = new THREE.LineBasicMaterial({ color: 0xff00ff });
+    const line = new THREE.Line(geometry, material);
+    scene.add(line);
+    sat.commLines.push(line);
+  });
+};
 
   // Animation loop
   useEffect(() => {
@@ -644,9 +685,12 @@ const handleAddSatellite = () => {
     launchArgs: []
   });
 
-    if (!ok) {
-      notify('warning', 'Launch blocked: not your turn, insufficient AP, or insufficient funds.');
-    }
+  if (!ok) {
+    notify('warning', 'Launch blocked: not your turn, insufficient AP, or insufficient funds.');
+  } else {
+    // Ensure scene/UI state reflects the new satellite immediately
+    renderPlayerObjects();
+  }
 };
 
 
@@ -655,7 +699,7 @@ const handleAddSatellite = () => {
     function calculateLaunchCost(satelliteType, latitude, orbit) {
       const baseCosts = {
         imaging: 50, // in million dollars
-        communication: 150, // in million dollars
+        communication: 60, // reduced to make early comms accessible
       };
 
       const locationMultiplier = (lat) => {
@@ -688,7 +732,8 @@ const handleAddSatellite = () => {
       const altMultiplier = altitudeMultiplier(orbit.radius - 6371); // Subtract Earth's radius to get altitude
       const spdMultiplier = speedMultiplier(orbit.speed * (2 * Math.PI * (orbit.radius * 1000)) * 3600 / 1000); // Convert back to km/h for simplicity
 
-      return baseCost * locMultiplier * inclMultiplier * altMultiplier * spdMultiplier;
+     const millions = baseCost * locMultiplier * inclMultiplier * altMultiplier * spdMultiplier;
+     return Math.round(millions * 1_000_000); // return dollars
     }
 
     const addNeighborsInRange = (satelliteOrHQ, neighbors) => {
@@ -759,11 +804,7 @@ const handleAddSatellite = () => {
             hqSphereRef.current = null;
           }
 
-          // Link this HQ to any of the current player's satellites that are in range (and have LoS)
-          const neighbors = satellitesRef.current.filter(
-            sat => sat.ownerId === currentPlayerRef.current.id
-          );
-          addNeighborsInRange(newHQ, neighbors);
+          renderPlayerObjects();
     }
 
 
@@ -892,11 +933,10 @@ const handleAddSatellite = () => {
 
     <div ref={mountRef} style={{ width: '100vw', height: '100vh' }} />
 
-    <Typography
-      variant="h6"
-      style={{ position: 'absolute', top: 20, right: 430, zIndex: 1000, color: 'white' }}>
-      Funds: {currentPlayerRef.current ? currentPlayerRef.current.funds : 0}
-    </Typography>
+<Typography variant="h6" style={{ position: 'absolute', top: 20, right: 430, zIndex: 1000, color: 'white' }}>
+  Funds: {'$'}{Math.round((currentPlayerRef.current?.funds ?? 0) / 1_000_000)}M
+</Typography>
+
     <Typography
       variant="h6"
       style={{ position: 'absolute', top: 20, right: 250, zIndex: 1000, color: 'white' }}>
@@ -979,8 +1019,11 @@ const handleAddSatellite = () => {
           color="primary"
           onClick={handleAddSatellite}
         >
-          Launch (${launchCost}M)
+          Launch (${Math.round(launchCost / 1_000_000)}M)
         </Button>
+        <Typography variant="caption" display="block" style={{ marginTop: 6 }}>
+  Uses AP and funds. AP left: {actionPoints}; Funds: {'$'}{Math.round((currentPlayerRef.current?.funds ?? 0) / 1_000_000)}M
+</Typography>
       </Paper>
     )}
 
@@ -993,10 +1036,13 @@ const handleAddSatellite = () => {
           const me = currentPlayerRef.current;
           if (!me) return <Typography variant="body2">No active player.</Typography>;
 
-          const log = detectionLogRef.current?.forPlayer?.(me.id) || [];
-          const knownIds = new Set(log.filter(e => e.type === 'HQ_DETECTED').map(e => e.targetId));
-          const knownHQs = hqSpheresRef.current.filter(h => knownIds.has(h.id) && h.ownerID !== me.id);
-
+         const log = detectionLogRef.current?.forPlayer?.(me.id) || [];
+         const knownHQIds = new Set(
+           log.filter(e => e.type === 'HQ_DETECTED').map(e => e.targetId)
+         );
+         const knownHQs = hqSpheresRef.current.filter(
+           h => knownHQIds.has(h.id) && h.ownerID !== me.id
+         );
           if (knownHQs.length === 0) {
             return <Typography variant="body2">No known enemy HQs yet.</Typography>;
           }
@@ -1013,8 +1059,12 @@ const handleAddSatellite = () => {
               )}
 
               {knownHQs.map(hq => {
-                const canAPFunds = !!actionRegistryRef.current?.canPerform?.('GROUND_STRIKE', me.id);
-                const canStrike = hasComms && canAPFunds;
+             const canAPFunds = !!actionRegistryRef.current?.canPerform?.(
+               'GROUND_STRIKE',
+               me.id,
+               { targetHQ: hq, hasComms }
+             );
+              const canStrike = hasComms && canAPFunds;
 
                 return (
                   <Box key={hq.id} style={{ border: '1px solid #ddd', borderRadius: 6, padding: 8, marginBottom: 8 }}>
@@ -1030,8 +1080,11 @@ const handleAddSatellite = () => {
                         variant="contained"
                         color="error"
                         disabled={!canStrike}
-                        onClick={() => {
-                          const ok = actionRegistryRef.current.perform('GROUND_STRIKE', me.id, { targetHQ: hq });
+                         onClick={() => {
+                           const ok = actionRegistryRef.current.perform('GROUND_STRIKE', me.id, {
+                             targetHQ: hq,
+                             hasComms
+                           });
                           if (ok) {
                             notify('success', 'Strike launched. Impact in ~90s.');
                           } else {
@@ -1105,6 +1158,7 @@ const handleAddSatellite = () => {
 
 export default App;
 // Economy constants
-const INCOME_PER_IMAGING_IN_LINK = 1_000_000;
-const INCOME_PER_COMM_IN_LINK    =   300_000;
+const BASE_INCOME_PER_TURN       = 2_000_000;
+const INCOME_PER_IMAGING_IN_LINK = 1_500_000;
+const INCOME_PER_COMM_IN_LINK    =   500_000;
 const UPKEEP_PER_SAT             =   200_000;

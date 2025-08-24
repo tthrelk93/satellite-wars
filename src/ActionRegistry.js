@@ -5,7 +5,7 @@ const STRIKE_TRAVEL_TIME_MS = 90_000;
 const STRIKE_DAMAGE = 50;
 const STRIKE_COST = 20_000_000;
 const AP_COST = {
-  LAUNCH_SAT: 4,
+  LAUNCH_SAT: 3,
   GROUND_STRIKE: 5,
 };
 
@@ -88,11 +88,11 @@ export class ActionRegistry {
           }
         },
       },
-      GROUND_STRIKE: {
-        apCost: AP_COST.GROUND_STRIKE,
-        moneyCost: STRIKE_COST,
-        preconditions: () => true,
-        perform: (attackerId, { targetHQ }) => {
+     GROUND_STRIKE: {
+       apCost: AP_COST.GROUND_STRIKE,
+       moneyCost: STRIKE_COST,
+       preconditions: (attackerId, { targetHQ, hasComms }) => !!targetHQ && !!hasComms,
+       perform: (attackerId, { targetHQ }) => {
           setTimeout(() => {
             targetHQ.applyDamage(STRIKE_DAMAGE);
             this.eventBus.emit('ACTION_STRIKE_RESOLVED', {

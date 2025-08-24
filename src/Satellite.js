@@ -38,7 +38,7 @@ class Satellite {
     this.commLines = [];
     this.neighbors = new Set(); // Initialize neighbors for graph representation
     this.DEBUG = true;
-
+    this._lastHQDetect = new Map(); // hqId -> timestamp
     this.latitude = null;
     this.longitude = null;
     this.altitude = null;
@@ -202,7 +202,7 @@ updateOrbit(hqSpheres, playerID, satellites) {
       const coneRadius = Math.sqrt(revealArea / Math.PI);
 
       const detectedSpheres = [];
-
+      const now = Date.now();
       hqSpheres.current.forEach(hq => {
         // Only detect enemy HQs (skip your own)
         if (hq.ownerID === this.ownerId) return;
@@ -218,7 +218,10 @@ updateOrbit(hqSpheres, playerID, satellites) {
 
         const distanceToConeAxis = closest.distanceTo(spherePosition);
 
-        if (distanceToConeAxis <= coneRadius) {
+      if (distanceToConeAxis <= coneRadius) {
+           const last = this._lastHQDetect.get(hq.id) || 0;
+           if (now - last < 5000) return;        // 5s throttle per HQ per sat
+           this._lastHQDetect.set(hq.id, now);
           // Emit detection event for enemy HQ with hqId included
           if (this.eventBus) {
             this.eventBus.emit('DETECTION_HQ', {
@@ -368,14 +371,12 @@ updateOrbit(hqSpheres, playerID, satellites) {
   }
 
   isInRange(position, isHQ) {
-      
-      let maxRange = 40000; // Use the range value used in communication lines
+      const maxRange = isHQ ? HQ_RANGE_KM : COMM_RANGE_KM;
       // console.log("intersectDist: ", intersectionDistance);
        if(isHQ){
            maxRange = 3000;
        }
     const distance = this.mesh.position.distanceTo(position);
-      
     return distance <= maxRange;
   }
 
