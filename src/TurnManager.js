@@ -55,8 +55,13 @@ export class TurnManager {
     const prev = this.currentPlayerId;
     this.eventBus.emit('TURN_ENDED', { playerId: prev, turnNumber: this.turnNumber });
     this.eventBus.emit('ECONOMY_TICK', { playerId: prev });
-    const idx = this.playerIds.indexOf(prev);
-    const next = this.playerIds[(idx + 1) % this.playerIds.length];
-    this.startTurn(next);
+    if (this.playerIds.length <= 1) {
+      // Single-player: keep advancing turns for the same player
+      this.startTurn(prev);
+    } else {
+      const idx = this.playerIds.indexOf(prev);
+      const next = this.playerIds[(idx + 1) % this.playerIds.length];
+      this.startTurn(next);
+    }
   }
 }

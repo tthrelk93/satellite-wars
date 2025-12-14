@@ -36,6 +36,7 @@ import RemoveIcon from '@mui/icons-material/Remove';
 
 const App = () => {
     const mountRef = useRef(null);
+    const [gameMode, setGameMode] = useState(null); // 'solo' or 'pvp'
     const [showMenu, setShowMenu] = useState(false);
     const [showSatPanel, setShowSatPanel] = useState(false);
     const orbitPreviewRef = useRef(null); // Green orbit preview line
@@ -105,6 +106,25 @@ const App = () => {
     };
     // Initialize the scene, camera, renderer, controls, and lights
     useEffect(() => {
+        if (!gameMode) return;
+
+        // Reset shared refs/state when switching modes
+        satellitesRef.current = [];
+        hqSpheresRef.current = [];
+        knownEnemyHQsRef.current = {};
+        compromisedHQIdsRef.current = new Set();
+        pendingWarningsRef.current = {};
+        setSatellites([]);
+        setPlayers([]);
+        setToasts([]);
+        setActivePlayerId(null);
+        setCurrentTurn(0);
+        setActionPoints(AP_MAX);
+        setShowMenu(false);
+        setShowSatPanel(false);
+        setShowStrikePad(false);
+        showHQSphereRef.current = false;
+
         // Core systems setup
         const eventBus = new EventBus();
         const turnManager = new TurnManager(eventBus);
@@ -115,6 +135,19 @@ const App = () => {
         turnManagerRef.current = turnManager;
         detectionLogRef.current = detectionLog;
         actionRegistryRef.current = actionRegistry;
+
+        // Initialize players based on mode
+        const playersList = [new Player('player1')];
+        if (gameMode === 'pvp') {
+            playersList.push(new Player('player2'));
+        }
+        setPlayers(playersList);
+        playersList.forEach(p => {
+            playersMap[p.id] = p;
+            knownEnemyHQsRef.current[p.id] = new Set();
+            pendingWarningsRef.current[p.id] = false;
+        });
+
         // Subscribe to turn and AP events for UI updates
         eventBus.on('TURN_STARTED', ({ playerId, turnNumber }) => {
             setActivePlayerId(playerId);
@@ -144,11 +177,14 @@ const App = () => {
 
         // Enemy HQ detection -> reveal to attacker; warn defender
         eventBus.on('DETECTION_HQ', ({ ownerId, enemyId, hqId, position }) => {
-            // mark intel for attacker
-            if (!knownEnemyHQsRef.current[ownerId]) knownEnemyHQsRef.current[ownerId] = new Set();
-            knownEnemyHQsRef.current[ownerId].add(enemyId);
+            // mark intel for attacker (if enemy exists in this mode)
+            if (knownEnemyHQsRef.current[ownerId]) {
+                knownEnemyHQsRef.current[ownerId].add(enemyId);
+            }
             if (hqId) compromisedHQIdsRef.current.add(hqId);
-            pendingWarningsRef.current[enemyId] = true;
+            if (pendingWarningsRef.current[enemyId] !== undefined) {
+                pendingWarningsRef.current[enemyId] = true;
+            }
 
             // attacker toast (only if currently viewing the attacker)
             const latDeg = THREE.MathUtils.radToDeg(Math.asin(position.clone().normalize().y)).toFixed(1);
@@ -177,7 +213,9 @@ const App = () => {
         renderer.setSize(window.innerWidth, window.innerHeight);
         rendererRef.current = renderer;
         const mountNode = mountRef.current;
-        mountNode.appendChild(renderer.domElement);
+        if (mountNode) {
+            mountNode.appendChild(renderer.domElement);
+        }
 
         // Handle WebGL context lost and restore
         renderer.domElement.addEventListener('webglcontextlost', (event) => {
@@ -190,21 +228,8 @@ const App = () => {
             // Reinitialize the scene or handle the context restoration as needed
         }, false);
 
-        // Initialize players
-        const player1 = new Player('player1');
-        const player2 = new Player('player2');
-        setPlayers([player1, player2]);
-        // Map of playerId to Player
-        playersMap[player1.id] = player1;
-        playersMap[player2.id] = player2;
-        knownEnemyHQsRef.current[player1.id] = new Set();
-        knownEnemyHQsRef.current[player2.id] = new Set();
-        // Start the turn cycle
-        // Start the turn cycle (initial TURN_STARTED will fire once earth is ready)
-        // turnManager.startGame will be called after Earth is created below
-
         // Create Earth
-        const earth = new Earth(camera, [player1, player2]);
+        const earth = new Earth(camera, playersList);
         earth.render(scene);
         earthRef.current = earth;
 
@@ -219,7 +244,7 @@ const App = () => {
             if (showSatPanelRef.current) updateOrbitPreview();
         });
         // Now that Earth is ready, start the turn cycle, emitting initial TURN_STARTED
-        turnManager.startGame([player1.id, player2.id]);
+        turnManager.startGame(playersList.map(p => p.id));
 
 
         // Set up camera and orbit controls
@@ -277,7 +302,6 @@ const App = () => {
             window.removeEventListener('pointerup', handlePointerUpCapture, true);
             renderer.domElement.removeEventListener('pointermove', handleMouseMove);
             window.removeEventListener('mousedown', handleMouseClick);
-            //if (cameraRef.current) cameraRef.current.dispose(); // Dispose of controls
             if (rendererRef.current) rendererRef.current.dispose();
             if (sceneRef.current) {
                 sceneRef.current.children.forEach(child => {
@@ -286,9 +310,11 @@ const App = () => {
                     sceneRef.current.remove(child);
                 });
             }
-            mountNode.removeChild(renderer.domElement);
+            if (mountNode && renderer.domElement.parentNode === mountNode) {
+                mountNode.removeChild(renderer.domElement);
+            }
         };
-    }, []);
+    }, [gameMode]);
 
     // Orbit preview helpers
     const removeOrbitPreview = () => {
@@ -966,7 +992,7 @@ const App = () => {
         };
 
         animate();
-    }, [satellites]);
+    }, [satellites, gameMode]);
 
     function handleMouseMove(event) {
         // --- Orbit preview drag: rotate plane normal around HQ vector t ---
@@ -1449,6 +1475,19 @@ const App = () => {
 
 
 
+    if (!gameMode) {
+        return (
+            <div style={{ width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 16, background: '#0b1020', color: 'white' }}>
+                <Typography variant="h4" gutterBottom>Satellite Wars</Typography>
+                <Typography variant="body1" gutterBottom>Select a mode to begin:</Typography>
+                <Box display="flex" gap={2}>
+                    <Button variant="contained" color="primary" onClick={() => setGameMode('solo')}>Single Player</Button>
+                    <Button variant="outlined" color="secondary" onClick={() => setGameMode('pvp')}>Player vs Player</Button>
+                </Box>
+            </div>
+        );
+    }
+
     return (
         <div>
             {/* End Turn button controlled by TurnManager */}
@@ -1518,21 +1557,23 @@ const App = () => {
                         Sat
                     </Button>
 
-                    <Button
-                        onClick={() => {
-                            setShowStrikePad(prev => {
-                                const next = !prev;
-                                if (next) {
-                                    // opening Strike Pad closes SAT editor & clears preview
-                                    setShowSatPanel(false);
-                                    removeOrbitPreview();
-                                }
-                                return next;
-                            });
-                        }}
-                    >
-                        Strike
-                    </Button>
+                    {gameMode === 'pvp' && (
+                        <Button
+                            onClick={() => {
+                                setShowStrikePad(prev => {
+                                    const next = !prev;
+                                    if (next) {
+                                        // opening Strike Pad closes SAT editor & clears preview
+                                        setShowSatPanel(false);
+                                        removeOrbitPreview();
+                                    }
+                                    return next;
+                                });
+                            }}
+                        >
+                            Strike
+                        </Button>
+                    )}
                 </Paper>
             )}
 
@@ -1606,7 +1647,7 @@ const App = () => {
             )}
 
             {/* Strike Pad */}
-            {showStrikePad && (
+            {gameMode === 'pvp' && showStrikePad && (
                 <Paper style={{ position: 'absolute', top: 100, left: 230, padding: 12, width: 280, zIndex: 1000, backgroundColor: 'white' }}>
                     <Typography variant="h6" gutterBottom>Strike Pad</Typography>
 
@@ -1735,4 +1776,3 @@ const App = () => {
 };
 
 export default App;
-

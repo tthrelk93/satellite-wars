@@ -1,0 +1,111 @@
+name: satellite-wars
+repo: satellite-wars
+level: repo
+languages: [js]
+domain: ui
+responsibilities:
+  - render a Three.js Earth with satellite orbits and fog-of-war overlays
+  - manage turn-based economy, action points, and action gating
+  - provide UI to place HQs, launch satellites, and initiate strikes
+entrypoints:
+  build: "npm run build"
+  test: "npm test"
+  run: "npm start"
+  lint: "TODO (no script configured)"
+  format: "TODO (no script configured)"
+  smoke: "npm test -- --watch=false"
+capabilities:
+  - search_code
+  - read_file
+  - run_tests
+  - propose_patch
+  - static_analysis
+  - run_smoke
+hot_paths:
+  - path: "src/App.js"
+    reason: "Scene setup, UI panels, event wiring, orbit preview, rendering updates"
+  - path: "src/Satellite.js"
+    reason: "Orbit propagation, comm network, fog/detection logic"
+  - path: "src/Earth.js"
+    reason: "Earth rendering, fog-of-war canvases, HQ placement"
+  - path: "src/ActionRegistry.js"
+    reason: "Action definitions, AP/funds gating, strike resolution"
+  - path: "src/TurnManager.js"
+    reason: "Turn rotation, AP lifecycle, economy tick"
+apis:
+  provides:
+    - name: "actions"
+      path: "src/ActionRegistry.js"
+      stability: experimental
+    - name: "event-bus-topics"
+      path: "src/EventBus.js"
+      stability: experimental
+  consumes:
+    - name: "three.js"
+      where: "src/App.js, src/Satellite.js, src/Earth.js"
+    - name: "mui-components"
+      where: "src/App.js"
+configs:
+  env: []
+  files:
+    - "public/manifest.json"
+guardrails:
+  readonly_paths: []
+  secrets_policy: "front-end only; no secrets expected"
+runtime:
+  toolchain:
+    node: "unspecified (uses react-scripts 5.0.1)"
+    notes: "React 18.3.1, Three.js 0.165.0, MUI 5.15.x"
+tests:
+  patterns:
+    - "src/**/*.test.js"
+  quick_subset: "npm test -- --watch=false"
+sub_agents:
+  - kind: module
+    id: "core-game-client"
+    path: "src/AGENT.md"
+    focus: "React/Three scene orchestration and UI flows"
+  - kind: module
+    id: "gameplay-systems"
+    path: "src/gameplay/AGENT.md"
+    focus: "Turn, action, and economy rules (TurnManager, ActionRegistry, constants)"
+  - kind: module
+    id: "world-fog"
+    path: "src/world/AGENT.md"
+    focus: "Earth rendering, fog-of-war canvases, HQ placement"
+  - kind: module
+    id: "entities-network"
+    path: "src/entities/AGENT.md"
+    focus: "Satellite/HQ entities, LoS/comm network, detections"
+  - kind: module
+    id: "static-shell"
+    path: "public/AGENT.md"
+    focus: "CRA HTML shell, manifest, icons"
+  - kind: file
+    id: "app-component"
+    path: "src/App.AGENT.md"
+    focus: "Main component, orbit preview, UI controls, rendering loop"
+  - kind: file
+    id: "satellite-class"
+    path: "src/Satellite.AGENT.md"
+    focus: "Orbit update, comm graph, fog/detection logic"
+  - kind: file
+    id: "earth-class"
+    path: "src/Earth.AGENT.md"
+    focus: "Earth mesh, fog textures, HQ placement"
+  - kind: file
+    id: "action-registry"
+    path: "src/ActionRegistry.AGENT.md"
+    focus: "Actions, AP/funds gating, strike resolution"
+  - kind: file
+    id: "turn-manager"
+    path: "src/TurnManager.AGENT.md"
+    focus: "Turn/AP lifecycle and economy tick"
+  - kind: file
+    id: "constants"
+    path: "src/constants.AGENT.md"
+    focus: "Shared ranges, physics, and economy values"
+metadata:
+  last_scanned_commit: "816bd001772c968c849c250c4bd6b5ded0229d71"
+  generated_by: "repo-intel-agent"
+  generated_at_utc: "2025-12-14T21:52:28Z"

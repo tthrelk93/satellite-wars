@@ -119,7 +119,11 @@ class Earth {
   }
 
     addHQSphere(position, hqSpheresRef, currentPlayerRef) {
-        const newHQ = new HQ('hq-' + Math.floor(Math.random() * 1000), position, currentPlayerRef.current.id); // Pass a unique id
+        // Raycaster gives a world-space point on the rotated Earth; convert to local so parenting doesn't double-apply rotation
+        const localPosition = position.clone();
+        this.parentObject.worldToLocal(localPosition);
+
+        const newHQ = new HQ('hq-' + Math.floor(Math.random() * 1000), localPosition, currentPlayerRef.current.id); // Pass a unique id
         hqSpheresRef.current.push(newHQ);
         this.parentObject.add(newHQ.sphere);
         currentPlayerRef.current.addHQ(newHQ);
