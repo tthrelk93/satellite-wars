@@ -29,8 +29,10 @@ export function advectScalar({
   kappa = 0 // m^2/s
 }) {
   const { nx, ny, cellLonDeg, cellLatDeg, cosLat } = grid;
+  const minKmPerDegLon = 20;
   const kmPerDegLat = 111.0;
   for (let j = 0; j < ny; j++) {
+
     const kmPerDegLon = Math.max(1.0, kmPerDegLat * cosLat[j]);
     const dx = kmPerDegLon * 1000 * cellLonDeg;
     const dy = kmPerDegLat * 1000 * cellLatDeg;

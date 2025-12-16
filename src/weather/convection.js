@@ -4,11 +4,13 @@ import { saturationMixingRatio } from './surface';
 
 export function stepConvection({ dt, fields, geo, grid }) {
   const { nx, ny, cellLonDeg, cellLatDeg, cosLat } = grid;
+  const minKmPerDegLon = 20; // avoid runaway metrics near poles
   const { T, Ts, qv, qc, ps, u, v } = fields;
   const { elev } = geo;
 
   const kmPerDegLat = 111.0;
   for (let j = 0; j < ny; j++) {
+
     const kmPerDegLon = Math.max(1.0, kmPerDegLat * cosLat[j]);
     const invDx = 1 / (kmPerDegLon * 1000 * cellLonDeg);
     const invDy = 1 / (kmPerDegLat * 1000 * cellLatDeg);
@@ -37,6 +39,7 @@ export function stepConvection({ dt, fields, geo, grid }) {
       const upslopeW = Math.max(0, u[k] * deDx + v[k] * deDy); // ~ m/s vertical proxy
 
       // Convert convergence (1/s) to an equivalent vertical velocity scale (m/s)
+
       const wConv = conv * 100000; // 100 km scale (tunable)
       const lift = Math.min(2.0, wConv + upslopeW); // cap to avoid runaway
 

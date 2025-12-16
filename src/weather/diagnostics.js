@@ -12,8 +12,10 @@ export function computeRH(fields) {
 export function computeVorticity(fields, grid, vortOut) {
   const { nx, ny, cellLonDeg, cellLatDeg, cosLat } = grid;
   const { u, v } = fields;
+  const minKmPerDegLon = 20;
   const kmPerDegLat = 111.0;
   for (let j = 0; j < ny; j++) {
+
     const kmPerDegLon = Math.max(1.0, kmPerDegLat * cosLat[j]);
     const invDx = 1 / (kmPerDegLon * 1000 * cellLonDeg);
     const invDy = 1 / (kmPerDegLat * 1000 * cellLatDeg);
