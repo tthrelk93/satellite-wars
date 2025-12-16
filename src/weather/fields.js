@@ -1,5 +1,4 @@
 // fields.js: allocation and initialization of model state
-import { createLatLonGrid } from './grid';
 import { computeDensity } from './dynamics';
 
 export function createFields(grid) {

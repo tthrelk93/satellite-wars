@@ -2,7 +2,7 @@
 import { createLatLonGrid } from './grid';
 import { createFields, initAtmosphere } from './fields';
 import { loadGeoTexture, analyticGeo } from './geo';
-import { solarDeclination, cosZenith, surfaceRadiation } from './solar';
+import { cosZenith, surfaceRadiation } from './solar';
 import { updateSurface } from './surface';
 import { computeDensity, stepWinds } from './dynamics';
 import { advectScalar } from './advect';

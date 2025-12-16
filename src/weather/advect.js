@@ -1,5 +1,5 @@
 // advect.js: semi-Lagrangian advection for scalar and vector fields
-import { wrapLon, clampLat } from './grid';
+import { clampLat } from './grid';
 
 export function bilinear(field, lon, lat, nx, ny) {
   const i0 = Math.floor(lon);

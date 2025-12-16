@@ -14,7 +14,7 @@ export function computeVorticity(fields, grid, vortOut) {
   const { u, v } = fields;
   const kmPerDegLat = 111.0;
   for (let j = 0; j < ny; j++) {
-    const kmPerDegLon = kmPerDegLat * cosLat[j];
+    const kmPerDegLon = Math.max(1.0, kmPerDegLat * cosLat[j]);
     const invDx = 1 / (kmPerDegLon * 1000 * cellLonDeg);
     const invDy = 1 / (kmPerDegLat * 1000 * cellLatDeg);
     for (let i = 0; i < nx; i++) {
