@@ -10,10 +10,12 @@ export function stepConvection({ dt, fields, geo, grid }) {
 
   const kmPerDegLat = 111.0;
   for (let j = 0; j < ny; j++) {
+    const kmPerDegLon = Math.max(minKmPerDegLon, kmPerDegLat * cosLat[j]);
+    const dx = kmPerDegLon * 1000 * cellLonDeg;
+    const dy = kmPerDegLat * 1000 * cellLatDeg;
+    const invDx = 1 / dx;
+    const invDy = 1 / dy;
 
-    const kmPerDegLon = Math.max(1.0, kmPerDegLat * cosLat[j]);
-    const invDx = 1 / (kmPerDegLon * 1000 * cellLonDeg);
-    const invDy = 1 / (kmPerDegLat * 1000 * cellLatDeg);
     for (let i = 0; i < nx; i++) {
       const k = j * nx + i;
       const iE = (i + 1) % nx;
@@ -39,9 +41,10 @@ export function stepConvection({ dt, fields, geo, grid }) {
       const upslopeW = Math.max(0, u[k] * deDx + v[k] * deDy); // ~ m/s vertical proxy
 
       // Convert convergence (1/s) to an equivalent vertical velocity scale (m/s)
-
-      const wConv = conv * 100000; // 100 km scale (tunable)
+      const horizScale = 0.5 * (dx + dy); // meters
+      const wConv = conv * horizScale;
       const lift = Math.min(2.0, wConv + upslopeW); // cap to avoid runaway
+
 
       // Trigger combines lift + buoyancy (unitless-ish)
       const trigger = lift * buoy;
