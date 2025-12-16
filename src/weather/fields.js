@@ -1,6 +1,6 @@
 // fields.js: allocation and initialization of model state
-import { createLatLonGrid } from './grid';
 import { computeDensity } from './dynamics';
+import { saturationMixingRatio } from './surface';
 
 export function createFields(grid) {
   const { count } = grid;
@@ -15,6 +15,7 @@ export function createFields(grid) {
     rho: new Float32Array(count),
     Ts: new Float32Array(count),
     RH: new Float32Array(count),
+    vort: new Float32Array(count),
     cloud: new Float32Array(count),
     precipRate: new Float32Array(count),
     // diagnostics / helpers
@@ -34,7 +35,10 @@ export function initAtmosphere(fields, grid) {
       T[k] = baseT + noise;
       Ts[k] = T[k];
       ps[k] = 101000 - 40 * Math.abs(lat);
-      qv[k] = 0.006 + 0.01 * Math.max(0, 1 - Math.abs(lat) / 60) + (Math.random() - 0.5) * 0.002;
+      const qs = saturationMixingRatio(T[k], ps[k]);
+      const targetRH = 0.7 + 0.15 * Math.max(0, 1 - Math.abs(lat) / 70); // moister tropics, drier poles
+      const humidityNoise = (Math.random() - 0.5) * 0.08;
+      qv[k] = Math.max(0, (targetRH + humidityNoise) * qs);
       qc[k] = 0;
       qr[k] = 0;
       u[k] = 4 * Math.sin((lat * Math.PI) / 180); // weak jets

@@ -2,7 +2,7 @@
 import { createLatLonGrid } from './grid';
 import { createFields, initAtmosphere } from './fields';
 import { loadGeoTexture, analyticGeo } from './geo';
-import { solarDeclination, cosZenith, surfaceRadiation } from './solar';
+import { cosZenith, surfaceRadiation } from './solar';
 import { updateSurface } from './surface';
 import { computeDensity, stepWinds } from './dynamics';
 import { advectScalar } from './advect';
@@ -14,8 +14,9 @@ export class WeatherCore {
   constructor({
     nx = 180,
     ny = 90,
-    dt = 120,
-    diffusion = 1e-4
+    dt = 120,        // modelDt seconds
+    timeScale = 200, // model seconds per real second
+    kappa = 2000     // diffusion m^2/s
   } = {}) {
     this.grid = createLatLonGrid(nx, ny);
     this.fields = createFields(this.grid);
@@ -27,10 +28,13 @@ export class WeatherCore {
       rough: new Float32Array(this.grid.count)
     };
     this.timeUTC = 0;
-    this.dt = dt; // seconds model time per step
-    this.diffusion = diffusion;
+    this.modelDt = dt;
+    this.timeScale = timeScale;
+    this.kappa = kappa;
+    this._accum = 0;
     this.ready = false;
     initAtmosphere(this.fields, this.grid);
+    this._tmp = new Float32Array(this.grid.count);
     this._loadGeo();
   }
 
@@ -46,15 +50,20 @@ export class WeatherCore {
 
   step(realDtSeconds) {
     if (!this.ready) return;
-    const steps = Math.max(1, Math.floor(realDtSeconds / this.dt));
-    for (let s = 0; s < steps; s++) {
-      this._stepOnce(this.dt);
+    this._accum += realDtSeconds * this.timeScale;
+    const maxSteps = 8;
+    let steps = 0;
+    while (this._accum >= this.modelDt && steps < maxSteps) {
+      this._stepOnce(this.modelDt);
+      this._accum -= this.modelDt;
+      steps++;
     }
   }
 
   _stepOnce(dt) {
     const { grid, fields, geo } = this;
     const dayOfYear = (this.timeUTC / 86400) % 365;
+    const tauRad = 5 * 86400; // radiative relaxation timescale
     // Radiation per cell
     for (let j = 0; j < grid.ny; j++) {
       for (let i = 0; i < grid.nx; i++) {
@@ -70,6 +79,10 @@ export class WeatherCore {
           Tair: fields.T[k]
         });
         fields.rad[k] = rad;
+
+        const sinLat = Math.sin(latRad);
+        const Teq = (285 - 55 * (sinLat * sinLat)) + 10 * cosZ - 6 * cloudFrac;
+        fields.T[k] += (Teq - fields.T[k]) * (dt / tauRad);
       }
     }
 
@@ -93,7 +106,7 @@ export class WeatherCore {
 
     // Diagnostics
     computeRH(fields);
-    computeVorticity(fields, grid, this.vorticity || (this.vorticity = new Float32Array(fields.T.length)));
+    computeVorticity(fields, grid, fields.vort);
     computeCloudDensity(fields, fields.cloud);
     computePrecipRate(fields, fields.precipRate);
 
@@ -102,16 +115,16 @@ export class WeatherCore {
 
   _advectAll(dt) {
     const { grid, fields } = this;
-    const tmp = new Float32Array(fields.T.length);
-    advectScalar({ src: fields.T, dst: tmp, u: fields.u, v: fields.v, dt, grid, diffusion: this.diffusion });
+    const tmp = this._tmp;
+    advectScalar({ src: fields.T, dst: tmp, u: fields.u, v: fields.v, dt, grid, kappa: this.kappa });
     fields.T.set(tmp);
-    advectScalar({ src: fields.qv, dst: tmp, u: fields.u, v: fields.v, dt, grid, diffusion: this.diffusion });
+    advectScalar({ src: fields.qv, dst: tmp, u: fields.u, v: fields.v, dt, grid, kappa: this.kappa });
     fields.qv.set(tmp);
-    advectScalar({ src: fields.qc, dst: tmp, u: fields.u, v: fields.v, dt, grid, diffusion: this.diffusion });
+    advectScalar({ src: fields.qc, dst: tmp, u: fields.u, v: fields.v, dt, grid, kappa: this.kappa });
     fields.qc.set(tmp);
-    advectScalar({ src: fields.qr, dst: tmp, u: fields.u, v: fields.v, dt, grid, diffusion: this.diffusion });
+    advectScalar({ src: fields.qr, dst: tmp, u: fields.u, v: fields.v, dt, grid, kappa: this.kappa });
     fields.qr.set(tmp);
-    advectScalar({ src: fields.ps, dst: tmp, u: fields.u, v: fields.v, dt, grid, diffusion: this.diffusion * 0.5 });
+    advectScalar({ src: fields.ps, dst: tmp, u: fields.u, v: fields.v, dt, grid, kappa: this.kappa * 0.5 });
     fields.ps.set(tmp);
   }
 }
