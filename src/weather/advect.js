@@ -33,6 +33,7 @@ export function advectScalar({
   const kmPerDegLat = 111.0;
   for (let j = 0; j < ny; j++) {
     const kmPerDegLon = Math.max(minKmPerDegLon, kmPerDegLat * cosLat[j]);
+
     const dx = kmPerDegLon * 1000 * cellLonDeg;
     const dy = kmPerDegLat * 1000 * cellLatDeg;
     const invDx2 = 1 / (dx * dx);
