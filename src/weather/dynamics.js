@@ -3,11 +3,12 @@ import { Omega, g, Rd } from './constants';
 
 export function stepWinds({ dt, grid, fields, geo, dragCoeff = 1e-5 }) {
   const { nx, ny, cellLonDeg, cellLatDeg, cosLat, sinLat } = grid;
+  const minKmPerDegLon = 20;
   const { u, v, ps, rho } = fields;
 
   for (let j = 0; j < ny; j++) {
     const kmPerDegLat = 111.0;
-    const kmPerDegLon = kmPerDegLat * cosLat[j];
+    const kmPerDegLon = Math.max(minKmPerDegLon, kmPerDegLat * cosLat[j]);
     const invDx = 1 / (kmPerDegLon * 1000 * cellLonDeg);
     const invDy = 1 / (kmPerDegLat * 1000 * cellLatDeg);
     const f = 2 * Omega * sinLat[j];

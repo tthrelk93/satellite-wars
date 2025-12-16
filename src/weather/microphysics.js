@@ -10,6 +10,7 @@ export function stepMicrophysics({ dt, fields }) {
   const kAuto = 1.5e-3;
   const kEvap = 0.6;
   const kFall = 0.4;
+  const kCloudEvap = 0.5; // 1/s (tunable)
 
   for (let k = 0; k < len; k++) {
     const qs = saturationMixingRatio(T[k], ps[k]);
@@ -20,7 +21,7 @@ export function stepMicrophysics({ dt, fields }) {
       qc[k] += dq;
       T[k] += (Lv / Cp) * dq;
     } else if (qv[k] < qs && qc[k] > 0) {
-      const dq = Math.min(qc[k], (qs - qv[k]) * 0.3);
+      const dq = Math.min(qc[k], (qs - qv[k]) * kCloudEvap * dt);
       qv[k] += dq;
       qc[k] -= dq;
       T[k] -= (Lv / Cp) * dq;
