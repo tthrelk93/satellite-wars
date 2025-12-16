@@ -31,12 +31,20 @@ export function stepConvection({ dt, fields, geo, grid }) {
       const qsSurf = saturationMixingRatio(Ts[k], ps[k]);
       const buoy = Math.max(0, (Ts[k] - T[k]) * 0.5 + (qv[k] - 0.7 * qsSurf) * 300);
 
-      // Orographic lift proxy
-      const oro = elev[k] * 0.2;
+      // Orographic lift (wind blowing up slope) — NOT "being high"
+      const deDx = (elev[kE] - elev[kW]) * 0.5 * invDx; // dimensionless slope
+      const deDy = (elev[kN] - elev[kS]) * 0.5 * invDy;
+      const upslopeW = Math.max(0, u[k] * deDx + v[k] * deDy); // ~ m/s vertical proxy
 
-      const trigger = (conv + oro) * buoy;
-      if (trigger > 0.02) {
-        const dq = Math.min(qv[k], trigger * 0.02 * dt);
+      // Convert convergence (1/s) to an equivalent vertical velocity scale (m/s)
+      const wConv = conv * 100000; // 100 km scale (tunable)
+      const lift = Math.min(2.0, wConv + upslopeW); // cap to avoid runaway
+
+      // Trigger combines lift + buoyancy (unitless-ish)
+      const trigger = lift * buoy;
+      if (trigger > 0.15) {
+        // Tune coefficient so dq is ~1e-4..1e-3 per step under moderate storms
+        const dq = Math.min(qv[k], trigger * 1.0e-5 * dt);
         qv[k] -= dq;
         qc[k] += dq;
         T[k] += (Lv / Cp) * dq;

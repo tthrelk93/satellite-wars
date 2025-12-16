@@ -26,12 +26,16 @@ export function advectScalar({
   v,
   dt,
   grid,
-  diffusion = 0
+  kappa = 0 // m^2/s
 }) {
   const { nx, ny, cellLonDeg, cellLatDeg, cosLat } = grid;
   const kmPerDegLat = 111.0;
   for (let j = 0; j < ny; j++) {
-    const kmPerDegLon = kmPerDegLat * cosLat[j];
+    const kmPerDegLon = Math.max(1.0, kmPerDegLat * cosLat[j]);
+    const dx = kmPerDegLon * 1000 * cellLonDeg;
+    const dy = kmPerDegLat * 1000 * cellLatDeg;
+    const invDx2 = 1 / (dx * dx);
+    const invDy2 = 1 / (dy * dy);
     for (let i = 0; i < nx; i++) {
       const k = j * nx + i;
       const dLon = (u[k] / 1000 / kmPerDegLon) * dt;
@@ -41,13 +45,19 @@ export function advectScalar({
       srcLon = ((srcLon % nx) + nx) % nx;
       srcLat = clampLat(srcLat, ny);
       let val = bilinear(src, srcLon, srcLat, nx, ny);
-      if (diffusion > 0) {
+      if (kappa > 0) {
         const iE = (i + 1) % nx;
         const iW = (i - 1 + nx) % nx;
         const jN = Math.max(0, j - 1);
         const jS = Math.min(ny - 1, j + 1);
-        const lap = src[j * nx + iE] + src[j * nx + iW] + src[jN * nx + i] + src[jS * nx + i] - 4 * src[k];
-        val += diffusion * lap;
+        const kE = j * nx + iE;
+        const kW = j * nx + iW;
+        const kN = jN * nx + i;
+        const kS = jS * nx + i;
+        const lap =
+          (src[kE] + src[kW] - 2 * src[k]) * invDx2 +
+          (src[kN] + src[kS] - 2 * src[k]) * invDy2;
+        val += kappa * dt * lap;
       }
       dst[k] = val;
     }
@@ -63,8 +73,8 @@ export function advectVector({
   v,
   dt,
   grid,
-  diffusion = 0
+  kappa = 0
 }) {
-  advectScalar({ src: uSrc, dst: uDst, u, v, dt, grid, diffusion });
-  advectScalar({ src: vSrc, dst: vDst, u, v, dt, grid, diffusion });
+  advectScalar({ src: uSrc, dst: uDst, u, v, dt, grid, kappa });
+  advectScalar({ src: vSrc, dst: vDst, u, v, dt, grid, kappa });
 }

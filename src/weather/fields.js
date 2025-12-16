@@ -15,6 +15,7 @@ export function createFields(grid) {
     rho: new Float32Array(count),
     Ts: new Float32Array(count),
     RH: new Float32Array(count),
+    vort: new Float32Array(count),
     cloud: new Float32Array(count),
     precipRate: new Float32Array(count),
     // diagnostics / helpers
