@@ -14,7 +14,7 @@ export function computeVorticity(fields, grid, vortOut) {
   const { u, v } = fields;
   const kmPerDegLat = 111.0;
   for (let j = 0; j < ny; j++) {
-    const kmPerDegLon = kmPerDegLat * cosLat[j];
+    const kmPerDegLon = Math.max(1.0, kmPerDegLat * cosLat[j]);
     const invDx = 1 / (kmPerDegLon * 1000 * cellLonDeg);
     const invDy = 1 / (kmPerDegLat * 1000 * cellLatDeg);
     for (let i = 0; i < nx; i++) {
@@ -35,11 +35,16 @@ export function computeVorticity(fields, grid, vortOut) {
 }
 
 export function computeCloudDensity(fields, cloudOut) {
-  const { qc, RH } = fields;
+  const { qc, RH, vort } = fields;
+  const smoothstep = (a, b, x) => {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
   for (let k = 0; k < qc.length; k++) {
-    const base = qc[k] * 400; // scale to ~0..1
-    const rhBoost = Math.max(0, RH[k] - 1) * 0.6;
-    cloudOut[k] = Math.max(0, Math.min(1, base + rhBoost));
+    const qcTerm = 1.0 - Math.exp(-qc[k] / 0.0015); // softer than linear
+    const rhTerm = 0.8 * smoothstep(0.85, 1.05, RH[k]); // allows stratiform clouds < 100% RH
+    const vortTerm = vort ? Math.min(0.25, Math.abs(vort[k]) * 5000) : 0;
+    cloudOut[k] = Math.max(0, Math.min(1, qcTerm + rhTerm + vortTerm));
   }
 }
 
