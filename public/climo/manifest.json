@@ -1,0 +1,157 @@
+{
+  "version": 1,
+  "size": { "w": 360, "h": 180 },
+  "sst": {
+    "type": "monthly_gray",
+    "files": [
+      "sst_00.png",
+      "sst_01.png",
+      "sst_02.png",
+      "sst_03.png",
+      "sst_04.png",
+      "sst_05.png",
+      "sst_06.png",
+      "sst_07.png",
+      "sst_08.png",
+      "sst_09.png",
+      "sst_10.png",
+      "sst_11.png"
+    ],
+    "units": "K",
+    "decode": { "min": 271.15, "max": 307.15 }
+  },
+  "seaIce": {
+    "type": "monthly_gray_optional",
+    "files": [
+      "ice_00.png",
+      "ice_01.png",
+      "ice_02.png",
+      "ice_03.png",
+      "ice_04.png",
+      "ice_05.png",
+      "ice_06.png",
+      "ice_07.png",
+      "ice_08.png",
+      "ice_09.png",
+      "ice_10.png",
+      "ice_11.png"
+    ],
+    "units": "fraction",
+    "decode": { "min": 0.0, "max": 1.0 }
+  },
+  "topography": {
+    "type": "static_gray",
+    "file": "topo.png",
+    "units": "m",
+    "decode": { "min": 0, "max": 5000 }
+  },
+  "albedo": {
+    "type": "static_gray",
+    "file": "albedo.png",
+    "units": "unitless",
+    "decode": { "min": 0.02, "max": 0.85 }
+  },
+  "soilCap": {
+    "type": "static_gray",
+    "file": "soilcap.png",
+    "units": "fraction",
+    "decode": { "min": 0.0, "max": 1.0 }
+  },
+  "optionalNudging": {
+    "slp": {
+      "type": "monthly_gray_optional",
+      "files": [
+        "slp_00.png",
+        "slp_01.png",
+        "slp_02.png",
+        "slp_03.png",
+        "slp_04.png",
+        "slp_05.png",
+        "slp_06.png",
+        "slp_07.png",
+        "slp_08.png",
+        "slp_09.png",
+        "slp_10.png",
+        "slp_11.png"
+      ],
+      "units": "Pa",
+      "decode": { "min": 95000, "max": 105000 }
+    },
+    "wind": {
+      "type": "monthly_rg_optional",
+      "files": [
+        "wind_00.png",
+        "wind_01.png",
+        "wind_02.png",
+        "wind_03.png",
+        "wind_04.png",
+        "wind_05.png",
+        "wind_06.png",
+        "wind_07.png",
+        "wind_08.png",
+        "wind_09.png",
+        "wind_10.png",
+        "wind_11.png"
+      ],
+      "units": "m/s",
+      "decode": { "maxAbs": 30 }
+    },
+    "wind500": {
+      "type": "monthly_rg_optional",
+      "files": [
+        "wind500_00.png",
+        "wind500_01.png",
+        "wind500_02.png",
+        "wind500_03.png",
+        "wind500_04.png",
+        "wind500_05.png",
+        "wind500_06.png",
+        "wind500_07.png",
+        "wind500_08.png",
+        "wind500_09.png",
+        "wind500_10.png",
+        "wind500_11.png"
+      ],
+      "units": "m/s",
+      "decode": { "maxAbs": 80 }
+    },
+    "wind250": {
+      "type": "monthly_rg_optional",
+      "files": [
+        "wind250_00.png",
+        "wind250_01.png",
+        "wind250_02.png",
+        "wind250_03.png",
+        "wind250_04.png",
+        "wind250_05.png",
+        "wind250_06.png",
+        "wind250_07.png",
+        "wind250_08.png",
+        "wind250_09.png",
+        "wind250_10.png",
+        "wind250_11.png"
+      ],
+      "units": "m/s",
+      "decode": { "maxAbs": 100 }
+    },
+    "t2m": {
+      "type": "monthly_gray_optional",
+      "files": [
+        "t2m_00.png",
+        "t2m_01.png",
+        "t2m_02.png",
+        "t2m_03.png",
+        "t2m_04.png",
+        "t2m_05.png",
+        "t2m_06.png",
+        "t2m_07.png",
+        "t2m_08.png",
+        "t2m_09.png",
+        "t2m_10.png",
+        "t2m_11.png"
+      ],
+      "units": "K",
+      "decode": { "min": 220, "max": 320 }
+    }
+  }
+}
