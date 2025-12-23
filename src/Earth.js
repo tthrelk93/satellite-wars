@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import HQ from './HQ';
+import WeatherField from './WeatherField';
 import earthmap from './8081_earthmap10k.jpg';
 import earthbump from './8081_earthbump10k.jpg';
 import fogTexture from './fog.png'; // Add your fog texture map here
@@ -26,10 +27,44 @@ class Earth {
     });
     this.cloudMesh = new THREE.Mesh(this.cloudGeometry, this.cloudMaterial);
 
+    // Weather layers (dynamic clouds under FoW)
+    this.weatherField = new WeatherField();
+    this.weatherLowGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 120, 256, 256);
+    this.weatherHighGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 160, 256, 256);
+    this.weatherLowMaterial = new THREE.MeshPhongMaterial({
+      map: this.weatherField.textureLow,
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false
+    });
+    this.weatherHighMaterial = new THREE.MeshPhongMaterial({
+      map: this.weatherField.textureHigh,
+      transparent: true,
+      opacity: 0.6,
+      depthWrite: false
+    });
+    this.weatherLowMesh = new THREE.Mesh(this.weatherLowGeometry, this.weatherLowMaterial);
+    this.weatherHighMesh = new THREE.Mesh(this.weatherHighGeometry, this.weatherHighMaterial);
+
+    this.weatherDebugGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 220, 256, 256);
+    this.weatherDebugMaterial = new THREE.MeshBasicMaterial({
+      map: this.weatherField.getDebugTexture(),
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false
+    });
+    this.weatherDebugMesh = new THREE.Mesh(this.weatherDebugGeometry, this.weatherDebugMaterial);
+    this.weatherDebugMesh.visible = false;
+    this.weatherVisible = true;
+    this.weatherDebugMode = 'clouds';
+
     // Create a parent object to hold both the Earth and the spheres
     this.parentObject = new THREE.Object3D();
     this.parentObject.add(this.mesh);
+    this.parentObject.add(this.weatherLowMesh);
+    this.parentObject.add(this.weatherHighMesh);
     this.parentObject.add(this.cloudMesh);
+    this.parentObject.add(this.weatherDebugMesh);
 
     // Create a main canvas to dynamically update the fog texture
     this.canvas = document.createElement('canvas');
@@ -131,9 +166,11 @@ class Earth {
         return newHQ;
       }
 
-  update() {
-    const rotScale = 8640000;
-    this.parentObject.rotation.y += (2 * Math.PI) / rotScale; // Rotate the parent object
+  update(simTimeSeconds, realDtSeconds, simContext) {
+    const daySeconds = 86400;
+    const dayFrac = (((simTimeSeconds / daySeconds) % 1) + 1) % 1;
+    this.parentObject.rotation.y = 2 * Math.PI * (dayFrac - 0.5);
+    this.weatherField?.update(simTimeSeconds, realDtSeconds, simContext);
   }
 
     revealFog(position, fov, logPosition = false, radius, playerID) {
@@ -157,6 +194,13 @@ class Earth {
 
         // Convert u, v to a string to use as a key
         const positionKey = `${u.toFixed(6)}-${v.toFixed(6)}`;
+
+        // Weather check: if dense cloud cover, block reveal
+        const cloudCover = this.weatherField?.sampleWeather(u, v) ?? 0;
+        const CLOUD_BLOCK = 0.45;
+        if (cloudCover > CLOUD_BLOCK) {
+          return; // imaging blocked by weather
+        }
 
         // Ensure player-specific revealed positions and fog maps are initialized
         if (!this.revealedPositions[playerID.current]) {
@@ -203,6 +247,83 @@ class Earth {
   setCurrentPlayer(playerID) {
     this.currentPlayerID = playerID;
     this.updateFogMapForCurrentPlayer();
+  }
+
+  setFogVisible(visible) {
+    if (this.cloudMesh) this.cloudMesh.visible = visible;
+  }
+
+  setWeatherVisible(visible) {
+    this.weatherVisible = visible;
+    if (this.weatherLowMesh) this.weatherLowMesh.visible = visible;
+    if (this.weatherHighMesh) this.weatherHighMesh.visible = visible;
+    if (this.weatherDebugMesh) {
+      this.weatherDebugMesh.visible = visible && this.weatherDebugMode !== 'clouds';
+    }
+  }
+
+  setWeatherDebugMode(mode) {
+    this.weatherDebugMode = mode || 'clouds';
+    this.weatherField?.setDebugMode(this.weatherDebugMode);
+    if (this.weatherDebugMesh) {
+      this.weatherDebugMesh.visible = this.weatherVisible && this.weatherDebugMode !== 'clouds';
+    }
+  }
+
+  setWeatherPaused(paused) {
+    this.weatherField?.setPaused(paused);
+  }
+
+  weatherStepHours(hours = 1) {
+    this.weatherField?.stepModelSeconds(hours * 3600);
+  }
+
+  weatherStepDays(days = 1) {
+    this.weatherField?.stepModelSeconds(days * 86400);
+  }
+
+  getWeatherZonalMean(mode) {
+    return this.weatherField?.getZonalMean(mode) ?? new Float32Array(0);
+  }
+
+  getWeatherTimeUTC() {
+    return this.weatherField?.getTimeUTC() ?? 0;
+  }
+
+  getWeatherSeed() {
+    return this.weatherField?.getSeed();
+  }
+
+  setWeatherSeed(seed) {
+    this.weatherField?.setSeed(seed);
+  }
+
+  startWeatherLogCapture(options) {
+    this.weatherField?.startLogCapture(options);
+  }
+
+  stopWeatherLogCapture() {
+    this.weatherField?.stopLogCapture();
+  }
+
+  clearWeatherLogCapture() {
+    this.weatherField?.clearLogCapture();
+  }
+
+  downloadWeatherLogCapture(filename) {
+    return this.weatherField?.downloadLogCapture(filename);
+  }
+
+  setWeatherLogCadence(cadenceSeconds, simTimeSeconds) {
+    this.weatherField?.setLogCadence(cadenceSeconds, simTimeSeconds);
+  }
+
+  getWeatherLogStatus() {
+    return this.weatherField?.getLogStatus() ?? { enabled: false, count: 0, cadenceSeconds: 0 };
+  }
+
+  weatherLogNow(simTimeSeconds, simContext, reason) {
+    return this.weatherField?.logNow(simTimeSeconds, simContext, reason);
   }
 
   render(scene) {

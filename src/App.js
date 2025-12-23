@@ -6,6 +6,8 @@ import Earth from './Earth';
 import HQ from './HQ';
 import Player from './Player';
 import { UPKEEP_PER_SAT, INCOME_PER_COMM_IN_LINK, INCOME_PER_IMAGING_IN_LINK, BASE_INCOME_PER_TURN, MU_EARTH, RE_M, OMEGA_EARTH, LOSSES_MPS, DV_REF_MPS, DV_EXPONENT, COMM_RANGE_KM, HQ_RANGE_KM, SPACE_LOS_EPS, GROUND_LOS_EPS } from './constants';
+import SimClock from './SimClock';
+import { solarDeclination } from './weather/solar';
 
 import { EventBus } from './EventBus';
 import { TurnManager, AP_MAX } from './TurnManager';
@@ -21,6 +23,8 @@ import {
     Slider,
     FormControl,
     InputLabel,
+    FormControlLabel,
+    Switch,
     Box,
     Typography,
     Paper,
@@ -34,11 +38,107 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
 
+const WEATHER_DEBUG_OPTIONS = [
+    { value: 'clouds', label: 'Clouds (normal)' },
+    { value: 'ps', label: 'Pressure (ps)' },
+    { value: 'T', label: 'Temp (T)' },
+    { value: 'Ts', label: 'Surface Temp (Ts)' },
+    { value: 'TU', label: 'Upper Temp (TU)' },
+    { value: 'RHU', label: 'Upper RH (RHU)' },
+    { value: 'sst', label: 'SST (climo)' },
+    { value: 'seaIce', label: 'Sea Ice (climo)' },
+    { value: 'albedo', label: 'Albedo (climo)' },
+    { value: 'elev', label: 'Elevation (climo)' },
+    { value: 'soilCap', label: 'Soil Capacity (climo)' },
+    { value: 'landMask', label: 'Land Mask' },
+    { value: 'RH', label: 'RH' },
+    { value: 'wind', label: 'Wind (arrows)' },
+    { value: 'windUpper', label: 'Upper Wind (speed)' },
+    { value: 'hUpper', label: 'Upper Thickness (hU)' },
+    { value: 'omegaL', label: 'Omega (lower)' },
+    { value: 'omegaU', label: 'Omega (upper)' },
+    { value: 'tauLow', label: 'Tau (low)' },
+    { value: 'tauHigh', label: 'Tau (high)' },
+    { value: 'cloudLow', label: 'Cloud Low' },
+    { value: 'cloudHigh', label: 'Cloud High' },
+    { value: 'cwpLow', label: 'CWP (low)' },
+    { value: 'cwpHigh', label: 'CWP (high)' },
+    { value: 'div', label: 'Divergence' },
+    { value: 'vort', label: 'Vorticity' },
+    { value: 'cwp', label: 'Cloud Water Path' },
+    { value: 'precip', label: 'Precip (mm/hr)' }
+];
+
+const WEATHER_DEBUG_SCALE = {
+    clouds: { min: 0, max: 1 },
+    ps: { min: 95000, max: 103000 },
+    T: { min: 240, max: 320 },
+    Ts: { min: 240, max: 320 },
+    TU: { min: 180, max: 320 },
+    RHU: { min: 0, max: 1.2 },
+    sst: { min: 271, max: 307 },
+    seaIce: { min: 0, max: 1 },
+    albedo: { min: 0, max: 1 },
+    elev: { min: 0, max: 5000 },
+    soilCap: { min: 0, max: 1 },
+    landMask: { min: 0, max: 1 },
+    RH: { min: 0, max: 1.2 },
+    wind: { min: 0, max: 30 },
+    windUpper: { min: 0, max: 100 },
+    hUpper: { min: 1000, max: 5000 },
+    omegaL: { min: -0.2, max: 0.2, diverging: true },
+    omegaU: { min: -0.2, max: 0.2, diverging: true },
+    tauLow: { min: 0, max: 20 },
+    tauHigh: { min: 0, max: 20 },
+    cloudLow: { min: 0, max: 1 },
+    cloudHigh: { min: 0, max: 1 },
+    cwpLow: { min: 0, max: 0.5, log: true },
+    cwpHigh: { min: 0, max: 0.5, log: true },
+    vort: { min: -5e-5, max: 5e-5, diverging: true },
+    div: { min: -5e-5, max: 5e-5, diverging: true },
+    cwp: { min: 0, max: 0.5, log: true },
+    precip: { min: 0, max: 50, log: true }
+};
+
+const SIM_SPEED_DEFAULT = 3600;
+const SIM_SPEED_MAX = 14400;
+const SIM_SPEED_MARKS = [
+    { value: 0, label: '1x' },
+    { value: 1, label: '10x' },
+    { value: 2, label: '100x' },
+    { value: 3, label: '1k' },
+    { value: 4, label: '10k' },
+    { value: Math.log10(SIM_SPEED_MAX), label: `${(SIM_SPEED_MAX / 1000).toFixed(1)}k` }
+];
+
+const WEATHER_LOG_CADENCE_OPTIONS = [
+    { value: 600, label: '10 min' },
+    { value: 3600, label: '1 hour' },
+    { value: 21600, label: '6 hours' },
+    { value: 86400, label: '1 day' }
+];
+
 const App = () => {
     const mountRef = useRef(null);
     const [gameMode, setGameMode] = useState(null); // 'solo' or 'pvp'
     const [showMenu, setShowMenu] = useState(false);
     const [showSatPanel, setShowSatPanel] = useState(false);
+    const [showFogLayer, setShowFogLayer] = useState(true);
+    const [showWeatherLayer, setShowWeatherLayer] = useState(true);
+    const showFogLayerRef = useRef(true);
+    const showWeatherLayerRef = useRef(true);
+    const [weatherDebugMode, setWeatherDebugMode] = useState('clouds');
+    const weatherDebugModeRef = useRef('clouds');
+    const [simPausedUI, setSimPausedUI] = useState(false);
+    const [simSpeedUI, setSimSpeedUI] = useState(SIM_SPEED_DEFAULT);
+    const [simTimeLabel, setSimTimeLabel] = useState('Day 0, 00:00');
+    const [weatherSeed, setWeatherSeed] = useState('');
+    const [weatherSeedInput, setWeatherSeedInput] = useState('');
+    const [weatherLogEnabled, setWeatherLogEnabled] = useState(false);
+    const [weatherLogCadence, setWeatherLogCadence] = useState(3600);
+    const [weatherLogCount, setWeatherLogCount] = useState(0);
+    const zonalCanvasRef = useRef(null);
+    const seedEditedRef = useRef(false);
     const orbitPreviewRef = useRef(null); // Green orbit preview line
     const orbitHandlesRef = useRef([]);   // Draggable preview handle meshes
     const orbitArrowsRef = useRef([]); // little direction arrows
@@ -66,7 +166,11 @@ const App = () => {
     const earthRef = useRef(null);
     const cameraRef = useRef(null);
     const rendererRef = useRef(null);
+    const directionalLightRef = useRef(null);
     const controlsRef = useRef(null);
+    const simClockRef = useRef(new SimClock({ startTimeSeconds: 0, simSpeed: SIM_SPEED_DEFAULT, paused: false }));
+    const lastFrameMsRef = useRef(null);
+    const sunDirRef = useRef(new THREE.Vector3());
     const orbitHoveringRef = useRef(false); // true while pointer over orbit gizmo
     // Live mirrors for state that global listeners read
     const showSatPanelRef = useRef(false);
@@ -123,7 +227,16 @@ const App = () => {
         setShowMenu(false);
         setShowSatPanel(false);
         setShowStrikePad(false);
+        setWeatherLogEnabled(false);
+        setWeatherLogCount(0);
         showHQSphereRef.current = false;
+
+        const simClock = simClockRef.current;
+        simClock.simTimeSeconds = 0;
+        simClock.setSpeed(simSpeedUI);
+        simClock.setPaused(simPausedUI);
+        lastFrameMsRef.current = null;
+        setSimTimeLabel('Day 0, 00:00');
 
         // Core systems setup
         const eventBus = new EventBus();
@@ -232,6 +345,9 @@ const App = () => {
         const earth = new Earth(camera, playersList);
         earth.render(scene);
         earthRef.current = earth;
+        earth.setWeatherDebugMode(weatherDebugModeRef.current);
+        earth.setWeatherVisible(showWeatherLayerRef.current);
+        earth.setFogVisible(showFogLayerRef.current);
 
         // Sync view and objects on turn start (after Earth exists)
         eventBus.on('TURN_STARTED', ({ playerId }) => {
@@ -258,8 +374,11 @@ const App = () => {
         const ambientLight = new THREE.AmbientLight(0x404040);
         scene.add(ambientLight);
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-        directionalLight.position.set(5, 3, 5);
+        directionalLight.position.set(1, 0, 0);
+        directionalLight.target.position.set(0, 0, 0);
+        scene.add(directionalLight.target);
         scene.add(directionalLight);
+        directionalLightRef.current = directionalLight;
 
         // Add AxesHelper to the scene
         const axesHelper = new THREE.AxesHelper(80);
@@ -774,10 +893,211 @@ const App = () => {
         if (el) el.style.cursor = '';
     }
 
+    const formatSimTime = (seconds) => {
+        if (!Number.isFinite(seconds)) return 'Day 0, 00:00';
+        const total = Math.max(0, Math.floor(seconds));
+        const day = Math.floor(total / 86400);
+        const hours = Math.floor((total % 86400) / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+        const pad = (value) => String(value).padStart(2, '0');
+        return `Day ${day}, ${pad(hours)}:${pad(minutes)}`;
+    };
+
+    const getZonalScale = (values, mode) => {
+        const config = WEATHER_DEBUG_SCALE[mode] || WEATHER_DEBUG_SCALE.clouds;
+        const transform = config.log
+            ? (v) => Math.log10(1 + Math.max(0, v))
+            : (v) => v;
+        let min = transform(config.min);
+        let max = transform(config.max);
+        if (values && values.length > 0) {
+            const sorted = Array.from(values, (v) => {
+                const t = transform(v);
+                return Number.isFinite(t) ? t : 0;
+            });
+            sorted.sort((a, b) => a - b);
+            const lo = Math.floor(0.05 * (sorted.length - 1));
+            const hi = Math.floor(0.95 * (sorted.length - 1));
+            const pMin = sorted[Math.max(0, lo)];
+            const pMax = sorted[Math.min(sorted.length - 1, hi)];
+            if (Number.isFinite(pMin) && Number.isFinite(pMax) && pMax > pMin) {
+                min = pMin;
+                max = pMax;
+            }
+        }
+        if (config.diverging) {
+            const maxAbs = Math.max(Math.abs(min), Math.abs(max)) || 1;
+            min = -maxAbs;
+            max = maxAbs;
+        }
+        if (!(max > min)) {
+            min = 0;
+            max = 1;
+        }
+        return { min, max, transform, diverging: Boolean(config.diverging) };
+    };
+
+    const drawZonalMean = (canvas, values, mode) => {
+        if (!canvas || !values || values.length === 0) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.fillRect(0, 0, w, h);
+        const pad = 6;
+        const plotW = w - pad * 2;
+        const plotH = h - pad * 2;
+        const { min, max, transform, diverging } = getZonalScale(values, mode);
+        const denom = max - min || 1;
+
+        if (diverging) {
+            const zeroX = pad + ((transform(0) - min) / denom) * plotW;
+            ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+            ctx.beginPath();
+            ctx.moveTo(zeroX, pad);
+            ctx.lineTo(zeroX, pad + plotH);
+            ctx.stroke();
+        }
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let j = 0; j < values.length; j++) {
+            const t = Math.max(0, Math.min(1, (transform(values[j]) - min) / denom));
+            const x = pad + t * plotW;
+            const y = pad + (j / Math.max(1, values.length - 1)) * plotH;
+            if (j === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.strokeRect(pad, pad, plotW, plotH);
+    };
+
+    function updateWeatherDebugNow() {
+        const simTime = simClockRef.current?.simTimeSeconds ?? 0;
+        setSimTimeLabel(formatSimTime(simTime));
+        const earth = earthRef.current;
+        if (!earth) return;
+        const seed = earth.getWeatherSeed();
+        if (seed !== undefined && seed !== null) {
+            const seedText = String(seed);
+            setWeatherSeed(seedText);
+            if (!seedEditedRef.current) {
+                setWeatherSeedInput(seedText);
+            }
+        }
+        const canvas = zonalCanvasRef.current;
+        if (canvas) {
+            const zonal = earth.getWeatherZonalMean(weatherDebugModeRef.current);
+            drawZonalMean(canvas, zonal, weatherDebugModeRef.current);
+        }
+        const logStatus = earth.getWeatherLogStatus?.();
+        if (logStatus && Number.isFinite(logStatus.count)) {
+            setWeatherLogCount(logStatus.count);
+        }
+    }
+
+    const handleWeatherSeedChange = (event) => {
+        setWeatherSeedInput(event.target.value);
+        seedEditedRef.current = true;
+    };
+
+    const applyWeatherSeed = () => {
+        const seed = Number.parseInt(weatherSeedInput, 10);
+        if (!Number.isFinite(seed)) return;
+        seedEditedRef.current = false;
+        earthRef.current?.setWeatherSeed(seed);
+        updateWeatherDebugNow();
+    };
+
+    const speedToSliderValue = (speed) => {
+        if (!Number.isFinite(speed) || speed <= 0) return 0;
+        return Math.log10(speed);
+    };
+
+    const sliderValueToSpeed = (value) => {
+        const v = Number.isFinite(value) ? value : 0;
+        return Math.min(SIM_SPEED_MAX, Math.pow(10, v));
+    };
+
+    const handleSimSpeedChange = (_, value) => {
+        const raw = Array.isArray(value) ? value[0] : value;
+        const nextSpeed = Math.round(sliderValueToSpeed(raw));
+        setSimSpeedUI(nextSpeed);
+    };
+
+    const handleWeatherLogCadenceChange = (event) => {
+        const nextCadence = Number(event.target.value);
+        if (!Number.isFinite(nextCadence)) return;
+        setWeatherLogCadence(nextCadence);
+        const simTime = simClockRef.current?.simTimeSeconds ?? 0;
+        earthRef.current?.setWeatherLogCadence(nextCadence, simTime);
+    };
+
+    const toggleWeatherLogCapture = () => {
+        const earth = earthRef.current;
+        if (!earth) return;
+        const simClock = simClockRef.current;
+        const nextEnabled = !weatherLogEnabled;
+        setWeatherLogEnabled(nextEnabled);
+        if (nextEnabled) {
+            earth.startWeatherLogCapture({
+                cadenceSeconds: weatherLogCadence,
+                simTimeSeconds: simClock.simTimeSeconds
+            });
+        } else {
+            earth.stopWeatherLogCapture();
+        }
+        updateWeatherDebugNow();
+    };
+
+    const clearWeatherLogCapture = () => {
+        earthRef.current?.clearWeatherLogCapture();
+        setWeatherLogCount(0);
+    };
+
+    const downloadWeatherLogCapture = () => {
+        earthRef.current?.downloadWeatherLogCapture(`weather-log-${Date.now()}.jsonl`);
+    };
+
 
     useEffect(() => { showSatPanelRef.current = showSatPanel; }, [showSatPanel]);
     useEffect(() => { altitudeRef.current = altitude; }, [altitude]);
     useEffect(() => { inclinationRef.current = inclination; }, [inclination]);
+    useEffect(() => {
+        showFogLayerRef.current = showFogLayer;
+        if (earthRef.current) earthRef.current.setFogVisible(showFogLayer);
+    }, [showFogLayer]);
+    useEffect(() => {
+        showWeatherLayerRef.current = showWeatherLayer;
+        if (earthRef.current) earthRef.current.setWeatherVisible(showWeatherLayer);
+    }, [showWeatherLayer]);
+    useEffect(() => {
+        weatherDebugModeRef.current = weatherDebugMode;
+        if (earthRef.current) earthRef.current.setWeatherDebugMode(weatherDebugMode);
+        updateWeatherDebugNow();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [weatherDebugMode]);
+    useEffect(() => {
+        simClockRef.current.setPaused(simPausedUI);
+    }, [simPausedUI]);
+    useEffect(() => {
+        simClockRef.current.setSpeed(Math.min(SIM_SPEED_MAX, Math.max(0, simSpeedUI)));
+    }, [simSpeedUI]);
+    useEffect(() => {
+        if (!gameMode) return;
+        const interval = setInterval(() => {
+            updateWeatherDebugNow();
+        }, 500);
+        return () => clearInterval(interval);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gameMode]);
 
     // When the Sat panel opens, default inclination to 90° (polar) and show preview.
     useEffect(() => {
@@ -970,9 +1290,33 @@ const App = () => {
             if (!rendererRef.current) return;
             requestAnimationFrame(animate);
 
+            const nowMs = performance.now();
+            if (lastFrameMsRef.current === null) {
+                lastFrameMsRef.current = nowMs;
+            }
+            const rawDtSeconds = (nowMs - lastFrameMsRef.current) / 1000;
+            const realDtSeconds = Math.max(0, Math.min(rawDtSeconds, 0.1));
+            lastFrameMsRef.current = nowMs;
+
+            const simClock = simClockRef.current;
+            simClock.tick(realDtSeconds);
+            const simTimeSeconds = simClock.simTimeSeconds;
+
             // Update Earth
             if (earthRef.current) {
-                earthRef.current.update();
+                earthRef.current.update(simTimeSeconds, realDtSeconds, {
+                    simSpeed: simClock.simSpeed,
+                    paused: simClock.paused
+                });
+            }
+
+            const directionalLight = directionalLightRef.current;
+            if (directionalLight) {
+                const dayOfYear = (((simTimeSeconds / 86400) % 365) + 365) % 365;
+                const decl = solarDeclination(dayOfYear);
+                const sunDir = sunDirRef.current;
+                sunDir.set(Math.cos(decl), Math.sin(decl), 0).normalize();
+                directionalLight.position.copy(sunDir).multiplyScalar(100000);
             }
 
             let detectedSpheres = [];
@@ -1501,6 +1845,203 @@ const App = () => {
             </Button>
 
             <div ref={mountRef} style={{ width: '100vw', height: '100vh' }} />
+            <Paper style={{ position: 'absolute', bottom: 10, left: 10, padding: 10, zIndex: 1200, backgroundColor: 'rgba(0,0,0,0.75)', color: 'white' }}>
+                <Typography variant="caption" display="block" gutterBottom>Debug Layers</Typography>
+                <FormControlLabel
+                    control={
+                        <Switch
+                            size="small"
+                            checked={showFogLayer}
+                            onChange={(_, v) => setShowFogLayer(v)}
+                            color="primary"
+                        />
+                    }
+                    label={<Typography variant="caption" style={{ color: 'white' }}>Fog of War</Typography>}
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            size="small"
+                            checked={showWeatherLayer}
+                            onChange={(_, v) => setShowWeatherLayer(v)}
+                            color="primary"
+                        />
+                    }
+                    label={<Typography variant="caption" style={{ color: 'white' }}>Weather</Typography>}
+                />
+                <Box mt={1}>
+                    <FormControl size="small" fullWidth variant="outlined">
+                        <InputLabel style={{ color: 'white' }}>Weather Debug</InputLabel>
+                        <Select
+                            value={weatherDebugMode}
+                            onChange={(e) => setWeatherDebugMode(e.target.value)}
+                            label="Weather Debug"
+                            sx={{
+                                color: 'white',
+                                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' }
+                            }}
+                        >
+                            {WEATHER_DEBUG_OPTIONS.map((option) => (
+                                <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </Box>
+                <Box display="flex" gap={1} mt={1} flexWrap="wrap">
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        color="inherit"
+                        onClick={() => setSimPausedUI(prev => !prev)}
+                    >
+                        {simPausedUI ? 'Resume Sim' : 'Pause Sim'}
+                    </Button>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        color="inherit"
+                        onClick={() => {
+                            const simClock = simClockRef.current;
+                            simClock.stepSeconds(3600);
+                            earthRef.current?.update(simClock.simTimeSeconds, 1, {
+                                simSpeed: simClock.simSpeed,
+                                paused: simClock.paused
+                            });
+                            earthRef.current?.weatherLogNow(simClock.simTimeSeconds, {
+                                simSpeed: simClock.simSpeed,
+                                paused: simClock.paused
+                            }, 'step+1h');
+                            updateWeatherDebugNow();
+                        }}
+                    >
+                        Step +1 hour
+                    </Button>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        color="inherit"
+                        onClick={() => {
+                            const simClock = simClockRef.current;
+                            simClock.stepSeconds(86400);
+                            earthRef.current?.update(simClock.simTimeSeconds, 1, {
+                                simSpeed: simClock.simSpeed,
+                                paused: simClock.paused
+                            });
+                            earthRef.current?.weatherLogNow(simClock.simTimeSeconds, {
+                                simSpeed: simClock.simSpeed,
+                                paused: simClock.paused
+                            }, 'step+1d');
+                            updateWeatherDebugNow();
+                        }}
+                    >
+                        Step +1 day
+                    </Button>
+                </Box>
+                <Box mt={1}>
+                    <Typography variant="caption" display="block" style={{ color: 'white' }}>
+                        Sim speed: {simSpeedUI.toLocaleString()}x
+                    </Typography>
+                    <Slider
+                        size="small"
+                        min={0}
+                        max={Math.log10(SIM_SPEED_MAX)}
+                        step={0.1}
+                        marks={SIM_SPEED_MARKS}
+                        value={speedToSliderValue(simSpeedUI)}
+                        onChange={handleSimSpeedChange}
+                        sx={{ color: 'white' }}
+                    />
+                </Box>
+                <Typography variant="caption" display="block" style={{ color: 'white', marginTop: 6 }}>
+                    Sim time: {simTimeLabel}{simPausedUI ? ' (paused)' : ''}
+                </Typography>
+                <Box mt={1}>
+                    <Typography variant="caption" display="block" style={{ color: 'white' }}>
+                        Weather Log Capture
+                    </Typography>
+                    <Box display="flex" gap={1} mt={0.5} flexWrap="wrap">
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            color="inherit"
+                            onClick={toggleWeatherLogCapture}
+                        >
+                            {weatherLogEnabled ? 'Stop Capture' : 'Start Capture'}
+                        </Button>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            color="inherit"
+                            onClick={clearWeatherLogCapture}
+                        >
+                            Clear
+                        </Button>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            color="inherit"
+                            onClick={downloadWeatherLogCapture}
+                            disabled={weatherLogCount === 0}
+                        >
+                            Download
+                        </Button>
+                    </Box>
+                    <Box mt={1}>
+                        <FormControl size="small" fullWidth variant="outlined">
+                            <InputLabel style={{ color: 'white' }}>Log Cadence</InputLabel>
+                            <Select
+                                value={weatherLogCadence}
+                                onChange={handleWeatherLogCadenceChange}
+                                label="Log Cadence"
+                                sx={{
+                                    color: 'white',
+                                    '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' }
+                                }}
+                            >
+                                {WEATHER_LOG_CADENCE_OPTIONS.map((option) => (
+                                    <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Box>
+                    <Typography variant="caption" display="block" style={{ color: 'white', marginTop: 4 }}>
+                        Entries: {weatherLogCount}{weatherLogEnabled ? ' (capturing)' : ''}
+                    </Typography>
+                </Box>
+                <Box mt={1}>
+                    <Typography variant="caption" display="block" style={{ color: 'white' }}>
+                        Zonal Mean ({weatherDebugMode})
+                    </Typography>
+                    <canvas
+                        ref={zonalCanvasRef}
+                        width={180}
+                        height={120}
+                        style={{ width: 180, height: 120, border: '1px solid rgba(255,255,255,0.2)' }}
+                    />
+                </Box>
+                <Box display="flex" gap={1} mt={1} alignItems="center">
+                    <TextField
+                        size="small"
+                        variant="outlined"
+                        label="Seed"
+                        value={weatherSeedInput}
+                        onChange={handleWeatherSeedChange}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                                applyWeatherSeed();
+                            }
+                        }}
+                        InputLabelProps={{ style: { color: 'white' } }}
+                        inputProps={{ style: { color: 'white' } }}
+                    />
+                    <Button size="small" variant="outlined" color="inherit" onClick={applyWeatherSeed}>
+                        Apply
+                    </Button>
+                </Box>
+                <Typography variant="caption" display="block" style={{ color: 'white', marginTop: 4 }}>
+                    Current seed: {weatherSeed || '...'}
+                </Typography>
+            </Paper>
 
             <Typography variant="h6" style={{ position: 'absolute', top: 20, right: 430, zIndex: 1000, color: 'white' }}>
                 Funds: {'$'}{Math.round((currentPlayerRef.current?.funds ?? 0) / 1_000_000)}M

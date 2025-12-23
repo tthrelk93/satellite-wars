@@ -41,17 +41,22 @@ export function updateSurface({
 }) {
   const { nx, ny } = grid;
   const { Ts, T, qv, ps, u, v, rho } = fields;
-  const { soilM, landMask, albedo } = geo;
+  const { soilM, soilCap, landMask, sstNow, iceNow } = geo;
 
   const C_land = 2e6; // J/m^2/K
   const C_ocean = 4e8; // J/m^2/K
   const Gk = 0.00005; // ground relaxation
+  const tauSST = 7 * 86400;
 
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
       const k = j * nx + i;
       const land = landMask[k] === 1;
       const cap = land ? C_land : C_ocean;
+
+      if (!land && sstNow) {
+        Ts[k] += (sstNow[k] - Ts[k]) * (dt / tauSST);
+      }
 
       const { Rnet } = rad[k];
       const flux = bulkFluxes({
@@ -63,9 +68,13 @@ export function updateSurface({
         p: ps[k],
         rho: rho[k],
         land,
-        soilM: soilM[k],
+        soilM: soilCap ? soilCap[k] : soilM[k],
         hbl
       });
+      if (!land && iceNow) {
+        const ice = Math.max(0, Math.min(1, iceNow[k]));
+        flux.evap *= 1 - ice;
+      }
       const LE = Lv * flux.evap;
       const G = Gk * (Ts[k] - 280); // weak deep soil relax
       const dTs = (Rnet - flux.H - LE - G) / cap;

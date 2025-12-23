@@ -2,12 +2,14 @@
 import { clampLat } from './grid';
 
 export function bilinear(field, lon, lat, nx, ny) {
-  const i0 = Math.floor(lon);
-  const j0 = Math.floor(lat);
+  const lonWrapped = ((lon % nx) + nx) % nx;
+  const latClamped = Math.max(0, Math.min(ny - 1, lat));
+  const i0 = Math.floor(lonWrapped);
+  const j0 = Math.floor(latClamped);
   const i1 = (i0 + 1) % nx;
   const j1 = Math.min(ny - 1, j0 + 1);
-  const fi = lon - i0;
-  const fj = lat - j0;
+  const fi = lonWrapped - i0;
+  const fj = latClamped - j0;
 
   const k00 = j0 * nx + i0;
   const k10 = j0 * nx + i1;
@@ -29,10 +31,9 @@ export function advectScalar({
   kappa = 0 // m^2/s
 }) {
   const { nx, ny, cellLonDeg, cellLatDeg, cosLat } = grid;
-  const minKmPerDegLon = 20;
   const kmPerDegLat = 111.0;
   for (let j = 0; j < ny; j++) {
-    const kmPerDegLon = Math.max(minKmPerDegLon, kmPerDegLat * cosLat[j]);
+    const kmPerDegLon = Math.max(1.0, kmPerDegLat * cosLat[j]);
 
     const dx = kmPerDegLon * 1000 * cellLonDeg;
     const dy = kmPerDegLat * 1000 * cellLatDeg;

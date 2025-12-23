@@ -57,3 +57,32 @@ export function stepMicrophysics({ dt, fields }) {
   }
 }
 
+export function stepUpperCloudMicrophysics({ dt, fields }) {
+  const { TU, qvU, qcU } = fields;
+  const len = TU.length;
+  const P_UPPER = 50000;
+  const kCloudEvap = 0.2;
+  const tauAnvil = 36 * 3600;
+
+  for (let k = 0; k < len; k++) {
+    const qs = saturationMixingRatio(TU[k], P_UPPER);
+    if (qvU[k] > qs) {
+      const dq = qvU[k] - qs;
+      qvU[k] -= dq;
+      qcU[k] += dq;
+      TU[k] += (Lv / Cp) * dq;
+    } else if (qvU[k] < qs && qcU[k] > 0) {
+      const dq = Math.min(qcU[k], (qs - qvU[k]) * kCloudEvap * dt);
+      qvU[k] += dq;
+      qcU[k] -= dq;
+      TU[k] -= (Lv / Cp) * dq;
+    }
+
+    if (tauAnvil > 0) {
+      qcU[k] *= Math.exp(-dt / tauAnvil);
+    }
+
+    qvU[k] = Math.max(0, qvU[k]);
+    qcU[k] = Math.max(0, qcU[k]);
+  }
+}
