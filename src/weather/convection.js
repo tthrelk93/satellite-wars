@@ -5,10 +5,14 @@ import { saturationMixingRatio } from './surface';
 export function stepConvection({ dt, fields, geo, grid }) {
   const { nx, ny, cellLonDeg, cellLatDeg, cosLat } = grid;
   const minKmPerDegLon = 20; // avoid runaway metrics near poles
-  const { T, Ts, TU, qv, qvU, qc, qcU, ps, u, v, hL, hU } = fields;
+  const { T, Ts, TU, qv, qvU, qc, qcU, ps, u, v, hL, hU, omegaL } = fields;
   const { elev } = geo;
   const hMin = 500;
   const tauConv = 2 * 3600;
+  const smoothstep = (a, b, x) => {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  };
 
   const kmPerDegLat = 111.0;
   for (let j = 0; j < ny; j++) {
@@ -29,10 +33,6 @@ export function stepConvection({ dt, fields, geo, grid }) {
       const kN = jN * nx + i;
       const kS = jS * nx + i;
 
-      // Convergence proxy
-      const div = (u[kE] - u[kW]) * 0.5 * invDx + (v[kN] - v[kS]) * 0.5 * invDy;
-      const conv = Math.max(0, -div);
-
       // Instability proxy: surface warmer/moister than air
       const qsSurf = saturationMixingRatio(Ts[k], ps[k]);
       const rhSurf = qv[k] / Math.max(1e-8, qsSurf);
@@ -44,16 +44,16 @@ export function stepConvection({ dt, fields, geo, grid }) {
       const deDy = (elev[kN] - elev[kS]) * 0.5 * invDy;
       const upslopeW = Math.max(0, u[k] * deDx + v[k] * deDy); // ~ m/s vertical proxy
 
-      // Convert convergence (1/s) to an equivalent vertical velocity scale (m/s)
-      const horizScale = 0.5 * (dx + dy); // meters
-      const wConv = conv * horizScale;
-      const lift = Math.min(2.0, wConv + upslopeW); // cap to avoid runaway
-
+      const wAscent = Math.max(0, omegaL ? omegaL[k] : 0);
+      const w0Conv = 0.0004;
+      const w1Conv = 0.0025;
+      const lift = smoothstep(w0Conv, w1Conv, wAscent + 0.2 * upslopeW);
 
       // Trigger combines lift + buoyancy (unitless-ish)
-      const moistureGate = rhSurf > 0.85;
+      const warmGate = (Ts[k] - T[k]) > 0.2;
+      const moistureGate = rhSurf > 0.75 && warmGate;
       const trigger = moistureGate ? lift * (buoy + 0.08 * instability) : 0;
-      if (trigger > 0.15) {
+      if (trigger > 0.07) {
         const m = Math.max(0, Math.min(0.5, dt / tauConv));
         const ML = Math.max(hL[k], hMin);
         const MU = Math.max(hU[k], hMin);
@@ -66,11 +66,12 @@ export function stepConvection({ dt, fields, geo, grid }) {
         qvU[k] -= m * dQ * ratio;
 
         // Tune coefficient so dq is ~1e-4..1e-3 per step under moderate storms
-        const dq = Math.min(qv[k], trigger * 1.0e-5 * dt);
+        const dq = Math.min(qv[k], trigger * 1.2e-4 * dt);
         qv[k] -= dq;
-        const detrainFrac = 0.4;
+        const detrainFrac = 0.75;
+        const dqU = detrainFrac * dq;
         qc[k] += (1 - detrainFrac) * dq;
-        qcU[k] += detrainFrac * dq;
+        qcU[k] += dqU;
         const heat = (Lv / Cp) * dq;
         T[k] += 0.3 * heat;
         TU[k] += 0.7 * heat;

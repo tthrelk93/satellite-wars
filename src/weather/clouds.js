@@ -2,6 +2,10 @@ import { Cp, Lv } from './constants';
 import { saturationMixingRatio } from './surface';
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const smoothstep = (a, b, x) => {
+  const t = clamp01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+};
 
 export function stepStratiformClouds({ dt, fields, geo, grid }) {
   const {
@@ -22,13 +26,15 @@ export function stepStratiformClouds({ dt, fields, geo, grid }) {
   const landMask = geo?.landMask;
   const sstNow = geo?.sstNow;
 
-  const w0 = 0.005;
-  const w1 = 0.05;
+  const w0L = 0.0003;
+  const w1L = 0.0018;
+  const w0U = 0.0025;
+  const w1U = 0.013;
   const RH0 = 0.82;
-  const RH0U = 0.7;
+  const RH0U = 0.5;
   const C = 0.6e-3;
-  const CUpper = 0.4e-3;
-  const CStrat = 0.4e-3;
+  const CUpper = 0.3e-3;
+  const CStrat = 0.3e-3;
   const tauSubLowBase = 18 * 3600;
   const tauSubHighBase = 30 * 3600;
 
@@ -54,15 +60,13 @@ export function stepStratiformClouds({ dt, fields, geo, grid }) {
     const rh = qv[k] / Math.max(1e-8, qs);
     const w = omegaL[k];
 
-    if (w > w0 && rh > RH0) {
-      const asc = Math.min(1, w / w1);
-      const rhFactor = clamp01((rh - RH0) / (1 - RH0));
-      const dq = Math.min(qv[k], qv[k] * asc * rhFactor * C * dt);
-      if (dq > 0) {
-        qv[k] -= dq;
-        qc[k] += dq;
-        T[k] += (Lv / Cp) * dq;
-      }
+    const asc = smoothstep(w0L, w1L, w);
+    const rhFactor = smoothstep(RH0, 1.0, rh);
+    const dq = Math.min(qv[k], qv[k] * asc * rhFactor * C * dt);
+    if (dq > 0) {
+      qv[k] -= dq;
+      qc[k] += dq;
+      T[k] += (Lv / Cp) * dq;
     }
 
     if (useGeo && landMask[k] === 0) {
@@ -83,29 +87,27 @@ export function stepStratiformClouds({ dt, fields, geo, grid }) {
       }
     }
 
-    if (w < -0.02 && qc[k] > 0 && rh < 0.8) {
-      const f = Math.min(1, Math.abs(w) / 0.08);
-      const tau = tauSubLowBase - 10 * 3600 * f;
+    if (w < -0.0022 && qc[k] > 0 && rh < 0.8) {
+      const f = Math.min(1, Math.abs(w) / 0.003);
+      const tau = tauSubLowBase - 6 * 3600 * f;
       qc[k] *= Math.exp(-dt / Math.max(1, tau));
     }
 
     const qsU = saturationMixingRatio(TU[k], 50000);
     const rhU = qvU[k] / Math.max(1e-8, qsU);
     const wU = omegaU[k];
-    if (wU > w0 && rhU > RH0U) {
-      const ascU = Math.min(1, wU / w1);
-      const rhFactorU = clamp01((rhU - RH0U) / (1 - RH0U));
-      const dqU = Math.min(qvU[k], qvU[k] * ascU * rhFactorU * CUpper * dt);
-      if (dqU > 0) {
-        qvU[k] -= dqU;
-        qcU[k] += dqU;
-        TU[k] += (Lv / Cp) * dqU;
-      }
+    const ascU = smoothstep(w0U, w1U, wU);
+    const rhFactorU = smoothstep(RH0U, 1.0, rhU);
+    const dqU = Math.min(qvU[k], qvU[k] * ascU * rhFactorU * CUpper * dt);
+    if (dqU > 0) {
+      qvU[k] -= dqU;
+      qcU[k] += dqU;
+      TU[k] += (Lv / Cp) * dqU;
     }
 
-    if (wU < -0.02 && qcU[k] > 0 && rhU < 0.75) {
-      const fU = Math.min(1, Math.abs(wU) / 0.08);
-      const tauU = tauSubHighBase - 10 * 3600 * fU;
+    if (wU < -0.01 && qcU[k] > 0 && rhU < 0.75) {
+      const fU = Math.min(1, Math.abs(wU) / 0.03);
+      const tauU = tauSubHighBase - 12 * 3600 * fU;
       qcU[k] *= Math.exp(-dt / Math.max(1, tauU));
     }
 

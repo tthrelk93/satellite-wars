@@ -50,6 +50,7 @@ const WEATHER_DEBUG_OPTIONS = [
     { value: 'albedo', label: 'Albedo (climo)' },
     { value: 'elev', label: 'Elevation (climo)' },
     { value: 'soilCap', label: 'Soil Capacity (climo)' },
+    { value: 'soilW', label: 'Soil Water (soilW)' },
     { value: 'landMask', label: 'Land Mask' },
     { value: 'RH', label: 'RH' },
     { value: 'wind', label: 'Wind (arrows)' },
@@ -57,12 +58,16 @@ const WEATHER_DEBUG_OPTIONS = [
     { value: 'hUpper', label: 'Upper Thickness (hU)' },
     { value: 'omegaL', label: 'Omega (lower)' },
     { value: 'omegaU', label: 'Omega (upper)' },
+    { value: 'phiMid', label: 'Geopotential Φ (mid)' },
     { value: 'tauLow', label: 'Tau (low)' },
     { value: 'tauHigh', label: 'Tau (high)' },
+    { value: 'tauLowDelta', label: 'Tau Low Delta' },
     { value: 'cloudLow', label: 'Cloud Low' },
     { value: 'cloudHigh', label: 'Cloud High' },
     { value: 'cwpLow', label: 'CWP (low)' },
     { value: 'cwpHigh', label: 'CWP (high)' },
+    { value: 'tcGenesis', label: 'TC Genesis' },
+    { value: 'tcMask', label: 'TC Mask' },
     { value: 'div', label: 'Divergence' },
     { value: 'vort', label: 'Vorticity' },
     { value: 'cwp', label: 'Cloud Water Path' },
@@ -81,6 +86,7 @@ const WEATHER_DEBUG_SCALE = {
     albedo: { min: 0, max: 1 },
     elev: { min: 0, max: 5000 },
     soilCap: { min: 0, max: 1 },
+    soilW: { min: 0, max: 200 },
     landMask: { min: 0, max: 1 },
     RH: { min: 0, max: 1.2 },
     wind: { min: 0, max: 30 },
@@ -88,12 +94,16 @@ const WEATHER_DEBUG_SCALE = {
     hUpper: { min: 1000, max: 5000 },
     omegaL: { min: -0.2, max: 0.2, diverging: true },
     omegaU: { min: -0.2, max: 0.2, diverging: true },
+    phiMid: { min: 0, max: 600000 },
     tauLow: { min: 0, max: 20 },
     tauHigh: { min: 0, max: 20 },
+    tauLowDelta: { min: 0, max: 1 },
     cloudLow: { min: 0, max: 1 },
     cloudHigh: { min: 0, max: 1 },
     cwpLow: { min: 0, max: 0.5, log: true },
     cwpHigh: { min: 0, max: 0.5, log: true },
+    tcGenesis: { min: 0, max: 0.2, log: true },
+    tcMask: { min: 0, max: 1 },
     vort: { min: -5e-5, max: 5e-5, diverging: true },
     div: { min: -5e-5, max: 5e-5, diverging: true },
     cwp: { min: 0, max: 0.5, log: true },
@@ -102,6 +112,7 @@ const WEATHER_DEBUG_SCALE = {
 
 const SIM_SPEED_DEFAULT = 3600;
 const SIM_SPEED_MAX = 14400;
+const MONTH_SECONDS = (365 * 86400) / 12;
 const SIM_SPEED_MARKS = [
     { value: 0, label: '1x' },
     { value: 1, label: '10x' },
@@ -121,10 +132,18 @@ const WEATHER_LOG_CADENCE_OPTIONS = [
 const App = () => {
     const mountRef = useRef(null);
     const [gameMode, setGameMode] = useState(null); // 'solo' or 'pvp'
+    const params = new URLSearchParams(window.location.search);
+    const initialCoreVersion = params.get('weatherCore') === 'v1' || params.get('weather') === 'v1' ? 'v1' : 'v2';
+    const initialSeedParam = params.get('weatherSeed');
+    const envSeedParam = process.env.REACT_APP_WEATHER_SEED;
+    const fallbackSeed = Number.isFinite(Number.parseInt(envSeedParam, 10)) ? envSeedParam : '12345';
+    const initialSeed = Number.isFinite(Number.parseInt(initialSeedParam, 10)) ? initialSeedParam : fallbackSeed;
     const [showMenu, setShowMenu] = useState(false);
     const [showSatPanel, setShowSatPanel] = useState(false);
+    const [showSatListPanel, setShowSatListPanel] = useState(true);
     const [showFogLayer, setShowFogLayer] = useState(true);
     const [showWeatherLayer, setShowWeatherLayer] = useState(true);
+    const [showDebugPanel, setShowDebugPanel] = useState(true);
     const showFogLayerRef = useRef(true);
     const showWeatherLayerRef = useRef(true);
     const [weatherDebugMode, setWeatherDebugMode] = useState('clouds');
@@ -132,11 +151,14 @@ const App = () => {
     const [simPausedUI, setSimPausedUI] = useState(false);
     const [simSpeedUI, setSimSpeedUI] = useState(SIM_SPEED_DEFAULT);
     const [simTimeLabel, setSimTimeLabel] = useState('Day 0, 00:00');
-    const [weatherSeed, setWeatherSeed] = useState('');
-    const [weatherSeedInput, setWeatherSeedInput] = useState('');
-    const [weatherLogEnabled, setWeatherLogEnabled] = useState(false);
-    const [weatherLogCadence, setWeatherLogCadence] = useState(3600);
+    const [weatherCoreVersion, setWeatherCoreVersion] = useState(initialCoreVersion);
+    const [weatherSeed, setWeatherSeed] = useState(initialSeed);
+    const [weatherSeedInput, setWeatherSeedInput] = useState(initialSeed);
+    const [weatherLogEnabled, setWeatherLogEnabled] = useState(true);
+    const [weatherLogCadence, setWeatherLogCadence] = useState(21600);
     const [weatherLogCount, setWeatherLogCount] = useState(0);
+    const [weatherStormSummary, setWeatherStormSummary] = useState({ stormCount: 0, storms: [] });
+    const [weatherV2ConvectionEnabled, setWeatherV2ConvectionEnabled] = useState(true);
     const zonalCanvasRef = useRef(null);
     const seedEditedRef = useRef(false);
     const orbitPreviewRef = useRef(null); // Green orbit preview line
@@ -226,6 +248,8 @@ const App = () => {
         setActionPoints(AP_MAX);
         setShowMenu(false);
         setShowSatPanel(false);
+        setShowSatListPanel(true);
+        setShowDebugPanel(true);
         setShowStrikePad(false);
         setWeatherLogEnabled(false);
         setWeatherLogCount(0);
@@ -342,7 +366,11 @@ const App = () => {
         }, false);
 
         // Create Earth
-        const earth = new Earth(camera, playersList);
+        const seedNum = Number.parseInt(weatherSeed, 10);
+        const earth = new Earth(camera, playersList, {
+            useWeatherV2: weatherCoreVersion === 'v2',
+            weatherSeed: Number.isFinite(seedNum) ? seedNum : undefined
+        });
         earth.render(scene);
         earthRef.current = earth;
         earth.setWeatherDebugMode(weatherDebugModeRef.current);
@@ -1001,6 +1029,20 @@ const App = () => {
         if (logStatus && Number.isFinite(logStatus.count)) {
             setWeatherLogCount(logStatus.count);
         }
+        if (logStatus && typeof logStatus.enabled === 'boolean' && logStatus.enabled !== weatherLogEnabled) {
+            setWeatherLogEnabled(logStatus.enabled);
+        }
+        if (
+            logStatus &&
+            Number.isFinite(logStatus.cadenceSeconds) &&
+            logStatus.cadenceSeconds !== weatherLogCadence
+        ) {
+            setWeatherLogCadence(logStatus.cadenceSeconds);
+        }
+        const stormSummary = earth.getWeatherStormSummary?.();
+        if (stormSummary) {
+            setWeatherStormSummary(stormSummary);
+        }
     }
 
     const handleWeatherSeedChange = (event) => {
@@ -1012,6 +1054,7 @@ const App = () => {
         const seed = Number.parseInt(weatherSeedInput, 10);
         if (!Number.isFinite(seed)) return;
         seedEditedRef.current = false;
+        setWeatherSeed(String(seed));
         earthRef.current?.setWeatherSeed(seed);
         updateWeatherDebugNow();
     };
@@ -1057,6 +1100,20 @@ const App = () => {
         updateWeatherDebugNow();
     };
 
+    const handleV2ConvectionToggle = (_, checked) => {
+        setWeatherV2ConvectionEnabled(checked);
+        earthRef.current?.setWeatherV2ConvectionEnabled?.(checked);
+    };
+
+    const stormListText = (weatherStormSummary.storms || [])
+        .map((storm) => {
+            const lat = Number.isFinite(storm.lat) ? storm.lat.toFixed(1) : '?';
+            const lon = Number.isFinite(storm.lon) ? storm.lon.toFixed(1) : '?';
+            const vmax = Number.isFinite(storm.vmax) ? Math.round(storm.vmax) : '?';
+            return `#${storm.id} ${lat}, ${lon} ${vmax} m/s`;
+        })
+        .join(' | ');
+
     const clearWeatherLogCapture = () => {
         earthRef.current?.clearWeatherLogCapture();
         setWeatherLogCount(0);
@@ -1078,6 +1135,15 @@ const App = () => {
         showWeatherLayerRef.current = showWeatherLayer;
         if (earthRef.current) earthRef.current.setWeatherVisible(showWeatherLayer);
     }, [showWeatherLayer]);
+    useEffect(() => {
+        if (earthRef.current) earthRef.current.setWeatherCoreVersion(weatherCoreVersion);
+    }, [weatherCoreVersion]);
+    useEffect(() => {
+        if (earthRef.current) {
+            const seedNum = Number.parseInt(weatherSeed, 10);
+            if (Number.isFinite(seedNum)) earthRef.current.setWeatherSeed(seedNum);
+        }
+    }, [weatherSeed]);
     useEffect(() => {
         weatherDebugModeRef.current = weatherDebugMode;
         if (earthRef.current) earthRef.current.setWeatherDebugMode(weatherDebugMode);
@@ -1779,40 +1845,54 @@ const App = () => {
 
         const playerSatellites = currentPlayer.getSatellites();
 
+        const panelStyle = {
+            position: 'absolute',
+            top: '5%',
+            right: '1%',
+            width: '22%',
+            height: showSatListPanel ? '40%' : 'auto',
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            padding: '10px',
+            overflowY: showSatListPanel ? 'auto' : 'hidden',
+            zIndex: 1000
+        };
+
         return (
-            <div style={{
-                position: 'absolute',
-                top: '5%',
-                right: '1%',
-                width: '22%',
-                height: '40%',
-                backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                padding: '10px',
-                overflowY: 'auto',
-                zIndex: 1000
-            }}>
-                <TableContainer component={Paper}>
-                    <Table size="small" aria-label="satellites table">
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Sat ID</TableCell>
-                                <TableCell>Owner ID</TableCell>
-                                <TableCell>Lat/Lon</TableCell>
-                                <TableCell>Neighbors</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {playerSatellites.map(sat => (
-                                <TableRow key={sat.id}>
-                                    <TableCell>{sat.id}</TableCell>
-                                    <TableCell>{sat.ownerId}</TableCell>
-                                    <TableCell>{`Lat: ${sat.latitude}, Lon: ${sat.longitude}`}</TableCell>
-                                    <TableCell>{Array.from(sat.neighbors).join(', ')}</TableCell>
+            <div style={panelStyle}>
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={showSatListPanel ? 1 : 0}>
+                    <Typography variant="caption" style={{ fontWeight: 600 }}>Satellites</Typography>
+                    <IconButton
+                        size="small"
+                        onClick={() => setShowSatListPanel(prev => !prev)}
+                        aria-label="Toggle satellites panel"
+                    >
+                        {showSatListPanel ? <RemoveIcon fontSize="small" /> : <AddIcon fontSize="small" />}
+                    </IconButton>
+                </Box>
+                {showSatListPanel && (
+                    <TableContainer component={Paper}>
+                        <Table size="small" aria-label="satellites table">
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Sat ID</TableCell>
+                                    <TableCell>Owner ID</TableCell>
+                                    <TableCell>Lat/Lon</TableCell>
+                                    <TableCell>Neighbors</TableCell>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                            </TableHead>
+                            <TableBody>
+                                {playerSatellites.map(sat => (
+                                    <TableRow key={sat.id}>
+                                        <TableCell>{sat.id}</TableCell>
+                                        <TableCell>{sat.ownerId}</TableCell>
+                                        <TableCell>{`Lat: ${sat.latitude}, Lon: ${sat.longitude}`}</TableCell>
+                                        <TableCell>{Array.from(sat.neighbors).join(', ')}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                )}
             </div>
         );
     };
@@ -1845,202 +1925,312 @@ const App = () => {
             </Button>
 
             <div ref={mountRef} style={{ width: '100vw', height: '100vh' }} />
-            <Paper style={{ position: 'absolute', bottom: 10, left: 10, padding: 10, zIndex: 1200, backgroundColor: 'rgba(0,0,0,0.75)', color: 'white' }}>
-                <Typography variant="caption" display="block" gutterBottom>Debug Layers</Typography>
-                <FormControlLabel
-                    control={
-                        <Switch
-                            size="small"
-                            checked={showFogLayer}
-                            onChange={(_, v) => setShowFogLayer(v)}
-                            color="primary"
+            <Paper
+                style={{
+                    position: 'absolute',
+                    bottom: 10,
+                    left: 10,
+                    padding: showDebugPanel ? 10 : 6,
+                    zIndex: 1200,
+                    backgroundColor: 'rgba(0,0,0,0.75)',
+                    color: 'white'
+                }}
+            >
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={showDebugPanel ? 1 : 0}>
+                    <Typography variant="caption" style={{ color: 'white', fontWeight: 600 }}>Debug Layers</Typography>
+                    <IconButton
+                        size="small"
+                        onClick={() => setShowDebugPanel(prev => !prev)}
+                        aria-label="Toggle debug panel"
+                        style={{ color: 'white' }}
+                    >
+                        {showDebugPanel ? <RemoveIcon fontSize="small" /> : <AddIcon fontSize="small" />}
+                    </IconButton>
+                </Box>
+                {showDebugPanel && (
+                    <>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    size="small"
+                                    checked={showFogLayer}
+                                    onChange={(_, v) => setShowFogLayer(v)}
+                                    color="primary"
+                                />
+                            }
+                            label={<Typography variant="caption" style={{ color: 'white' }}>Fog of War</Typography>}
                         />
-                    }
-                    label={<Typography variant="caption" style={{ color: 'white' }}>Fog of War</Typography>}
-                />
-                <FormControlLabel
-                    control={
-                        <Switch
-                            size="small"
-                            checked={showWeatherLayer}
-                            onChange={(_, v) => setShowWeatherLayer(v)}
-                            color="primary"
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    size="small"
+                                    checked={showWeatherLayer}
+                                    onChange={(_, v) => setShowWeatherLayer(v)}
+                                    color="primary"
+                                />
+                            }
+                            label={<Typography variant="caption" style={{ color: 'white' }}>Weather</Typography>}
                         />
-                    }
-                    label={<Typography variant="caption" style={{ color: 'white' }}>Weather</Typography>}
-                />
-                <Box mt={1}>
-                    <FormControl size="small" fullWidth variant="outlined">
-                        <InputLabel style={{ color: 'white' }}>Weather Debug</InputLabel>
-                        <Select
-                            value={weatherDebugMode}
-                            onChange={(e) => setWeatherDebugMode(e.target.value)}
-                            label="Weather Debug"
-                            sx={{
-                                color: 'white',
-                                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' }
-                            }}
-                        >
-                            {WEATHER_DEBUG_OPTIONS.map((option) => (
-                                <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                </Box>
-                <Box display="flex" gap={1} mt={1} flexWrap="wrap">
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        color="inherit"
-                        onClick={() => setSimPausedUI(prev => !prev)}
-                    >
-                        {simPausedUI ? 'Resume Sim' : 'Pause Sim'}
-                    </Button>
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        color="inherit"
-                        onClick={() => {
-                            const simClock = simClockRef.current;
-                            simClock.stepSeconds(3600);
-                            earthRef.current?.update(simClock.simTimeSeconds, 1, {
-                                simSpeed: simClock.simSpeed,
-                                paused: simClock.paused
-                            });
-                            earthRef.current?.weatherLogNow(simClock.simTimeSeconds, {
-                                simSpeed: simClock.simSpeed,
-                                paused: simClock.paused
-                            }, 'step+1h');
-                            updateWeatherDebugNow();
-                        }}
-                    >
-                        Step +1 hour
-                    </Button>
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        color="inherit"
-                        onClick={() => {
-                            const simClock = simClockRef.current;
-                            simClock.stepSeconds(86400);
-                            earthRef.current?.update(simClock.simTimeSeconds, 1, {
-                                simSpeed: simClock.simSpeed,
-                                paused: simClock.paused
-                            });
-                            earthRef.current?.weatherLogNow(simClock.simTimeSeconds, {
-                                simSpeed: simClock.simSpeed,
-                                paused: simClock.paused
-                            }, 'step+1d');
-                            updateWeatherDebugNow();
-                        }}
-                    >
-                        Step +1 day
-                    </Button>
-                </Box>
-                <Box mt={1}>
-                    <Typography variant="caption" display="block" style={{ color: 'white' }}>
-                        Sim speed: {simSpeedUI.toLocaleString()}x
-                    </Typography>
-                    <Slider
-                        size="small"
-                        min={0}
-                        max={Math.log10(SIM_SPEED_MAX)}
-                        step={0.1}
-                        marks={SIM_SPEED_MARKS}
-                        value={speedToSliderValue(simSpeedUI)}
-                        onChange={handleSimSpeedChange}
-                        sx={{ color: 'white' }}
-                    />
-                </Box>
-                <Typography variant="caption" display="block" style={{ color: 'white', marginTop: 6 }}>
-                    Sim time: {simTimeLabel}{simPausedUI ? ' (paused)' : ''}
-                </Typography>
-                <Box mt={1}>
-                    <Typography variant="caption" display="block" style={{ color: 'white' }}>
-                        Weather Log Capture
-                    </Typography>
-                    <Box display="flex" gap={1} mt={0.5} flexWrap="wrap">
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            color="inherit"
-                            onClick={toggleWeatherLogCapture}
-                        >
-                            {weatherLogEnabled ? 'Stop Capture' : 'Start Capture'}
-                        </Button>
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            color="inherit"
-                            onClick={clearWeatherLogCapture}
-                        >
-                            Clear
-                        </Button>
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            color="inherit"
-                            onClick={downloadWeatherLogCapture}
-                            disabled={weatherLogCount === 0}
-                        >
-                            Download
-                        </Button>
-                    </Box>
-                    <Box mt={1}>
-                        <FormControl size="small" fullWidth variant="outlined">
-                            <InputLabel style={{ color: 'white' }}>Log Cadence</InputLabel>
-                            <Select
-                                value={weatherLogCadence}
-                                onChange={handleWeatherLogCadenceChange}
-                                label="Log Cadence"
-                                sx={{
-                                    color: 'white',
-                                    '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' }
+                        <Box mt={1}>
+                            <FormControl size="small" fullWidth variant="outlined" sx={{ mb: 1 }}>
+                                <InputLabel style={{ color: 'white' }}>Weather Core</InputLabel>
+                                <Select
+                                    value={weatherCoreVersion}
+                                    onChange={(e) => setWeatherCoreVersion(e.target.value)}
+                                    label="Weather Core"
+                                    sx={{
+                                        color: 'white',
+                                        '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' }
+                                    }}
+                                >
+                                    <MenuItem value="v1">v1 (legacy)</MenuItem>
+                                    <MenuItem value="v2">v2 (new)</MenuItem>
+                                </Select>
+                            </FormControl>
+                            <FormControl size="small" fullWidth variant="outlined">
+                                <InputLabel style={{ color: 'white' }}>Weather Debug</InputLabel>
+                                <Select
+                                    value={weatherDebugMode}
+                                    onChange={(e) => setWeatherDebugMode(e.target.value)}
+                                    label="Weather Debug"
+                                    sx={{
+                                        color: 'white',
+                                        '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' }
+                                    }}
+                                >
+                                    {WEATHER_DEBUG_OPTIONS.map((option) => (
+                                        <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Box>
+                        <Box display="flex" gap={1} mt={1} flexWrap="wrap">
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                color="inherit"
+                                onClick={() => setSimPausedUI(prev => !prev)}
+                            >
+                                {simPausedUI ? 'Resume Sim' : 'Pause Sim'}
+                            </Button>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                color="inherit"
+                                onClick={() => {
+                                    earthRef.current?.spawnWeatherTropicalCycloneDebug?.();
+                                    earthRef.current?.weatherLogNow(simClockRef.current?.simTimeSeconds ?? 0, {
+                                        simSpeed: simClockRef.current?.simSpeed,
+                                        paused: simClockRef.current?.paused
+                                    }, 'spawn-tc');
+                                    updateWeatherDebugNow();
                                 }}
                             >
-                                {WEATHER_LOG_CADENCE_OPTIONS.map((option) => (
-                                    <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                    </Box>
-                    <Typography variant="caption" display="block" style={{ color: 'white', marginTop: 4 }}>
-                        Entries: {weatherLogCount}{weatherLogEnabled ? ' (capturing)' : ''}
-                    </Typography>
-                </Box>
-                <Box mt={1}>
-                    <Typography variant="caption" display="block" style={{ color: 'white' }}>
-                        Zonal Mean ({weatherDebugMode})
-                    </Typography>
-                    <canvas
-                        ref={zonalCanvasRef}
-                        width={180}
-                        height={120}
-                        style={{ width: 180, height: 120, border: '1px solid rgba(255,255,255,0.2)' }}
-                    />
-                </Box>
-                <Box display="flex" gap={1} mt={1} alignItems="center">
-                    <TextField
-                        size="small"
-                        variant="outlined"
-                        label="Seed"
-                        value={weatherSeedInput}
-                        onChange={handleWeatherSeedChange}
-                        onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                                applyWeatherSeed();
-                            }
-                        }}
-                        InputLabelProps={{ style: { color: 'white' } }}
-                        inputProps={{ style: { color: 'white' } }}
-                    />
-                    <Button size="small" variant="outlined" color="inherit" onClick={applyWeatherSeed}>
-                        Apply
-                    </Button>
-                </Box>
-                <Typography variant="caption" display="block" style={{ color: 'white', marginTop: 4 }}>
-                    Current seed: {weatherSeed || '...'}
-                </Typography>
+                                Spawn TC
+                            </Button>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                color="inherit"
+                                onClick={() => {
+                                    earthRef.current?.spawnWeatherHurricaneDebug?.();
+                                    earthRef.current?.weatherLogNow(simClockRef.current?.simTimeSeconds ?? 0, {
+                                        simSpeed: simClockRef.current?.simSpeed,
+                                        paused: simClockRef.current?.paused
+                                    }, 'spawn-hurricane');
+                                    updateWeatherDebugNow();
+                                }}
+                            >
+                                Spawn Hurricane (Cat 1)
+                            </Button>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        size="small"
+                                        checked={weatherV2ConvectionEnabled}
+                                        onChange={handleV2ConvectionToggle}
+                                        color="primary"
+                                    />
+                                }
+                                label={<Typography variant="caption" style={{ color: 'white' }}>V2 Convection</Typography>}
+                            />
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                color="inherit"
+                                onClick={() => {
+                                    const simClock = simClockRef.current;
+                                    simClock.stepSeconds(3600);
+                                    earthRef.current?.update(simClock.simTimeSeconds, 1, {
+                                        simSpeed: simClock.simSpeed,
+                                        paused: simClock.paused
+                                    });
+                                    earthRef.current?.weatherLogNow(simClock.simTimeSeconds, {
+                                        simSpeed: simClock.simSpeed,
+                                        paused: simClock.paused
+                                    }, 'step+1h');
+                                    updateWeatherDebugNow();
+                                }}
+                            >
+                                Step +1 hour
+                            </Button>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                color="inherit"
+                                onClick={() => {
+                                    const simClock = simClockRef.current;
+                                    simClock.stepSeconds(86400);
+                                    earthRef.current?.update(simClock.simTimeSeconds, 1, {
+                                        simSpeed: simClock.simSpeed,
+                                        paused: simClock.paused
+                                    });
+                                    earthRef.current?.weatherLogNow(simClock.simTimeSeconds, {
+                                        simSpeed: simClock.simSpeed,
+                                        paused: simClock.paused
+                                    }, 'step+1d');
+                                    updateWeatherDebugNow();
+                                }}
+                            >
+                                Step +1 day
+                            </Button>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                color="inherit"
+                                onClick={() => {
+                                    const simClock = simClockRef.current;
+                                    simClock.stepSeconds(MONTH_SECONDS);
+                                    earthRef.current?.update(simClock.simTimeSeconds, 1, {
+                                        simSpeed: simClock.simSpeed,
+                                        paused: simClock.paused
+                                    });
+                                    earthRef.current?.weatherLogNow(simClock.simTimeSeconds, {
+                                        simSpeed: simClock.simSpeed,
+                                        paused: simClock.paused
+                                    }, 'step+1mo');
+                                    updateWeatherDebugNow();
+                                }}
+                            >
+                                Step +1 month
+                            </Button>
+                        </Box>
+                        <Box mt={1}>
+                            <Typography variant="caption" display="block" style={{ color: 'white' }}>
+                                Sim speed: {simSpeedUI.toLocaleString()}x
+                            </Typography>
+                            <Slider
+                                size="small"
+                                min={0}
+                                max={Math.log10(SIM_SPEED_MAX)}
+                                step={0.1}
+                                marks={SIM_SPEED_MARKS}
+                                value={speedToSliderValue(simSpeedUI)}
+                                onChange={handleSimSpeedChange}
+                                sx={{ color: 'white' }}
+                            />
+                        </Box>
+                        <Typography variant="caption" display="block" style={{ color: 'white', marginTop: 6 }}>
+                            Sim time: {simTimeLabel}{simPausedUI ? ' (paused)' : ''}
+                        </Typography>
+                        <Box mt={1}>
+                            <Typography variant="caption" display="block" style={{ color: 'white' }}>
+                                Active storms: {weatherStormSummary.stormCount ?? 0}
+                            </Typography>
+                            {weatherStormSummary.stormCount > 0 && (
+                                <Typography variant="caption" display="block" style={{ color: 'white', marginTop: 2 }}>
+                                    {stormListText}
+                                </Typography>
+                            )}
+                        </Box>
+                        <Box mt={1}>
+                            <Typography variant="caption" display="block" style={{ color: 'white' }}>
+                                Weather Log Capture
+                            </Typography>
+                            <Box display="flex" gap={1} mt={0.5} flexWrap="wrap">
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="inherit"
+                                    onClick={toggleWeatherLogCapture}
+                                >
+                                    {weatherLogEnabled ? 'Stop Capture' : 'Start Capture'}
+                                </Button>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="inherit"
+                                    onClick={clearWeatherLogCapture}
+                                >
+                                    Clear
+                                </Button>
+                                <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="inherit"
+                                    onClick={downloadWeatherLogCapture}
+                                    disabled={weatherLogCount === 0}
+                                >
+                                    Download
+                                </Button>
+                            </Box>
+                            <Box mt={1}>
+                                <FormControl size="small" fullWidth variant="outlined">
+                                    <InputLabel style={{ color: 'white' }}>Log Cadence</InputLabel>
+                                    <Select
+                                        value={weatherLogCadence}
+                                        onChange={handleWeatherLogCadenceChange}
+                                        label="Log Cadence"
+                                        sx={{
+                                            color: 'white',
+                                            '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' }
+                                        }}
+                                    >
+                                        {WEATHER_LOG_CADENCE_OPTIONS.map((option) => (
+                                            <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Box>
+                            <Typography variant="caption" display="block" style={{ color: 'white', marginTop: 4 }}>
+                                Entries: {weatherLogCount}{weatherLogEnabled ? ' (capturing)' : ''}
+                            </Typography>
+                        </Box>
+                        <Box mt={1}>
+                            <Typography variant="caption" display="block" style={{ color: 'white' }}>
+                                Zonal Mean ({weatherDebugMode})
+                            </Typography>
+                            <canvas
+                                ref={zonalCanvasRef}
+                                width={180}
+                                height={120}
+                                style={{ width: 180, height: 120, border: '1px solid rgba(255,255,255,0.2)' }}
+                            />
+                        </Box>
+                        <Box display="flex" gap={1} mt={1} alignItems="center">
+                            <TextField
+                                size="small"
+                                variant="outlined"
+                                label="Seed"
+                                value={weatherSeedInput}
+                                onChange={handleWeatherSeedChange}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        applyWeatherSeed();
+                                    }
+                                }}
+                                InputLabelProps={{ style: { color: 'white' } }}
+                                inputProps={{ style: { color: 'white' } }}
+                            />
+                            <Button size="small" variant="outlined" color="inherit" onClick={applyWeatherSeed}>
+                                Apply
+                            </Button>
+                        </Box>
+                        <Typography variant="caption" display="block" style={{ color: 'white', marginTop: 4 }}>
+                            Current seed: {weatherSeed || '...'}
+                        </Typography>
+                    </>
+                )}
             </Paper>
 
             <Typography variant="h6" style={{ position: 'absolute', top: 20, right: 430, zIndex: 1000, color: 'white' }}>

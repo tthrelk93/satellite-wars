@@ -101,7 +101,9 @@ export function stepDyn2Layer({ dt, grid, fields, params, scratch }) {
     uU,
     vU,
     divDynL,
-    divDynU
+    divDynU,
+    T,
+    TU
   } = fields;
   const {
     hMin = 500,
@@ -111,7 +113,11 @@ export function stepDyn2Layer({ dt, grid, fields, params, scratch }) {
     tauDragU = 10 * 86400,
     nu4 = 1e16,
     minDx = 20000,
-    maxWind = 150
+    maxWind = 150,
+    thermoCouplingL = 0,
+    thermoCouplingU = 0,
+    thermoTrefL = 285,
+    thermoTrefU = 270
   } = params;
 
   advectVector({
@@ -164,8 +170,10 @@ export function stepDyn2Layer({ dt, grid, fields, params, scratch }) {
   }
 
   for (let k = 0; k < hL.length; k++) {
-    scratch.phiL[k] = g * (hL[k] + alpha * hU[k]);
-    scratch.phiU[k] = g * (hU[k] + alpha * hL[k]);
+    const thermL = thermoCouplingL ? thermoCouplingL * (T[k] - thermoTrefL) : 0;
+    const thermU = thermoCouplingU ? thermoCouplingU * (TU[k] - thermoTrefU) : 0;
+    scratch.phiL[k] = g * (hL[k] + alpha * hU[k] + thermL);
+    scratch.phiU[k] = g * (hU[k] + alpha * hL[k] + thermU);
   }
 
   const { nx, ny, sinLat } = grid;

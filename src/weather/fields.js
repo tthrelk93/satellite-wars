@@ -37,7 +37,13 @@ export function createFields(grid) {
     cwpHigh: new Float32Array(count),
     tauLow: new Float32Array(count),
     tauHigh: new Float32Array(count),
+    tauLowDelta: new Float32Array(count),
+    tauHighDelta: new Float32Array(count),
+    tauLowPrev: new Float32Array(count),
+    tauHighPrev: new Float32Array(count),
     precipRate: new Float32Array(count),
+    tcGenesis: new Float32Array(count),
+    tcMask: new Float32Array(count),
     // diagnostics / helpers
     rad: new Array(count)
   };
@@ -89,7 +95,13 @@ export function initAtmosphere(fields, grid, seed = 1, options = {}) {
     cwpHigh,
     tauLow,
     tauHigh,
-    precipRate
+    tauLowDelta,
+    tauHighDelta,
+    tauLowPrev,
+    tauHighPrev,
+    precipRate,
+    tcGenesis,
+    tcMask
   } = fields;
   const P_UPPER = 50000;
   const rand = mulberry32(seed);
@@ -137,7 +149,13 @@ export function initAtmosphere(fields, grid, seed = 1, options = {}) {
       cwpHigh[k] = 0;
       tauLow[k] = 0;
       tauHigh[k] = 0;
+      tauLowDelta[k] = 0;
+      tauHighDelta[k] = 0;
+      tauLowPrev[k] = 0;
+      tauHighPrev[k] = 0;
       precipRate[k] = 0;
+      tcGenesis[k] = 0;
+      tcMask[k] = 0;
       fields.rad[k] = { Rnet: 0 };
     }
   }

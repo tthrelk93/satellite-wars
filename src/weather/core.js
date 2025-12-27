@@ -14,17 +14,21 @@ import { stepVerticalExchange } from './vertical';
 import { stepStratiformClouds } from './clouds';
 import { computeRH, computeRHUpper, computeOmegaProxy, computeVorticity, computeDivergence, computeCloudOptics, computePrecipRate } from './diagnostics';
 import WeatherLogger from './WeatherLogger';
+import { TropicalCycloneSystem } from './tropicalCyclones';
 
 const HL0 = 9000;
 const HU0 = 3000;
 const P0 = 101325;
 const P_SCALE = 10;
 
-const NUDGE_TAU_U_L = 8 * 86400;
-const NUDGE_TAU_U_U = 5 * 86400;
-const NUDGE_TAU_H = 10 * 86400;
-const NUDGE_TAU_T = 7 * 86400;
-const NUDGE_SMOOTH_PASSES = 3;
+const NUDGE_TAU_U_L = 30 * 86400;
+const NUDGE_TAU_U_U = 20 * 86400;
+const NUDGE_TAU_H = 40 * 86400;
+const NUDGE_TAU_T = 20 * 86400;
+const NUDGE_CADENCE_SECONDS = 6 * 3600;
+const NUDGE_LON_WINDOW = 31;
+const NUDGE_LAT_WINDOW = 9;
+const NUDGE_WINDS = false;
 const KAPPA_UPPER_FACTOR = 0.5;
 
 export class WeatherCore {
@@ -81,15 +85,21 @@ export class WeatherCore {
     this.logger = null;
     this._loggerContext = null;
     this._lastAdvanceSteps = 0;
+    this._nudgeAccumSeconds = 0;
+    this.tcSystem = new TropicalCycloneSystem(this.seed);
     this.dynParams = {
       hMin: 500,
       alpha: 0.25,
-      tauShear: 3 * 86400,
-      tauDragL: 3 * 86400,
-      tauDragU: 10 * 86400,
-      nu4: 1e16,
+      tauShear: 12 * 86400,
+      tauDragL: 6 * 86400,
+      tauDragU: 20 * 86400,
+      nu4: 3e15,
       minDx: 80000,
-      maxWind: 150
+      maxWind: 150,
+      thermoCouplingL: 10,
+      thermoCouplingU: 30,
+      thermoTrefL: 285,
+      thermoTrefU: 270
     };
     initAtmosphere(this.fields, this.grid, this.seed, { hL0: HL0, hU0: HU0, pScale: P_SCALE, p0: P0 });
     this._tmp = new Float32Array(this.grid.count);
@@ -120,7 +130,7 @@ export class WeatherCore {
       hU: new Float32Array(this.grid.count),
       T: new Float32Array(this.grid.count)
     };
-    this._computeDiagnostics();
+    this._computeDiagnostics(0);
     this._loadGeo();
   }
 
@@ -256,7 +266,8 @@ export class WeatherCore {
     this._accum = 0;
     this.timeUTC = 0;
     this._climoLastUpdateUTC = -Infinity;
-    this._computeDiagnostics();
+    this._computeDiagnostics(0);
+    this.tcSystem?.setSeed?.(this.seed);
   }
 
   getSeed() {
@@ -269,7 +280,9 @@ export class WeatherCore {
     this._climoLastUpdateUTC = -Infinity;
     this._accum = 0;
     this._lastAdvanceSteps = 0;
+    this._nudgeAccumSeconds = 0;
     this._updateClimoNow();
+    this.tcSystem?.resetTime?.();
   }
 
   setLogger(logger) {
@@ -282,6 +295,42 @@ export class WeatherCore {
 
   getLoggerContext() {
     return this._loggerContext;
+  }
+
+  debugSpawnTropicalCyclone() {
+    if (!this.tcSystem) return;
+    this.tcSystem.debugSpawnBestCaribbean({
+      timeUTC: this.timeUTC,
+      grid: this.grid,
+      fields: this.fields,
+      geo: this.geo
+    });
+    this.tcSystem.step({
+      dt: 0,
+      timeUTC: this.timeUTC,
+      grid: this.grid,
+      fields: this.fields,
+      geo: this.geo,
+      dynParams: this.dynParams
+    });
+  }
+
+  debugSpawnHurricane({ latDeg, lonDeg } = {}) {
+    if (!this.tcSystem) return;
+    this.tcSystem.debugSpawnHurricane({
+      latDeg: Number.isFinite(latDeg) ? latDeg : 15,
+      lonDeg: Number.isFinite(lonDeg) ? lonDeg : -60,
+      vmax: 35,
+      radiusKm: 450
+    });
+    this.tcSystem.step({
+      dt: 0,
+      timeUTC: this.timeUTC,
+      grid: this.grid,
+      fields: this.fields,
+      geo: this.geo,
+      dynParams: this.dynParams
+    });
   }
 
   getLastAdvanceSteps() {
@@ -353,9 +402,14 @@ export class WeatherCore {
       stepDyn2Layer({ dt, grid, fields, params: this.dynParams, scratch: this._dynScratch });
     });
 
-    runWithLog('nudging', () => {
-      this._applyNudging(dt);
-    });
+    this._nudgeAccumSeconds += dt;
+    if (this._nudgeAccumSeconds >= NUDGE_CADENCE_SECONDS) {
+      const dtNudge = this._nudgeAccumSeconds;
+      this._nudgeAccumSeconds = 0;
+      runWithLog('nudging', () => {
+        this._applyNudging(dtNudge);
+      });
+    }
 
     // Derive surface pressure from lower-layer thickness
     this._deriveSurfacePressure();
@@ -372,6 +426,7 @@ export class WeatherCore {
     });
 
     computeOmegaProxy(fields);
+    this.tcSystem?.step({ dt, timeUTC: this.timeUTC, grid, fields, geo, dynParams: this.dynParams });
 
     runWithLog('stratiformClouds', () => {
       stepStratiformClouds({ dt, fields, geo, grid });
@@ -394,7 +449,7 @@ export class WeatherCore {
     });
 
     // Diagnostics
-    this._computeDiagnostics();
+    this._computeDiagnostics(dt);
 
     if (logger && logger.enabled) {
       const desyncThreshold = Math.max(this.modelDt * 2, 600);
@@ -546,16 +601,16 @@ export class WeatherCore {
 
     this._deriveSurfacePressure();
     computeDensity(fields);
-    this._computeDiagnostics();
+    this._computeDiagnostics(0);
   }
 
-  _computeDiagnostics() {
+  _computeDiagnostics(dt = 0) {
     const { grid, fields } = this;
     computeRH(fields);
     computeRHUpper(fields, fields.RHU);
     computeVorticity(fields, grid, fields.vort);
     computeDivergence(fields, grid, fields.div);
-    computeCloudOptics(fields);
+    computeCloudOptics(fields, {}, dt);
     computePrecipRate(fields, fields.precipRate);
   }
 
@@ -595,36 +650,68 @@ export class WeatherCore {
     return out;
   }
 
+  _smoothFieldBox(src, out, lonWindowCells, latWindowCells) {
+    const { nx, ny } = this.grid;
+    const tmp = this._smoothA;
+    const halfLon = Math.max(1, Math.floor(lonWindowCells / 2));
+    const halfLat = Math.max(1, Math.floor(latWindowCells / 2));
+    const lonWindow = halfLon * 2 + 1;
+    for (let j = 0; j < ny; j++) {
+      const row = j * nx;
+      for (let i = 0; i < nx; i++) {
+        let sum = 0;
+        for (let w = -halfLon; w <= halfLon; w++) {
+          const ii = (i + w + nx) % nx;
+          sum += src[row + ii];
+        }
+        tmp[row + i] = sum / lonWindow;
+      }
+    }
+    for (let j = 0; j < ny; j++) {
+      const row = j * nx;
+      for (let i = 0; i < nx; i++) {
+        let sum = 0;
+        let count = 0;
+        for (let w = -halfLat; w <= halfLat; w++) {
+          const jj = Math.max(0, Math.min(ny - 1, j + w));
+          sum += tmp[jj * nx + i];
+          count += 1;
+        }
+        out[row + i] = sum / count;
+      }
+    }
+    return out;
+  }
+
   _applyNudging(dt) {
     const { climo, fields } = this;
     if (!climo) return;
 
-    const nudgingLower = climo.windNowU && climo.windNowV;
-    const nudgingUpper = climo.wind500NowU || climo.wind250NowU;
+    const nudgingLower = NUDGE_WINDS && climo.windNowU && climo.windNowV;
+    const nudgingUpper = NUDGE_WINDS && (climo.wind500NowU || climo.wind250NowU);
     const nudgingMass = climo.slpNow;
     const nudgingTemp = climo.t2mNow;
     if (!nudgingLower && !nudgingUpper && !nudgingMass && !nudgingTemp) return;
 
-    const smoothPasses = NUDGE_SMOOTH_PASSES;
     const coeffUL = dt / NUDGE_TAU_U_L;
     const coeffUU = dt / NUDGE_TAU_U_U;
     const coeffH = dt / NUDGE_TAU_H;
     const coeffT = dt / NUDGE_TAU_T;
 
     if (nudgingLower) {
-      this._smoothField(fields.u, this._smoothStore.u, smoothPasses);
-      this._smoothField(fields.v, this._smoothStore.v, smoothPasses);
+      this._smoothFieldBox(fields.u, this._smoothStore.u, NUDGE_LON_WINDOW, NUDGE_LAT_WINDOW);
+      this._smoothFieldBox(fields.v, this._smoothStore.v, NUDGE_LON_WINDOW, NUDGE_LAT_WINDOW);
     }
     if (nudgingUpper) {
-      this._smoothField(fields.uU, this._smoothStore.uU, smoothPasses);
-      this._smoothField(fields.vU, this._smoothStore.vU, smoothPasses);
+      this._smoothFieldBox(fields.uU, this._smoothStore.uU, NUDGE_LON_WINDOW, NUDGE_LAT_WINDOW);
+      this._smoothFieldBox(fields.vU, this._smoothStore.vU, NUDGE_LON_WINDOW, NUDGE_LAT_WINDOW);
     }
     if (nudgingMass) {
-      this._smoothField(fields.hL, this._smoothStore.hL, smoothPasses);
-      this._smoothField(fields.hU, this._smoothStore.hU, smoothPasses);
+      this._smoothFieldBox(fields.hL, this._smoothStore.hL, NUDGE_LON_WINDOW, NUDGE_LAT_WINDOW);
+      this._smoothFieldBox(fields.hU, this._smoothStore.hU, NUDGE_LON_WINDOW, NUDGE_LAT_WINDOW);
     }
     if (nudgingTemp) {
-      this._smoothField(fields.T, this._smoothStore.T, smoothPasses);
+      this._smoothFieldBox(fields.T, this._smoothStore.T, NUDGE_LON_WINDOW, NUDGE_LAT_WINDOW);
     }
 
     for (let k = 0; k < fields.u.length; k++) {

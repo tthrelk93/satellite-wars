@@ -1,7 +1,12 @@
 import * as THREE from 'three';
 import { WeatherCore } from './weather/core';
+import { WeatherCore5 } from './weather/v2/core5';
 import WeatherLogger from './weather/WeatherLogger';
 import { bilinear } from './weather/advect';
+import { WeatherLogSink } from './weather/logSink';
+
+const AUTO_LOG_CADENCE_SECONDS = 6 * 3600;
+const AUTO_LOG_MAX_ENTRIES = 20000;
 
 // WeatherField: rendering wrapper around the physics core
 class WeatherField {
@@ -14,9 +19,13 @@ class WeatherField {
         timeScale = 200,
         kappa = 2000,
         seed,
-        debugMode = 'clouds'
+        debugMode = 'clouds',
+        useV2 = false
     } = {}) {
-        this.core = new WeatherCore({ nx, ny, dt: modelDt, timeScale, kappa, seed });
+        this.useV2 = useV2;
+        this.core = useV2
+            ? new WeatherCore5({ nx, ny, dt: modelDt, seed })
+            : new WeatherCore({ nx, ny, dt: modelDt, timeScale, kappa, seed });
         this.renderScale = renderScale;
         this.tickSeconds = tickSeconds;
         this._paintAccumSeconds = 0;
@@ -27,9 +36,18 @@ class WeatherField {
         this._percentileScratch = new Float32Array(this.core.grid.count);
         this._simContext = { simSpeed: null, paused: null };
         this._lastStepsRan = 0;
+        this._lastPaintSimTime = null;
         this._needsCoreTimeSync = true;
         this.logger = new WeatherLogger();
-        this.core.setLogger(this.logger);
+        this.core.setLogger?.(this.logger);
+        this._logSink = null;
+        this._autoLogReady = false;
+
+        const autoLogEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_AUTO_LOG === '1';
+        if (autoLogEnabled && typeof fetch !== 'undefined') {
+            this._logSink = new WeatherLogSink({ baseUrl: '/__weatherlog', flushIntervalMs: 300 });
+            this._initAutoLogging();
+        }
 
         const texW = nx * renderScale;
         const texH = ny * renderScale;
@@ -48,6 +66,22 @@ class WeatherField {
         this.imgCloudHigh = this.ctxCloudHigh.createImageData(texW, texH);
         this.dataCloudHigh = this.imgCloudHigh.data;
         this.textureHigh = new THREE.CanvasTexture(this.canvasCloudHigh);
+
+        this.renderParams = {
+            aLow: 0.95,
+            aHigh: 0.70,
+            gammaLow: 1.35,
+            gammaHigh: 1.85,
+            tauBrightLow: 12,
+            tauBrightHigh: 8,
+            tauEdgeLow: 0.08,
+            tauEdgeHigh: 0.05,
+            alphaHighCap: 0.65,
+            debugMode: 'final'
+        };
+
+        this._cloudLowMean = 0;
+        this._cloudHighMean = 0;
 
         [this.textureLow, this.textureHigh].forEach(t => {
             t.wrapS = THREE.RepeatWrapping;
@@ -71,6 +105,45 @@ class WeatherField {
         this.textureDebug.needsUpdate = true;
     }
 
+    async _initAutoLogging() {
+        if (!this._logSink || this._autoLogReady) return;
+        try {
+            if (this.core?._initPromise) {
+                await this.core._initPromise;
+            }
+        } catch (_) {
+            // proceed with whatever init data is available
+        }
+        const session = await this._logSink.init();
+        if (!session) return;
+
+        this.logger.setOnLine((line) => this._logSink.enqueue(line));
+        this.logger.setRunInfo({
+            runId: session.runId,
+            seqStart: Number.isFinite(session.seqStart) ? session.seqStart : 0
+        });
+        this.logger.start(this.core.timeUTC, {
+            cadenceSeconds: AUTO_LOG_CADENCE_SECONDS,
+            maxEntries: AUTO_LOG_MAX_ENTRIES
+        });
+        this.logger.recordRunStart(this.core, {
+            session,
+            cadenceSeconds: AUTO_LOG_CADENCE_SECONDS,
+            modelKind: this.useV2 ? 'v2' : 'v1'
+        });
+        this.logger.recordNow(
+            {
+                simTimeSeconds: this.core.timeUTC,
+                simSpeed: this._simContext.simSpeed,
+                paused: this._simContext.paused,
+                stepsRanThisTick: this._lastStepsRan
+            },
+            this.core,
+            { reason: 'autoStart' }
+        );
+        this._autoLogReady = true;
+    }
+
     update(simTimeSeconds, realDtSeconds, simContext = {}) {
         if (!Number.isFinite(simTimeSeconds)) return;
         if (!this.core.ready) {
@@ -89,7 +162,7 @@ class WeatherField {
             ? simContext.paused
             : this._simContext.paused;
         this._simContext = { simSpeed, paused };
-        this.core.setLoggerContext({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan });
+        this.core.setLoggerContext?.({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan });
         if (this._lastSimTimeSeconds === null || simTimeSeconds < this._lastSimTimeSeconds) {
             this._lastSimTimeSeconds = simTimeSeconds;
             return;
@@ -117,7 +190,7 @@ class WeatherField {
         this._paintAccumSeconds += realDt;
         if (this._paintAccumSeconds < this.tickSeconds) return;
         this._paintAccumSeconds -= this.tickSeconds;
-        this._paintClouds();
+        this._paintClouds(simTimeSeconds);
         this._paintDebug();
     }
 
@@ -134,13 +207,18 @@ class WeatherField {
         const stepsRan = this.core.advanceModelSeconds(modelSeconds) || 0;
         this._lastStepsRan = stepsRan;
         this._paintAccumSeconds = 0;
-        this._paintClouds();
+        this._paintClouds(this.core.timeUTC);
         this._paintDebug();
     }
 
     setDebugMode(mode) {
-        this.debugMode = mode || 'clouds';
-        this._paintDebug();
+        const validRenderDebug = ['final', 'cloudLow', 'cloudHigh', 'tauLow', 'tauHigh'];
+        if (validRenderDebug.includes(mode)) {
+            this.renderParams.debugMode = mode;
+        } else {
+            this.debugMode = mode || 'clouds';
+            this._paintDebug();
+        }
     }
 
     getDebugMode() {
@@ -156,8 +234,9 @@ class WeatherField {
         this._paintAccumSeconds = 0;
         this._lastSimTimeSeconds = null;
         this._lastStepsRan = 0;
+        this._lastPaintSimTime = null;
         this._needsCoreTimeSync = true;
-        this._paintClouds();
+        this._paintClouds(this.core.timeUTC);
         this._paintDebug();
     }
 
@@ -166,11 +245,12 @@ class WeatherField {
         this._lastSimTimeSeconds = simTimeSeconds;
         this._paintAccumSeconds = 0;
         this._lastStepsRan = 0;
+        this._lastPaintSimTime = null;
         this._needsCoreTimeSync = false;
     }
 
     getSeed() {
-        return this.core.getSeed();
+        return this.core.getSeed?.() ?? this.core.seed ?? 0;
     }
 
     getTimeUTC() {
@@ -184,7 +264,15 @@ class WeatherField {
         if (Number.isFinite(maxEntries)) {
             this.logger.setMaxEntries(maxEntries);
         }
-        this.logger.start(simTimeSeconds);
+        this.logger.start(simTimeSeconds, { cadenceSeconds, maxEntries });
+        if (!this.logger.hasRunStart?.()) {
+            const session = this._logSink?.getSession?.() || null;
+            this.logger.recordRunStart(this.core, {
+                session,
+                cadenceSeconds: this.logger.cadenceSeconds,
+                modelKind: this.useV2 ? 'v2' : 'v1'
+            });
+        }
     }
 
     stopLogCapture() {
@@ -211,6 +299,29 @@ class WeatherField {
         };
     }
 
+    getStormSummary() {
+        if (!this.core?.ready) return { stormCount: 0, storms: [] };
+        return this.core.tcSystem?.getStormSummary?.() || { stormCount: 0, storms: [] };
+    }
+
+    spawnTropicalCycloneDebug() {
+        if (!this.core?.ready) return;
+        this.core.debugSpawnTropicalCyclone();
+        this._paintClouds(this.core.timeUTC);
+        this._paintDebug();
+    }
+
+    spawnHurricaneDebug() {
+        if (!this.core?.ready) return;
+        this.core.debugSpawnHurricane();
+        this._paintClouds(this.core.timeUTC);
+        this._paintDebug();
+    }
+
+    setV2ConvectionEnabled(enabled) {
+        this.core.setV2ConvectionEnabled?.(enabled);
+    }
+
     logNow(simTimeSeconds, simContext = {}, reason) {
         const simSpeed = Number.isFinite(simContext.simSpeed)
             ? simContext.simSpeed
@@ -218,7 +329,7 @@ class WeatherField {
         const paused = typeof simContext.paused === 'boolean'
             ? simContext.paused
             : this._simContext.paused;
-        this.core.setLoggerContext({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan });
+        this.core.setLoggerContext?.({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan });
         return this.logger.recordNow({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan }, this.core, { reason });
     }
 
@@ -238,9 +349,18 @@ class WeatherField {
         return out;
     }
 
-    _paintClouds() {
+    _paintClouds(simTimeSeconds) {
         if (!this.core.ready) return;
         const { grid, fields } = this.core;
+        const storms = (this.core.tcSystem?.storms || [])
+            .filter(storm => storm.alive)
+            .map(storm => ({
+                latDeg: storm.latDeg,
+                lonDeg: storm.lonDeg,
+                radiusKm: storm.radiusKm,
+                phase: storm.phase || 0,
+                strength: Math.max(0, Math.min(1, (storm.vmax - 15) / 45)) * 6
+            }));
 
         const hash = (x, y, t) => {
             const s = Math.sin(x * 127.1 + y * 311.7 + t * 0.1) * 43758.5453;
@@ -256,12 +376,30 @@ class WeatherField {
             return v;
         };
 
-        const t = this.core.timeUTC || 0;
+        const simTime = Number.isFinite(simTimeSeconds) ? simTimeSeconds : this.core.timeUTC || 0;
+        const t = simTime;
+        const deltaSim = this._lastPaintSimTime === null ? 0 : Math.max(0, simTime - this._lastPaintSimTime);
+        const advectSeconds = Math.min(deltaSim, 3 * 3600);
+        this._lastPaintSimTime = simTime;
+
+        // Cache global means directly from model fields (when ready)
+        if (this.core?.ready && fields?.cloudLow && fields?.cloudHigh) {
+            const nCells = fields.cloudLow.length || 1;
+            let sumLow = 0;
+            let sumHigh = 0;
+            for (let i = 0; i < nCells; i++) {
+                sumLow += fields.cloudLow[i];
+                sumHigh += fields.cloudHigh[i];
+            }
+            this._cloudLowMean = sumLow / nCells;
+            this._cloudHighMean = sumHigh / nCells;
+        }
 
         const drawLayer = ({
             ctx,
             img,
             data,
+            cloudField,
             tauField,
             uField,
             vField,
@@ -269,7 +407,9 @@ class WeatherField {
             noiseScale,
             shadeBase,
             shadeVar,
-            tauScale
+            renderParams,
+            isHigh,
+            storms
         }) => {
             const w = ctx.canvas.width;
             const h = ctx.canvas.height;
@@ -277,6 +417,7 @@ class WeatherField {
             for (let y = 0; y < h; y++) {
                 const lat = (y / h) * grid.ny;
                 const j = Math.max(0, Math.min(grid.ny - 1, Math.floor(lat)));
+                const latDeg = grid.latDeg[j];
                 const kmPerDegLat = 111.0;
                 const kmPerDegLon = Math.max(1.0, kmPerDegLat * grid.cosLat[j]);
                 for (let x = 0; x < w; x++) {
@@ -286,17 +427,62 @@ class WeatherField {
                     const dLonCells = (u * advectSeconds) / (kmPerDegLon * 1000 * grid.cellLonDeg);
                     const dLatCells = (v * advectSeconds) / (kmPerDegLat * 1000 * grid.cellLatDeg);
 
+                    const cloud = bilinear(cloudField, lon - dLonCells, lat - dLatCells, grid.nx, grid.ny);
                     const tau = bilinear(tauField, lon - dLonCells, lat - dLatCells, grid.nx, grid.ny);
-                    const n = fbm(x * noiseScale, y * noiseScale, t);
-                    const tauMod = Math.max(0, tau * (0.8 + 0.4 * (n - 0.5)));
-                    const a = 1 - Math.exp(-tauMod * tauScale);
-                    const alpha = Math.max(0, Math.min(1, a));
+                    const advLon = lon - dLonCells;
+                    const advLat = lat - dLatCells;
+                    const n = fbm(advLon * noiseScale, advLat * noiseScale, t);
+                    let tauAdd = 0;
+                    if (storms.length > 0) {
+                        const lonIdx = Math.floor(lon) % grid.nx;
+                        const lonDeg = grid.lonDeg[(lonIdx + grid.nx) % grid.nx];
+                        for (const storm of storms) {
+                            const dLonDeg = ((lonDeg - storm.lonDeg + 540) % 360) - 180;
+                            const dx = dLonDeg * kmPerDegLon;
+                            const dy = (latDeg - storm.latDeg) * kmPerDegLat;
+                            const r = Math.hypot(dx, dy);
+                            const radius = storm.radiusKm;
+                            if (r > 1.2 * radius) continue;
+                            const theta = Math.atan2(dy, dx);
+                            const band = 0.5 + 0.5 * Math.sin(3 * theta + r / (0.18 * radius) - storm.phase);
+                            const radial = Math.exp(-Math.pow(r / (0.9 * radius), 2));
+                            tauAdd += storm.strength * band * radial;
+                        }
+                    }
+                    const tauEff = Math.max(0, tau + tauAdd);
+                    const aBase = Math.pow(cloud, isHigh ? renderParams.gammaHigh : renderParams.gammaLow) *
+                        (isHigh ? renderParams.aHigh : renderParams.aLow);
+                    let alpha = Math.max(0, Math.min(1, aBase));
+                    if (isHigh) alpha = Math.min(alpha, renderParams.alphaHighCap);
+
+                    const bright = 1 - Math.exp(-tauEff / (isHigh ? renderParams.tauBrightHigh : renderParams.tauBrightLow));
+                    let value = alpha * (0.55 + 0.45 * bright);
+                    const edgeScale = isHigh ? renderParams.tauEdgeHigh : renderParams.tauEdgeLow;
+                    if (edgeScale > 0) {
+                        const edge = 1 - Math.exp(-tauEff * edgeScale);
+                        value *= 0.90 + 0.10 * edge;
+                    }
+
+                    if (this.renderParams.debugMode === 'cloudLow' && !isHigh) {
+                        value = cloud;
+                        alpha = 1;
+                    } else if (this.renderParams.debugMode === 'cloudHigh' && isHigh) {
+                        value = cloud;
+                        alpha = 1;
+                    } else if (this.renderParams.debugMode === 'tauLow' && !isHigh) {
+                        value = Math.max(0, Math.min(1, tauEff / 50));
+                        alpha = 1;
+                    } else if (this.renderParams.debugMode === 'tauHigh' && isHigh) {
+                        value = Math.max(0, Math.min(1, tauEff / 50));
+                        alpha = 1;
+                    }
 
                     const idx = (y * w + x) * 4;
                     const shade = shadeBase + Math.floor(shadeVar * (n - 0.5));
-                    data[idx] = shade;
-                    data[idx + 1] = shade;
-                    data[idx + 2] = shade;
+                    const color = Math.max(0, Math.min(255, Math.floor(shade * value)));
+                    data[idx] = color;
+                    data[idx + 1] = color;
+                    data[idx + 2] = color;
                     data[idx + 3] = Math.floor(255 * alpha);
                 }
             }
@@ -307,28 +493,34 @@ class WeatherField {
             ctx: this.ctxCloudLow,
             img: this.imgCloudLow,
             data: this.dataCloudLow,
+            cloudField: fields.cloudLow,
             tauField: fields.tauLow,
             uField: fields.u,
             vField: fields.v,
-            advectSeconds: 1800,
+            advectSeconds,
             noiseScale: 0.015,
             shadeBase: 230,
             shadeVar: 24,
-            tauScale: 1.1
+            renderParams: this.renderParams,
+            isHigh: false,
+            storms
         });
 
         drawLayer({
             ctx: this.ctxCloudHigh,
             img: this.imgCloudHigh,
             data: this.dataCloudHigh,
+            cloudField: fields.cloudHigh,
             tauField: fields.tauHigh,
             uField: fields.uU,
             vField: fields.vU,
-            advectSeconds: 3600,
+            advectSeconds,
             noiseScale: 0.01,
             shadeBase: 240,
             shadeVar: 20,
-            tauScale: 0.9
+            renderParams: this.renderParams,
+            isHigh: true,
+            storms
         });
 
         this.textureLow.needsUpdate = true;
@@ -414,6 +606,8 @@ class WeatherField {
                 return this.core.geo?.elev || this._getZeroScratch();
             case 'soilCap':
                 return this.core.geo?.soilCap || this.core.geo?.soilM || this._getZeroScratch();
+            case 'soilW':
+                return this.core.geo?.soilW || this._getZeroScratch();
             case 'landMask':
                 return this.core.geo?.landMask || this._getZeroScratch();
             case 'wind':
@@ -426,10 +620,14 @@ class WeatherField {
                 return fields.omegaL;
             case 'omegaU':
                 return fields.omegaU;
+            case 'phiMid':
+                return fields.phiMid || this._getZeroScratch();
             case 'tauLow':
                 return fields.tauLow;
             case 'tauHigh':
                 return fields.tauHigh;
+            case 'tauLowDelta':
+                return fields.tauLowDelta;
             case 'cloudLow':
                 return fields.cloudLow;
             case 'cloudHigh':
@@ -438,6 +636,10 @@ class WeatherField {
                 return fields.cwpLow;
             case 'cwpHigh':
                 return fields.cwpHigh;
+            case 'tcGenesis':
+                return fields.tcGenesis;
+            case 'tcMask':
+                return fields.tcMask;
             case 'clouds':
             default:
                 return fields.cloud;
@@ -488,6 +690,8 @@ class WeatherField {
                 return { fixed: [0, 5000] };
             case 'soilCap':
                 return { fixed: [0, 1] };
+            case 'soilW':
+                return { fixed: [0, 200] };
             case 'landMask':
                 return { fixed: [0, 1] };
             case 'wind':
@@ -500,10 +704,14 @@ class WeatherField {
                 return { fixed: [-0.2, 0.2], diverging: true };
             case 'omegaU':
                 return { fixed: [-0.2, 0.2], diverging: true };
+            case 'phiMid':
+                return { fixed: [0, 600000] };
             case 'tauLow':
                 return { fixed: [0, 20] };
             case 'tauHigh':
                 return { fixed: [0, 20] };
+            case 'tauLowDelta':
+                return { fixed: [0, 1] };
             case 'cloudLow':
                 return { fixed: [0, 1] };
             case 'cloudHigh':
@@ -512,6 +720,10 @@ class WeatherField {
                 return { fixed: [0, 0.5], log: true };
             case 'cwpHigh':
                 return { fixed: [0, 0.5], log: true };
+            case 'tcGenesis':
+                return { fixed: [0, 0.2], log: true };
+            case 'tcMask':
+                return { fixed: [0, 1] };
             case 'clouds':
                 return { fixed: [0, 1] };
             default:
@@ -647,6 +859,34 @@ class WeatherField {
         lat = Math.max(0, Math.min(grid.ny - 1, lat));
         const k = lat * grid.nx + lon;
         return fields.cloud[k];
+    }
+
+    getCloudStats() {
+        return {
+            cloudLowMean: this._cloudLowMean || 0,
+            cloudHighMean: this._cloudHighMean || 0,
+            cloudMean: ((this._cloudLowMean || 0) + (this._cloudHighMean || 0)) * 0.5
+        };
+    }
+
+    sampleCloudLow(u, v) {
+        if (!this.core.ready) return 0;
+        const { grid, fields } = this.core;
+        const lon = Math.floor(grid.nx * u) % grid.nx;
+        let lat = Math.floor(grid.ny * v);
+        lat = Math.max(0, Math.min(grid.ny - 1, lat));
+        const k = lat * grid.nx + lon;
+        return fields.cloudLow[k];
+    }
+
+    sampleCloudHigh(u, v) {
+        if (!this.core.ready) return 0;
+        const { grid, fields } = this.core;
+        const lon = Math.floor(grid.nx * u) % grid.nx;
+        let lat = Math.floor(grid.ny * v);
+        lat = Math.max(0, Math.min(grid.ny - 1, lat));
+        const k = lat * grid.nx + lon;
+        return fields.cloudHigh[k];
     }
 }
 

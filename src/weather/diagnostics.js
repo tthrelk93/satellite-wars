@@ -24,12 +24,12 @@ const smoothstep = (a, b, x) => {
   return t * t * (3 - 2 * t);
 };
 
-export function computeOmegaProxy(fields, { hL = 1000, hU = 3000, wMax = 0.2 } = {}) {
+export function computeOmegaProxy(fields, { hL = 1000, hU = 3000, wMax = 0.05, omegaScale = 1 } = {}) {
   const { divDynL, divDynU, omegaL, omegaU } = fields;
   if (!divDynL || !divDynU || !omegaL || !omegaU) return;
   for (let k = 0; k < divDynL.length; k++) {
-    const wL = -divDynL[k] * hL;
-    const wU = -divDynU[k] * hU;
+    const wL = -divDynL[k] * hL * omegaScale;
+    const wU = -divDynU[k] * hU * omegaScale;
     omegaL[k] = clamp(wL, -wMax, wMax);
     omegaU[k] = clamp(wU, -wMax, wMax);
   }
@@ -40,8 +40,10 @@ export function computeCloudOptics(fields, {
   hHigh = 5000,
   tauCoeffLow = 6,
   tauCoeffHigh = 3,
-  tauMax = 20
-} = {}) {
+  tauMax = 20,
+  tauTauLow = 3600,
+  tauTauHigh = 14400
+} = {}, dt = 0) {
   const {
     qc,
     qcU,
@@ -57,8 +59,15 @@ export function computeCloudOptics(fields, {
     cwpLow,
     cwpHigh,
     tauLow,
-    tauHigh
+    tauHigh,
+    tauLowPrev,
+    tauHighPrev,
+    tauLowDelta,
+    tauHighDelta
   } = fields;
+  const hasDt = Number.isFinite(dt) && dt > 0;
+  const alphaLow = hasDt ? Math.min(1, dt / Math.max(1, tauTauLow)) : 1;
+  const alphaHigh = hasDt ? Math.min(1, dt / Math.max(1, tauTauHigh)) : 1;
   for (let k = 0; k < qc.length; k++) {
     const qcL = Math.max(0, qc[k]);
     const qcUpper = Math.max(0, qcU[k]);
@@ -70,22 +79,41 @@ export function computeCloudOptics(fields, {
     cwpHigh[k] = cwpH;
     cwp[k] = cwpL + cwpH;
 
-    let tauL = clamp(tauCoeffLow * cwpL, 0, tauMax);
-    let tauH = clamp(tauCoeffHigh * cwpH, 0, tauMax);
+    let tauTargetL = clamp(tauCoeffLow * cwpL, 0, tauMax);
+    let tauTargetH = clamp(tauCoeffHigh * cwpH, 0, tauMax);
 
     const rhGate = smoothstep(0.6, 0.9, RH[k]);
-    const ascGate = smoothstep(0.0, 0.05, omegaL[k]);
-    tauL *= (0.35 + 0.65 * ascGate) * rhGate;
+    const ascGate = smoothstep(0.0002, 0.002, omegaL[k]);
+    const subGate = smoothstep(-0.004, 0.0, omegaL[k]);
+    tauTargetL *= (0.045 + 0.955 * ascGate) * rhGate * subGate;
 
-    const rhGateU = smoothstep(0.45, 0.8, RHU[k]);
-    const ascGateU = smoothstep(0.0, 0.05, omegaU[k]);
-    tauH *= (0.35 + 0.65 * ascGateU) * rhGateU;
+    const rhGateU = smoothstep(0.35, 0.58, RHU[k]);
+    const ascGateU = smoothstep(0.0015, 0.015, omegaU[k]);
+    const subGateU = smoothstep(-0.04, 0.0, omegaU[k]);
+    tauTargetH *= (0.04 + 0.96 * ascGateU) * rhGateU * subGateU;
 
-    tauLow[k] = tauL;
-    tauHigh[k] = tauH;
+    tauLow[k] += (tauTargetL - tauLow[k]) * alphaLow;
+    tauHigh[k] += (tauTargetH - tauHigh[k]) * alphaHigh;
 
-    const cLow = 1 - Math.exp(-tauL);
-    const cHigh = 1 - Math.exp(-tauH);
+    if (tauLowPrev && tauLowDelta) {
+      if (hasDt) {
+        tauLowDelta[k] = Math.abs(tauLow[k] - tauLowPrev[k]);
+      } else {
+        tauLowDelta[k] = 0;
+      }
+      tauLowPrev[k] = tauLow[k];
+    }
+    if (tauHighPrev && tauHighDelta) {
+      if (hasDt) {
+        tauHighDelta[k] = Math.abs(tauHigh[k] - tauHighPrev[k]);
+      } else {
+        tauHighDelta[k] = 0;
+      }
+      tauHighPrev[k] = tauHigh[k];
+    }
+
+    const cLow = 1 - Math.exp(-tauLow[k]);
+    const cHigh = 1 - Math.exp(-tauHigh[k]);
     cloudLow[k] = cLow;
     cloudHigh[k] = cHigh;
     cloud[k] = 1 - (1 - cLow) * (1 - cHigh);
@@ -167,8 +195,9 @@ export function computeCloudWaterPath(fields, cwpOut, columnHeight = 1000) {
 
 export function computePrecipRate(fields, precipOut) {
   const { qr, rho } = fields;
-  const kFall = 0.4; // same as microphysics
+  const kFall = 1 / 3600; // same as microphysics
+  const H_rain = 1500;
   for (let k = 0; k < qr.length; k++) {
-    precipOut[k] = Math.max(0, qr[k] * kFall * rho[k] * 3600); // mm/hr approx
+    precipOut[k] = Math.max(0, qr[k] * kFall * rho[k] * H_rain * 3600); // mm/hr approx
   }
 }

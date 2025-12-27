@@ -1,9 +1,11 @@
-import { Re } from './constants';
+import { Re, g } from './constants';
 
 const EARTH_AREA = 4 * Math.PI * Re * Re;
 const DEFAULT_MAX_ENTRIES = 20000;
-const DEFAULT_CADENCE_SECONDS = 3600;
+const DEFAULT_CADENCE_SECONDS = 6 * 3600;
 const DEFAULT_WIND_PANIC = 150;
+const SCHEMA_ID = 'satellitewars.weatherlog';
+const SCHEMA_VERSION = 1;
 
 const PROBES = [
   { name: 'Caribbean', lat: 15, lon: -60 },
@@ -13,13 +15,6 @@ const PROBES = [
   { name: 'EqPacific', lat: 0, lon: -140 },
   { name: 'SOcean', lat: -55, lon: 0 }
 ];
-
-const nowMs = () => {
-  if (typeof performance !== 'undefined' && performance.now) {
-    return performance.now();
-  }
-  return Date.now();
-};
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -31,7 +26,9 @@ class WeatherLogger {
     this.cadenceSeconds = cadenceSeconds;
     this.nextLogSimTimeSeconds = 0;
     this.runId = null;
+    this.onLine = null;
     this.processEnabled = true;
+    this._seq = 0;
     this._grid = null;
     this._rowWeights = null;
     this._totalWeight = 0;
@@ -42,6 +39,25 @@ class WeatherLogger {
     this._probeIndices = null;
     this._lastPanicSimTime = null;
     this._firstNonFiniteModule = null;
+    this._runStartLogged = false;
+  }
+
+  setOnLine(onLine) {
+    this.onLine = typeof onLine === 'function' ? onLine : null;
+  }
+
+  setRunInfo({ runId, seqStart } = {}) {
+    if (typeof runId === 'string' && runId.length > 0 && runId !== this.runId) {
+      this.runId = runId;
+      this._seq = Number.isFinite(seqStart) ? Math.floor(seqStart) : 0;
+      this._runStartLogged = false;
+    } else if (Number.isFinite(seqStart)) {
+      this._seq = Math.floor(seqStart);
+    }
+  }
+
+  hasRunStart() {
+    return this._runStartLogged;
   }
 
   setCadence(seconds, simTimeSeconds) {
@@ -66,8 +82,14 @@ class WeatherLogger {
     if (Number.isFinite(maxEntries)) {
       this.maxEntries = Math.floor(maxEntries);
     }
-    this.nextLogSimTimeSeconds = Number.isFinite(simTimeSeconds) ? simTimeSeconds : 0;
-    this.runId = `weather-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    this.nextLogSimTimeSeconds = Number.isFinite(simTimeSeconds)
+      ? simTimeSeconds + this.cadenceSeconds
+      : this.cadenceSeconds;
+    if (!this.runId) {
+      this.runId = `local-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+      this._seq = 0;
+      this._runStartLogged = false;
+    }
     this._staticLoggedDay = null;
     this._logStaticNext = true;
     this._lastPanicSimTime = null;
@@ -89,7 +111,7 @@ class WeatherLogger {
 
   download(filename = 'weather-log.jsonl') {
     if (!this.entries.length || typeof document === 'undefined') return false;
-    const blob = new Blob([this.entries.join('\n') + '\n'], { type: 'application/json' });
+    const blob = new Blob([this.entries.join('\n') + '\n'], { type: 'application/x-ndjson' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -107,7 +129,7 @@ class WeatherLogger {
     if (!force && Number.isFinite(simTimeSeconds) && simTimeSeconds < this.nextLogSimTimeSeconds) {
       return false;
     }
-    const entry = this._buildStateEntry(context, core, { reason, event: force ? 'manualStep' : 'state' });
+    const entry = this._buildStateEntry(context, core, { reason, event: 'state' });
     this._pushEntry(entry);
     if (!force && Number.isFinite(simTimeSeconds)) {
       this.nextLogSimTimeSeconds = simTimeSeconds + this.cadenceSeconds;
@@ -118,6 +140,18 @@ class WeatherLogger {
   recordNow(context, core, { reason } = {}) {
     if (!this.enabled) return false;
     return this.recordIfDue(context, core, { force: true, reason });
+  }
+
+  recordRunStart(core, { session, cadenceSeconds, modelKind } = {}) {
+    if (this._runStartLogged) return false;
+    if (!this.runId) {
+      this.runId = `local-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+      this._seq = 0;
+    }
+    const entry = this._buildRunStartEntry(core, { session, cadenceSeconds, modelKind });
+    this._pushEntry(entry);
+    this._runStartLogged = true;
+    return true;
   }
 
   logProcessDelta(context, core, moduleName, before, after) {
@@ -145,18 +179,22 @@ class WeatherLogger {
       }
     }
     if (nonFiniteFields.length && !this._firstNonFiniteModule) {
-      const entry = this._buildBaseEntry(context, core);
-      entry.event = 'moduleNonFinite';
-      entry.module = moduleName;
-      entry.reason = 'firstNonFiniteAfterModule';
-      entry.nonFiniteFields = nonFiniteFields;
+      const entry = {
+        event: 'moduleNonFinite',
+        sim: this._buildSimMeta(context, core),
+        module: moduleName,
+        reason: 'firstNonFiniteAfterModule',
+        nonFiniteFields
+      };
       this._pushEntry(entry);
       this._firstNonFiniteModule = moduleName;
     }
-    const entry = this._buildBaseEntry(context, core);
-    entry.event = 'module';
-    entry.module = moduleName;
-    entry.deltas = deltas;
+    const entry = {
+      event: 'module',
+      sim: this._buildSimMeta(context, core),
+      module: moduleName,
+      deltas
+    };
     this._pushEntry(entry);
     return true;
   }
@@ -196,6 +234,8 @@ class WeatherLogger {
     scanArray(fields.qvU);
     scanArray(fields.qc);
     scanArray(fields.qcU);
+    if (fields.qi) scanArray(fields.qi);
+    if (fields.qiU) scanArray(fields.qiU);
     scanArray(fields.qr);
     scanArray(fields.ps);
 
@@ -245,7 +285,7 @@ class WeatherLogger {
   buildProcessSnapshot(core) {
     this._ensureGrid(core.grid);
     const { fields } = core;
-    return {
+    const snapshot = {
       T: this._meanMaxAbs(fields.T),
       Ts: this._meanMaxAbs(fields.Ts),
       TU: this._meanMaxAbs(fields.TU),
@@ -262,63 +302,294 @@ class WeatherLogger {
       uU: this._meanMaxAbs(fields.uU),
       vU: this._meanMaxAbs(fields.vU)
     };
+    if (fields.qi) snapshot.qi = this._meanMaxAbs(fields.qi);
+    if (fields.qiU) snapshot.qiU = this._meanMaxAbs(fields.qiU);
+    return snapshot;
   }
 
-  _buildBaseEntry(context, core) {
+  _buildSimMeta(context, core) {
     const simTimeSeconds = Number.isFinite(context?.simTimeSeconds)
       ? context.simTimeSeconds
       : core?.timeUTC ?? 0;
     const simDay = Math.floor(simTimeSeconds / 86400);
     const todHours = ((simTimeSeconds % 86400) + 86400) % 86400 / 3600;
-    const dayOfYear = (((simTimeSeconds / 86400) % 365) + 365) % 365;
-    const monthFloat = (dayOfYear / 365) * 12;
-    const monthFloor = Math.floor(monthFloat);
-    const m0 = monthFloor % 12;
-    const m1 = (m0 + 1) % 12;
-    const f = monthFloat - monthFloor;
-    const simIsoUTC = Number.isFinite(simTimeSeconds) ? new Date(simTimeSeconds * 1000).toISOString() : null;
-
     return {
-      tRealMs: nowMs(),
-      runId: this.runId,
       simTimeSeconds,
-      simIsoUTC,
-      simEpochLabel: 'sim-epoch-0',
       simDay,
       todHours,
-      monthFloat,
-      monthM0: m0,
-      monthM1: m1,
-      monthF: f,
       simSpeed: context?.simSpeed ?? null,
       paused: context?.paused ?? null,
       seed: core?.seed ?? null,
-      'core.timeUTC': core?.timeUTC ?? null,
-      deltaSimMinusCore: Number.isFinite(simTimeSeconds) && core ? simTimeSeconds - core.timeUTC : null,
-      modelDt: core?.modelDt ?? null,
-      stepsRanThisTick: context?.stepsRanThisTick ?? null
+      modelDtSeconds: core?.modelDt ?? null,
+      stepsRanThisTick: context?.stepsRanThisTick ?? null,
+      coreTimeUTCSeconds: core?.timeUTC ?? null,
+      deltaSimMinusCoreSeconds: Number.isFinite(simTimeSeconds) && core ? simTimeSeconds - core.timeUTC : null
     };
   }
 
   _buildStateEntry(context, core, { reason, event = 'state' } = {}) {
-    const base = this._buildBaseEntry(context, core);
-    base.event = event;
-    if (reason) base.reason = reason;
-    base.cadenceSeconds = this.cadenceSeconds;
+    const sim = this._buildSimMeta(context, core);
+    const entry = {
+      event,
+      sim
+    };
+    if (reason) entry.reason = reason;
 
     this._ensureGrid(core.grid);
 
-    const simDay = base.simDay;
+    const simDay = sim.simDay;
     const includeStatic = this._logStaticNext || (this._staticLoggedDay !== simDay);
     if (includeStatic) {
       this._staticLoggedDay = simDay;
       this._logStaticNext = false;
     }
 
-    base.fields = this._buildFieldStats(core, includeStatic);
-    base.staticFieldsLogged = includeStatic;
-    base.probes = this._collectProbes(core);
-    return base;
+    entry.fields = this._buildFieldStats(core, includeStatic);
+    entry.clamps = this._buildClampStats(core);
+    entry.budgets = this._buildBudgetStats(core);
+    entry.v2 = this._buildV2Stats(core);
+    entry.sanity = this._buildSanityStats(core);
+    entry.staticFieldsLogged = includeStatic;
+    entry.probes = this._collectProbes(core);
+    entry.tc = core?.tcSystem?.getStormSummary?.() || { stormCount: 0, storms: [] };
+    return entry;
+  }
+
+  _buildRunStartEntry(core, { session, cadenceSeconds, modelKind } = {}) {
+    const grid = core?.grid || {};
+    const params = {
+      dyn: core?.dynParams ?? null,
+      mass: core?.massParams ?? null,
+      advect: core?.advectParams ?? null,
+      vert: core?.vertParams ?? null,
+      micro: core?.microParams ?? null,
+      surface: core?.surfaceParams ?? null,
+      rad: core?.radParams ?? null,
+      diag: core?.diagParams ?? null,
+      nudge: core?.nudgeParams ?? null
+    };
+    const clone = (obj) => (obj ? JSON.parse(JSON.stringify(obj)) : null);
+    const sigmaHalf = core?.sigmaHalf
+      ? Array.from(core.sigmaHalf)
+      : core?.state?.sigmaHalf
+        ? Array.from(core.state.sigmaHalf)
+        : null;
+    const pTopPa = core?.microParams?.pTop ?? core?.diagParams?.pTop ?? null;
+    const model = {
+      kind: modelKind || (core?.state?.nz ? 'v2' : 'v1'),
+      grid: {
+        nx: grid.nx ?? null,
+        ny: grid.ny ?? null,
+        nz: core?.nz ?? core?.state?.nz ?? null,
+        sigmaHalf,
+        pTopPa,
+        minDxMeters: grid.minDxMeters ?? null
+      }
+    };
+    const build = session?.build || {};
+    return {
+      event: 'runStart',
+      log: {
+        file: session?.filename ?? null,
+        cadenceSimSeconds: Number.isFinite(cadenceSeconds) ? cadenceSeconds : this.cadenceSeconds
+      },
+      build: {
+        appVersion: build.appVersion ?? null,
+        gitCommit: build.gitCommit ?? null,
+        gitDirty: typeof build.gitDirty === 'boolean' ? build.gitDirty : null,
+        nodeEnv: build.nodeEnv ?? null
+      },
+      model,
+      params: {
+        dyn: clone(params.dyn),
+        mass: clone(params.mass),
+        advect: clone(params.advect),
+        vert: clone(params.vert),
+        micro: clone(params.micro),
+        surface: clone(params.surface),
+        rad: clone(params.rad),
+        diag: clone(params.diag),
+        nudge: clone(params.nudge)
+      },
+      init: {
+        seed: core?.seed ?? null,
+        timeUTCSeconds: core?.timeUTC ?? null,
+        useClimo: Boolean(core?.climo),
+        climoHasSlp: core?.climo?.hasSlp ?? false,
+        climoHasT2m: core?.climo?.hasT2m ?? false
+      },
+      server: {
+        pid: session?.pid ?? null,
+        startedAtUtc: session?.startedAtUtc ?? null
+      }
+    };
+  }
+
+  _buildClampStats(core) {
+    const fields = core?.fields || {};
+    return {
+      tauLowClampCount: Math.max(0, fields.tauLowClampCount || 0),
+      tauHighClampCount: Math.max(0, fields.tauHighClampCount || 0)
+    };
+  }
+
+  _buildBudgetStats(core) {
+    const state = core?.state;
+    const grid = core?.grid;
+    if (!state || !grid || !state.qv || !state.pHalf || !Number.isFinite(state.nz)) {
+      return {
+        columnWaterKgM2MeanAw: null,
+        columnWaterKgM2P95: null,
+        negWaterCount3d: 0
+      };
+    }
+    this._ensureGrid(grid);
+    const { nx, ny } = grid;
+    const { N, nz, qv, qc, qr, qi, pHalf } = state;
+    let sum = 0;
+    let sumW = 0;
+    let count = 0;
+    const gLocal = g;
+    let negWaterCount3d = 0;
+
+    for (let j = 0; j < ny; j++) {
+      const w = this._rowWeights[j];
+      const row = j * nx;
+      for (let i = 0; i < nx; i++) {
+        const k = row + i;
+        let col = 0;
+        for (let lev = 0; lev < nz; lev++) {
+          const idx = lev * N + k;
+          const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+          const qvVal = qv[idx];
+          const qcVal = qc ? qc[idx] : 0;
+          const qiVal = qi ? qi[idx] : 0;
+          const qrVal = qr ? qr[idx] : 0;
+          if (qvVal < 0 || qcVal < 0 || qiVal < 0 || qrVal < 0) {
+            negWaterCount3d++;
+          }
+          col += (qvVal + qcVal + qiVal + qrVal) * (dp / gLocal);
+        }
+        sum += col * w;
+        sumW += w;
+        this._scratch[count++] = col;
+      }
+    }
+
+    const p95 = this._percentilesFromScratch(count, [95]).p95;
+    return {
+      columnWaterKgM2MeanAw: sumW > 0 ? sum / sumW : null,
+      columnWaterKgM2P95: p95,
+      negWaterCount3d
+    };
+  }
+
+  _buildV2Stats(core) {
+    const vm = core?.state?.vertMetrics;
+    const out = {
+      convectiveFraction: vm?.convectiveFraction ?? null,
+      omegaPosP90: vm?.omegaPosP90 ?? null,
+      instabP90: vm?.instabP90 ?? null,
+      cloudHighMeanInAscent: null,
+      cloudHighMeanInSubsidence: null,
+      cloudHighAscentRatio: null,
+      cloudHighMeanInMoistUpper: null
+    };
+
+    const fields = core?.fields;
+    const grid = core?.grid;
+    if (!fields || !grid || !fields.cloudHigh || !fields.omegaU) return out;
+    if (!fields.RHU) return out;
+
+    this._ensureGrid(grid);
+    const { nx, ny } = grid;
+    const omegaThreshRaw = core?.diagParams?.omegaHigh0;
+    const omegaThresh = Number.isFinite(omegaThreshRaw) ? omegaThreshRaw : 0.05;
+    const rhHigh0Raw = core?.diagParams?.rhHigh0;
+    const rhHigh0 = Number.isFinite(rhHigh0Raw) ? rhHigh0Raw : 0.55;
+
+    let sumAsc = 0;
+    let sumAscW = 0;
+    let sumSub = 0;
+    let sumSubW = 0;
+    let sumMoist = 0;
+    let sumMoistW = 0;
+
+    for (let j = 0; j < ny; j++) {
+      const w = this._rowWeights[j];
+      const row = j * nx;
+      for (let i = 0; i < nx; i++) {
+        const k = row + i;
+        const ch = fields.cloudHigh[k];
+        if (!Number.isFinite(ch)) continue;
+        const omegaU = fields.omegaU[k];
+        if (Number.isFinite(omegaU)) {
+          if (omegaU > omegaThresh) {
+            sumAsc += ch * w;
+            sumAscW += w;
+          } else if (omegaU < -omegaThresh) {
+            sumSub += ch * w;
+            sumSubW += w;
+          }
+        }
+        const rhu = fields.RHU[k];
+        if (Number.isFinite(rhu) && rhu > rhHigh0) {
+          sumMoist += ch * w;
+          sumMoistW += w;
+        }
+      }
+    }
+
+    const meanAsc = sumAscW > 0 ? sumAsc / sumAscW : null;
+    const meanSub = sumSubW > 0 ? sumSub / sumSubW : null;
+    const meanMoist = sumMoistW > 0 ? sumMoist / sumMoistW : null;
+
+    out.cloudHighMeanInAscent = meanAsc;
+    out.cloudHighMeanInSubsidence = meanSub;
+    out.cloudHighMeanInMoistUpper = meanMoist;
+    out.cloudHighAscentRatio =
+      meanAsc != null && meanSub != null ? meanAsc / (meanSub + 1e-6) : null;
+
+    return out;
+  }
+
+  _buildSanityStats(core) {
+    const state = core?.state;
+    const grid = core?.grid;
+    if (!state || !grid || !state.ps || !state.pHalf) {
+      return {
+        psOutOfRangeCount: 0,
+        pHalfInversionCount: 0,
+        dpNonPositiveCount: 0
+      };
+    }
+    const psMin = core?.massParams?.psMin ?? 50000;
+    const psMax = core?.massParams?.psMax ?? 110000;
+    const { N, nz, ps, pHalf } = state;
+    let psOut = 0;
+    let inversions = 0;
+    let dpNonPositive = 0;
+
+    for (let k = 0; k < N; k++) {
+      const p = ps[k];
+      if (p < psMin || p > psMax) psOut++;
+      let inverted = false;
+      for (let lev = 0; lev < nz; lev++) {
+        const p1 = pHalf[lev * N + k];
+        const p2 = pHalf[(lev + 1) * N + k];
+        if (p1 >= p2) {
+          inverted = true;
+        }
+        if (p2 - p1 <= 0) dpNonPositive++;
+      }
+      if (inverted) inversions++;
+    }
+
+    return {
+      psOutOfRangeCount: psOut,
+      pHalfInversionCount: inversions,
+      dpNonPositiveCount: dpNonPositive
+    };
   }
 
   _buildFieldStats(core, includeStatic) {
@@ -357,10 +628,12 @@ class WeatherLogger {
     cloudHighStats.below0Count = cloudHighStats.belowPhysMinCount;
     stats.cloudHigh = cloudHighStats;
 
+    const psMin = core?.massParams?.psMin ?? 85000;
+    const psMax = core?.massParams?.psMax ?? 107000;
     const psStats = this._statsScalar(fields.ps, {
       landMask,
-      physMin: 85000,
-      physMax: 107000
+      physMin: psMin,
+      physMax: psMax
     });
     if (psStats) {
       psStats.minHpa = psStats.min != null ? psStats.min / 100 : null;
@@ -396,17 +669,6 @@ class WeatherLogger {
       sstStats.meanOcean = sstStats.meanAw;
     }
     stats.sst = sstStats;
-
-    if (climo.sstNow) {
-      const tsMinusSst = this._diffStats(fields.Ts, climo.sstNow, {
-        landMask,
-        landMaskMode: 'ocean'
-      });
-      stats.tsMinusSst = {
-        meanOcean: tsMinusSst.meanAw,
-        p95Ocean: tsMinusSst.p95
-      };
-    }
 
     const seaIceStats = climo.iceNow
       ? this._statsScalar(climo.iceNow, {
@@ -474,10 +736,24 @@ class WeatherLogger {
     qvUStats.below0Count = qvUStats.belowPhysMinCount;
     stats.qvU = qvUStats;
 
-    const tauLowStats = this._statsScalar(fields.tauLow, { landMask, physMin: 0, physMax: 20 });
+    const qcUStats = this._statsScalar(fields.qcU, { landMask, physMin: 0 });
+    qcUStats.below0Count = qcUStats.belowPhysMinCount;
+    stats.qcU = qcUStats;
+
+    if (fields.qiU) {
+      const qiUStats = this._statsScalar(fields.qiU, { landMask, physMin: 0 });
+      qiUStats.below0Count = qiUStats.belowPhysMinCount;
+      stats.qiU = qiUStats;
+    }
+
+    const tauLowStats = this._statsScalar(fields.tauLow, { landMask, physMin: 0, physMax: 80 });
     stats.tauLow = tauLowStats;
-    const tauHighStats = this._statsScalar(fields.tauHigh, { landMask, physMin: 0, physMax: 20 });
+    const tauHighStats = this._statsScalar(fields.tauHigh, { landMask, physMin: 0, physMax: 80 });
     stats.tauHigh = tauHighStats;
+    const tauLowDeltaStats = this._statsScalar(fields.tauLowDelta, { landMask, physMin: 0 });
+    stats.tauLowDelta = tauLowDeltaStats;
+    const tauHighDeltaStats = this._statsScalar(fields.tauHighDelta, { landMask, physMin: 0 });
+    stats.tauHighDelta = tauHighDeltaStats;
 
     stats.wind = this._statsVector(fields.u, fields.v, { landMask });
     stats.windUpper = this._statsVector(fields.uU, fields.vU, { landMask });
@@ -589,7 +865,9 @@ class WeatherLogger {
         uU: fields.uU[k],
         vU: fields.vU[k],
         hU: fields.hU[k],
-        qvU: fields.qvU[k]
+        qvU: fields.qvU[k],
+        qcU: fields.qcU ? fields.qcU[k] : 0,
+        qiU: fields.qiU ? fields.qiU[k] : 0
       });
     }
     return probes;
@@ -629,7 +907,22 @@ class WeatherLogger {
   }
 
   _missingStats() {
-    return { missing: true };
+    return {
+      missing: true,
+      min: null,
+      max: null,
+      meanAw: null,
+      stdAw: null,
+      rmsAw: null,
+      p05: null,
+      p50: null,
+      p95: null,
+      nanCount: 0,
+      infCount: 0,
+      belowPhysMinCount: 0,
+      abovePhysMaxCount: 0,
+      count: 0
+    };
   }
 
   _meanMaxAbs(arr) {
@@ -760,7 +1053,8 @@ class WeatherLogger {
     let sumV = 0;
     let sumSpeed = 0;
     let sumKe = 0;
-    let maxSpeed = 0;
+    let minSpeed = Infinity;
+    let maxSpeed = -Infinity;
     let nanCount = 0;
     let infCount = 0;
     let scratchCount = 0;
@@ -788,21 +1082,32 @@ class WeatherLogger {
         sumSpeed += speed * w;
         sumKe += 0.5 * (uu * uu + vv * vv) * w;
         sumW += w;
+        if (speed < minSpeed) minSpeed = speed;
         if (speed > maxSpeed) maxSpeed = speed;
         this._scratch[scratchCount++] = speed;
       }
     }
 
-    const speedPercentiles = this._percentilesFromScratch(scratchCount, [95]);
+    const speedPercentiles = this._percentilesFromScratch(scratchCount, [5, 50, 95]);
+    const speedMeanAw = sumW > 0 ? sumSpeed / sumW : null;
+    const maxOut = scratchCount > 0 ? maxSpeed : null;
     return {
       meanUAw: sumW > 0 ? sumU / sumW : null,
       meanVAw: sumW > 0 ? sumV / sumW : null,
-      speedMeanAw: sumW > 0 ? sumSpeed / sumW : null,
+      meanAw: speedMeanAw,
+      min: scratchCount > 0 ? minSpeed : null,
+      max: maxOut,
+      p05: speedPercentiles.p05,
+      p50: speedPercentiles.p50,
+      p95: speedPercentiles.p95,
+      speedMeanAw,
       speedP95: speedPercentiles.p95,
-      speedMax: scratchCount > 0 ? maxSpeed : null,
+      speedMax: maxOut,
       keMeanAw: sumW > 0 ? sumKe / sumW : null,
       nanCount,
       infCount,
+      belowPhysMinCount: 0,
+      abovePhysMaxCount: 0,
       count: scratchCount
     };
   }
@@ -927,8 +1232,22 @@ class WeatherLogger {
   }
 
   _pushEntry(entry) {
-    this.entries.push(JSON.stringify(entry));
+    const decorated = {
+      schema: SCHEMA_ID,
+      schemaVersion: SCHEMA_VERSION,
+      runId: this.runId,
+      seq: this._seq++,
+      tRealUtcMs: Date.now(),
+      ...entry
+    };
+    const line = JSON.stringify(decorated);
+    this.entries.push(line);
     this._trimEntries();
+    if (this.onLine && this.runId) {
+      try {
+        this.onLine(line);
+      } catch (_) {}
+    }
   }
 
   _trimEntries() {

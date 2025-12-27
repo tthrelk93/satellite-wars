@@ -5,9 +5,17 @@ import earthmap from './8081_earthmap10k.jpg';
 import earthbump from './8081_earthbump10k.jpg';
 import fogTexture from './fog.png'; // Add your fog texture map here
 
+const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+const smoothstep = (edge0, edge1, x) => {
+  const t = clamp01((x - edge0) / Math.max(1e-6, edge1 - edge0));
+  return t * t * (3 - 2 * t);
+};
+
 class Earth {
-  constructor(camera, players) {
+  constructor(camera, players, { useWeatherV2 = true, weatherSeed } = {}) {
     this.camera = camera;
+    this.useWeatherV2 = useWeatherV2;
+    this.weatherSeed = weatherSeed;
     this.earthRadiusKm = 6371; // Earth's radius in kilometers
     this.geometry = new THREE.SphereGeometry(this.earthRadiusKm, 64, 64);
     this.material = new THREE.MeshPhongMaterial({
@@ -28,17 +36,17 @@ class Earth {
     this.cloudMesh = new THREE.Mesh(this.cloudGeometry, this.cloudMaterial);
 
     // Weather layers (dynamic clouds under FoW)
-    this.weatherField = new WeatherField();
+    this.weatherField = null;
     this.weatherLowGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 120, 256, 256);
     this.weatherHighGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 160, 256, 256);
     this.weatherLowMaterial = new THREE.MeshPhongMaterial({
-      map: this.weatherField.textureLow,
+      map: null,
       transparent: true,
       opacity: 0.8,
       depthWrite: false
     });
     this.weatherHighMaterial = new THREE.MeshPhongMaterial({
-      map: this.weatherField.textureHigh,
+      map: null,
       transparent: true,
       opacity: 0.6,
       depthWrite: false
@@ -48,7 +56,7 @@ class Earth {
 
     this.weatherDebugGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 220, 256, 256);
     this.weatherDebugMaterial = new THREE.MeshBasicMaterial({
-      map: this.weatherField.getDebugTexture(),
+      map: null,
       transparent: true,
       opacity: 0.95,
       depthWrite: false
@@ -65,6 +73,8 @@ class Earth {
     this.parentObject.add(this.weatherHighMesh);
     this.parentObject.add(this.cloudMesh);
     this.parentObject.add(this.weatherDebugMesh);
+
+    this._createWeatherField();
 
     // Create a main canvas to dynamically update the fog texture
     this.canvas = document.createElement('canvas');
@@ -101,6 +111,48 @@ class Earth {
     this.lastLogTime = 0; // Timestamp of the last log
     this.DEBUG = false;
     this.currentPlayerID = null;
+  }
+
+  _createWeatherField() {
+    if (this.weatherField) {
+      this.weatherField.textureLow.dispose?.();
+      this.weatherField.textureHigh.dispose?.();
+      this.weatherField.textureDebug.dispose?.();
+    }
+    this.weatherField = new WeatherField({
+      renderScale: 4,
+      tickSeconds: 1.0,
+      useV2: this.useWeatherV2,
+      seed: this.weatherSeed
+    });
+    this.weatherLowMaterial.map = this.weatherField.textureLow;
+    this.weatherLowMaterial.needsUpdate = true;
+    this.weatherHighMaterial.map = this.weatherField.textureHigh;
+    this.weatherHighMaterial.needsUpdate = true;
+    this.weatherDebugMaterial.map = this.weatherField.getDebugTexture();
+    this.weatherDebugMaterial.needsUpdate = true;
+  }
+
+  setWeatherCoreVersion(version) {
+    const useV2 = version === 'v2';
+    if (this.useWeatherV2 === useV2) return;
+    this.useWeatherV2 = useV2;
+    this._createWeatherField();
+    this.setWeatherDebugMode(this.weatherDebugMode);
+    this.setWeatherVisible(this.weatherVisible);
+  }
+
+  setWeatherSeed(seed) {
+    if (!Number.isFinite(seed)) return;
+    this.weatherSeed = seed;
+    this.weatherField?.setSeed?.(seed);
+  }
+
+  getWeatherSeed() {
+    const wfSeed = this.weatherField?.getSeed?.();
+    if (Number.isFinite(wfSeed)) return wfSeed;
+    if (Number.isFinite(this.weatherSeed)) return this.weatherSeed;
+    return null;
   }
 
   createLatLines() {
@@ -195,38 +247,40 @@ class Earth {
         // Convert u, v to a string to use as a key
         const positionKey = `${u.toFixed(6)}-${v.toFixed(6)}`;
 
-        // Weather check: if dense cloud cover, block reveal
-        const cloudCover = this.weatherField?.sampleWeather(u, v) ?? 0;
-        const CLOUD_BLOCK = 0.45;
-        if (cloudCover > CLOUD_BLOCK) {
-          return; // imaging blocked by weather
-        }
+    // Weather check: smooth cloud blocking based on low/high means
+    const cl = this.weatherField?.sampleCloudLow?.(u, v) ?? 0;
+    const ch = this.weatherField?.sampleCloudHigh?.(u, v) ?? 0;
+    const wLow = 0.75;
+    const wHigh = 0.35;
+    const coverLocal = clamp01(wLow * cl + wHigh * ch);
+    const cloudBlock = smoothstep(0.35, 0.75, coverLocal);
+    const blockFactor = 1 - cloudBlock;
 
         // Ensure player-specific revealed positions and fog maps are initialized
         if (!this.revealedPositions[playerID.current]) {
           this.revealedPositions[playerID.current] = new Set();
         }
 
-        if (!this.revealedPositions[playerID.current].has(positionKey)) {
-          const offscreenContext = this.playerCanvases[playerID.current].context;
-          offscreenContext.globalCompositeOperation = 'destination-out';
-          offscreenContext.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    if (!this.revealedPositions[playerID.current].has(positionKey)) {
+      const offscreenContext = this.playerCanvases[playerID.current].context;
+      offscreenContext.globalCompositeOperation = 'destination-out';
+      offscreenContext.fillStyle = `rgba(0, 0, 0, ${0.5 * blockFactor})`;
 
-          // Calculate the reveal area based on the FOV value
-          const earthRadius = this.earthRadiusKm; // The Earth's radius in your scene scale
-          const surfaceArea = 4 * Math.PI * Math.pow(earthRadius, 2);
-          const revealArea = (fov / 100000000) * surfaceArea;
-          const revealRadius = Math.sqrt(revealArea / Math.PI);
+      // Calculate the reveal area based on the FOV value
+      const earthRadius = this.earthRadiusKm; // The Earth's radius in your scene scale
+      const surfaceArea = 4 * Math.PI * Math.pow(earthRadius, 2);
+      const revealArea = (fov / 100000000) * surfaceArea;
+      const revealRadius = Math.sqrt(revealArea / Math.PI);
 
-          offscreenContext.beginPath();
-          offscreenContext.arc(u * this.canvas.width, v * this.canvas.height, revealRadius, 0, 2 * Math.PI);
-          offscreenContext.fill();
-          offscreenContext.globalCompositeOperation = 'source-over';
+      offscreenContext.beginPath();
+      offscreenContext.arc(u * this.canvas.width, v * this.canvas.height, revealRadius, 0, 2 * Math.PI);
+      offscreenContext.fill();
+      offscreenContext.globalCompositeOperation = 'source-over';
 
-          this.revealedPositions[playerID.current].add(positionKey);
-          // Immediately update the main fog texture so the new reveal is visible
-          this.updateFogMapForCurrentPlayer();
-        }
+      this.revealedPositions[playerID.current].add(positionKey);
+      // Immediately update the main fog texture so the new reveal is visible
+      this.updateFogMapForCurrentPlayer();
+    }
       }
 
       updateFogMapForCurrentPlayer() {
@@ -320,6 +374,22 @@ class Earth {
 
   getWeatherLogStatus() {
     return this.weatherField?.getLogStatus() ?? { enabled: false, count: 0, cadenceSeconds: 0 };
+  }
+
+  getWeatherStormSummary() {
+    return this.weatherField?.getStormSummary?.() ?? { stormCount: 0, storms: [] };
+  }
+
+  spawnWeatherTropicalCycloneDebug() {
+    this.weatherField?.spawnTropicalCycloneDebug?.();
+  }
+
+  spawnWeatherHurricaneDebug() {
+    this.weatherField?.spawnHurricaneDebug?.();
+  }
+
+  setWeatherV2ConvectionEnabled(enabled) {
+    this.weatherField?.setV2ConvectionEnabled?.(enabled);
   }
 
   weatherLogNow(simTimeSeconds, simContext, reason) {

@@ -6,11 +6,12 @@ export function stepMicrophysics({ dt, fields }) {
   const { T, qv, qc, qr, ps } = fields;
   const len = T.length;
 
-  const qc0 = 1e-3; // autoconversion threshold kg/kg
-  const kAuto = 1.5e-3;
-  const kEvap = 0.6;
-  const kFall = 0.4;
-  const kCloudEvap = 0.5; // 1/s (tunable)
+  const qc0 = 2e-4; // autoconversion threshold kg/kg
+  const kAuto = 1e-4;
+  const kEvap = 2e-4;
+  const kFall = 1 / 3600;
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
 
   for (let k = 0; k < len; k++) {
     const qs = saturationMixingRatio(T[k], ps[k]);
@@ -21,7 +22,9 @@ export function stepMicrophysics({ dt, fields }) {
       qc[k] += dq;
       T[k] += (Lv / Cp) * dq;
     } else if (qv[k] < qs && qc[k] > 0) {
-      const dq = Math.min(qc[k], (qs - qv[k]) * kCloudEvap * dt);
+      const RH = qv[k] / Math.max(1e-8, qs);
+      const tauEvap = lerp(1800, 28800, clamp01(RH));
+      const dq = Math.min(qc[k], (qs - qv[k]) * (dt / tauEvap));
       qv[k] += dq;
       qc[k] -= dq;
       T[k] -= (Lv / Cp) * dq;
@@ -61,8 +64,9 @@ export function stepUpperCloudMicrophysics({ dt, fields }) {
   const { TU, qvU, qcU } = fields;
   const len = TU.length;
   const P_UPPER = 50000;
-  const kCloudEvap = 0.2;
-  const tauAnvil = 36 * 3600;
+  const tauAnvil = 24 * 3600;
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
 
   for (let k = 0; k < len; k++) {
     const qs = saturationMixingRatio(TU[k], P_UPPER);
@@ -72,7 +76,9 @@ export function stepUpperCloudMicrophysics({ dt, fields }) {
       qcU[k] += dq;
       TU[k] += (Lv / Cp) * dq;
     } else if (qvU[k] < qs && qcU[k] > 0) {
-      const dq = Math.min(qcU[k], (qs - qvU[k]) * kCloudEvap * dt);
+      const RH = qvU[k] / Math.max(1e-8, qs);
+      const tauEvap = lerp(6 * 3600, 36 * 3600, clamp01(RH));
+      const dq = Math.min(qcU[k], qcU[k] * (1 - RH) * (dt / tauEvap));
       qvU[k] += dq;
       qcU[k] -= dq;
       TU[k] -= (Lv / Cp) * dq;
