@@ -111,14 +111,14 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
     }
   }
 
-  u.set(tmpU);
-  v.set(tmpV);
-
   advectScalar(theta);
   advectScalar(qv);
   advectScalar(qc);
   advectScalar(qi);
   advectScalar(qr);
+
+  u.set(tmpU);
+  v.set(tmpV);
 
   const applyFilter = (field, base, j, passes) => {
     if (passes <= 0) return;

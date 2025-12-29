@@ -12,6 +12,7 @@ import { stepRadiation2D5 } from './radiation2d';
 import { updateDiagnostics2D5 } from './diagnostics2d';
 import { initializeV2FromClimo } from './initializeFromClimo';
 import { stepNudging5 } from './nudging5';
+import WeatherLogger from '../WeatherLogger';
 
 // Fractions anchored between pTop and ps, thin aloft, thicker near surface
 const SIGMA_HALF = new Float32Array([0.0, 0.07, 0.18, 0.38, 0.65, 1.0]);
@@ -48,22 +49,26 @@ export class WeatherCore5 {
     this._metricsEverySteps = 10;
     this._metricsCounter = 0;
     this._debugChecks = typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production';
+    this._moduleLogCadenceSeconds = 6 * 3600;
+    this._nextModuleLogSimTime = null;
+    this.logger = null;
+    this._loggerContext = null;
     this.dynParams = {
       maxWind: 150,
-      tauDragSurface: 6 * 86400,
-      tauDragTop: 20 * 86400,
-      nuLaplacian: 2e5,
+      tauDragSurface: 1 * 86400,
+      tauDragTop: 10 * 86400,
+      nuLaplacian: 1_000_000,
       polarFilterLatStartDeg: 60,
       polarFilterEverySteps: 0,
       extraFilterEverySteps: 0,
       extraFilterPasses: 2,
-      enableMetricTerms: true
+      enableMetricTerms: false
     };
     this.massParams = {
-      psMin: 50000,
-      psMax: 110000,
+      psMin: 80000,
+      psMax: 105000,
       conserveGlobalMean: true,
-      maxAbsDpsDt: 1.0
+      maxAbsDpsDt: 0.02
     };
     this.advectParams = {
       polarLatStartDeg: 60,
@@ -90,9 +95,19 @@ export class WeatherCore5 {
       enable: true,
       cadenceSeconds: 6 * 3600,
       tauPs: 30 * 86400,
+      tauThetaS: 45 * 86400,
+      tauQvS: 30 * 86400,
+      sstAirOffsetK: -1,
+      rhTargetOceanEq: 0.8,
+      rhTargetOceanPole: 0.72,
+      rhTargetLandEq: 0.7,
+      rhTargetLandPole: 0.55,
+      qvCap: 0.03,
       smoothLon: 31,
       smoothLat: 9,
       enablePs: true,
+      enableThetaS: true,
+      enableQvS: true,
       enableUpper: false
     };
     this.radParams = {
@@ -104,8 +119,13 @@ export class WeatherCore5 {
       eps0: 0.75,
       kWv: 12.0,
       kCld: 0.1,
-      tauRadLower: 2.5 * 86400,
-      tauRadUpper: 1.5 * 86400,
+      tauRadLower: 30 * 86400,
+      tauRadUpper: 15 * 86400,
+      TeqLowerEqK: 288,
+      TeqLowerPoleK: 253,
+      TeqUpperEqK: 255,
+      TeqUpperPoleK: 235,
+      TeqLatShape: 'sin2',
       heatFracLower: 0.65,
       heatFracUpper: 0.35,
       dThetaMaxPerStep: 1.0,
@@ -115,15 +135,15 @@ export class WeatherCore5 {
       enableSigmaLWProfile: true,
       enableSwMassDistribution: true
     };
-    this.vertParams = {
-      enableMixing: true,
-      enableConvection: true,
-      enableConvectiveMixing: true,
-      enableConvectiveOutcome: false,
-      mu0: 0.05,
-      tauConv: 2 * 3600,
-      tauPblUnstable: 6 * 3600,
-      tauPblStable: 2 * 86400,
+     this.vertParams = {
+       enableMixing: true,
+       enableConvection: true,
+       enableConvectiveMixing: false,
+       enableConvectiveOutcome: true,
+       mu0: 0.05,
+       tauConv: 2 * 3600,
+       tauPblUnstable: 6 * 3600,
+       tauPblStable: 2 * 86400,
       pblDepthFrac: 0.35,
       maxMixFracPbl: 0.2,
       pblTaper: 0.85,
@@ -137,9 +157,17 @@ export class WeatherCore5 {
       thetaeCoeff: 10,
       thetaeQvCap: 0.03,
       pblWarmRain: true,
-      qcAuto0: 7e-4,
-      tauAuto: 4 * 3600,
-      autoMaxFrac: 0.2,
+       qcAuto0: 7e-4,
+       tauAuto: 4 * 3600,
+       autoMaxFrac: 0.2,
+       entrainFrac: 0.2,
+      detrainTopFrac: 0.7,
+      buoyTrigK: 0.0,
+      dThetaMaxConvPerStep: 2.5,
+      enableLargeScaleVerticalAdvection: false,
+      verticalAdvectionCflMax: 0.4,
+      dThetaMaxVertAdvPerStep: 2.0,
+      enableOmegaMassFix: true,
       eps: 1e-12,
       debugConservation: false
     };
@@ -159,6 +187,11 @@ export class WeatherCore5 {
       Tfreeze: 273.15,
       TiceFull: 253.15,
       kFall: 1 / 3600,
+      enableFluxSedimentation: true,
+      enableIceSedimentation: true,
+      kFallIce: 1 / (6 * 3600),
+      enableIceMeltToRain: true,
+      tauMeltIceToRain: 3600,
       tauEvapCloudMin: 900,
       tauEvapCloudMax: 7200,
       tauEvapRainMin: 900,
@@ -169,6 +202,11 @@ export class WeatherCore5 {
       tauIceAgg: 12 * 3600,
       iceAggMaxFrac: 0.05,
       precipRateMax: 200,
+      enableConvectiveOutcome: true,
+      convTauEvapCloudScale: 0.35,
+      convKAutoScale: 2.0,
+      convPrecipEffBoost: 0.15,
+      dThetaMaxMicroPerStepConv: 2.5,
       enable: true
     };
     this.diagParams = {
@@ -198,6 +236,7 @@ export class WeatherCore5 {
       qc1Low: 8e-4,
       qc0High: 0.002,
       qc1High: 0.004,
+      dpTauLowMaxPa: 11000,
       tau0: 6,
       levVort: 2,
       levUpper: 2,
@@ -229,13 +268,15 @@ export class WeatherCore5 {
 	    this.fields = {
 	      u: this.state.u.subarray(lowerOffset, lowerOffset + N),
 	      v: this.state.v.subarray(lowerOffset, lowerOffset + N),
-	      uU: this.state.u.subarray(upperOffset, upperOffset + N),
-	      vU: this.state.v.subarray(upperOffset, upperOffset + N),
-	      hL: makeArray(N, 9000),
-	      hU: makeArray(N, 3000),
-	      T: this.state.T.subarray(lowerOffset, lowerOffset + N),
-	      Ts: this.state.Ts,
-	      TU: this.state.T.subarray(upperOffset, upperOffset + N),
+      uU: this.state.u.subarray(upperOffset, upperOffset + N),
+      vU: this.state.v.subarray(upperOffset, upperOffset + N),
+      hL: makeArray(N, 9000),
+      hU: makeArray(N, 3000),
+      theta: this.state.theta.subarray(lowerOffset, lowerOffset + N),
+      thetaU: this.state.theta.subarray(upperOffset, upperOffset + N),
+      T: this.state.T.subarray(lowerOffset, lowerOffset + N),
+      Ts: this.state.Ts,
+      TU: this.state.T.subarray(upperOffset, upperOffset + N),
 	      qv: this.state.qv.subarray(lowerOffset, lowerOffset + N),
 	      qvU: this.state.qv.subarray(upperOffset, upperOffset + N),
 	      qc: this.state.qc.subarray(lowerOffset, lowerOffset + N),
@@ -309,6 +350,9 @@ export class WeatherCore5 {
     const steps = Math.floor(this._accum / this.modelDt);
     const maxSteps = Math.max(1000, Math.ceil(86400 / this.modelDt) + 10);
     const stepsToRun = Math.min(steps, maxSteps);
+    if (this._loggerContext) {
+      this._loggerContext.stepsRanThisTick = stepsToRun;
+    }
     for (let i = 0; i < stepsToRun; i++) {
       this._stepOnce(this.modelDt);
     }
@@ -318,6 +362,18 @@ export class WeatherCore5 {
     }
     this._lastAdvanceSteps = stepsToRun;
     return stepsToRun;
+  }
+
+  setLogger(logger) {
+    this.logger = logger instanceof WeatherLogger ? logger : null;
+  }
+
+  setLoggerContext(context) {
+    this._loggerContext = context || null;
+  }
+
+  getLoggerContext() {
+    return this._loggerContext;
   }
 
   setTimeUTC(seconds) {
@@ -475,73 +531,118 @@ export class WeatherCore5 {
 
   _stepOnce(dt) {
     this._updateClimoNow(dt, false);
-    updateHydrostatic(this.state, { pTop: P_TOP });
-    stepSurface2D5({
-      dt,
-      grid: this.grid,
-      state: this.state,
-      params: this.surfaceParams
+    const logger = this.logger;
+    const logContext = this._loggerContext;
+    const logEnabled = Boolean(logger && logger.enabled && logger.processEnabled);
+    const moduleCadenceSeconds = Number.isFinite(logger?.processCadenceSeconds) && logger.processCadenceSeconds > 0
+      ? logger.processCadenceSeconds
+      : Number.isFinite(logger?.cadenceSeconds) && logger.cadenceSeconds > 0
+        ? logger.cadenceSeconds
+        : this._moduleLogCadenceSeconds;
+    if (!Number.isFinite(this._nextModuleLogSimTime)) {
+      this._nextModuleLogSimTime = this.timeUTC;
+    }
+    const shouldLogModules = logEnabled && this.timeUTC >= this._nextModuleLogSimTime;
+    if (shouldLogModules) {
+      this._nextModuleLogSimTime = this.timeUTC + moduleCadenceSeconds;
+    }
+    const runWithLog = (name, fn) => {
+      if (!shouldLogModules) {
+        fn();
+        return;
+      }
+      const before = logger.buildProcessSnapshot(this);
+      fn();
+      const after = logger.buildProcessSnapshot(this);
+      logger.logProcessDelta(logContext, this, name, before, after);
+    };
+
+    runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
+    runWithLog('stepSurface2D5', () => {
+      stepSurface2D5({
+        dt,
+        grid: this.grid,
+        state: this.state,
+        params: this.surfaceParams
+      });
     });
-    updateHydrostatic(this.state, { pTop: P_TOP });
-    stepRadiation2D5({
-      dt,
-      grid: this.grid,
-      state: this.state,
-      timeUTC: this.timeUTC,
-      params: this.radParams
+    runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
+    runWithLog('stepRadiation2D5', () => {
+      stepRadiation2D5({
+        dt,
+        grid: this.grid,
+        state: this.state,
+        timeUTC: this.timeUTC,
+        params: this.radParams
+      });
     });
-    updateHydrostatic(this.state, { pTop: P_TOP });
-    stepWinds5({
-      dt,
-      grid: this.grid,
-      state: this.state,
-      params: { ...this.dynParams, stepIndex: this._dynStepIndex },
-      scratch: this._dynScratch
+    runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
+    runWithLog('stepWinds5', () => {
+      stepWinds5({
+        dt,
+        grid: this.grid,
+        state: this.state,
+        params: { ...this.dynParams, stepIndex: this._dynStepIndex },
+        scratch: this._dynScratch
+      });
     });
-    stepSurfacePressure5({
-      dt,
-      grid: this.grid,
-      state: this.state,
-      params: this.massParams,
-      scratch: this._dynScratch
+    runWithLog('stepSurfacePressure5', () => {
+      stepSurfacePressure5({
+        dt,
+        grid: this.grid,
+        state: this.state,
+        params: this.massParams,
+        scratch: this._dynScratch
+      });
     });
-    stepAdvection5({
-      dt,
-      grid: this.grid,
-      state: this.state,
-      params: { ...this.advectParams, stepIndex: this._dynStepIndex },
-      scratch: this._dynScratch
+    runWithLog('stepAdvection5', () => {
+      stepAdvection5({
+        dt,
+        grid: this.grid,
+        state: this.state,
+        params: { ...this.advectParams, stepIndex: this._dynStepIndex },
+        scratch: this._dynScratch
+      });
     });
-    stepVertical5({
-      dt,
-      grid: this.grid,
-      state: this.state,
-      params: this.vertParams,
-      scratch: this._dynScratch
+    runWithLog('stepVertical5', () => {
+      stepVertical5({
+        dt,
+        grid: this.grid,
+        state: this.state,
+        params: this.vertParams,
+        scratch: this._dynScratch
+      });
     });
-    updateHydrostatic(this.state, { pTop: P_TOP });
-    stepMicrophysics5({ dt, state: this.state, params: this.microParams });
-    updateHydrostatic(this.state, { pTop: P_TOP });
+    runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
+    if (typeof this.vertParams?.enableConvectiveOutcome === 'boolean') {
+      this.microParams.enableConvectiveOutcome = this.vertParams.enableConvectiveOutcome;
+    }
+    runWithLog('stepMicrophysics5', () => stepMicrophysics5({ dt, state: this.state, params: this.microParams }));
+    runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
     this._nudgeAccumSeconds += dt;
     if (this.nudgeParams.enable && this._nudgeAccumSeconds >= this.nudgeParams.cadenceSeconds) {
       const dtNudge = this._nudgeAccumSeconds;
       this._nudgeAccumSeconds = 0;
-      stepNudging5({
-        dt: dtNudge,
+      runWithLog('stepNudging5', () => {
+        stepNudging5({
+          dt: dtNudge,
+          grid: this.grid,
+          state: this.state,
+          climo: this.climo,
+          params: this.nudgeParams,
+          scratch: this._nudgeScratch
+        });
+      });
+      runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
+    }
+    runWithLog('updateDiagnostics2D5', () => {
+      updateDiagnostics2D5({
+        dt,
         grid: this.grid,
         state: this.state,
-        climo: this.climo,
-        params: this.nudgeParams,
-        scratch: this._nudgeScratch
+        outFields: this.fields,
+        params: this.diagParams
       });
-      updateHydrostatic(this.state, { pTop: P_TOP });
-    }
-    updateDiagnostics2D5({
-      dt,
-      grid: this.grid,
-      state: this.state,
-      outFields: this.fields,
-      params: this.diagParams
     });
     this._metricsCounter += 1;
     if (this._metricsCounter % this._metricsEverySteps === 0) {
@@ -614,11 +715,14 @@ export class WeatherCore5 {
   _sanityCheck() {
     const { ps, qv, qc, qi, qr, pHalf } = this.state;
     const { tauLow, tauHigh } = this.fields;
+    const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production';
     let badPs = 0;
     let inversions = 0;
     let dpNeg = 0;
     let neg = 0;
     let tauClamp = 0;
+    let tOut = 0;
+    let tuOut = 0;
     for (let i = 0; i < ps.length; i++) {
       const p = ps[i];
       if (p < 50000 || p > 110000) badPs++;
@@ -641,9 +745,22 @@ export class WeatherCore5 {
     for (let i = 0; i < tauLow.length; i++) {
       if (tauLow[i] > 50 || tauHigh[i] > 50) tauClamp++;
     }
-    if (badPs || neg || tauClamp || dpNeg || inversions) {
+    if (isDev && this.fields?.T && this.fields?.TU) {
+      const tMin = 150;
+      const tMax = 350;
+      const tField = this.fields.T;
+      const tuField = this.fields.TU;
+      for (let i = 0; i < tField.length; i++) {
+        const tVal = tField[i];
+        if (Number.isFinite(tVal) && (tVal < tMin || tVal > tMax)) tOut++;
+        const tuVal = tuField[i];
+        if (Number.isFinite(tuVal) && (tuVal < tMin || tuVal > tMax)) tuOut++;
+      }
+    }
+    if (badPs || neg || tauClamp || dpNeg || inversions || (isDev && (tOut || tuOut))) {
+      const tMsg = isDev ? ` TOut=${tOut} TUOut=${tuOut}` : '';
       console.warn(
-        `[V2 sanity] psBad=${badPs} inversions=${inversions} dpNeg=${dpNeg} negWater=${neg} tau>50=${tauClamp}`
+        `[V2 sanity] psBad=${badPs} inversions=${inversions} dpNeg=${dpNeg} negWater=${neg} tau>50=${tauClamp}${tMsg}`
       );
     }
   }

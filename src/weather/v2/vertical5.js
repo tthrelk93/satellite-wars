@@ -1,4 +1,4 @@
-import { Cp, Rd, g } from '../constants';
+import { Cp, Rd, g, Lv } from '../constants';
 
 const P0 = 100000;
 const KAPPA = Rd / Cp;
@@ -29,6 +29,14 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'qcAuto0',
   'tauAuto',
   'autoMaxFrac',
+  'entrainFrac',
+  'detrainTopFrac',
+  'buoyTrigK',
+  'dThetaMaxConvPerStep',
+  'enableLargeScaleVerticalAdvection',
+  'verticalAdvectionCflMax',
+  'dThetaMaxVertAdvPerStep',
+  'enableOmegaMassFix',
   'eps',
   'debugConservation'
 ]);
@@ -61,7 +69,7 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
   const {
     enableMixing = true,
     enableConvection = true,
-    enableConvectiveMixing = true,
+    enableConvectiveMixing = false,
     enableConvectiveOutcome = false,
     // Deep convection strength: either a fixed per-step parcel mass fraction (mu0),
     // or dt-scaled via tauConv (preferred for stability across dt).
@@ -81,7 +89,7 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
     // Deep convection triggers
     rhTrig = 0.75,
     rhMidMin = 0.25,
-    omegaTrig = 0.3, // ascent defined as positive omega tail
+    omegaTrig = 0.3, // ascent defined as negative omega tail
     instabTrig = 3,
     qvTrig = 0.002,
     thetaeCoeff = 10,
@@ -93,12 +101,26 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
     tauAuto = 4 * 3600,
     autoMaxFrac = 0.2,
 
+    // Plume/detrainment
+    entrainFrac = 0.2,
+    detrainTopFrac = 0.7,
+    buoyTrigK = 0.0,
+    dThetaMaxConvPerStep = 2.5,
+
+    // Large-scale vertical advection (omega-based)
+    enableLargeScaleVerticalAdvection = true,
+    verticalAdvectionCflMax = 0.4,
+    dThetaMaxVertAdvPerStep = 2.0,
+
+    // Omega correction to match applied surface pressure tendency
+    enableOmegaMassFix = true,
+
     // Numerical/heating
     eps = 1e-12
   } = params;
 
   const { nx, ny, invDx, invDy, cosLat } = grid;
-  const { N, nz, u, v, omega, theta, qv, qc, qi, qr, pHalf, pMid } = state;
+  const { N, nz, u, v, omega, theta, qv, qc, qi, qr, pHalf, pMid, sigmaHalf, dpsDtApplied } = state;
 
   // Convective column mask (boolean per column) for microphysics overrides
   if (!state.convMask || state.convMask.length !== N) state.convMask = new Uint8Array(N);
@@ -110,6 +132,8 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
   let totalDetrainedQc = 0;
   let totalRainProduced = 0;
   let nOmegaPos = 0;
+  let convTopLevMean = null;
+  let convCondMassMean = 0;
   const debugConservation = params.debugConservation;
   const sampleCols = debugConservation ? 8 : 0;
   if (sampleCols > 0 && !state._waterSample) state._waterSample = new Float32Array(sampleCols);
@@ -157,6 +181,88 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
         const div = du_dx + dvcos_dy / cosC;
         const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
         omega[omegaNext + k] = omega[omegaBase + k] - div * dp;
+      }
+    }
+  }
+
+  if (
+    enableOmegaMassFix &&
+    sigmaHalf &&
+    sigmaHalf.length >= nz + 1 &&
+    dpsDtApplied &&
+    dpsDtApplied.length === N
+  ) {
+    for (let k = 0; k < N; k++) {
+      const omegaSurf = omega[nz * N + k];
+      const target = dpsDtApplied[k];
+      if (!Number.isFinite(omegaSurf) || !Number.isFinite(target)) continue;
+      const delta = target - omegaSurf;
+      if (delta === 0) continue;
+      for (let lev = 0; lev <= nz; lev++) {
+        omega[lev * N + k] += delta * sigmaHalf[lev];
+      }
+    }
+  }
+
+  if (enableLargeScaleVerticalAdvection && dt > 0) {
+    const cflMax = clamp(verticalAdvectionCflMax, 0, 1);
+    if (cflMax > 0) {
+      if (!state._vertAdvQv || state._vertAdvQv.length !== qv.length) {
+        state._vertAdvQv = new Float32Array(qv.length);
+      }
+      if (!state._vertAdvTheta || state._vertAdvTheta.length !== theta.length) {
+        state._vertAdvTheta = new Float32Array(theta.length);
+      }
+      const qvNext = state._vertAdvQv;
+      const thetaNext = state._vertAdvTheta;
+      for (let k = 0; k < N; k++) {
+        let fluxQvTop = 0;
+        let fluxThetaTop = 0;
+        for (let lev = 0; lev < nz; lev++) {
+          const idx = lev * N + k;
+          const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+          if (dpLev <= 0) {
+            qvNext[idx] = qv[idx];
+            thetaNext[idx] = theta[idx];
+            fluxQvTop = 0;
+            fluxThetaTop = 0;
+            continue;
+          }
+          const mLev = dpLev / g;
+          let fluxQvBot = 0;
+          let fluxThetaBot = 0;
+          if (lev < nz - 1) {
+            let mDot = -omega[(lev + 1) * N + k] / g;
+            if (mDot !== 0) {
+              let mUp = mLev;
+              if (mDot > 0) {
+                const dpBelow = pHalf[(lev + 2) * N + k] - pHalf[(lev + 1) * N + k];
+                mUp = dpBelow / g;
+              }
+              const maxAbs = cflMax * Math.max(1e-6, mUp) / dt;
+              if (Math.abs(mDot) > maxAbs) mDot = Math.sign(mDot) * maxAbs;
+              const idxUp = mDot > 0 ? (lev + 1) * N + k : idx;
+              fluxQvBot = mDot * qv[idxUp];
+              fluxThetaBot = mDot * theta[idxUp];
+            }
+          }
+          qvNext[idx] = qv[idx] + (dt / mLev) * (fluxQvBot - fluxQvTop);
+          const thetaUpdated = theta[idx] + (dt / mLev) * (fluxThetaBot - fluxThetaTop);
+          if (dThetaMaxVertAdvPerStep > 0) {
+            const dTheta = thetaUpdated - theta[idx];
+            thetaNext[idx] =
+              theta[idx] + clamp(dTheta, -dThetaMaxVertAdvPerStep, dThetaMaxVertAdvPerStep);
+          } else {
+            thetaNext[idx] = thetaUpdated;
+          }
+          fluxQvTop = fluxQvBot;
+          fluxThetaTop = fluxThetaBot;
+        }
+      }
+      qv.set(qvNext);
+      theta.set(thetaNext);
+      for (let m = 0; m < qv.length; m++) {
+        if (qv[m] < 0) qv[m] = 0;
       }
     }
   }
@@ -259,6 +365,35 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
     const instabArr = state._instabScratch;
     nOmegaPos = 0;
     const omegaThreshDynamic = Math.max(omegaTrig, state.vertMetrics?.omegaPosP90 || 0);
+    const muMax = clamp01(mu0);
+    const entrain = clamp01(entrainFrac);
+    const detrainTop = clamp01(detrainTopFrac);
+    let convTopLevSum = 0;
+    let convPlumeCount = 0;
+    let convCondMassSum = 0;
+    let totalWeightAll = 0;
+    for (let j = 0; j < ny; j++) {
+      totalWeightAll += cosLat[j] * nx;
+    }
+
+    const detrainAt = (k, lev, condMassLev) => {
+      if (condMassLev <= 0) return 0;
+      const idx = lev * N + k;
+      const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+      if (dpLev <= 0) return 0;
+      const massLev = dpLev / g;
+      let dqDetrain = condMassLev / massLev;
+      const pLev = Math.max(100, pMid[idx]);
+      const PiLev = Math.pow(pLev / P0, KAPPA);
+      const dTheta = (Lv / Cp * dqDetrain) / PiLev;
+      if (dThetaMaxConvPerStep > 0 && dTheta > dThetaMaxConvPerStep) {
+        const scale = dThetaMaxConvPerStep / dTheta;
+        dqDetrain *= scale;
+      }
+      qc[idx] += dqDetrain;
+      theta[idx] += (Lv / Cp * dqDetrain) / PiLev;
+      return dqDetrain * massLev;
+    };
 
     for (let k = 0; k < N; k++) {
       const levS = nz - 1;
@@ -277,8 +412,8 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
       const rhS = qvS / Math.max(qsS, eps);
 
       const omegaLow = omega[levS * N + k];
-      if (omegaLow > 0) omegaPos[nOmegaPos++] = omegaLow;
-      const ascent = omegaLow > omegaThreshDynamic; // ascent based on positive tail
+      if (omegaLow < 0) omegaPos[nOmegaPos++] = -omegaLow;
+      const ascent = -omegaLow > omegaThreshDynamic; // ascent based on negative tail
 
       const pMidM = Math.max(100, pMid[idxM]);
       const PiM = Math.pow(pMidM / P0, KAPPA);
@@ -297,18 +432,12 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
       convectiveColumnsCount++;
       convMask[k] = 1;
 
-      // Convective overturning as conservative vertical mixing (optional):
-      // - Conserves column-integrated theta/qv/qc/qi/qr (up to clamp/roundoff)
-      // - Relies on microphysics for condensation/precip after the vertical step
-      if (enableConvectiveMixing) {
-        const muMax = clamp01(mu0);
-        const mu = Number.isFinite(tauConv) && tauConv > 0
-          ? clamp(dt / Math.max(tauConv, eps), 0, muMax)
-          : muMax;
-        if (mu > 0) {
-          const mixCondensate = true;
-          const mixFracC = 0.6 * mu;
+      const mu = Number.isFinite(tauConv) && tauConv > 0
+        ? clamp(dt / Math.max(tauConv, eps), 0, muMax)
+        : muMax;
 
+      if (enableConvectiveMixing) {
+        if (mu > 0) {
           for (let lev = levS; lev > convTopLev; lev--) {
             const levBelow = lev;
             const levAbove = lev - 1;
@@ -326,24 +455,70 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
             const qvMean = (qv[idxA] * dpA + qv[idxB] * dpB) / denom;
             qv[idxA] += mu * (qvMean - qv[idxA]);
             qv[idxB] += mu * (qvMean - qv[idxB]);
+          }
+        }
+      } else if (mu > 0) {
+        const dpSurface = pHalf[(levS + 1) * N + k] - pHalf[levS * N + k];
+        const massSurface = dpSurface / g;
+        let thetaP = theta[idxS];
+        let qvP = qv[idxS];
+        let qCondTotal = 0;
+        let plumeTopLev = levS;
 
-            if (mixCondensate) {
-              const qcMean = (qc[idxA] * dpA + qc[idxB] * dpB) / denom;
-              qc[idxA] += mixFracC * (qcMean - qc[idxA]);
-              qc[idxB] += mixFracC * (qcMean - qc[idxB]);
+        for (let lev = levS - 1; lev >= 0; lev--) {
+          const idxEnv = lev * N + k;
+          const thetaEnv = theta[idxEnv];
+          const qvEnv = qv[idxEnv];
+          thetaP = (1 - entrain) * thetaP + entrain * thetaEnv;
+          qvP = (1 - entrain) * qvP + entrain * qvEnv;
 
-              const qiMean = (qi[idxA] * dpA + qi[idxB] * dpB) / denom;
-              qi[idxA] += mixFracC * (qiMean - qi[idxA]);
-              qi[idxB] += mixFracC * (qiMean - qi[idxB]);
+          const pLev = Math.max(100, pMid[idxEnv]);
+          const Pi = Math.pow(pLev / P0, KAPPA);
+          let Tparcel = thetaP * Pi;
+          const qs = saturationMixingRatio(Tparcel, pLev);
+          if (qvP > qs) {
+            const dq = qvP - qs;
+            qvP -= dq;
+            qCondTotal += dq;
+            thetaP += (Lv / Cp * dq) / Pi;
+            Tparcel = thetaP * Pi;
+          }
+          const Tenv = thetaEnv * Pi;
+          const buoyK = Tparcel - Tenv;
+          if (buoyK < buoyTrigK) break;
+          plumeTopLev = lev;
+        }
 
-              const qrMean = (qr[idxA] * dpA + qr[idxB] * dpB) / denom;
-              qr[idxA] += mixFracC * (qrMean - qr[idxA]);
-              qr[idxB] += mixFracC * (qrMean - qr[idxB]);
-            }
+        if (plumeTopLev <= levS - 1) {
+          convTopLevSum += plumeTopLev;
+          convPlumeCount++;
+        }
+
+        if (plumeTopLev <= levS - 1 && qCondTotal > 0 && massSurface > 0) {
+          const condMass = mu * qCondTotal * massSurface;
+          const levTop = plumeTopLev;
+          const levBelow = Math.min(levTop + 1, levS);
+          const topFrac = detrainTop;
+          const belowFrac = levBelow === levTop ? 0 : 1 - topFrac;
+
+          let usedMass = detrainAt(k, levTop, condMass * topFrac);
+          if (belowFrac > 0) {
+            usedMass += detrainAt(k, levBelow, condMass * belowFrac);
+          }
+          if (usedMass > 0) {
+            const dqSrc = usedMass / massSurface;
+            qv[idxS] = Math.max(0, qv[idxS] - dqSrc);
+            const j = Math.floor(k / nx);
+            convCondMassSum += usedMass * cosLat[j];
+            totalCondensed += usedMass;
+            totalDetrainedQc += usedMass;
           }
         }
       }
     }
+
+    convTopLevMean = convPlumeCount > 0 ? convTopLevSum / convPlumeCount : null;
+    convCondMassMean = totalWeightAll > 0 ? convCondMassSum / totalWeightAll : 0;
   }
 
   // Positivity guards
@@ -353,6 +528,22 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
     qc[m] = Math.max(0, qc[m]);
     qi[m] = Math.max(0, qi[m]);
     qr[m] = Math.max(0, qr[m]);
+  }
+
+  let omegaSurfMinusDpsDtRms = null;
+  if (dpsDtApplied && dpsDtApplied.length === N) {
+    let sumSq = 0;
+    let count = 0;
+    const omegaSurfaceBase = nz * N;
+    for (let k = 0; k < N; k++) {
+      const omegaSurf = omega[omegaSurfaceBase + k];
+      const target = dpsDtApplied[k];
+      if (!Number.isFinite(omegaSurf) || !Number.isFinite(target)) continue;
+      const diff = omegaSurf - target;
+      sumSq += diff * diff;
+      count++;
+    }
+    omegaSurfMinusDpsDtRms = count > 0 ? Math.sqrt(sumSq / count) : null;
   }
 
   // Metrics helpers for tuning and logging
@@ -384,7 +575,10 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
     instabP50,
     instabP90,
     instabP95,
-    convectiveFraction: convectiveColumnsCount / Math.max(1, N)
+    convectiveFraction: convectiveColumnsCount / Math.max(1, N),
+    convTopLevMean,
+    convCondMassTotalKgM2: convCondMassMean,
+    omegaSurfMinusDpsDtRms
   };
 
   if (sampleCols > 0 && waterBefore) {

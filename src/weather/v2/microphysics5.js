@@ -1,6 +1,10 @@
 import { g, Rd, Cp, Lv } from '../constants';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+const smoothstep = (edge0, edge1, x) => {
+  const t = clamp((x - edge0) / Math.max(1e-6, edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+};
 
 const saturationMixingRatio = (T, p) => {
   const Tuse = clamp(T, 180, 330);
@@ -30,6 +34,11 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
     Tfreeze = 273.15,
     TiceFull = 253.15,
     kFall = 1 / 3600,
+    enableFluxSedimentation = true,
+    enableIceSedimentation = true,
+    kFallIce = 1 / (6 * 3600),
+    enableIceMeltToRain = true,
+    tauMeltIceToRain = 3600,
     tauEvapCloudMin = 900,
     tauEvapCloudMax = 7200,
     tauEvapRainMin = 900,
@@ -63,8 +72,6 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
 
   for (let lev = 0; lev < nz; lev++) {
     const base = lev * N;
-    const baseHalf = lev * N;
-    const baseHalfNext = (lev + 1) * N;
     for (let k = 0; k < N; k++) {
       const idx = base + k;
       const p = Math.max(pTop, pMid[idx]);
@@ -174,19 +181,126 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         }
       }
 
-      const dp = pHalf[baseHalfNext + k] - pHalf[baseHalf + k];
-      const mAir = dp / g;
-      const dqFall = Math.min(qrVal, qrVal * kFall * dt);
-      qrVal -= dqFall;
-      const massFall = dqFall * mAir;
-      if (precipAccum) precipAccum[k] += massFall;
-      if (precipRate) precipRate[k] += massFall * (3600 / dt);
-
       qv[idx] = qvVal;
       qc[idx] = qcVal;
       qi[idx] = qiVal;
       qr[idx] = qrVal;
       theta[idx] = thetaVal;
+    }
+  }
+
+  if (enableFluxSedimentation) {
+    if (enableIceSedimentation) {
+      const fallFracIce = clamp(kFallIce * dt, 0, 1);
+      const tauMeltIceSafe = Math.max(1e-6, tauMeltIceToRain);
+      for (let lev = nz - 1; lev >= 0; lev--) {
+        const base = lev * N;
+        const baseHalf = lev * N;
+        const baseHalfNext = (lev + 1) * N;
+        const baseHalfBelow = (lev + 2) * N;
+        for (let k = 0; k < N; k++) {
+          const idx = base + k;
+          let qiVal = qi[idx];
+          if (qiVal <= 0) continue;
+
+          if (enableIceMeltToRain) {
+            const p = Math.max(pTop, pMid[idx]);
+            const Pi = Math.pow(p / p0, kappa);
+            const Tcell = Number.isFinite(Tstate?.[idx]) ? Tstate[idx] : theta[idx] * Pi;
+            if (Tcell > Tfreeze) {
+              const meltFrac = clamp(dt / tauMeltIceSafe, 0, 1);
+              const warmFactor = smoothstep(Tfreeze, Tfreeze + 2, Tcell);
+              const dqMelt = qiVal * meltFrac * warmFactor;
+              if (dqMelt > 0) {
+                qiVal -= dqMelt;
+                qr[idx] += dqMelt;
+              }
+            }
+          }
+
+          if (qiVal <= 0 || fallFracIce <= 0) {
+            qi[idx] = Math.max(0, qiVal);
+            continue;
+          }
+
+          const dpLev = pHalf[baseHalfNext + k] - pHalf[baseHalf + k];
+          if (dpLev <= 0) {
+            qi[idx] = Math.max(0, qiVal);
+            continue;
+          }
+          const mLev = dpLev / g;
+          const massOut = qiVal * mLev * fallFracIce;
+          qiVal -= massOut / mLev;
+          qi[idx] = Math.max(0, qiVal);
+          if (massOut <= 0) continue;
+
+          if (lev === nz - 1) {
+            if (precipAccum) precipAccum[k] += massOut;
+            if (precipRate) precipRate[k] += massOut * (3600 / dt);
+          } else {
+            const dpBelow = pHalf[baseHalfBelow + k] - pHalf[baseHalfNext + k];
+            if (dpBelow > 0) {
+              const mBelow = dpBelow / g;
+              qi[base + N + k] += massOut / mBelow;
+            } else {
+              qi[idx] += massOut / mLev;
+            }
+          }
+        }
+      }
+    }
+
+    const fallFracRain = clamp(kFall * dt, 0, 1);
+    if (fallFracRain > 0) {
+      for (let lev = nz - 1; lev >= 0; lev--) {
+        const base = lev * N;
+        const baseHalf = lev * N;
+        const baseHalfNext = (lev + 1) * N;
+        const baseHalfBelow = (lev + 2) * N;
+        for (let k = 0; k < N; k++) {
+          const idx = base + k;
+          const qrVal = qr[idx];
+          if (qrVal <= 0) continue;
+          const dpLev = pHalf[baseHalfNext + k] - pHalf[baseHalf + k];
+          if (dpLev <= 0) continue;
+          const mLev = dpLev / g;
+          const massOut = qrVal * mLev * fallFracRain;
+          if (massOut <= 0) continue;
+          qr[idx] = qrVal - massOut / mLev;
+          if (lev === nz - 1) {
+            if (precipAccum) precipAccum[k] += massOut;
+            if (precipRate) precipRate[k] += massOut * (3600 / dt);
+          } else {
+            const dpBelow = pHalf[baseHalfBelow + k] - pHalf[baseHalfNext + k];
+            if (dpBelow > 0) {
+              const mBelow = dpBelow / g;
+              qr[base + N + k] += massOut / mBelow;
+            } else {
+              qr[idx] += massOut / mLev;
+            }
+          }
+        }
+      }
+    }
+  } else if (kFall > 0) {
+    const fallFracLegacy = clamp(kFall * dt, 0, 1);
+    for (let lev = 0; lev < nz; lev++) {
+      const base = lev * N;
+      const baseHalf = lev * N;
+      const baseHalfNext = (lev + 1) * N;
+      for (let k = 0; k < N; k++) {
+        const idx = base + k;
+        const qrVal = qr[idx];
+        if (qrVal <= 0) continue;
+        const dp = pHalf[baseHalfNext + k] - pHalf[baseHalf + k];
+        if (dp <= 0) continue;
+        const mAir = dp / g;
+        const dqFall = Math.min(qrVal, qrVal * fallFracLegacy);
+        qr[idx] = qrVal - dqFall;
+        const massFall = dqFall * mAir;
+        if (precipAccum) precipAccum[k] += massFall;
+        if (precipRate) precipRate[k] += massFall * (3600 / dt);
+      }
     }
   }
 

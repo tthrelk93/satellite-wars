@@ -17,6 +17,8 @@ export function createState5({ grid, nz = 5, sigmaHalf } = {}) {
   const qr = makeArray(SZ);
 
   const ps = makeArray(N, 101325);
+  const dpsDtRaw = makeArray(N);
+  const dpsDtApplied = makeArray(N);
   const Ts = makeArray(N, 288);
   const soilW = makeArray(N);
   const precipAccum = makeArray(N);
@@ -46,6 +48,8 @@ export function createState5({ grid, nz = 5, sigmaHalf } = {}) {
     qi,
     qr,
     ps,
+    dpsDtRaw,
+    dpsDtApplied,
     Ts,
     soilW,
     precipAccum,

@@ -45,6 +45,7 @@ const DIAG_ALLOWED_PARAMS = new Set([
   'qc1Low',
   'qc0High',
   'qc1High',
+  'dpTauLowMaxPa',
   'tau0',
   'levVort',
   'levUpper',
@@ -94,6 +95,7 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
     qc1Low = 8e-4,
     qc0High = 0.002,
     qc1High = 0.004,
+    dpTauLowMaxPa = 11000,
     tau0 = 6,
     levVort = 2,
     levUpper = 2,
@@ -147,7 +149,8 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
       const base = lev * N + k;
       const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
       const mAir = dp / g;
-      lwpLow += qc[base] * mAir;
+      const mAirEff = Math.min(dp, dpTauLowMaxPa) / g;
+      lwpLow += qc[base] * mAirEff;
       qcMeanLow += qc[base] * mAir;
       weightLow += mAir;
     }
@@ -232,12 +235,12 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
       const rhFactorLow = smoothstep(rhLow0, rhLow1, RHlow);
       const dTheta = theta[levBot2 * N + k] - theta[levBot * N + k];
       const stab = smoothstep(stabLow0K, stabLow1K, dTheta);
-      const subs = smoothstep(omegaLowSubs0, omegaLowSubs1, -omegaL);
+      const subs = smoothstep(omegaLowSubs0, omegaLowSubs1, omegaL);
       const noConv = clamp01(1 - convLowSuppress * anvil);
       const cloudLowTarget = clamp01(rhFactorLow * stab * subs * noConv);
 
       const rhFactorHigh = smoothstep(rhHigh0, rhHigh1, RHup);
-      const asc = smoothstep(omegaHigh0, omegaHigh1, omegaU);
+      const asc = smoothstep(omegaHigh0, omegaHigh1, -omegaU);
       const convBoost = clamp01(convAnvilBoost * anvil);
       const cloudHighTarget = 1 - (1 - rhFactorHigh * asc) * (1 - rhFactorHigh * convBoost);
 

@@ -302,6 +302,8 @@ class WeatherLogger {
       uU: this._meanMaxAbs(fields.uU),
       vU: this._meanMaxAbs(fields.vU)
     };
+    if (fields.theta) snapshot.theta = this._meanMaxAbs(fields.theta);
+    if (fields.thetaU) snapshot.thetaU = this._meanMaxAbs(fields.thetaU);
     if (fields.qi) snapshot.qi = this._meanMaxAbs(fields.qi);
     if (fields.qiU) snapshot.qiU = this._meanMaxAbs(fields.qiU);
     return snapshot;
@@ -490,65 +492,243 @@ class WeatherLogger {
       convectiveFraction: vm?.convectiveFraction ?? null,
       omegaPosP90: vm?.omegaPosP90 ?? null,
       instabP90: vm?.instabP90 ?? null,
+      convTopLevMean: vm?.convTopLevMean ?? null,
+      convCondMassTotalKgM2: vm?.convCondMassTotalKgM2 ?? null,
+      omegaSurfMinusDpsDtRms: vm?.omegaSurfMinusDpsDtRms ?? null,
+      thetaSMeanAw: null,
+      qvSMeanAw: null,
+      rainColumnKgM2MeanAw: null,
+      iceColumnKgM2MeanAw: null,
       cloudHighMeanInAscent: null,
       cloudHighMeanInSubsidence: null,
       cloudHighAscentRatio: null,
-      cloudHighMeanInMoistUpper: null
+      cloudHighMeanInMoistUpper: null,
+      cloudLowMeanTropics: null,
+      cloudHighMeanTropics: null,
+      tauLowMeanTropics: null,
+      tauHighMeanTropics: null,
+      precipMeanTropics: null,
+      RHU_p95Tropics: null,
+      omegaUAscentAbs_p95Tropics: null,
+      cloudLowMeanMidlat: null,
+      cloudHighMeanMidlat: null,
+      tauLowMeanMidlat: null,
+      tauHighMeanMidlat: null,
+      precipMeanMidlat: null,
+      RHU_p95Midlat: null,
+      omegaUAscentAbs_p95Midlat: null,
+      cloudLowMeanPolar: null,
+      cloudHighMeanPolar: null,
+      tauLowMeanPolar: null,
+      tauHighMeanPolar: null,
+      precipMeanPolar: null,
+      RHU_p95Polar: null,
+      omegaUAscentAbs_p95Polar: null
     };
 
     const fields = core?.fields;
     const grid = core?.grid;
-    if (!fields || !grid || !fields.cloudHigh || !fields.omegaU) return out;
-    if (!fields.RHU) return out;
-
-    this._ensureGrid(grid);
-    const { nx, ny } = grid;
-    const omegaThreshRaw = core?.diagParams?.omegaHigh0;
-    const omegaThresh = Number.isFinite(omegaThreshRaw) ? omegaThreshRaw : 0.05;
-    const rhHigh0Raw = core?.diagParams?.rhHigh0;
-    const rhHigh0 = Number.isFinite(rhHigh0Raw) ? rhHigh0Raw : 0.55;
-
-    let sumAsc = 0;
-    let sumAscW = 0;
-    let sumSub = 0;
-    let sumSubW = 0;
-    let sumMoist = 0;
-    let sumMoistW = 0;
-
-    for (let j = 0; j < ny; j++) {
-      const w = this._rowWeights[j];
-      const row = j * nx;
-      for (let i = 0; i < nx; i++) {
-        const k = row + i;
-        const ch = fields.cloudHigh[k];
-        if (!Number.isFinite(ch)) continue;
-        const omegaU = fields.omegaU[k];
-        if (Number.isFinite(omegaU)) {
-          if (omegaU > omegaThresh) {
-            sumAsc += ch * w;
-            sumAscW += w;
-          } else if (omegaU < -omegaThresh) {
-            sumSub += ch * w;
-            sumSubW += w;
+    const state = core?.state;
+    if (grid && state && state.qr && state.pHalf && Number.isFinite(state.nz)) {
+      this._ensureGrid(grid);
+      const { nx, ny } = grid;
+      const { N, nz, qr, qi, pHalf, theta, qv } = state;
+      let sumRain = 0;
+      let sumIce = 0;
+      let sumW = 0;
+      let sumTheta = 0;
+      let sumThetaW = 0;
+      let sumQv = 0;
+      let sumQvW = 0;
+      const levS = Math.max(0, nz - 1);
+      for (let j = 0; j < ny; j++) {
+        const w = this._rowWeights[j];
+        const row = j * nx;
+        for (let i = 0; i < nx; i++) {
+          const k = row + i;
+          let colRain = 0;
+          let colIce = 0;
+          for (let lev = 0; lev < nz; lev++) {
+            const idx = lev * N + k;
+            const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+            colRain += qr[idx] * (dp / g);
+            if (qi) colIce += qi[idx] * (dp / g);
+          }
+          sumRain += colRain * w;
+          sumIce += colIce * w;
+          sumW += w;
+          if (theta && qv) {
+            const idxS = levS * N + k;
+            const thetaVal = theta[idxS];
+            const qvVal = qv[idxS];
+            if (Number.isFinite(thetaVal)) {
+              sumTheta += thetaVal * w;
+              sumThetaW += w;
+            }
+            if (Number.isFinite(qvVal)) {
+              sumQv += qvVal * w;
+              sumQvW += w;
+            }
           }
         }
-        const rhu = fields.RHU[k];
-        if (Number.isFinite(rhu) && rhu > rhHigh0) {
-          sumMoist += ch * w;
-          sumMoistW += w;
+      }
+      if (sumW > 0) {
+        out.rainColumnKgM2MeanAw = sumRain / sumW;
+        out.iceColumnKgM2MeanAw = sumIce / sumW;
+      }
+      if (sumThetaW > 0) out.thetaSMeanAw = sumTheta / sumThetaW;
+      if (sumQvW > 0) out.qvSMeanAw = sumQv / sumQvW;
+    }
+
+    if (fields && grid) {
+      this._ensureGrid(grid);
+      const { nx, ny } = grid;
+      if (fields.cloudHigh && fields.omegaU && fields.RHU) {
+        const omegaThreshRaw = core?.diagParams?.omegaHigh0;
+        const omegaThresh = Number.isFinite(omegaThreshRaw) ? omegaThreshRaw : 0.05;
+        const rhHigh0Raw = core?.diagParams?.rhHigh0;
+        const rhHigh0 = Number.isFinite(rhHigh0Raw) ? rhHigh0Raw : 0.55;
+
+        let sumAsc = 0;
+        let sumAscW = 0;
+        let sumSub = 0;
+        let sumSubW = 0;
+        let sumMoist = 0;
+        let sumMoistW = 0;
+
+        for (let j = 0; j < ny; j++) {
+          const w = this._rowWeights[j];
+          const row = j * nx;
+          for (let i = 0; i < nx; i++) {
+            const k = row + i;
+            const ch = fields.cloudHigh[k];
+            if (!Number.isFinite(ch)) continue;
+            const omegaU = fields.omegaU[k];
+            if (Number.isFinite(omegaU)) {
+            if (omegaU < -omegaThresh) {
+              sumAsc += ch * w;
+              sumAscW += w;
+            } else if (omegaU > omegaThresh) {
+              sumSub += ch * w;
+              sumSubW += w;
+            }
+            }
+            const rhu = fields.RHU[k];
+            if (Number.isFinite(rhu) && rhu > rhHigh0) {
+              sumMoist += ch * w;
+              sumMoistW += w;
+            }
+          }
+        }
+
+        const meanAsc = sumAscW > 0 ? sumAsc / sumAscW : null;
+        const meanSub = sumSubW > 0 ? sumSub / sumSubW : null;
+        const meanMoist = sumMoistW > 0 ? sumMoist / sumMoistW : null;
+
+        out.cloudHighMeanInAscent = meanAsc;
+        out.cloudHighMeanInSubsidence = meanSub;
+        out.cloudHighMeanInMoistUpper = meanMoist;
+        out.cloudHighAscentRatio =
+          meanAsc != null && meanSub != null ? meanAsc / (meanSub + 1e-6) : null;
+      }
+
+      if (
+        fields.cloudLow &&
+        fields.cloudHigh &&
+        fields.tauLow &&
+        fields.tauHigh &&
+        fields.precipRate &&
+        fields.RHU &&
+        fields.omegaU
+      ) {
+        const { latDeg } = grid;
+        const bandKeys = ['Tropics', 'Midlat', 'Polar'];
+        const bandCount = bandKeys.length;
+        const sumCloudLow = new Float64Array(bandCount);
+        const sumCloudLowW = new Float64Array(bandCount);
+        const sumCloudHigh = new Float64Array(bandCount);
+        const sumCloudHighW = new Float64Array(bandCount);
+        const sumTauLow = new Float64Array(bandCount);
+        const sumTauLowW = new Float64Array(bandCount);
+        const sumTauHigh = new Float64Array(bandCount);
+        const sumTauHighW = new Float64Array(bandCount);
+        const sumPrecip = new Float64Array(bandCount);
+        const sumPrecipW = new Float64Array(bandCount);
+
+        for (let j = 0; j < ny; j++) {
+          const latAbs = Math.abs(latDeg[j]);
+          let band = 2;
+          if (latAbs < 20) band = 0;
+          else if (latAbs < 60) band = 1;
+          const w = this._rowWeights[j];
+          const row = j * nx;
+          for (let i = 0; i < nx; i++) {
+            const k = row + i;
+            const cl = fields.cloudLow[k];
+            if (Number.isFinite(cl)) {
+              sumCloudLow[band] += cl * w;
+              sumCloudLowW[band] += w;
+            }
+            const ch = fields.cloudHigh[k];
+            if (Number.isFinite(ch)) {
+              sumCloudHigh[band] += ch * w;
+              sumCloudHighW[band] += w;
+            }
+            const tl = fields.tauLow[k];
+            if (Number.isFinite(tl)) {
+              sumTauLow[band] += tl * w;
+              sumTauLowW[band] += w;
+            }
+            const th = fields.tauHigh[k];
+            if (Number.isFinite(th)) {
+              sumTauHigh[band] += th * w;
+              sumTauHighW[band] += w;
+            }
+            const pr = fields.precipRate[k];
+            if (Number.isFinite(pr)) {
+              sumPrecip[band] += pr * w;
+              sumPrecipW[band] += w;
+            }
+          }
+        }
+
+        const assignMean = (prefix, sums, weights) => {
+          for (let b = 0; b < bandCount; b++) {
+            out[`${prefix}${bandKeys[b]}`] = weights[b] > 0 ? sums[b] / weights[b] : null;
+          }
+        };
+
+        assignMean('cloudLowMean', sumCloudLow, sumCloudLowW);
+        assignMean('cloudHighMean', sumCloudHigh, sumCloudHighW);
+        assignMean('tauLowMean', sumTauLow, sumTauLowW);
+        assignMean('tauHighMean', sumTauHigh, sumTauHighW);
+        assignMean('precipMean', sumPrecip, sumPrecipW);
+
+        const bandP95 = (arr, bandIdx, invert) => {
+          let count = 0;
+          for (let j = 0; j < ny; j++) {
+            const latAbs = Math.abs(latDeg[j]);
+            let band = 2;
+            if (latAbs < 20) band = 0;
+            else if (latAbs < 60) band = 1;
+            if (band !== bandIdx) continue;
+            const row = j * nx;
+            for (let i = 0; i < nx; i++) {
+              const raw = arr[row + i];
+              const v = invert ? -raw : raw;
+              if (!Number.isFinite(v)) continue;
+              this._scratch[count++] = v;
+            }
+          }
+          return this._percentilesFromScratch(count, [95]).p95;
+        };
+
+        for (let b = 0; b < bandCount; b++) {
+          out[`RHU_p95${bandKeys[b]}`] = bandP95(fields.RHU, b, false);
+          out[`omegaUAscentAbs_p95${bandKeys[b]}`] = bandP95(fields.omegaU, b, true);
         }
       }
     }
-
-    const meanAsc = sumAscW > 0 ? sumAsc / sumAscW : null;
-    const meanSub = sumSubW > 0 ? sumSub / sumSubW : null;
-    const meanMoist = sumMoistW > 0 ? sumMoist / sumMoistW : null;
-
-    out.cloudHighMeanInAscent = meanAsc;
-    out.cloudHighMeanInSubsidence = meanSub;
-    out.cloudHighMeanInMoistUpper = meanMoist;
-    out.cloudHighAscentRatio =
-      meanAsc != null && meanSub != null ? meanAsc / (meanSub + 1e-6) : null;
 
     return out;
   }
@@ -560,7 +740,11 @@ class WeatherLogger {
       return {
         psOutOfRangeCount: 0,
         pHalfInversionCount: 0,
-        dpNonPositiveCount: 0
+        dpNonPositiveCount: 0,
+        psClampMinCount: 0,
+        psClampMaxCount: 0,
+        meanDpsDtApplied: null,
+        meanDpsDtActual: null
       };
     }
     const psMin = core?.massParams?.psMin ?? 50000;
@@ -588,7 +772,11 @@ class WeatherLogger {
     return {
       psOutOfRangeCount: psOut,
       pHalfInversionCount: inversions,
-      dpNonPositiveCount: dpNonPositive
+      dpNonPositiveCount: dpNonPositive,
+      psClampMinCount: Number.isFinite(state.psClampMinCount) ? state.psClampMinCount : 0,
+      psClampMaxCount: Number.isFinite(state.psClampMaxCount) ? state.psClampMaxCount : 0,
+      meanDpsDtApplied: Number.isFinite(state.meanDpsDtApplied) ? state.meanDpsDtApplied : null,
+      meanDpsDtActual: Number.isFinite(state.meanDpsDtActual) ? state.meanDpsDtActual : null
     };
   }
 

@@ -70,8 +70,117 @@ export function stepSurfacePressure5({ dt, grid, state, params = {}, scratch }) 
     }
   }
 
-  for (let k = 0; k < N; k++) {
-    const capped = clamp(dpsDt[k], -maxAbsDpsDt, maxAbsDpsDt);
-    ps[k] = clamp(ps[k] + capped * dt, psMin, psMax);
+  if (!state.dpsDtRaw || state.dpsDtRaw.length !== N) {
+    state.dpsDtRaw = new Float32Array(N);
   }
+  if (!state.dpsDtApplied || state.dpsDtApplied.length !== N) {
+    state.dpsDtApplied = new Float32Array(N);
+  }
+  const dpsDtApplied = state.dpsDtApplied;
+  for (let k = 0; k < N; k++) {
+    state.dpsDtRaw[k] = dpsDt[k];
+    dpsDtApplied[k] = clamp(dpsDt[k], -maxAbsDpsDt, maxAbsDpsDt);
+  }
+
+  let sumApplied = 0;
+  let denApplied = 0;
+  for (let j = 0; j < ny; j++) {
+    const w = cosLat[j];
+    const row = j * nx;
+    for (let i = 0; i < nx; i++) {
+      const k = row + i;
+      sumApplied += dpsDtApplied[k] * w;
+      denApplied += w;
+    }
+  }
+  const meanApplied = denApplied > 0 ? sumApplied / denApplied : 0;
+  for (let k = 0; k < N; k++) {
+    dpsDtApplied[k] -= meanApplied;
+  }
+
+  let clampMinCount = 0;
+  let clampMaxCount = 0;
+  let isFree = state._dpsDtFreeMask;
+  if (!isFree || isFree.length !== N) {
+    isFree = new Uint8Array(N);
+    state._dpsDtFreeMask = isFree;
+  }
+
+  const iterations = 3;
+  for (let iter = 0; iter < iterations; iter++) {
+    let freeWeight = 0;
+    let sumAppliedPre = 0;
+    let denAppliedPre = 0;
+    for (let j = 0; j < ny; j++) {
+      const w = cosLat[j];
+      const row = j * nx;
+      for (let i = 0; i < nx; i++) {
+        const k = row + i;
+        const lo = (psMin - ps[k]) / dt;
+        const hi = (psMax - ps[k]) / dt;
+        let applied = dpsDtApplied[k];
+        if (applied < lo) {
+          applied = lo;
+          isFree[k] = 0;
+        } else if (applied > hi) {
+          applied = hi;
+          isFree[k] = 0;
+        } else {
+          isFree[k] = 1;
+          freeWeight += w;
+        }
+        dpsDtApplied[k] = applied;
+        sumAppliedPre += applied * w;
+        denAppliedPre += w;
+      }
+    }
+
+    const meanAppliedPre = denAppliedPre > 0 ? sumAppliedPre / denAppliedPre : 0;
+    if (freeWeight <= 0 || meanAppliedPre === 0) break;
+    const corr = -meanAppliedPre;
+    const scale = denAppliedPre / freeWeight;
+    for (let j = 0; j < ny; j++) {
+      const row = j * nx;
+      for (let i = 0; i < nx; i++) {
+        const k = row + i;
+        if (!isFree[k]) continue;
+        dpsDtApplied[k] += corr * scale;
+      }
+    }
+  }
+
+  let sumAppliedPost = 0;
+  let denAppliedPost = 0;
+  let sumActual = 0;
+  let denActual = 0;
+  for (let j = 0; j < ny; j++) {
+    const w = cosLat[j];
+    const row = j * nx;
+    for (let i = 0; i < nx; i++) {
+      const k = row + i;
+      const applied = dpsDtApplied[k];
+      const psOld = ps[k];
+      const psNew = psOld + applied * dt;
+      if (psNew < psMin) {
+        clampMinCount += 1;
+        dpsDtApplied[k] = (psMin - psOld) / dt;
+        ps[k] = psMin;
+      } else if (psNew > psMax) {
+        clampMaxCount += 1;
+        dpsDtApplied[k] = (psMax - psOld) / dt;
+        ps[k] = psMax;
+      } else {
+        ps[k] = psNew;
+      }
+      sumAppliedPost += dpsDtApplied[k] * w;
+      denAppliedPost += w;
+      const actual = (ps[k] - psOld) / dt;
+      sumActual += actual * w;
+      denActual += w;
+    }
+  }
+  state.psClampMinCount = clampMinCount;
+  state.psClampMaxCount = clampMaxCount;
+  state.meanDpsDtApplied = denAppliedPost > 0 ? sumAppliedPost / denAppliedPost : 0;
+  state.meanDpsDtActual = denActual > 0 ? sumActual / denActual : 0;
 }

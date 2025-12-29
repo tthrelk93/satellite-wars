@@ -1,9 +1,39 @@
+import { Rd, Cp } from '../constants';
+
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+const clamp01 = (v) => clamp(v, 0, 1);
+const smoothstep = (edge0, edge1, x) => {
+  const t = clamp01((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+};
+const lerp = (a, b, t) => a + (b - a) * t;
+const P0 = 100000;
+const KAPPA = Rd / Cp;
+
+const saturationMixingRatio = (T, p) => {
+  const Tuse = clamp(T, 180, 330);
+  const Tc = Tuse - 273.15;
+  const es = 610.94 * Math.exp((17.625 * Tc) / (Tc + 243.04));
+  const esClamped = Math.min(es, 0.95 * p);
+  const eps = 0.622;
+  const qs = (eps * esClamped) / Math.max(1, p - esClamped);
+  return Math.min(qs, 0.2);
+};
 const NUDGE_ALLOWED_PARAMS = new Set([
   'enable',
   'enablePs',
+  'enableThetaS',
+  'enableQvS',
   'enableUpper',
   'tauPs',
+  'tauThetaS',
+  'tauQvS',
+  'sstAirOffsetK',
+  'rhTargetOceanEq',
+  'rhTargetOceanPole',
+  'rhTargetLandEq',
+  'rhTargetLandPole',
+  'qvCap',
   'smoothLon',
   'smoothLat',
   'cadenceSeconds'
@@ -82,31 +112,134 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
   const {
     enable = true,
     enablePs = true,
+    enableThetaS = false,
+    enableQvS = false,
     enableUpper = false,
     tauPs = 30 * 86400,
+    tauThetaS = 45 * 86400,
+    tauQvS = 30 * 86400,
+    sstAirOffsetK = -1,
+    rhTargetOceanEq = 0.8,
+    rhTargetOceanPole = 0.72,
+    rhTargetLandEq = 0.7,
+    rhTargetLandPole = 0.55,
+    qvCap = 0.03,
     smoothLon = 31,
     smoothLat = 9
   } = params;
-  if (!enable || !enablePs) return;
-  if (!climo.hasSlp || !climo.slpNow || climo.slpNow.length !== state.ps.length) return;
+  if (!enable) return;
 
   const { tmp2D, tmp2D2 } = scratch;
   if (!tmp2D || !tmp2D2) return;
 
+  const { nx, ny, latDeg } = grid;
+  const { N, nz, ps, theta, qv, landMask, pMid, sstNow } = state;
+  const slpNow = climo.hasSlp && climo.slpNow && climo.slpNow.length === ps.length ? climo.slpNow : null;
+  const t2mNow = climo.hasT2m && climo.t2mNow && climo.t2mNow.length === N ? climo.t2mNow : null;
+  const sstField = climo.sstNow && climo.sstNow.length === N ? climo.sstNow : sstNow;
+
+  if (enablePs && slpNow) {
+    smoothBox2D({
+      grid,
+      src: slpNow,
+      tmp: tmp2D,
+      out: tmp2D2,
+      smoothLon,
+      smoothLat
+    });
+
+    const coeff = clamp(dt / tauPs, 0, 1);
+    for (let k = 0; k < ps.length; k++) {
+      ps[k] += (tmp2D2[k] - ps[k]) * coeff;
+      ps[k] = clamp(ps[k], 50000, 110000);
+    }
+  }
+
+  if (!enableThetaS && !enableQvS) {
+    void enableUpper;
+    return;
+  }
+
+  const levS = nz - 1;
+  const thetaBase = 285;
+  const thetaEquatorBoost = 12;
+  const thetaPoleDrop = 22;
+
+  for (let j = 0; j < ny; j++) {
+    const latAbs = Math.abs(latDeg[j]);
+    const humidLat = smoothstep(60, 0, latAbs);
+    const thetaLat = thetaBase + thetaEquatorBoost * humidLat - thetaPoleDrop * (1 - humidLat);
+    const tBaseline = thetaLat - 2;
+    const row = j * nx;
+    for (let i = 0; i < nx; i++) {
+      const k = row + i;
+      const land = landMask[k] === 1;
+      let tTarget = tBaseline;
+      if (!land) {
+        if (sstField && sstField.length === N) {
+          tTarget = sstField[k] + sstAirOffsetK;
+        }
+      } else if (t2mNow) {
+        tTarget = t2mNow[k];
+      }
+      tmp2D[k] = clamp(tTarget, 200, 330);
+    }
+  }
+
   smoothBox2D({
     grid,
-    src: climo.slpNow,
-    tmp: tmp2D,
-    out: tmp2D2,
+    src: tmp2D,
+    tmp: tmp2D2,
+    out: tmp2D,
     smoothLon,
     smoothLat
   });
 
-  const { ps } = state;
-  const coeff = dt / tauPs;
-  for (let k = 0; k < ps.length; k++) {
-    ps[k] += (tmp2D2[k] - ps[k]) * coeff;
-    ps[k] = clamp(ps[k], 50000, 110000);
+  if (enableThetaS && pMid) {
+    const coeff = clamp(dt / tauThetaS, 0, 1);
+    for (let k = 0; k < N; k++) {
+      const idxS = levS * N + k;
+      const pS = Math.max(100, pMid[idxS]);
+      const PiS = Math.pow(pS / P0, KAPPA);
+      const thetaTarget = tmp2D[k] / PiS;
+      theta[idxS] += (thetaTarget - theta[idxS]) * coeff;
+      theta[idxS] = clamp(theta[idxS], 200, 400);
+    }
+  }
+
+  if (enableQvS && pMid) {
+    for (let j = 0; j < ny; j++) {
+      const latAbs = Math.abs(latDeg[j]);
+      const humidLat = smoothstep(60, 0, latAbs);
+      const rhOcean = lerp(rhTargetOceanPole, rhTargetOceanEq, humidLat);
+      const rhLand = lerp(rhTargetLandPole, rhTargetLandEq, humidLat);
+      const row = j * nx;
+      for (let i = 0; i < nx; i++) {
+        const k = row + i;
+        const land = landMask[k] === 1;
+        const rhTarget = clamp(land ? rhLand : rhOcean, 0.1, 0.95);
+        const idxS = levS * N + k;
+        const pS = Math.max(100, pMid[idxS]);
+        const qs = saturationMixingRatio(tmp2D[k], pS);
+        tmp2D2[k] = clamp(rhTarget * qs, 0, qvCap);
+      }
+    }
+
+    smoothBox2D({
+      grid,
+      src: tmp2D2,
+      tmp: tmp2D,
+      out: tmp2D2,
+      smoothLon,
+      smoothLat
+    });
+
+    const coeff = clamp(dt / tauQvS, 0, 1);
+    for (let k = 0; k < N; k++) {
+      const idxS = levS * N + k;
+      qv[idxS] += (tmp2D2[k] - qv[idxS]) * coeff;
+      qv[idxS] = Math.max(0, qv[idxS]);
+    }
   }
 
   void enableUpper;
