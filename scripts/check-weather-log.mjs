@@ -67,7 +67,8 @@ const makeSegment = (index, runStart) => ({
   warnings: {
     windPegged: makeWarningTracker(),
     psMin: makeWarningTracker(),
-    psMax: makeWarningTracker()
+    psAtMaxAreaFrac: makeWarningTracker(),
+    psAtMaxCount: makeWarningTracker()
   }
 });
 
@@ -131,6 +132,7 @@ const checkGate = (seg, entry) => {
     if (!seg.gridCount) addMissing(seg, 'model.grid.nx/ny');
   }
 
+  const sanity = entry.sanity || {};
   const simDay = Number.isFinite(sim.simDay) ? sim.simDay : null;
   if (simDay != null && simDay >= 5) {
     const psRms = fields.ps?.rmsVsClimoHpa;
@@ -168,14 +170,18 @@ const checkGate = (seg, entry) => {
     : false, sim);
 
   const psMin = fields.ps?.min;
-  const psMax = fields.ps?.max;
   const psMinLimit = seg.massParams?.psMin;
-  const psMaxLimit = seg.massParams?.psMax;
   updateWarning(seg.warnings.psMin, Number.isFinite(psMin) && Number.isFinite(psMinLimit)
     ? psMin <= psMinLimit + 1e-6
     : false, sim);
-  updateWarning(seg.warnings.psMax, Number.isFinite(psMax) && Number.isFinite(psMaxLimit)
-    ? psMax >= psMaxLimit - 1e-6
+
+  const psAtMaxAreaFrac = sanity.psAtMaxAreaFrac;
+  updateWarning(seg.warnings.psAtMaxAreaFrac, Number.isFinite(psAtMaxAreaFrac)
+    ? psAtMaxAreaFrac >= 0.002
+    : false, sim);
+  const psAtMaxCount = sanity.psAtMaxCount;
+  updateWarning(seg.warnings.psAtMaxCount, Number.isFinite(psAtMaxCount) && seg.gridCount
+    ? psAtMaxCount / seg.gridCount >= 0.01
     : false, sim);
 
   if (failReasons.length) {
@@ -235,7 +241,8 @@ const reportSegment = (seg) => {
   const warnItems = [
     reportWarning('wind pegged', seg.warnings.windPegged),
     reportWarning('ps min at psMin', seg.warnings.psMin),
-    reportWarning('ps max at psMax', seg.warnings.psMax)
+    reportWarning('ps at max area>=0.2%', seg.warnings.psAtMaxAreaFrac),
+    reportWarning('ps at max cells>=1%', seg.warnings.psAtMaxCount)
   ].filter(Boolean);
   if (warnItems.length) {
     console.log('  WARN: likely unstable indicators');

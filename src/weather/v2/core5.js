@@ -28,6 +28,14 @@ const makeArray = (count, value = 0) => {
 export class WeatherCore5 {
   constructor({ nx = 180, ny = 90, dt = 120, seed } = {}) {
     this.grid = createLatLonGridV2(nx, ny, { minDxMeters: 80000 });
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
+      const lat0 = this.grid.latDeg[0];
+      const latN = this.grid.latDeg[this.grid.ny - 1];
+      console.log(`[V2 grid] latDeg[0]=${lat0?.toFixed?.(3)} latDeg[ny-1]=${latN?.toFixed?.(3)}`);
+      if (!(lat0 > latN)) {
+        console.warn('[V2 grid] Expected lat decreases with j (j increases southward); advect5 assumes this.');
+      }
+    }
 	    this.nz = 5;
 	    this.sigmaHalf = SIGMA_HALF;
 	    this.state = createState5({ grid: this.grid, nz: this.nz, sigmaHalf: this.sigmaHalf });
@@ -89,12 +97,15 @@ export class WeatherCore5 {
       TsMax: 330,
       evapMax: 2e-4,
       soilEvapExponent: 1.0,
-      runoffEnabled: true
+      runoffEnabled: true,
+      enableLandClimoTs: true,
+      landTsUseT2m: true,
+      landTsUseLatBaseline: true
     };
     this.nudgeParams = {
       enable: true,
       cadenceSeconds: 6 * 3600,
-      tauPs: 30 * 86400,
+      tauPs: 15 * 86400,
       tauThetaS: 45 * 86400,
       tauQvS: 30 * 86400,
       sstAirOffsetK: -1,
@@ -103,8 +114,10 @@ export class WeatherCore5 {
       rhTargetLandEq: 0.7,
       rhTargetLandPole: 0.55,
       qvCap: 0.03,
-      smoothLon: 31,
-      smoothLat: 9,
+      landQvNudgeScale: 0.5,
+      oceanQvNudgeScale: 1.0,
+      smoothLon: 61,
+      smoothLat: 13,
       enablePs: true,
       enableThetaS: true,
       enableQvS: true,
@@ -563,6 +576,7 @@ export class WeatherCore5 {
         dt,
         grid: this.grid,
         state: this.state,
+        climo: this.climo,
         params: this.surfaceParams
       });
     });
@@ -624,14 +638,18 @@ export class WeatherCore5 {
       const dtNudge = this._nudgeAccumSeconds;
       this._nudgeAccumSeconds = 0;
       runWithLog('stepNudging5', () => {
-        stepNudging5({
-          dt: dtNudge,
-          grid: this.grid,
-          state: this.state,
-          climo: this.climo,
-          params: this.nudgeParams,
-          scratch: this._nudgeScratch
-        });
+      stepNudging5({
+        dt: dtNudge,
+        grid: this.grid,
+        state: this.state,
+        climo: this.climo,
+        params: {
+          ...this.nudgeParams,
+          psMin: this.massParams?.psMin,
+          psMax: this.massParams?.psMax
+        },
+        scratch: this._nudgeScratch
+      });
       });
       runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
     }
@@ -700,16 +718,16 @@ export class WeatherCore5 {
     const omegaP95 = vm.omegaPosP95 ?? 0;
     const instabP50 = vm.instabP50 ?? 0;
     const convFrac = vm.convectiveFraction ?? 0;
-    console.log(
-      `[V2] step=${this._dynStepIndex} t=${this.timeUTC.toFixed(0)} ` +
-      `cloudL m=${sCloudL.mean.toFixed(3)} mn=${sCloudL.min.toFixed(3)} mx=${sCloudL.max.toFixed(3)} ` +
-      `cloudH m=${sCloudH.mean.toFixed(3)} mn=${sCloudH.min.toFixed(3)} mx=${sCloudH.max.toFixed(3)} ` +
-      `tauL m=${sTauL.mean.toFixed(2)} mx=${sTauL.max.toFixed(2)} tauH m=${sTauH.mean.toFixed(2)} mx=${sTauH.max.toFixed(2)} ` +
-      `cwpL m=${sCwpL.mean.toFixed(3)} cwpH m=${sCwpH.mean.toFixed(3)} ` +
-      `tauClamp L=${clampL} H=${clampH} ` +
-      `precip m=${sPrecip.mean.toFixed(3)} mx=${sPrecip.max.toFixed(3)} ` +
-      `omegaP90=${omegaP90.toFixed(3)} omegaP95=${omegaP95.toFixed(3)} instabP50=${instabP50.toFixed(3)} convFrac=${convFrac.toFixed(3)}`
-    );
+    // console.log(
+    //   `[V2] step=${this._dynStepIndex} t=${this.timeUTC.toFixed(0)} ` +
+    //   `cloudL m=${sCloudL.mean.toFixed(3)} mn=${sCloudL.min.toFixed(3)} mx=${sCloudL.max.toFixed(3)} ` +
+    //   `cloudH m=${sCloudH.mean.toFixed(3)} mn=${sCloudH.min.toFixed(3)} mx=${sCloudH.max.toFixed(3)} ` +
+    //   `tauL m=${sTauL.mean.toFixed(2)} mx=${sTauL.max.toFixed(2)} tauH m=${sTauH.mean.toFixed(2)} mx=${sTauH.max.toFixed(2)} ` +
+    //   `cwpL m=${sCwpL.mean.toFixed(3)} cwpH m=${sCwpH.mean.toFixed(3)} ` +
+    //   `tauClamp L=${clampL} H=${clampH} ` +
+    //   `precip m=${sPrecip.mean.toFixed(3)} mx=${sPrecip.max.toFixed(3)} ` +
+    //   `omegaP90=${omegaP90.toFixed(3)} omegaP95=${omegaP95.toFixed(3)} instabP50=${instabP50.toFixed(3)} convFrac=${convFrac.toFixed(3)}`
+    // );
   }
 
   _sanityCheck() {

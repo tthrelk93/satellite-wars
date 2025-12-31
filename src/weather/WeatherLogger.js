@@ -497,6 +497,13 @@ class WeatherLogger {
       omegaSurfMinusDpsDtRms: vm?.omegaSurfMinusDpsDtRms ?? null,
       thetaSMeanAw: null,
       qvSMeanAw: null,
+      TsLandMean: null,
+      TsOceanMean: null,
+      qvSLandMean: null,
+      qvSOceanMean: null,
+      soilWFracLandMean: null,
+      precipLandMean: null,
+      precipOceanMean: null,
       rainColumnKgM2MeanAw: null,
       iceColumnKgM2MeanAw: null,
       cloudHighMeanInAscent: null,
@@ -533,6 +540,8 @@ class WeatherLogger {
       this._ensureGrid(grid);
       const { nx, ny } = grid;
       const { N, nz, qr, qi, pHalf, theta, qv } = state;
+      const landMask = core?.geo?.landMask || state.landMask;
+      const hasLandMask = landMask && landMask.length === N;
       let sumRain = 0;
       let sumIce = 0;
       let sumW = 0;
@@ -540,6 +549,20 @@ class WeatherLogger {
       let sumThetaW = 0;
       let sumQv = 0;
       let sumQvW = 0;
+      let sumTsLand = 0;
+      let sumTsLandW = 0;
+      let sumTsOcean = 0;
+      let sumTsOceanW = 0;
+      let sumQvLand = 0;
+      let sumQvLandW = 0;
+      let sumQvOcean = 0;
+      let sumQvOceanW = 0;
+      let sumSoilFracLand = 0;
+      let sumSoilFracLandW = 0;
+      let sumPrecipLand = 0;
+      let sumPrecipLandW = 0;
+      let sumPrecipOcean = 0;
+      let sumPrecipOceanW = 0;
       const levS = Math.max(0, nz - 1);
       for (let j = 0; j < ny; j++) {
         const w = this._rowWeights[j];
@@ -570,6 +593,47 @@ class WeatherLogger {
               sumQvW += w;
             }
           }
+          if (hasLandMask) {
+            const isLand = landMask[k] === 1;
+            const tsVal = fields?.Ts ? fields.Ts[k] : null;
+            const qvSVal = fields?.qv ? fields.qv[k] : null;
+            const precipVal = fields?.precipRate ? fields.precipRate[k] : null;
+            if (Number.isFinite(tsVal)) {
+              if (isLand) {
+                sumTsLand += tsVal * w;
+                sumTsLandW += w;
+              } else {
+                sumTsOcean += tsVal * w;
+                sumTsOceanW += w;
+              }
+            }
+            if (Number.isFinite(qvSVal)) {
+              if (isLand) {
+                sumQvLand += qvSVal * w;
+                sumQvLandW += w;
+              } else {
+                sumQvOcean += qvSVal * w;
+                sumQvOceanW += w;
+              }
+            }
+            if (Number.isFinite(precipVal)) {
+              if (isLand) {
+                sumPrecipLand += precipVal * w;
+                sumPrecipLandW += w;
+              } else {
+                sumPrecipOcean += precipVal * w;
+                sumPrecipOceanW += w;
+              }
+            }
+            if (isLand && state.soilW && state.soilCap) {
+              const cap = state.soilCap[k];
+              if (cap > 0) {
+                const frac = clamp(state.soilW[k] / cap, 0, 1);
+                sumSoilFracLand += frac * w;
+                sumSoilFracLandW += w;
+              }
+            }
+          }
         }
       }
       if (sumW > 0) {
@@ -578,6 +642,13 @@ class WeatherLogger {
       }
       if (sumThetaW > 0) out.thetaSMeanAw = sumTheta / sumThetaW;
       if (sumQvW > 0) out.qvSMeanAw = sumQv / sumQvW;
+      if (sumTsLandW > 0) out.TsLandMean = sumTsLand / sumTsLandW;
+      if (sumTsOceanW > 0) out.TsOceanMean = sumTsOcean / sumTsOceanW;
+      if (sumQvLandW > 0) out.qvSLandMean = sumQvLand / sumQvLandW;
+      if (sumQvOceanW > 0) out.qvSOceanMean = sumQvOcean / sumQvOceanW;
+      if (sumSoilFracLandW > 0) out.soilWFracLandMean = sumSoilFracLand / sumSoilFracLandW;
+      if (sumPrecipLandW > 0) out.precipLandMean = sumPrecipLand / sumPrecipLandW;
+      if (sumPrecipOceanW > 0) out.precipOceanMean = sumPrecipOcean / sumPrecipOceanW;
     }
 
     if (fields && grid) {
@@ -744,30 +815,57 @@ class WeatherLogger {
         psClampMinCount: 0,
         psClampMaxCount: 0,
         meanDpsDtApplied: null,
-        meanDpsDtActual: null
+        meanDpsDtActual: null,
+        psAtMaxCount: 0,
+        psAtMinCount: 0,
+        psAtMaxAreaFrac: 0,
+        psAtMinAreaFrac: 0
       };
     }
+    this._ensureGrid(grid);
     const psMin = core?.massParams?.psMin ?? 50000;
     const psMax = core?.massParams?.psMax ?? 110000;
+    const { nx, ny, cosLat } = grid;
     const { N, nz, ps, pHalf } = state;
     let psOut = 0;
     let inversions = 0;
     let dpNonPositive = 0;
+    let psAtMaxCount = 0;
+    let psAtMinCount = 0;
+    let psAtMaxWeight = 0;
+    let psAtMinWeight = 0;
 
-    for (let k = 0; k < N; k++) {
-      const p = ps[k];
-      if (p < psMin || p > psMax) psOut++;
-      let inverted = false;
-      for (let lev = 0; lev < nz; lev++) {
-        const p1 = pHalf[lev * N + k];
-        const p2 = pHalf[(lev + 1) * N + k];
-        if (p1 >= p2) {
-          inverted = true;
+    for (let j = 0; j < ny; j++) {
+      const w = cosLat[j];
+      const row = j * nx;
+      for (let i = 0; i < nx; i++) {
+        const k = row + i;
+        const p = ps[k];
+        if (p < psMin || p > psMax) psOut++;
+        if (p >= psMax - 1) {
+          psAtMaxCount += 1;
+          psAtMaxWeight += w;
         }
-        if (p2 - p1 <= 0) dpNonPositive++;
+        if (p <= psMin + 1) {
+          psAtMinCount += 1;
+          psAtMinWeight += w;
+        }
+        let inverted = false;
+        for (let lev = 0; lev < nz; lev++) {
+          const p1 = pHalf[lev * N + k];
+          const p2 = pHalf[(lev + 1) * N + k];
+          if (p1 >= p2) {
+            inverted = true;
+          }
+          if (p2 - p1 <= 0) dpNonPositive++;
+        }
+        if (inverted) inversions++;
       }
-      if (inverted) inversions++;
     }
+
+    const totalWeight = this._totalWeight || 0;
+    const psAtMaxAreaFrac = totalWeight > 0 ? psAtMaxWeight / totalWeight : 0;
+    const psAtMinAreaFrac = totalWeight > 0 ? psAtMinWeight / totalWeight : 0;
 
     return {
       psOutOfRangeCount: psOut,
@@ -776,7 +874,11 @@ class WeatherLogger {
       psClampMinCount: Number.isFinite(state.psClampMinCount) ? state.psClampMinCount : 0,
       psClampMaxCount: Number.isFinite(state.psClampMaxCount) ? state.psClampMaxCount : 0,
       meanDpsDtApplied: Number.isFinite(state.meanDpsDtApplied) ? state.meanDpsDtApplied : null,
-      meanDpsDtActual: Number.isFinite(state.meanDpsDtActual) ? state.meanDpsDtActual : null
+      meanDpsDtActual: Number.isFinite(state.meanDpsDtActual) ? state.meanDpsDtActual : null,
+      psAtMaxCount,
+      psAtMinCount,
+      psAtMaxAreaFrac,
+      psAtMinAreaFrac
     };
   }
 

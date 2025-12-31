@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import HQ from './HQ';
 import WeatherField from './WeatherField';
+import { WeatherVolumeGpu } from './sensors/radar/WeatherVolumeGpu';
+import { WeatherVolumeDebugView } from './sensors/radar/WeatherVolumeDebugView';
+import { RadarPpiOverlay } from './sensors/radar/RadarPpiOverlay';
 import earthmap from './8081_earthmap10k.jpg';
 import earthbump from './8081_earthbump10k.jpg';
 import fogTexture from './fog.png'; // Add your fog texture map here
@@ -37,6 +40,9 @@ class Earth {
 
     // Weather layers (dynamic clouds under FoW)
     this.weatherField = null;
+    this.weatherVolumeGpu = null;
+    this.weatherVolumeDebugView = null;
+    this.radarOverlay = null;
     this.weatherLowGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 120, 256, 256);
     this.weatherHighGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 160, 256, 256);
     this.weatherLowMaterial = new THREE.MeshPhongMaterial({
@@ -119,6 +125,16 @@ class Earth {
       this.weatherField.textureHigh.dispose?.();
       this.weatherField.textureDebug.dispose?.();
     }
+    if (this.weatherVolumeDebugView) {
+      this.weatherVolumeDebugView.dispose();
+      this.weatherVolumeDebugView = null;
+    }
+    if (this.radarOverlay) {
+      this.parentObject.remove(this.radarOverlay.mesh);
+      this.radarOverlay.dispose();
+      this.radarOverlay = null;
+    }
+    this.weatherVolumeGpu = null;
     this.weatherField = new WeatherField({
       renderScale: 4,
       tickSeconds: 1.0,
@@ -131,6 +147,42 @@ class Earth {
     this.weatherHighMaterial.needsUpdate = true;
     this.weatherDebugMaterial.map = this.weatherField.getDebugTexture();
     this.weatherDebugMaterial.needsUpdate = true;
+  }
+
+  initRadarVolume(renderer, options = {}) {
+    if (!renderer || !this.weatherField?.core) return;
+    if (!this.useWeatherV2) return;
+    this.weatherVolumeGpu = new WeatherVolumeGpu({ renderer, core: this.weatherField.core, options });
+    if (options.debug && this.weatherVolumeGpu?.isSupported()) {
+      this.weatherVolumeDebugView = new WeatherVolumeDebugView({
+        renderer,
+        volume: this.weatherVolumeGpu,
+        options: { camera: this.camera }
+      });
+    }
+  }
+
+  setRadarOverlay(ppiPass, options = {}) {
+    if (this.radarOverlay) {
+      this.parentObject.remove(this.radarOverlay.mesh);
+      this.radarOverlay.dispose();
+      this.radarOverlay = null;
+    }
+    if (!ppiPass) return;
+    this.radarOverlay = new RadarPpiOverlay({
+      ppiPass,
+      earthRadiusKm: this.earthRadiusKm,
+      options
+    });
+    this.parentObject.add(this.radarOverlay.mesh);
+  }
+
+  updateRadarOverlayOrigin(lat0Rad, lon0Rad) {
+    this.radarOverlay?.setOriginLatLonRad(lat0Rad, lon0Rad);
+  }
+
+  updateRadarOverlayTexture() {
+    this.radarOverlay?.updateTexture();
   }
 
   setWeatherCoreVersion(version) {
@@ -223,6 +275,10 @@ class Earth {
     const dayFrac = (((simTimeSeconds / daySeconds) % 1) + 1) % 1;
     this.parentObject.rotation.y = 2 * Math.PI * (dayFrac - 0.5);
     this.weatherField?.update(simTimeSeconds, realDtSeconds, simContext);
+    const didUpload = this.weatherVolumeGpu?.update({ simTimeSeconds });
+    if (didUpload) {
+      this.weatherVolumeDebugView?.render();
+    }
   }
 
     revealFog(position, fov, logPosition = false, radius, playerID) {

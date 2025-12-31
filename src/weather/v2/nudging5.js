@@ -34,9 +34,13 @@ const NUDGE_ALLOWED_PARAMS = new Set([
   'rhTargetLandEq',
   'rhTargetLandPole',
   'qvCap',
+  'landQvNudgeScale',
+  'oceanQvNudgeScale',
   'smoothLon',
   'smoothLat',
-  'cadenceSeconds'
+  'cadenceSeconds',
+  'psMin',
+  'psMax'
 ]);
 const nudgeWarnedParams = new Set();
 const warnUnknownNudgeParams = (params) => {
@@ -124,8 +128,12 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
     rhTargetLandEq = 0.7,
     rhTargetLandPole = 0.55,
     qvCap = 0.03,
+    landQvNudgeScale = 0.5,
+    oceanQvNudgeScale = 1.0,
     smoothLon = 31,
-    smoothLat = 9
+    smoothLat = 9,
+    psMin = 50000,
+    psMax = 110000
   } = params;
   if (!enable) return;
 
@@ -133,7 +141,7 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
   if (!tmp2D || !tmp2D2) return;
 
   const { nx, ny, latDeg } = grid;
-  const { N, nz, ps, theta, qv, landMask, pMid, sstNow } = state;
+  const { N, nz, ps, theta, qv, landMask, pMid, sstNow, soilW, soilCap } = state;
   const slpNow = climo.hasSlp && climo.slpNow && climo.slpNow.length === ps.length ? climo.slpNow : null;
   const t2mNow = climo.hasT2m && climo.t2mNow && climo.t2mNow.length === N ? climo.t2mNow : null;
   const sstField = climo.sstNow && climo.sstNow.length === N ? climo.sstNow : sstNow;
@@ -151,7 +159,7 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
     const coeff = clamp(dt / tauPs, 0, 1);
     for (let k = 0; k < ps.length; k++) {
       ps[k] += (tmp2D2[k] - ps[k]) * coeff;
-      ps[k] = clamp(ps[k], 50000, 110000);
+      ps[k] = clamp(ps[k], psMin, psMax);
     }
   }
 
@@ -237,7 +245,16 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
     const coeff = clamp(dt / tauQvS, 0, 1);
     for (let k = 0; k < N; k++) {
       const idxS = levS * N + k;
-      qv[idxS] += (tmp2D2[k] - qv[idxS]) * coeff;
+      const land = landMask[k] === 1;
+      let scale = land ? landQvNudgeScale : oceanQvNudgeScale;
+      if (land) {
+        const cap = soilCap ? soilCap[k] : 0;
+        const avail = cap > 0 ? clamp01((soilW ? soilW[k] : 0) / cap) : 0;
+        const landScale = lerp(0.2, 1.0, avail);
+        scale *= landScale;
+      }
+      const coeffLocal = coeff * scale;
+      qv[idxS] += (tmp2D2[k] - qv[idxS]) * coeffLocal;
       qv[idxS] = Math.max(0, qv[idxS]);
     }
   }

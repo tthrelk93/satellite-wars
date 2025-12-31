@@ -3,6 +3,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import Satellite from './Satellite';
 import Earth from './Earth';
+import { sampleV2AtLatLonSigma } from './sensors/radar/radarSampleCpu';
+import { RadarPpiPass } from './sensors/radar/RadarPpiPass';
+import { DEFAULT_GROUND_DOPPLER_SPECS } from './sensors/radar/radarSpecs';
 import HQ from './HQ';
 import Player from './Player';
 import { UPKEEP_PER_SAT, INCOME_PER_COMM_IN_LINK, INCOME_PER_IMAGING_IN_LINK, BASE_INCOME_PER_TURN, MU_EARTH, RE_M, OMEGA_EARTH, LOSSES_MPS, DV_REF_MPS, DV_EXPONENT, COMM_RANGE_KM, HQ_RANGE_KM, SPACE_LOS_EPS, GROUND_LOS_EPS } from './constants';
@@ -159,6 +162,7 @@ const App = () => {
     const [weatherLogCount, setWeatherLogCount] = useState(0);
     const [weatherStormSummary, setWeatherStormSummary] = useState({ stormCount: 0, storms: [] });
     const [weatherV2ConvectionEnabled, setWeatherV2ConvectionEnabled] = useState(true);
+    const [sensorOnlyWeather, setSensorOnlyWeather] = useState(false);
     const zonalCanvasRef = useRef(null);
     const seedEditedRef = useRef(false);
     const orbitPreviewRef = useRef(null); // Green orbit preview line
@@ -199,6 +203,10 @@ const App = () => {
     const altitudeRef = useRef(altitude);
     const inclinationRef = useRef(inclination);
     const previewNormalRef = useRef(null); // plane normal n (always ⟂ to HQ vector t)
+    const radarPpiPassRef = useRef(null);
+    const radarOriginVecRef = useRef(new THREE.Vector3());
+    const radarFallbackRef = useRef({ latRad: 0, lonRad: 0, lastUpdateSim: -Infinity });
+    const radarFollowRef = useRef('');
 
 
     const [launchCost, setLaunchCost] = useState(0);
@@ -346,6 +354,7 @@ const App = () => {
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.7, 100000);
         camera.position.set(0, 0, 20000); // Set camera far enough to view the entire Earth
         cameraRef.current = camera;
+        scene.add(camera);
         const renderer = new THREE.WebGLRenderer();
         renderer.setSize(window.innerWidth, window.innerHeight);
         rendererRef.current = renderer;
@@ -373,9 +382,188 @@ const App = () => {
         });
         earth.render(scene);
         earthRef.current = earth;
+        const urlParams = new URLSearchParams(window.location.search);
+        const radarDebug = process.env.NODE_ENV !== 'production' && urlParams.get('radarDebug') === '1';
+        const radarEnabled = process.env.NODE_ENV !== 'production' && urlParams.get('radar') === '1';
+        radarFollowRef.current = urlParams.get('radarFollow') || '';
+        earth.initRadarVolume?.(renderer, { debug: radarDebug });
+        if (radarPpiPassRef.current) {
+            radarPpiPassRef.current.dispose();
+            radarPpiPassRef.current = null;
+            earth.setRadarOverlay(null);
+        }
+        if (radarEnabled && earth.weatherVolumeGpu?.isSupported?.()) {
+            radarPpiPassRef.current = new RadarPpiPass({
+                renderer,
+                volume: earth.weatherVolumeGpu,
+                specs: DEFAULT_GROUND_DOPPLER_SPECS
+            });
+            earth.setRadarOverlay(radarPpiPassRef.current, {
+                radiusOffsetKm: 12,
+                opacity: 1.0,
+                backgroundAlpha: 0.10,
+                backgroundColor: [0.0, 0.0, 0.0],
+                edgeFadeFrac: 0.03
+            });
+            earth.updateRadarOverlayTexture();
+        }
+        if (process.env.NODE_ENV !== 'production') {
+            window.__sw = window.__sw || {};
+            window.__sw.earth = earth;
+            window.__sw.sampleRadarV2 = (lat, lon, sigma = 0.95) => sampleV2AtLatLonSigma(
+                earth.weatherField?.core,
+                lat,
+                lon,
+                sigma,
+                { method: 'bilinear', returnMeta: true }
+            );
+            window.__sw.storms = () => earth.weatherField?.getStormSummary?.() ?? { stormCount: 0, storms: [] };
+            window.__sw.getRadarOrigin = () => {
+                const simTimeSeconds = simClockRef.current?.simTimeSeconds ?? 0;
+                const origin = getRadarOriginLatLonRad(simTimeSeconds);
+                if (!origin) return null;
+                return {
+                    latDeg: THREE.MathUtils.radToDeg(origin.latRad),
+                    lonDeg: THREE.MathUtils.radToDeg(origin.lonRad),
+                    source: origin.source ?? 'unknown'
+                };
+            };
+            window.__sw.logRadarOrigin = () => {
+                const info = window.__sw.getRadarOrigin?.();
+                if (!info) {
+                    console.log('[radar] origin unavailable');
+                    return null;
+                }
+                console.log(`[radar] origin ${info.source} lat=${info.latDeg.toFixed(3)} lon=${info.lonDeg.toFixed(3)}`);
+                return info;
+            };
+            window.__sw.getRadarFallback = () => {
+                const fallback = radarFallbackRef.current;
+                return {
+                    latDeg: THREE.MathUtils.radToDeg(fallback.latRad),
+                    lonDeg: THREE.MathUtils.radToDeg(fallback.lonRad),
+                    lastUpdateSim: fallback.lastUpdateSim
+                };
+            };
+            window.__sw.setRadarZScale = (value) => {
+                const pass = radarPpiPassRef.current;
+                if (!pass || !pass.material?.uniforms?.zScale) return null;
+                const v = Number(value);
+                if (!Number.isFinite(v)) return pass.material.uniforms.zScale.value;
+                pass.material.uniforms.zScale.value = v;
+                return pass.material.uniforms.zScale.value;
+            };
+            window.__sw.setRadarZExponent = (value) => {
+                const pass = radarPpiPassRef.current;
+                if (!pass || !pass.material?.uniforms?.zExponent) return null;
+                const v = Number(value);
+                if (!Number.isFinite(v)) return pass.material.uniforms.zExponent.value;
+                pass.material.uniforms.zExponent.value = v;
+                return pass.material.uniforms.zExponent.value;
+            };
+            window.__sw.setRadarDbzMin = (value) => {
+                const pass = radarPpiPassRef.current;
+                if (!pass || !pass.material?.uniforms?.dbzMin) return null;
+                const v = Number(value);
+                if (!Number.isFinite(v)) return pass.material.uniforms.dbzMin.value;
+                pass.material.uniforms.dbzMin.value = v;
+                return pass.material.uniforms.dbzMin.value;
+            };
+            window.__sw.setRadarQMin = (value) => {
+                const pass = radarPpiPassRef.current;
+                if (!pass || !pass.material?.uniforms?.qMin) return null;
+                const v = Number(value);
+                if (!Number.isFinite(v)) return pass.material.uniforms.qMin.value;
+                pass.material.uniforms.qMin.value = v;
+                return pass.material.uniforms.qMin.value;
+            };
+            window.__sw.setRadarDbzAlphaSpan = (value) => {
+                const pass = radarPpiPassRef.current;
+                if (!pass || !pass.material?.uniforms?.dbzAlphaSpan) return null;
+                const v = Number(value);
+                if (!Number.isFinite(v)) return pass.material.uniforms.dbzAlphaSpan.value;
+                pass.material.uniforms.dbzAlphaSpan.value = v;
+                return pass.material.uniforms.dbzAlphaSpan.value;
+            };
+            window.__sw.radarDiskStats = () => {
+                const simTimeSeconds = simClockRef.current?.simTimeSeconds ?? 0;
+                const origin = getRadarOriginLatLonRad(simTimeSeconds);
+                const core = window.__sw.earth?.weatherField?.core;
+                const grid = core?.grid;
+                const state = core?.state;
+                if (!origin || !core || !grid || !state) return null;
+
+                const { nx, ny, latDeg, lonDeg } = grid;
+                const N = nx * ny;
+                if (!nx || !ny || !latDeg || !lonDeg) return null;
+
+                const rangeMaxKm = DEFAULT_GROUND_DOPPLER_SPECS.rangeMaxKm;
+                const rangeMaxM = rangeMaxKm * 1000;
+                const cosLat0 = Math.cos(origin.latRad);
+                const precip = state.precipRate;
+                const qr = state.qr;
+                const nz = state.nz ?? core.nz ?? 0;
+                const base = Math.max(0, nz - 1) * N;
+
+                const maxPrecip = { value: 0, distKm: null, latDeg: null, lonDeg: null };
+                const maxQr = { value: 0, distKm: null, latDeg: null, lonDeg: null };
+
+                for (let j = 0; j < ny; j += 1) {
+                    const latRad = THREE.MathUtils.degToRad(latDeg[j]);
+                    const dLat = latRad - origin.latRad;
+                    const rowOffset = j * nx;
+                    for (let i = 0; i < nx; i += 1) {
+                        const lonRad = THREE.MathUtils.degToRad(lonDeg[i]);
+                        const dLon = wrapRadToPi(lonRad - origin.lonRad);
+                        const eastM = dLon * RE_M * cosLat0;
+                        const northM = dLat * RE_M;
+                        const rM = Math.hypot(eastM, northM);
+                        if (rM > rangeMaxM) continue;
+
+                        const k = rowOffset + i;
+                        if (precip && precip.length === N) {
+                            const val = precip[k];
+                            if (val > maxPrecip.value) {
+                                maxPrecip.value = val;
+                                maxPrecip.distKm = rM / 1000;
+                                maxPrecip.latDeg = latDeg[j];
+                                maxPrecip.lonDeg = lonDeg[i];
+                            }
+                        }
+                        if (qr && qr.length >= base + N) {
+                            const val = qr[base + k];
+                            if (val > maxQr.value) {
+                                maxQr.value = val;
+                                maxQr.distKm = rM / 1000;
+                                maxQr.latDeg = latDeg[j];
+                                maxQr.lonDeg = lonDeg[i];
+                            }
+                        }
+                    }
+                }
+
+                const result = {
+                    rangeKm: rangeMaxKm,
+                    origin: {
+                        latDeg: THREE.MathUtils.radToDeg(origin.latRad),
+                        lonDeg: THREE.MathUtils.radToDeg(origin.lonRad),
+                        source: origin.source ?? 'unknown'
+                    },
+                    maxPrecipRateMmHr: maxPrecip,
+                    maxQrSurface: maxQr
+                };
+                console.log('[radar] disk stats', result);
+                return result;
+            };
+        }
         earth.setWeatherDebugMode(weatherDebugModeRef.current);
-        earth.setWeatherVisible(showWeatherLayerRef.current);
-        earth.setFogVisible(showFogLayerRef.current);
+        if (sensorOnlyWeather) {
+            earth.setWeatherVisible(false);
+            earth.setFogVisible(false);
+        } else {
+            earth.setWeatherVisible(showWeatherLayerRef.current);
+            earth.setFogVisible(showFogLayerRef.current);
+        }
 
         // Sync view and objects on turn start (after Earth exists)
         eventBus.on('TURN_STARTED', ({ playerId }) => {
@@ -1129,12 +1317,24 @@ const App = () => {
     useEffect(() => { inclinationRef.current = inclination; }, [inclination]);
     useEffect(() => {
         showFogLayerRef.current = showFogLayer;
-        if (earthRef.current) earthRef.current.setFogVisible(showFogLayer);
-    }, [showFogLayer]);
+        if (!earthRef.current) return;
+        earthRef.current.setFogVisible(sensorOnlyWeather ? false : showFogLayer);
+    }, [showFogLayer, sensorOnlyWeather]);
     useEffect(() => {
         showWeatherLayerRef.current = showWeatherLayer;
-        if (earthRef.current) earthRef.current.setWeatherVisible(showWeatherLayer);
-    }, [showWeatherLayer]);
+        if (!earthRef.current) return;
+        earthRef.current.setWeatherVisible(sensorOnlyWeather ? false : showWeatherLayer);
+    }, [showWeatherLayer, sensorOnlyWeather]);
+    useEffect(() => {
+        if (!earthRef.current) return;
+        if (sensorOnlyWeather) {
+            earthRef.current.setWeatherVisible(false);
+            earthRef.current.setFogVisible(false);
+        } else {
+            earthRef.current.setWeatherVisible(showWeatherLayerRef.current);
+            earthRef.current.setFogVisible(showFogLayerRef.current);
+        }
+    }, [sensorOnlyWeather]);
     useEffect(() => {
         if (earthRef.current) earthRef.current.setWeatherCoreVersion(weatherCoreVersion);
     }, [weatherCoreVersion]);
@@ -1350,6 +1550,84 @@ const App = () => {
         });
     };
 
+    const wrapRadToPi = (rad) => {
+        const twoPi = Math.PI * 2;
+        let v = ((rad + Math.PI) % twoPi + twoPi) % twoPi;
+        return v - Math.PI;
+    };
+
+    const getRadarOriginLatLonRad = (simTimeSeconds) => {
+        if (radarFollowRef.current === 'precipMax') {
+            return getRadarFallbackLatLonRad(simTimeSeconds);
+        }
+        const player = currentPlayerRef.current;
+        const hq = player?.getHQs?.()[0] || player?.hqs?.[0];
+        if (hq?.sphere?.position) {
+            const vec = radarOriginVecRef.current;
+            vec.copy(hq.sphere.position).normalize();
+            return {
+                latRad: Math.asin(vec.y),
+                lonRad: Math.atan2(-vec.z, vec.x),
+                source: 'hq'
+            };
+        }
+        return getRadarFallbackLatLonRad(simTimeSeconds);
+    };
+
+    const getRadarFallbackLatLonRad = (simTimeSeconds) => {
+        const fallback = radarFallbackRef.current;
+        if (!Number.isFinite(simTimeSeconds)) return fallback;
+        if (simTimeSeconds - fallback.lastUpdateSim < 600) return fallback;
+
+        const core = earthRef.current?.weatherField?.core;
+        const state = core?.state;
+        const grid = core?.grid;
+        const nx = grid?.nx ?? 0;
+        const ny = grid?.ny ?? 0;
+        const N = nx * ny;
+        if (!state || !grid || N <= 0) return fallback;
+
+        let maxVal = -Infinity;
+        let maxI = 0;
+        let maxJ = 0;
+        const precip = state.precipRate;
+        if (precip && precip.length === N) {
+            for (let j = 0; j < ny; j += 1) {
+                const rowOffset = j * nx;
+                for (let i = 0; i < nx; i += 1) {
+                    const val = precip[rowOffset + i];
+                    if (val > maxVal) {
+                        maxVal = val;
+                        maxI = i;
+                        maxJ = j;
+                    }
+                }
+            }
+        } else if (state.qr && state.qr.length === N * (state.nz ?? 0)) {
+            const levS = (state.nz ?? 1) - 1;
+            const base = Math.max(0, levS) * N;
+            for (let j = 0; j < ny; j += 1) {
+                const rowOffset = j * nx;
+                for (let i = 0; i < nx; i += 1) {
+                    const val = state.qr[base + rowOffset + i];
+                    if (val > maxVal) {
+                        maxVal = val;
+                        maxI = i;
+                        maxJ = j;
+                    }
+                }
+            }
+        }
+
+        if (maxVal > 0 && grid.latDeg && grid.lonDeg) {
+            fallback.latRad = THREE.MathUtils.degToRad(grid.latDeg[maxJ]);
+            fallback.lonRad = THREE.MathUtils.degToRad(grid.lonDeg[maxI]);
+        }
+        fallback.lastUpdateSim = simTimeSeconds;
+        fallback.source = 'fallback';
+        return fallback;
+    };
+
     // Animation loop
     useEffect(() => {
         const animate = () => {
@@ -1374,6 +1652,17 @@ const App = () => {
                     simSpeed: simClock.simSpeed,
                     paused: simClock.paused
                 });
+            }
+
+            const radarPass = radarPpiPassRef.current;
+            if (radarPass) {
+                const origin = getRadarOriginLatLonRad(simTimeSeconds);
+                if (origin) {
+                    radarPass.setOriginLatLonRad(origin.latRad, origin.lonRad);
+                    earthRef.current?.updateRadarOverlayOrigin(origin.latRad, origin.lonRad);
+                    radarPass.render({ simTimeSeconds });
+                    earthRef.current?.updateRadarOverlayTexture();
+                }
             }
 
             const directionalLight = directionalLightRef.current;
@@ -1971,6 +2260,20 @@ const App = () => {
                             }
                             label={<Typography variant="caption" style={{ color: 'white' }}>Weather</Typography>}
                         />
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    size="small"
+                                    checked={sensorOnlyWeather}
+                                    onChange={(_, v) => setSensorOnlyWeather(v)}
+                                    color="primary"
+                                />
+                            }
+                            label={<Typography variant="caption" style={{ color: 'white' }}>Sensor-Only Weather</Typography>}
+                        />
+                        <Typography variant="caption" style={{ color: 'rgba(255,255,255,0.7)', marginLeft: 8 }}>
+                            Hide clouds; show only sensor detections.
+                        </Typography>
                         <Box mt={1}>
                             <FormControl size="small" fullWidth variant="outlined" sx={{ mb: 1 }}>
                                 <InputLabel style={{ color: 'white' }}>Weather Core</InputLabel>

@@ -2,6 +2,10 @@ import { g, Cp, Lv, Rd } from '../constants';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
+const smoothstep = (edge0, edge1, x) => {
+  const t = clamp01((x - edge0) / Math.max(1e-6, edge1 - edge0));
+  return t * t * (3 - 2 * t);
+};
 
 const P0 = 100000;
 const KAPPA = Rd / Cp;
@@ -16,7 +20,7 @@ const saturationMixingRatio = (T, p) => {
   return Math.min(qs, 0.2);
 };
 
-export function stepSurface2D5({ dt, grid, state, params = {} }) {
+export function stepSurface2D5({ dt, grid, state, climo, params = {} }) {
   if (!grid || !state || !Number.isFinite(dt) || dt <= 0) return;
   const {
     enable = true,
@@ -33,12 +37,22 @@ export function stepSurface2D5({ dt, grid, state, params = {} }) {
     evapMax = 2e-4,
     soilEvapExponent = 1.0,
     runoffEnabled = true,
+    enableLandClimoTs = false,
+    landTsUseT2m = true,
+    landTsUseLatBaseline = true,
     enableThetaClosure = true
   } = params;
   if (!enable) return;
 
   const { N, nz, theta, T, u, v, qv, Ts, soilW, soilCap, landMask, sstNow, precipRate, pHalf, pMid } = state;
+  const { nx, latDeg } = grid;
   const levS = nz - 1;
+  const t2mNow = enableLandClimoTs && landTsUseT2m && climo?.hasT2m && climo?.t2mNow?.length === N
+    ? climo.t2mNow
+    : null;
+  const thetaBase = 285;
+  const thetaEquatorBoost = 12;
+  const thetaPoleDrop = 22;
 
   for (let k = 0; k < N; k++) {
     const land = landMask[k] === 1;
@@ -69,7 +83,20 @@ export function stepSurface2D5({ dt, grid, state, params = {} }) {
     if (!land) {
       TsVal += (sst - TsVal) * (dt / oceanTauTs);
     } else {
-      TsVal += (288 - TsVal) * (dt / landTauTs);
+      let TsTargetLand = 288;
+      if (enableLandClimoTs) {
+        if (t2mNow && t2mNow.length === N) {
+          TsTargetLand = t2mNow[k];
+        } else if (landTsUseLatBaseline && latDeg) {
+          const j = Math.floor(k / nx);
+          const latAbs = Math.abs(latDeg[j]);
+          const humidLat = smoothstep(60, 0, latAbs);
+          const thetaLat = thetaBase + thetaEquatorBoost * humidLat - thetaPoleDrop * (1 - humidLat);
+          TsTargetLand = thetaLat - 2;
+        }
+      }
+      TsTargetLand = clamp(TsTargetLand, TsMin, TsMax);
+      TsVal += (TsTargetLand - TsVal) * (dt / landTauTs);
     }
     TsVal = clamp(TsVal, TsMin, TsMax);
     Ts[k] = TsVal;
