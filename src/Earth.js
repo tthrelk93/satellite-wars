@@ -15,9 +15,8 @@ const smoothstep = (edge0, edge1, x) => {
 };
 
 class Earth {
-  constructor(camera, players, { useWeatherV2 = true, weatherSeed } = {}) {
+  constructor(camera, players, { weatherSeed } = {}) {
     this.camera = camera;
-    this.useWeatherV2 = useWeatherV2;
     this.weatherSeed = weatherSeed;
     this.earthRadiusKm = 6371; // Earth's radius in kilometers
     this.geometry = new THREE.SphereGeometry(this.earthRadiusKm, 64, 64);
@@ -138,7 +137,6 @@ class Earth {
     this.weatherField = new WeatherField({
       renderScale: 4,
       tickSeconds: 1.0,
-      useV2: this.useWeatherV2,
       seed: this.weatherSeed
     });
     this.weatherLowMaterial.map = this.weatherField.textureLow;
@@ -151,7 +149,6 @@ class Earth {
 
   initRadarVolume(renderer, options = {}) {
     if (!renderer || !this.weatherField?.core) return;
-    if (!this.useWeatherV2) return;
     this.weatherVolumeGpu = new WeatherVolumeGpu({ renderer, core: this.weatherField.core, options });
     if (options.debug && this.weatherVolumeGpu?.isSupported()) {
       this.weatherVolumeDebugView = new WeatherVolumeDebugView({
@@ -183,15 +180,6 @@ class Earth {
 
   updateRadarOverlayTexture() {
     this.radarOverlay?.updateTexture();
-  }
-
-  setWeatherCoreVersion(version) {
-    const useV2 = version === 'v2';
-    if (this.useWeatherV2 === useV2) return;
-    this.useWeatherV2 = useV2;
-    this._createWeatherField();
-    this.setWeatherDebugMode(this.weatherDebugMode);
-    this.setWeatherVisible(this.weatherVisible);
   }
 
   setWeatherSeed(seed) {
@@ -430,18 +418,6 @@ class Earth {
 
   getWeatherLogStatus() {
     return this.weatherField?.getLogStatus() ?? { enabled: false, count: 0, cadenceSeconds: 0 };
-  }
-
-  getWeatherStormSummary() {
-    return this.weatherField?.getStormSummary?.() ?? { stormCount: 0, storms: [] };
-  }
-
-  spawnWeatherTropicalCycloneDebug() {
-    this.weatherField?.spawnTropicalCycloneDebug?.();
-  }
-
-  spawnWeatherHurricaneDebug() {
-    this.weatherField?.spawnHurricaneDebug?.();
   }
 
   setWeatherV2ConvectionEnabled(enabled) {

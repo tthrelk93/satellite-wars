@@ -136,7 +136,6 @@ const App = () => {
     const mountRef = useRef(null);
     const [gameMode, setGameMode] = useState(null); // 'solo' or 'pvp'
     const params = new URLSearchParams(window.location.search);
-    const initialCoreVersion = params.get('weatherCore') === 'v1' || params.get('weather') === 'v1' ? 'v1' : 'v2';
     const initialSeedParam = params.get('weatherSeed');
     const envSeedParam = process.env.REACT_APP_WEATHER_SEED;
     const fallbackSeed = Number.isFinite(Number.parseInt(envSeedParam, 10)) ? envSeedParam : '12345';
@@ -154,13 +153,11 @@ const App = () => {
     const [simPausedUI, setSimPausedUI] = useState(false);
     const [simSpeedUI, setSimSpeedUI] = useState(SIM_SPEED_DEFAULT);
     const [simTimeLabel, setSimTimeLabel] = useState('Day 0, 00:00');
-    const [weatherCoreVersion, setWeatherCoreVersion] = useState(initialCoreVersion);
     const [weatherSeed, setWeatherSeed] = useState(initialSeed);
     const [weatherSeedInput, setWeatherSeedInput] = useState(initialSeed);
     const [weatherLogEnabled, setWeatherLogEnabled] = useState(true);
     const [weatherLogCadence, setWeatherLogCadence] = useState(21600);
     const [weatherLogCount, setWeatherLogCount] = useState(0);
-    const [weatherStormSummary, setWeatherStormSummary] = useState({ stormCount: 0, storms: [] });
     const [weatherV2ConvectionEnabled, setWeatherV2ConvectionEnabled] = useState(true);
     const [sensorOnlyWeather, setSensorOnlyWeather] = useState(false);
     const zonalCanvasRef = useRef(null);
@@ -377,7 +374,6 @@ const App = () => {
         // Create Earth
         const seedNum = Number.parseInt(weatherSeed, 10);
         const earth = new Earth(camera, playersList, {
-            useWeatherV2: weatherCoreVersion === 'v2',
             weatherSeed: Number.isFinite(seedNum) ? seedNum : undefined
         });
         earth.render(scene);
@@ -417,7 +413,6 @@ const App = () => {
                 sigma,
                 { method: 'bilinear', returnMeta: true }
             );
-            window.__sw.storms = () => earth.weatherField?.getStormSummary?.() ?? { stormCount: 0, storms: [] };
             window.__sw.getRadarOrigin = () => {
                 const simTimeSeconds = simClockRef.current?.simTimeSeconds ?? 0;
                 const origin = getRadarOriginLatLonRad(simTimeSeconds);
@@ -1227,10 +1222,6 @@ const App = () => {
         ) {
             setWeatherLogCadence(logStatus.cadenceSeconds);
         }
-        const stormSummary = earth.getWeatherStormSummary?.();
-        if (stormSummary) {
-            setWeatherStormSummary(stormSummary);
-        }
     }
 
     const handleWeatherSeedChange = (event) => {
@@ -1293,15 +1284,6 @@ const App = () => {
         earthRef.current?.setWeatherV2ConvectionEnabled?.(checked);
     };
 
-    const stormListText = (weatherStormSummary.storms || [])
-        .map((storm) => {
-            const lat = Number.isFinite(storm.lat) ? storm.lat.toFixed(1) : '?';
-            const lon = Number.isFinite(storm.lon) ? storm.lon.toFixed(1) : '?';
-            const vmax = Number.isFinite(storm.vmax) ? Math.round(storm.vmax) : '?';
-            return `#${storm.id} ${lat}, ${lon} ${vmax} m/s`;
-        })
-        .join(' | ');
-
     const clearWeatherLogCapture = () => {
         earthRef.current?.clearWeatherLogCapture();
         setWeatherLogCount(0);
@@ -1335,9 +1317,6 @@ const App = () => {
             earthRef.current.setFogVisible(showFogLayerRef.current);
         }
     }, [sensorOnlyWeather]);
-    useEffect(() => {
-        if (earthRef.current) earthRef.current.setWeatherCoreVersion(weatherCoreVersion);
-    }, [weatherCoreVersion]);
     useEffect(() => {
         if (earthRef.current) {
             const seedNum = Number.parseInt(weatherSeed, 10);
@@ -2275,21 +2254,6 @@ const App = () => {
                             Hide clouds; show only sensor detections.
                         </Typography>
                         <Box mt={1}>
-                            <FormControl size="small" fullWidth variant="outlined" sx={{ mb: 1 }}>
-                                <InputLabel style={{ color: 'white' }}>Weather Core</InputLabel>
-                                <Select
-                                    value={weatherCoreVersion}
-                                    onChange={(e) => setWeatherCoreVersion(e.target.value)}
-                                    label="Weather Core"
-                                    sx={{
-                                        color: 'white',
-                                        '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' }
-                                    }}
-                                >
-                                    <MenuItem value="v1">v1 (legacy)</MenuItem>
-                                    <MenuItem value="v2">v2 (new)</MenuItem>
-                                </Select>
-                            </FormControl>
                             <FormControl size="small" fullWidth variant="outlined">
                                 <InputLabel style={{ color: 'white' }}>Weather Debug</InputLabel>
                                 <Select
@@ -2315,36 +2279,6 @@ const App = () => {
                                 onClick={() => setSimPausedUI(prev => !prev)}
                             >
                                 {simPausedUI ? 'Resume Sim' : 'Pause Sim'}
-                            </Button>
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                color="inherit"
-                                onClick={() => {
-                                    earthRef.current?.spawnWeatherTropicalCycloneDebug?.();
-                                    earthRef.current?.weatherLogNow(simClockRef.current?.simTimeSeconds ?? 0, {
-                                        simSpeed: simClockRef.current?.simSpeed,
-                                        paused: simClockRef.current?.paused
-                                    }, 'spawn-tc');
-                                    updateWeatherDebugNow();
-                                }}
-                            >
-                                Spawn TC
-                            </Button>
-                            <Button
-                                size="small"
-                                variant="outlined"
-                                color="inherit"
-                                onClick={() => {
-                                    earthRef.current?.spawnWeatherHurricaneDebug?.();
-                                    earthRef.current?.weatherLogNow(simClockRef.current?.simTimeSeconds ?? 0, {
-                                        simSpeed: simClockRef.current?.simSpeed,
-                                        paused: simClockRef.current?.paused
-                                    }, 'spawn-hurricane');
-                                    updateWeatherDebugNow();
-                                }}
-                            >
-                                Spawn Hurricane (Cat 1)
                             </Button>
                             <FormControlLabel
                                 control={
@@ -2436,16 +2370,6 @@ const App = () => {
                         <Typography variant="caption" display="block" style={{ color: 'white', marginTop: 6 }}>
                             Sim time: {simTimeLabel}{simPausedUI ? ' (paused)' : ''}
                         </Typography>
-                        <Box mt={1}>
-                            <Typography variant="caption" display="block" style={{ color: 'white' }}>
-                                Active storms: {weatherStormSummary.stormCount ?? 0}
-                            </Typography>
-                            {weatherStormSummary.stormCount > 0 && (
-                                <Typography variant="caption" display="block" style={{ color: 'white', marginTop: 2 }}>
-                                    {stormListText}
-                                </Typography>
-                            )}
-                        </Box>
                         <Box mt={1}>
                             <Typography variant="caption" display="block" style={{ color: 'white' }}>
                                 Weather Log Capture

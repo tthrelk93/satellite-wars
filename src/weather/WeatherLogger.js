@@ -353,7 +353,6 @@ class WeatherLogger {
     entry.sanity = this._buildSanityStats(core);
     entry.staticFieldsLogged = includeStatic;
     entry.probes = this._collectProbes(core);
-    entry.tc = core?.tcSystem?.getStormSummary?.() || { stormCount: 0, storms: [] };
     return entry;
   }
 

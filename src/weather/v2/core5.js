@@ -424,10 +424,6 @@ export class WeatherCore5 {
     return this.seed;
   }
 
-  debugSpawnTropicalCyclone() {}
-
-  debugSpawnHurricane() {}
-
   setV2ConvectionEnabled(enabled) {
     this.vertParams.enableConvection = Boolean(enabled);
   }

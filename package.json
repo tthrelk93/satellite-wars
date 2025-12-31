@@ -22,7 +22,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "weather:check": "node scripts/check-weather-log.mjs"
+    "weather:check": "node scripts/check-weather-log.mjs",
+    "verify:no-v1-weather": "node scripts/no-v1-weather.mjs"
   },
   "eslintConfig": {
     "extends": [

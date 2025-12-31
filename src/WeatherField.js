@@ -1,8 +1,7 @@
 import * as THREE from 'three';
-import { WeatherCore } from './weather/core';
 import { WeatherCore5 } from './weather/v2/core5';
 import WeatherLogger from './weather/WeatherLogger';
-import { bilinear } from './weather/advect';
+import { bilinear } from './weather/shared/bilinear';
 import { WeatherLogSink } from './weather/logSink';
 
 const AUTO_LOG_CADENCE_SECONDS = 6 * 3600;
@@ -16,16 +15,10 @@ class WeatherField {
         renderScale = 2,
         tickSeconds = 0.5,
         modelDt = 120,
-        timeScale = 200,
-        kappa = 2000,
         seed,
-        debugMode = 'clouds',
-        useV2 = false
+        debugMode = 'clouds'
     } = {}) {
-        this.useV2 = useV2;
-        this.core = useV2
-            ? new WeatherCore5({ nx, ny, dt: modelDt, seed })
-            : new WeatherCore({ nx, ny, dt: modelDt, timeScale, kappa, seed });
+        this.core = new WeatherCore5({ nx, ny, dt: modelDt, seed });
         this.renderScale = renderScale;
         this.tickSeconds = tickSeconds;
         this._paintAccumSeconds = 0;
@@ -129,7 +122,7 @@ class WeatherField {
         this.logger.recordRunStart(this.core, {
             session,
             cadenceSeconds: AUTO_LOG_CADENCE_SECONDS,
-            modelKind: this.useV2 ? 'v2' : 'v1'
+            modelKind: 'v2'
         });
         this.logger.recordNow(
             {
@@ -270,7 +263,7 @@ class WeatherField {
             this.logger.recordRunStart(this.core, {
                 session,
                 cadenceSeconds: this.logger.cadenceSeconds,
-                modelKind: this.useV2 ? 'v2' : 'v1'
+                modelKind: 'v2'
             });
         }
     }
@@ -297,25 +290,6 @@ class WeatherField {
             count: this.logger.getCount(),
             cadenceSeconds: this.logger.cadenceSeconds
         };
-    }
-
-    getStormSummary() {
-        if (!this.core?.ready) return { stormCount: 0, storms: [] };
-        return this.core.tcSystem?.getStormSummary?.() || { stormCount: 0, storms: [] };
-    }
-
-    spawnTropicalCycloneDebug() {
-        if (!this.core?.ready) return;
-        this.core.debugSpawnTropicalCyclone();
-        this._paintClouds(this.core.timeUTC);
-        this._paintDebug();
-    }
-
-    spawnHurricaneDebug() {
-        if (!this.core?.ready) return;
-        this.core.debugSpawnHurricane();
-        this._paintClouds(this.core.timeUTC);
-        this._paintDebug();
     }
 
     setV2ConvectionEnabled(enabled) {
@@ -352,15 +326,6 @@ class WeatherField {
     _paintClouds(simTimeSeconds) {
         if (!this.core.ready) return;
         const { grid, fields } = this.core;
-        const storms = (this.core.tcSystem?.storms || [])
-            .filter(storm => storm.alive)
-            .map(storm => ({
-                latDeg: storm.latDeg,
-                lonDeg: storm.lonDeg,
-                radiusKm: storm.radiusKm,
-                phase: storm.phase || 0,
-                strength: Math.max(0, Math.min(1, (storm.vmax - 15) / 45)) * 6
-            }));
 
         const hash = (x, y, t) => {
             const s = Math.sin(x * 127.1 + y * 311.7 + t * 0.1) * 43758.5453;
@@ -408,8 +373,7 @@ class WeatherField {
             shadeBase,
             shadeVar,
             renderParams,
-            isHigh,
-            storms
+            isHigh
         }) => {
             const w = ctx.canvas.width;
             const h = ctx.canvas.height;
@@ -432,24 +396,7 @@ class WeatherField {
                     const advLon = lon - dLonCells;
                     const advLat = lat - dLatCells;
                     const n = fbm(advLon * noiseScale, advLat * noiseScale, t);
-                    let tauAdd = 0;
-                    if (storms.length > 0) {
-                        const lonIdx = Math.floor(lon) % grid.nx;
-                        const lonDeg = grid.lonDeg[(lonIdx + grid.nx) % grid.nx];
-                        for (const storm of storms) {
-                            const dLonDeg = ((lonDeg - storm.lonDeg + 540) % 360) - 180;
-                            const dx = dLonDeg * kmPerDegLon;
-                            const dy = (latDeg - storm.latDeg) * kmPerDegLat;
-                            const r = Math.hypot(dx, dy);
-                            const radius = storm.radiusKm;
-                            if (r > 1.2 * radius) continue;
-                            const theta = Math.atan2(dy, dx);
-                            const band = 0.5 + 0.5 * Math.sin(3 * theta + r / (0.18 * radius) - storm.phase);
-                            const radial = Math.exp(-Math.pow(r / (0.9 * radius), 2));
-                            tauAdd += storm.strength * band * radial;
-                        }
-                    }
-                    const tauEff = Math.max(0, tau + tauAdd);
+                    const tauEff = Math.max(0, tau);
                     const aBase = Math.pow(cloud, isHigh ? renderParams.gammaHigh : renderParams.gammaLow) *
                         (isHigh ? renderParams.aHigh : renderParams.aLow);
                     let alpha = Math.max(0, Math.min(1, aBase));
@@ -502,8 +449,7 @@ class WeatherField {
             shadeBase: 230,
             shadeVar: 24,
             renderParams: this.renderParams,
-            isHigh: false,
-            storms
+            isHigh: false
         });
 
         drawLayer({
@@ -519,8 +465,7 @@ class WeatherField {
             shadeBase: 240,
             shadeVar: 20,
             renderParams: this.renderParams,
-            isHigh: true,
-            storms
+            isHigh: true
         });
 
         this.textureLow.needsUpdate = true;
