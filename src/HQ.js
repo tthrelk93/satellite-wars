@@ -7,8 +7,11 @@ class HQ {
     this.hp = 100; // hit points for ground strikes
     this.sphere = this.createMesh(position);
     const spherical = new THREE.Spherical().setFromVector3(position);
-    this.latitude = THREE.MathUtils.radToDeg(spherical.phi);
-    this.longitude = THREE.MathUtils.radToDeg(spherical.theta);
+    const latDeg = 90 - THREE.MathUtils.radToDeg(spherical.phi);
+    let lonDeg = THREE.MathUtils.radToDeg(spherical.theta);
+    if (lonDeg > 180) lonDeg -= 360;
+    this.latitude = latDeg;
+    this.longitude = lonDeg;
     this.position = position;
     this.ownerID = ownerID;
     this.neighbors = new Set(); // Initialize neighbors for graph representation

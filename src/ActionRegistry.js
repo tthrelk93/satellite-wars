@@ -7,6 +7,9 @@ const STRIKE_COST = 20_000_000;
 const AP_COST = {
   LAUNCH_SAT: 3,
   GROUND_STRIKE: 5,
+  RUN_FORECAST: 1,
+  ISSUE_WARNING: 1,
+  UPGRADE_FORECAST_TECH: 1,
 };
 
 export class ActionRegistry {
@@ -87,6 +90,30 @@ export class ActionRegistry {
             launchFn(...(launchArgs || []));
           }
         },
+      },
+      RUN_FORECAST: {
+        apCost: AP_COST.RUN_FORECAST,
+        moneyCost: 0,
+        preconditions: (playerId, { runFn }) => typeof runFn === 'function',
+        perform: (playerId, { runFn }) => {
+          runFn();
+        },
+      },
+      ISSUE_WARNING: {
+        apCost: AP_COST.ISSUE_WARNING,
+        moneyCost: 0,
+        preconditions: (playerId, { addWarningFn }) => typeof addWarningFn === 'function',
+        perform: (playerId, { addWarningFn }) => {
+          addWarningFn();
+        },
+      },
+      UPGRADE_FORECAST_TECH: {
+        apCost: AP_COST.UPGRADE_FORECAST_TECH,
+        moneyCost: 0,
+        preconditions: (playerId, { applyFn }) => typeof applyFn === 'function',
+        perform: (playerId, { applyFn }) => {
+          applyFn();
+        }
       },
      GROUND_STRIKE: {
        apCost: AP_COST.GROUND_STRIKE,

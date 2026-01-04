@@ -1,5 +1,12 @@
 import * as THREE from 'three';
-import { COMM_RANGE_KM, HQ_RANGE_KM, SPACE_LOS_EPS, GROUND_LOS_EPS } from './constants';
+import {
+  COMM_RANGE_KM,
+  HQ_RANGE_KM_COMM,
+  HQ_RANGE_KM_CLOUDWATCH,
+  HQ_RANGE_KM_IMAGING,
+  SPACE_LOS_EPS,
+  GROUND_LOS_EPS
+} from './constants';
 
 /**
  * Returns true if the segment from start->end passes through the sphere (excluding endpoints).
@@ -29,8 +36,18 @@ class Satellite {
     this.fov = fov;
     this.eventBus = eventBus;
     this.color = this.getColorByType(type);
+    this.coneEnabled = true;
+    this.cloudFootprintRadiusKm = this.type === 'cloudWatch'
+      ? this.computeCloudFootprintRadiusKm()
+      : 0;
     this.mesh = this.createMesh();
     this.viewCone = this.createViewCone();
+    this.sarFootprintRadiusKm = this.type === 'sar' ? this.revealRadius : 0;
+    this.highlightMesh = this.createHighlightMesh();
+    if (this.highlightMesh) {
+      this.mesh.add(this.highlightMesh);
+      this.highlightMesh.visible = false;
+    }
     this.lastLoggedAngle = null;
     this.lastLogTime = 0;
     this.inHqRange = false;
@@ -61,9 +78,26 @@ class Satellite {
         return 0xffa500; // Orange
       case 'imaging':
         return 0xffc0cb; // Pink
+      case 'cloudWatch':
+        return 0x55c6ff; // Cyan-blue
+      case 'sar':
+        return 0x7dd89a; // Green
       default:
         return 0xffffff; // White for unknown types
     }
+  }
+
+  computeCloudFootprintRadiusKm() {
+    const earthRadius = this.earth?.earthRadiusKm ?? 6371;
+    const r = this.orbit?.radius ?? earthRadius;
+    if (!(r > earthRadius)) return 0;
+    const psi = Math.acos(Math.min(1, earthRadius / r));
+    const horizonKm = earthRadius * psi;
+    const altitudeKm = r - earthRadius;
+    if (altitudeKm >= 30000) {
+      return horizonKm;
+    }
+    return Math.min(horizonKm, 1200);
   }
 
   createMesh() {
@@ -75,12 +109,18 @@ class Satellite {
   createViewCone() {
     const earthRadius = this.earth.earthRadiusKm;
     const distanceToSurface = this.orbit.radius - earthRadius;
+    let coneRadius = 1;
+    if (this.type === 'cloudWatch') {
+      this.cloudFootprintRadiusKm = this.computeCloudFootprintRadiusKm();
+      coneRadius = Math.max(1, this.cloudFootprintRadiusKm);
+    } else {
+      const surfaceArea = 4 * Math.PI * Math.pow(earthRadius, 2);
+      this.revealArea = (this.fov / 100000) * surfaceArea;
+      this.revealRadius = Math.sqrt(this.revealArea / Math.PI);
+      coneRadius = Math.max(1, this.revealRadius);
+    }
 
-    const surfaceArea = 4 * Math.PI * Math.pow(earthRadius, 2);
-    this.revealArea = (this.fov / 100000) * surfaceArea;
-    this.revealRadius = Math.sqrt(this.revealArea / Math.PI);
-
-    const coneGeometry = new THREE.ConeGeometry(this.revealRadius, distanceToSurface, 32);
+    const coneGeometry = new THREE.ConeGeometry(coneRadius, distanceToSurface, 32);
     const coneMaterial = new THREE.MeshBasicMaterial({
       color: this.color,
       transparent: true,
@@ -90,11 +130,38 @@ class Satellite {
     return new THREE.Mesh(coneGeometry, coneMaterial);
   }
 
-updateOrbit(hqSpheres, playerID, satellites) {
+  createHighlightMesh() {
+    const geometry = new THREE.SphereGeometry(16, 32, 32);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xfff07a,
+      transparent: true,
+      opacity: 0.65,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.renderOrder = 10;
+    return mesh;
+  }
+
+  setHighlighted(isOn) {
+    if (this.highlightMesh) {
+      this.highlightMesh.visible = Boolean(isOn);
+    }
+  }
+
+  getHqRangeKm() {
+    if (this.type === 'communication') return HQ_RANGE_KM_COMM;
+    if (this.type === 'cloudWatch') return HQ_RANGE_KM_CLOUDWATCH;
+    return HQ_RANGE_KM_IMAGING;
+  }
+
+updateOrbit(hqSpheres, playerID, satellites, deltaSimSeconds = 0) {
+  const dt = Number.isFinite(deltaSimSeconds) ? Math.max(0, deltaSimSeconds) : 0;
   const { radius, speed, inclination, raan = 0 } = this.orbit;
 
   // advance true anomaly
-  this.orbit.angle = (this.orbit.angle + speed) % (2 * Math.PI);
+  this.orbit.angle = (this.orbit.angle + speed * dt) % (2 * Math.PI);
   const nu = this.orbit.angle;
 
   // base circle in XZ
@@ -112,8 +179,11 @@ updateOrbit(hqSpheres, playerID, satellites) {
 
   // --- the rest of your method stays the same ---
   const spherical = new THREE.Spherical().setFromVector3(position);
-  this.latitude = THREE.MathUtils.radToDeg(spherical.phi);
-  this.longitude = THREE.MathUtils.radToDeg(spherical.theta);
+  const latDeg = 90 - THREE.MathUtils.radToDeg(spherical.phi);
+  let lonDeg = THREE.MathUtils.radToDeg(spherical.theta);
+  if (lonDeg > 180) lonDeg -= 360;
+  this.latitude = latDeg;
+  this.longitude = lonDeg;
   this.altitude = spherical.radius - this.earth.earthRadiusKm;
 
   const earthRadius = this.earth.earthRadiusKm;
@@ -175,7 +245,7 @@ updateOrbit(hqSpheres, playerID, satellites) {
                 const hqWorld = new THREE.Vector3();
                 hq.sphere.getWorldPosition(hqWorld);
                 const distance = this.mesh.position.distanceTo(hqWorld);
-                const maxRange = HQ_RANGE_KM;
+                const maxRange = this.getHqRangeKm();
                 const hasLoS = !segmentOccludedBySphere(hqWorld, this.mesh.position, this.earth.earthRadiusKm, GROUND_LOS_EPS);
 
                 if (distance <= maxRange && hasLoS) {
@@ -279,11 +349,12 @@ updateOrbit(hqSpheres, playerID, satellites) {
       const myHqs = hqSpheres.current.filter(hq => hq.ownerID === this.ownerId);
 
       // --- Fast path: direct world-space range + LoS to any friendly HQ ---
+      const maxRange = this.getHqRangeKm();
       const direct = myHqs.some(hq => {
         const hqWorld = new THREE.Vector3();
         hq.sphere.getWorldPosition(hqWorld);
         const distKm = this.mesh.position.distanceTo(hqWorld);
-        if (distKm > HQ_RANGE_KM) return false;
+        if (distKm > maxRange) return false;
         // LoS with a tolerant epsilon for the ground endpoint
         const clear = !segmentOccludedBySphere(
           hqWorld,
@@ -371,24 +442,27 @@ updateOrbit(hqSpheres, playerID, satellites) {
   }
 
   isInRange(position, isHQ) {
-      const maxRange = isHQ ? HQ_RANGE_KM : COMM_RANGE_KM;
-      // console.log("intersectDist: ", intersectionDistance);
-       if(isHQ){
-           maxRange = 3000;
-       }
+    const maxRange = isHQ ? this.getHqRangeKm() : COMM_RANGE_KM;
     const distance = this.mesh.position.distanceTo(position);
     return distance <= maxRange;
   }
 
-  render(scene) {
-      if (!scene.children.includes(this.mesh)) {
-             scene.add(this.mesh);
-         }
-         if (this.type === "imaging" && !scene.children.includes(this.viewCone)) {
+	  render(scene) {
+	      if (!scene.children.includes(this.mesh)) {
+	             scene.add(this.mesh);
+	         }
+         if (
+             (this.type === "imaging" || this.type === "cloudWatch")
+             && this.viewCone
+             && this.coneEnabled !== false
+             && !scene.children.includes(this.viewCone)
+         ) {
+             this.viewCone.visible = true;
              scene.add(this.viewCone);
-         }
-    console.log('Satellite added to scene:', this.mesh.position);
-  }
+	         } else if (this.viewCone) {
+	             this.viewCone.visible = this.coneEnabled !== false;
+	         }
+	  }
     
     dispose() {
         if (this.mesh) {
@@ -400,6 +474,11 @@ updateOrbit(hqSpheres, playerID, satellites) {
             this.viewCone.geometry.dispose();
             this.viewCone.material.dispose();
             this.viewCone = null;
+        }
+        if (this.highlightMesh) {
+            this.highlightMesh.geometry.dispose();
+            this.highlightMesh.material.dispose();
+            this.highlightMesh = null;
         }
         if (this.trail) {
             this.trail.geometry.dispose();
