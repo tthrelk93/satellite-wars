@@ -68,7 +68,7 @@ export class RadarPpiOverlay {
                 void main() {
                     vec3 dir = normalize(vDir);
                     float lat = asin(clamp(dir.y, -1.0, 1.0));
-                    float lon = atan(-dir.z, dir.x);
+                    float lon = atan(dir.x, dir.z);
 
                     float dLon = atan(sin(lon - lon0Rad), cos(lon - lon0Rad));
                     float dLat = lat - lat0Rad;

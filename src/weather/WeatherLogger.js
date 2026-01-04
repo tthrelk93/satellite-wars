@@ -142,6 +142,18 @@ class WeatherLogger {
     return this.recordIfDue(context, core, { force: true, reason });
   }
 
+  recordEvent(event, context, core, payload, { force = false } = {}) {
+    if (!this.enabled && !force) return false;
+    if (typeof event !== 'string' || event.length === 0) return false;
+    const entry = {
+      event,
+      sim: this._buildSimMeta(context, core),
+      payload: payload ?? null
+    };
+    this._pushEntry(entry);
+    return true;
+  }
+
   recordRunStart(core, { session, cadenceSeconds, modelKind } = {}) {
     if (this._runStartLogged) return false;
     if (!this.runId) {
