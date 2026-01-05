@@ -14,7 +14,8 @@ import { RadarSensor } from './sensors/weather/RadarSensor';
 import { SoundingSensor } from './sensors/weather/SoundingSensor';
 import { AmvSensor } from './sensors/weather/AmvSensor';
 import { paintGridToTexture } from './sensors/weather/paintGridToTexture';
-import { CLOUD_WATCH_GRID_LON_OFFSET_RAD } from './constants';
+import WindStreamlineRenderer from './WindStreamlineRenderer';
+import { CLOUD_WATCH_GRID_LON_OFFSET_RAD, WIND_REALISM_TARGETS } from './constants';
 import earthmap from './8081_earthmap10k.jpg';
 import earthbump from './8081_earthbump10k.jpg';
 import fogTexture from './fog.png'; // Add your fog texture map here
@@ -89,6 +90,218 @@ const WIND_COLOR_MAP = makeColorMap([
   { t: 0.5, color: [255, 160, 40] },
   { t: 1.0, color: [220, 60, 60] }
 ]);
+const WIND_MODEL_DIAGNOSTICS_CADENCE_SECONDS = 1800;
+const WIND_VIZ_DIAGNOSTICS_CADENCE_SECONDS = 600;
+
+const computePercentiles = (values, percentiles) => {
+  if (!values || values.length === 0) return {};
+  const sorted = values.slice().sort((a, b) => a - b);
+  const n = sorted.length;
+  const out = {};
+  percentiles.forEach((p) => {
+    const idx = Math.min(n - 1, Math.max(0, Math.round(p * (n - 1))));
+    out[`p${Math.round(p * 100)}`] = sorted[idx];
+  });
+  return out;
+};
+
+const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 }) => {
+  if (!grid || !u || !v) return null;
+  const nx = grid.nx;
+  const ny = grid.ny;
+  if (!nx || !ny) return null;
+  const N = grid.count || (nx * ny);
+  if (!N) return null;
+  const sampleStride = Math.max(1, Math.floor(N / sampleTarget));
+  const speedSamples = [];
+  const divSamples = [];
+  const vortSamples = [];
+  const bandSamples = { tropics: [], mid: [], polar: [] };
+  const bandSums = { tropics: 0, mid: 0, polar: 0 };
+  const bandCounts = { tropics: 0, mid: 0, polar: 0 };
+  const bandEkeSums = { tropics: 0, mid: 0, polar: 0 };
+  const bandEkeCounts = { tropics: 0, mid: 0, polar: 0 };
+  let sumSpeed = 0;
+  let maxSpeed = 0;
+  let sampleCount = 0;
+  let roughUSum = 0;
+  let roughVSum = 0;
+  let roughCount = 0;
+  let sumEke = 0;
+  let ekeCount = 0;
+
+  const kmPerDegLat = grid.kmPerDegLat ?? 111.0;
+  const cellLonDeg = grid.cellLonDeg ?? (360 / nx);
+  const cellLatDeg = grid.cellLatDeg ?? (180 / ny);
+  let invDxArr = grid.invDx;
+  let invDyArr = grid.invDy;
+  if (!invDxArr || !invDyArr || invDxArr.length !== ny || invDyArr.length !== ny) {
+    invDxArr = new Float32Array(ny);
+    invDyArr = new Float32Array(ny);
+    const invDyConst = 1 / (kmPerDegLat * 1000 * cellLatDeg);
+    for (let j = 0; j < ny; j++) {
+      const lat = Number.isFinite(grid.latDeg?.[j])
+        ? grid.latDeg[j]
+        : 90 - ((j + 0.5) / ny) * 180;
+      const cosLat = Number.isFinite(grid.cosLat?.[j])
+        ? grid.cosLat[j]
+        : Math.cos(lat * Math.PI / 180);
+      const dx = Math.max(1e-6, kmPerDegLat * 1000 * cellLonDeg * cosLat);
+      invDxArr[j] = 1 / dx;
+      invDyArr[j] = invDyConst;
+    }
+  }
+  const latDegArr = grid.latDeg;
+  const hasDiv = div && div.length === N;
+  const hasVort = vort && vort.length === N;
+
+  const rowMeanU = new Float32Array(ny);
+  const rowMeanV = new Float32Array(ny);
+  for (let j = 0; j < ny; j++) {
+    let sumU = 0;
+    let sumV = 0;
+    let count = 0;
+    const row = j * nx;
+    for (let i = 0; i < nx; i++) {
+      const u0 = u[row + i];
+      const v0 = v[row + i];
+      if (!Number.isFinite(u0) || !Number.isFinite(v0)) continue;
+      sumU += u0;
+      sumV += v0;
+      count += 1;
+    }
+    rowMeanU[j] = count > 0 ? sumU / count : 0;
+    rowMeanV[j] = count > 0 ? sumV / count : 0;
+  }
+
+  for (let k = 0; k < N; k += sampleStride) {
+    const u0 = u[k];
+    const v0 = v[k];
+    if (!Number.isFinite(u0) || !Number.isFinite(v0)) continue;
+    const speed = Math.hypot(u0, v0);
+    speedSamples.push(speed);
+    sumSpeed += speed;
+    if (speed > maxSpeed) maxSpeed = speed;
+    const j = Math.floor(k / nx);
+    const i = k - j * nx;
+    const latDeg = Number.isFinite(latDegArr?.[j])
+      ? latDegArr[j]
+      : 90 - ((j + 0.5) / ny) * 180;
+    const latAbs = Math.abs(latDeg);
+    let band = 'polar';
+    if (latAbs < 20) band = 'tropics';
+    else if (latAbs <= 60) band = 'mid';
+    bandSamples[band].push(speed);
+    bandSums[band] += speed;
+    bandCounts[band] += 1;
+
+    const uBar = rowMeanU[j];
+    const vBar = rowMeanV[j];
+    const du = u0 - uBar;
+    const dv = v0 - vBar;
+    const eke = du * du + dv * dv;
+    sumEke += eke;
+    ekeCount += 1;
+    bandEkeSums[band] += eke;
+    bandEkeCounts[band] += 1;
+
+    if (hasDiv) {
+      divSamples.push(Math.abs(div[k]));
+    }
+    if (hasVort) {
+      vortSamples.push(Math.abs(vort[k]));
+    }
+    if (!hasDiv || !hasVort) {
+      const iE = (i + 1) % nx;
+      const iW = (i - 1 + nx) % nx;
+      const jN = Math.max(0, j - 1);
+      const jS = Math.min(ny - 1, j + 1);
+      const row = j * nx;
+      const rowN = jN * nx;
+      const rowS = jS * nx;
+      const invDx = invDxArr[j];
+      const invDy = invDyArr[j];
+      const duDx = (u[row + iE] - u[row + iW]) * 0.5 * invDx;
+      const dvDy = (v[rowS + i] - v[rowN + i]) * 0.5 * invDy;
+      const dvDx = (v[row + iE] - v[row + iW]) * 0.5 * invDx;
+      const duDy = (u[rowS + i] - u[rowN + i]) * 0.5 * invDy;
+      if (!hasDiv) divSamples.push(Math.abs(duDx + dvDy));
+      if (!hasVort) vortSamples.push(Math.abs(dvDx - duDy));
+    }
+
+    let sumU = 0;
+    let sumV = 0;
+    let count = 0;
+    for (let dj = -1; dj <= 1; dj++) {
+      const jj = Math.max(0, Math.min(ny - 1, j + dj));
+      const row = jj * nx;
+      for (let di = -1; di <= 1; di++) {
+        const ii = (i + di + nx) % nx;
+        const idx = row + ii;
+        const uN = u[idx];
+        const vN = v[idx];
+        if (!Number.isFinite(uN) || !Number.isFinite(vN)) continue;
+        sumU += uN;
+        sumV += vN;
+        count += 1;
+      }
+    }
+    if (count > 0) {
+      roughUSum += Math.abs(u0 - (sumU / count));
+      roughVSum += Math.abs(v0 - (sumV / count));
+      roughCount += 1;
+    }
+
+    sampleCount += 1;
+  }
+
+  if (!sampleCount) return null;
+  const speedPct = computePercentiles(speedSamples, [0.5, 0.9, 0.99]);
+  const divPct = computePercentiles(divSamples, [0.9, 0.99]);
+  const vortPct = computePercentiles(vortSamples, [0.9, 0.99]);
+  const latBands = {};
+  ['tropics', 'mid', 'polar'].forEach((band) => {
+    const count = bandCounts[band];
+    if (count > 0) {
+      const pct = computePercentiles(bandSamples[band], [0.9, 0.99]);
+      latBands[band] = {
+        meanSpeed: bandSums[band] / count,
+        p90: pct.p90 ?? null,
+        p99: pct.p99 ?? null,
+        ekeMean: bandEkeCounts[band] > 0 ? bandEkeSums[band] / bandEkeCounts[band] : null,
+        sampleCount: count
+      };
+    } else {
+      latBands[band] = {
+        meanSpeed: null,
+        p90: null,
+        p99: null,
+        ekeMean: null,
+        sampleCount: 0
+      };
+    }
+  });
+
+  const roughness = roughCount > 0
+    ? (roughUSum / roughCount) + (roughVSum / roughCount)
+    : null;
+  const ekeMean = ekeCount > 0 ? sumEke / ekeCount : null;
+
+  return {
+    nx,
+    ny,
+    sampleStride,
+    sampleCount,
+    meanSpeed: sumSpeed / sampleCount,
+    maxSpeed,
+    speedPercentiles: speedPct,
+    divAbsPercentiles: divPct,
+    vortAbsPercentiles: vortPct,
+    ekeMean,
+    latBands,
+    roughness
+  };
+};
 const CLOUD_INTEL_RENDER_PARAMS = {
   aLow: 0.95,
   aHigh: 0.70,
@@ -103,27 +316,48 @@ const CLOUD_INTEL_RENDER_PARAMS = {
 const CLOUD_INTEL_RENDER_SCALE = 4;
 const CLOUD_OBS_LON_OFFSET_RAD = 0;
 const CLOUD_OBS_FLIP_X = false;
+const WIND_STREAMLINE_LON_OFFSET_RAD = CLOUD_OBS_LON_OFFSET_RAD;
+const WIND_STREAMLINE_RADIUS_OFFSET_KM = 210;
 
 class Earth {
   constructor(camera, players, { weatherSeed } = {}) {
     this.camera = camera;
     this.weatherSeed = weatherSeed;
     this.earthRadiusKm = 6371; // Earth's radius in kilometers
-    this.geometry = new THREE.SphereGeometry(this.earthRadiusKm, 64, 64);
+    const baseMapTexture = new THREE.TextureLoader().load(earthmap);
+    baseMapTexture.colorSpace = THREE.SRGBColorSpace;
+    baseMapTexture.minFilter = THREE.LinearMipmapLinearFilter;
+    baseMapTexture.magFilter = THREE.LinearFilter;
+    const bumpTexture = new THREE.TextureLoader().load(earthbump);
+    bumpTexture.colorSpace = THREE.NoColorSpace;
+    bumpTexture.minFilter = THREE.LinearMipmapLinearFilter;
+    bumpTexture.magFilter = THREE.LinearFilter;
+    this._textureAnisotropy = 1;
+    this._baseMapTexture = baseMapTexture;
+    this._bumpTexture = bumpTexture;
+    this.geometry = new THREE.SphereGeometry(this.earthRadiusKm, 128, 128);
     this.material = new THREE.MeshPhongMaterial({
-      map: new THREE.TextureLoader().load(earthmap),
-      bumpMap: new THREE.TextureLoader().load(earthbump),
-      bumpScale: 0.05
+      map: baseMapTexture,
+      bumpMap: bumpTexture,
+      bumpScale: 0.04,
+      specular: new THREE.Color(0x222222),
+      shininess: 15
     });
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.scale.set(1, 1, 1); // Ensure it is a perfect sphere
 
     // Create cloud layer using fog.png
     this.cloudGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 200, 512, 512); // Slightly larger than Earth
+    const fogBaseTexture = new THREE.TextureLoader().load(fogTexture);
+    fogBaseTexture.colorSpace = THREE.SRGBColorSpace;
+    fogBaseTexture.minFilter = THREE.LinearMipmapLinearFilter;
+    fogBaseTexture.magFilter = THREE.LinearFilter;
+    this._fogBaseTexture = fogBaseTexture;
     this.cloudMaterial = new THREE.MeshPhongMaterial({
-      map: new THREE.TextureLoader().load(fogTexture),
+      map: fogBaseTexture,
       transparent: true,
-      opacity: 0.9
+      opacity: 0.9,
+      depthWrite: false
     });
     this.cloudMesh = new THREE.Mesh(this.cloudGeometry, this.cloudMaterial);
 
@@ -133,13 +367,17 @@ class Earth {
     this.forecastWeatherField = null;
     this.weatherViewSource = 'truth';
     this.analysisSigma2 = null;
+    this.analysisSigma2Cloud = null;
     this.analysisObsLastSeenSimTimeSeconds = null;
+    this.analysisObsLastSeenCloudSimTimeSeconds = null;
     this._lastSigmaSimTimeSeconds = null;
     this._confidenceCalibrationByPlayerId = new Map();
     this._analysisSyncedFromTruth = false;
     this._analysisNoiseSeed = (this.weatherSeed ?? 0) + 1337;
     this.weatherSensorManager = null;
     this.latestWeatherObservations = new Map();
+    this._radiosondeLaunchHistoryByPlayerId = new Map();
+    this.uplinkHubsByPlayerId = new Map();
     this._weatherSensorsInitialized = false;
     this.stationObsObject = null;
     this.stationObsVisible = true;
@@ -245,6 +483,35 @@ class Earth {
     this.cloudObsMesh.rotation.y = CLOUD_OBS_LON_OFFSET_RAD;
     this.parentObject.add(this.cloudObsMesh);
 
+    this.windStreamlinesVisible = true;
+    this.windStreamlineRenderer = new WindStreamlineRenderer();
+    if (this.windStreamlineRenderer?.texture) {
+      this.windStreamlineRenderer.texture.colorSpace = THREE.SRGBColorSpace;
+      this.windStreamlineRenderer.texture.minFilter = THREE.LinearFilter;
+      this.windStreamlineRenderer.texture.magFilter = THREE.LinearFilter;
+    }
+    this.windStreamlineSource = 'analysis';
+    this.windReferenceCore = null;
+    this._lastWindModelDiagPayload = null;
+    this._lastWindVizDiagPayload = null;
+    this._lastWindTargetsStatus = null;
+    this._lastWindReferenceDiagPayload = null;
+    this._lastWindReferenceComparison = null;
+    this.windStreamlineGeometry = new THREE.SphereGeometry(this.earthRadiusKm + WIND_STREAMLINE_RADIUS_OFFSET_KM, 256, 256);
+    this.windStreamlineMaterial = new THREE.MeshBasicMaterial({
+      map: this.windStreamlineRenderer.texture,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false
+    });
+    this.windStreamlineMesh = new THREE.Mesh(this.windStreamlineGeometry, this.windStreamlineMaterial);
+    this.windStreamlineMesh.visible = this.windStreamlinesVisible;
+    this.windStreamlineMesh.rotation.y = WIND_STREAMLINE_LON_OFFSET_RAD;
+    this.parentObject.add(this.windStreamlineMesh);
+    this._lastWindModelDiagSimTimeSeconds = null;
+    this._lastWindVizDiagSimTimeSeconds = null;
+    this._lastWindReferenceDiagSimTimeSeconds = null;
+
     this.forecastOverlayGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 240, 256, 256);
     this.forecastOverlayMaterial = new THREE.MeshBasicMaterial({
       map: null,
@@ -265,7 +532,11 @@ class Earth {
     this.context = this.canvas.getContext('2d');
 
     this.fogTexture = new THREE.CanvasTexture(this.canvas);
+    this.fogTexture.colorSpace = THREE.SRGBColorSpace;
+    this.fogTexture.minFilter = THREE.LinearFilter;
+    this.fogTexture.magFilter = THREE.LinearFilter;
     this.cloudMaterial.map = this.fogTexture;
+    this.setTextureAnisotropy(this._textureAnisotropy);
 
     // Fill the canvas with the initial fog
     const ctx = this.context;
@@ -429,6 +700,31 @@ class Earth {
     } else if (obsSet.sensorId === 'cloudSat') {
       this._updateCloudIntelFromObservation(obsSet);
       this._cloudIntelNeedsRefresh = true;
+    } else if (obsSet.sensorId === 'soundings') {
+      const pid = String(this._sensorGating?.playerId ?? '');
+      const product = obsSet.products?.u;
+      const mask = product?.mask;
+      const levels = product?.meta?.levels;
+      const levelsCount = Array.isArray(levels) ? levels.length : 0;
+      if (pid && mask && levelsCount > 0 && Number.isFinite(obsSet.t)) {
+        const stationsCount = Math.floor(mask.length / levelsCount);
+        let validStations = 0;
+        for (let s = 0; s < stationsCount; s++) {
+          if (mask[s * levelsCount] > 0) validStations += 1;
+        }
+        const history = this._radiosondeLaunchHistoryByPlayerId.get(pid) ?? [];
+        history.push({ t: obsSet.t, count: validStations });
+        const cutoff = obsSet.t - 86400;
+        let writeIdx = 0;
+        for (let i = 0; i < history.length; i++) {
+          const entry = history[i];
+          if (Number.isFinite(entry?.t) && entry.t >= cutoff) {
+            history[writeIdx++] = entry;
+          }
+        }
+        history.length = writeIdx;
+        this._radiosondeLaunchHistoryByPlayerId.set(pid, history);
+      }
     } else if (obsSet.sensorId === 'groundRadar') {
       const texture = obsSet.products?.radarDbzPpi?.data;
       this.updateRadarOverlayTexture(texture);
@@ -570,11 +866,12 @@ class Earth {
           yObs,
           sigmaO2: 0.05 * 0.05,
           sigmaA0: SIGMA_A0_CLOUD,
-          weight: w
+          weight: w,
+          sigma2Array: this.analysisSigma2Cloud
         });
         cloudCov[k] = Math.min(1, Math.max(0, updated));
         if (fields.cloudHigh) fields.cloudHigh[k] = cloudCov[k];
-        this._markAnalysisObsSeen(k, obsSet.t);
+        this._markAnalysisObsSeen(k, obsSet.t, this.analysisObsLastSeenCloudSimTimeSeconds);
         did = true;
       }
     }
@@ -597,11 +894,12 @@ class Earth {
           yObs,
           sigmaO2: 0.05 * 0.05,
           sigmaA0: SIGMA_A0_CLOUD,
-          weight: w
+          weight: w,
+          sigma2Array: this.analysisSigma2Cloud
         });
         cloudCov[k] = Math.min(1, Math.max(0, updated));
         if (fields.cloudLow) fields.cloudLow[k] = cloudCov[k];
-        this._markAnalysisObsSeen(k, obsSet.t);
+        this._markAnalysisObsSeen(k, obsSet.t, this.analysisObsLastSeenCloudSimTimeSeconds);
         did = true;
       }
     }
@@ -629,7 +927,8 @@ class Earth {
             yObs,
             sigmaO2,
             sigmaA0: SIGMA_A0_TAU,
-            weight: w
+            weight: w,
+            sigma2Array: this.analysisSigma2Cloud
           });
           const tauTarget = Math.min(50, Math.max(0, updatedTau));
           const f = Math.min(4.0, Math.max(0.25, tauTarget / Math.max(1e-3, tauAnal)));
@@ -642,7 +941,7 @@ class Earth {
             qi[idx1] = Math.min(QCQI_MAX, Math.max(0, qi[idx1] * f));
           }
           tauField[k] = tauTarget;
-          this._markAnalysisObsSeen(k, obsSet.t);
+          this._markAnalysisObsSeen(k, obsSet.t, this.analysisObsLastSeenCloudSimTimeSeconds);
           did = true;
         }
       }
@@ -671,7 +970,8 @@ class Earth {
             yObs,
             sigmaO2,
             sigmaA0: SIGMA_A0_TAU,
-            weight: w
+            weight: w,
+            sigma2Array: this.analysisSigma2Cloud
           });
           const tauTarget = Math.min(50, Math.max(0, updatedTau));
           const f = Math.min(4.0, Math.max(0.25, tauTarget / Math.max(1e-3, tauAnal)));
@@ -684,7 +984,7 @@ class Earth {
             qi[idx1] = Math.min(QCQI_MAX, Math.max(0, qi[idx1] * f));
           }
           tauField[k] = tauTarget;
-          this._markAnalysisObsSeen(k, obsSet.t);
+          this._markAnalysisObsSeen(k, obsSet.t, this.analysisObsLastSeenCloudSimTimeSeconds);
           did = true;
         }
       }
@@ -860,21 +1160,24 @@ class Earth {
     return { updatedCount, levelIndex };
   }
 
-  _markAnalysisObsSeen(k, t) {
-    if (!this.analysisObsLastSeenSimTimeSeconds) return;
+  _markAnalysisObsSeen(k, t, lastSeenArray = null) {
+    const arr = lastSeenArray ?? this.analysisObsLastSeenSimTimeSeconds;
+    if (!arr) return;
     if (!Number.isFinite(k) || !Number.isFinite(t)) return;
-    const prev = this.analysisObsLastSeenSimTimeSeconds[k];
+    const prev = arr[k];
     if (!Number.isFinite(prev) || t > prev) {
-      this.analysisObsLastSeenSimTimeSeconds[k] = t;
+      arr[k] = t;
     }
   }
 
-  _kalmanUpdate({ value, k, yObs, sigmaO2, sigmaA0, weight }) {
-    const sigmaA2 = this.analysisSigma2[k] * sigmaA0 * sigmaA0;
+  _kalmanUpdate({ value, k, yObs, sigmaO2, sigmaA0, weight, sigma2Array = null }) {
+    const arr = sigma2Array && sigma2Array.length > k ? sigma2Array : this.analysisSigma2;
+    if (!arr || !Number.isFinite(arr[k])) return value;
+    const sigmaA2 = arr[k] * sigmaA0 * sigmaA0;
     const K = clamp01(sigmaA2 / (sigmaA2 + sigmaO2));
     const updated = value + K * (yObs - value) * weight;
-    const nextSigma2 = this.analysisSigma2[k] * (1 - K * weight);
-    this.analysisSigma2[k] = Math.min(SIGMA2_MAX, Math.max(SIGMA2_MIN, nextSigma2));
+    const nextSigma2 = arr[k] * (1 - K * weight);
+    arr[k] = Math.min(SIGMA2_MAX, Math.max(SIGMA2_MIN, nextSigma2));
     return updated;
   }
 
@@ -885,12 +1188,16 @@ class Earth {
     const lonDeg = data?.lonDeg;
     const count = latDeg?.length ?? 0;
     if (!count) return null;
-    const radiusKm = product?.meta?.stationRadiusKm ?? 300;
+    const radiusByStation = product?.meta?.stationRadiusKmByStation;
+    const usePerStation = radiusByStation && radiusByStation.length === count;
+    const defaultRadiusKm = Number.isFinite(product?.meta?.stationRadiusKm)
+      ? product.meta.stationRadiusKm
+      : 300;
     const grid = analysisCore.grid;
     if (!grid) return null;
 
-    const key = `${grid.nx}:${grid.ny}:${radiusKm}:${count}`;
-    if (this._stationInfluenceCache?.key === key) return this._stationInfluenceCache;
+    const key = `${grid.nx}:${grid.ny}:${count}:${Math.round(defaultRadiusKm)}`;
+    if (!usePerStation && this._stationInfluenceCache?.key === key) return this._stationInfluenceCache;
 
     const { nx, ny, cellLonDeg, cellLatDeg } = grid;
     const gridLat = grid.latDeg;
@@ -902,14 +1209,18 @@ class Earth {
     for (let i = 0; i < count; i++) {
       const lat = latDeg[i];
       const lon = lonDeg[i];
+      const radiusKm = usePerStation
+        ? radiusByStation[i]
+        : defaultRadiusKm;
+      const radiusUsed = Number.isFinite(radiusKm) ? radiusKm : defaultRadiusKm;
       const latRad = lat * degToRad;
       const lonRad = lon * degToRad;
 
       const jCenter = Math.round((90 - lat) / cellLatDeg - 0.5);
       const iCenter = Math.round((lon + 180) / cellLonDeg - 0.5);
-      const dJ = Math.ceil(radiusKm / (111 * cellLatDeg));
+      const dJ = Math.ceil(radiusUsed / (111 * cellLatDeg));
       const cosLat = Math.max(0.1, Math.abs(Math.cos(latRad)));
-      const dI = Math.ceil(radiusKm / Math.max(1e-6, 111 * cellLonDeg * cosLat));
+      const dI = Math.ceil(radiusUsed / Math.max(1e-6, 111 * cellLonDeg * cosLat));
 
       const indices = [];
       const weights = [];
@@ -926,8 +1237,8 @@ class Earth {
           const dLat = latCellRad - latRad;
           const dLon = wrapRadToPi(lonCellRad - lonRad);
           const distKm = earthRadiusKm * Math.sqrt(dLat * dLat + Math.pow(Math.cos(latRad) * dLon, 2));
-          if (distKm > radiusKm) continue;
-          const w = radialWeight(distKm, radiusKm);
+          if (distKm > radiusUsed) continue;
+          const w = radialWeight(distKm, radiusUsed);
           if (w <= 0) continue;
           indices.push(rowOffset + ii);
           weights.push(w);
@@ -940,7 +1251,10 @@ class Earth {
       };
     }
 
-    this._stationInfluenceCache = { key, entries, radiusKm };
+    if (usePerStation) {
+      return { entries, radiusKmByStation: radiusByStation };
+    }
+    this._stationInfluenceCache = { key, entries, radiusKm: defaultRadiusKm };
     return this._stationInfluenceCache;
   }
 
@@ -1025,6 +1339,352 @@ class Earth {
       this._cloudIntelNeedsRefresh = true;
       this._refreshCloudIntelTextureForPlayer(this._sensorGating?.playerId);
     }
+  }
+
+  setWindStreamlinesVisible(visible) {
+    const next = Boolean(visible);
+    if (this.windStreamlinesVisible === next) return;
+    this.windStreamlinesVisible = next;
+    if (this.windStreamlineMesh) this.windStreamlineMesh.visible = next;
+    if (next) {
+      this.windStreamlineRenderer?.reset?.();
+    }
+  }
+
+  setWindStreamlineSource(source) {
+    this.windStreamlineSource = source === 'reference' ? 'reference' : 'analysis';
+  }
+
+  setWindReferenceWindCore(coreLike) {
+    this.windReferenceCore = coreLike ?? null;
+  }
+
+  _maybeLogWindDiagnostics(simTimeSeconds) {
+    if (!Number.isFinite(simTimeSeconds)) return;
+    const modelDue = this._lastWindModelDiagSimTimeSeconds == null
+      || (simTimeSeconds - this._lastWindModelDiagSimTimeSeconds) >= WIND_MODEL_DIAGNOSTICS_CADENCE_SECONDS;
+    let updated = false;
+    if (modelDue) {
+      if (this._logWindModelDiagnostics(simTimeSeconds)) {
+        this._lastWindModelDiagSimTimeSeconds = simTimeSeconds;
+        updated = true;
+      }
+    }
+    const referenceDue = this._lastWindReferenceDiagSimTimeSeconds == null
+      || (simTimeSeconds - this._lastWindReferenceDiagSimTimeSeconds) >= WIND_MODEL_DIAGNOSTICS_CADENCE_SECONDS;
+    if (referenceDue && this.windReferenceCore?.ready) {
+      if (this._logWindReferenceDiagnostics(simTimeSeconds)) {
+        this._lastWindReferenceDiagSimTimeSeconds = simTimeSeconds;
+        updated = true;
+      }
+    }
+
+    const vizDue = this._lastWindVizDiagSimTimeSeconds == null
+      || (simTimeSeconds - this._lastWindVizDiagSimTimeSeconds) >= WIND_VIZ_DIAGNOSTICS_CADENCE_SECONDS;
+    if (vizDue && this.windStreamlinesVisible) {
+      if (this._logWindVizDiagnostics(simTimeSeconds)) {
+        this._lastWindVizDiagSimTimeSeconds = simTimeSeconds;
+        updated = true;
+      }
+    }
+    if (updated) {
+      this._logWindTargetsStatus(simTimeSeconds);
+      this._logWindReferenceComparison(simTimeSeconds);
+    }
+  }
+
+  _logWindModelDiagnostics(simTimeSeconds) {
+    const core = this.analysisWeatherField?.core;
+    if (!core?.ready) return false;
+    const { grid, fields } = core;
+    if (!grid || !fields?.u || !fields?.v) return false;
+    const diag = computeWindDiagnostics({
+      grid,
+      u: fields.u,
+      v: fields.v,
+      div: fields.div,
+      vort: fields.vort,
+      sampleTarget: 20000
+    });
+    if (!diag) return false;
+    const speedPct = diag.speedPercentiles || {};
+    const meanSpeed = diag.meanSpeed;
+    const maxSpeed = diag.maxSpeed;
+    const dynMaxWind = core?.dynParams?.maxWind ?? null;
+    const speedRatio = Number.isFinite(dynMaxWind) && dynMaxWind > 0 ? speedPct.p99 / dynMaxWind : null;
+    const flags = [];
+    if (meanSpeed < WIND_REALISM_TARGETS.model.meanMin) flags.push('mean_too_low');
+    if (meanSpeed > WIND_REALISM_TARGETS.model.meanMax) flags.push('mean_too_high');
+    if (speedPct.p90 < WIND_REALISM_TARGETS.model.p90Min) flags.push('p90_too_low');
+    if (speedPct.p90 > WIND_REALISM_TARGETS.model.p90Max) flags.push('p90_too_high');
+    if (speedPct.p99 < WIND_REALISM_TARGETS.model.p99Min) flags.push('p99_too_low');
+    if (speedPct.p99 > WIND_REALISM_TARGETS.model.p99Max) flags.push('p99_too_high');
+    if (maxSpeed > WIND_REALISM_TARGETS.model.maxMax) flags.push('max_too_high');
+
+    const payload = {
+      source: 'analysis',
+      ...diag,
+      dynMaxWind,
+      speedToMaxWindRatio: speedRatio,
+      modelDtSeconds: core.modelDt ?? null,
+      flags
+    };
+    this._lastWindModelDiagPayload = payload;
+    return this.logWeatherEvent?.(
+      'windModelDiagnostics',
+      payload,
+      { simTimeSeconds, core }
+    );
+  }
+
+  _logWindReferenceDiagnostics(simTimeSeconds) {
+    const core = this.windReferenceCore;
+    if (!core?.ready) return false;
+    const { grid, fields } = core;
+    if (!grid || !fields?.u || !fields?.v) return false;
+    const diag = computeWindDiagnostics({
+      grid,
+      u: fields.u,
+      v: fields.v,
+      div: fields.div,
+      vort: fields.vort,
+      sampleTarget: 20000
+    });
+    if (!diag) return false;
+    const payload = {
+      source: 'reference',
+      ...diag
+    };
+    this._lastWindReferenceDiagPayload = payload;
+    return this.logWeatherEvent?.(
+      'windReferenceDiagnostics',
+      payload,
+      { simTimeSeconds }
+    );
+  }
+
+  _logWindReferenceComparison(simTimeSeconds) {
+    if (!this._lastWindModelDiagPayload || !this._lastWindReferenceDiagPayload) return false;
+    const model = this._lastWindModelDiagPayload;
+    const reference = this._lastWindReferenceDiagPayload;
+    const diff = (a, b) => (Number.isFinite(a) && Number.isFinite(b) ? a - b : null);
+    const modelPct = model.speedPercentiles || {};
+    const refPct = reference.speedPercentiles || {};
+    const deltaLatBands = {};
+    ['tropics', 'mid', 'polar'].forEach((band) => {
+      const m = model.latBands?.[band] || {};
+      const r = reference.latBands?.[band] || {};
+      deltaLatBands[band] = {
+        meanSpeed: diff(m.meanSpeed, r.meanSpeed),
+        p90: diff(m.p90, r.p90),
+        p99: diff(m.p99, r.p99),
+        ekeMean: diff(m.ekeMean, r.ekeMean)
+      };
+    });
+    const delta = {
+      meanSpeed: diff(model.meanSpeed, reference.meanSpeed),
+      p90: diff(modelPct.p90, refPct.p90),
+      p99: diff(modelPct.p99, refPct.p99),
+      maxSpeed: diff(model.maxSpeed, reference.maxSpeed),
+      ekeMean: diff(model.ekeMean, reference.ekeMean),
+      roughness: diff(model.roughness, reference.roughness),
+      latBands: deltaLatBands,
+      divAbsPercentiles: {
+        p90: diff(model.divAbsPercentiles?.p90, reference.divAbsPercentiles?.p90),
+        p99: diff(model.divAbsPercentiles?.p99, reference.divAbsPercentiles?.p99)
+      },
+      vortAbsPercentiles: {
+        p90: diff(model.vortAbsPercentiles?.p90, reference.vortAbsPercentiles?.p90),
+        p99: diff(model.vortAbsPercentiles?.p99, reference.vortAbsPercentiles?.p99)
+      }
+    };
+    const payload = {
+      model: {
+        meanSpeed: model.meanSpeed,
+        p90: modelPct.p90 ?? null,
+        p99: modelPct.p99 ?? null,
+        maxSpeed: model.maxSpeed,
+        ekeMean: model.ekeMean ?? null,
+        roughness: model.roughness ?? null,
+        latBands: model.latBands ?? null,
+        divAbsPercentiles: model.divAbsPercentiles ?? null,
+        vortAbsPercentiles: model.vortAbsPercentiles ?? null
+      },
+      reference: {
+        meanSpeed: reference.meanSpeed,
+        p90: refPct.p90 ?? null,
+        p99: refPct.p99 ?? null,
+        maxSpeed: reference.maxSpeed,
+        ekeMean: reference.ekeMean ?? null,
+        roughness: reference.roughness ?? null,
+        latBands: reference.latBands ?? null,
+        divAbsPercentiles: reference.divAbsPercentiles ?? null,
+        vortAbsPercentiles: reference.vortAbsPercentiles ?? null
+      },
+      delta
+    };
+    this._lastWindReferenceComparison = payload;
+    return this.logWeatherEvent?.(
+      'windReferenceComparison',
+      payload,
+      { simTimeSeconds }
+    );
+  }
+
+  _logWindVizDiagnostics(simTimeSeconds) {
+    const diag = this.windStreamlineRenderer?.getDiagnostics?.();
+    if (!diag) return false;
+    const field = diag.field;
+    const frame = diag.frame;
+    if (!field && !frame) return false;
+    const flags = [];
+    const stepMeanPx = field?.meanStepPx ?? null;
+    const stepP99Px = field?.stepPercentiles?.p99 ?? null;
+    const clippedFrac = field?.clippedFrac ?? null;
+    const outOfBoundsFrac = frame?.outOfBoundsFrac ?? null;
+    if (Number.isFinite(stepMeanPx) && stepMeanPx < WIND_REALISM_TARGETS.viz.stepMeanMinPx) {
+      flags.push('step_mean_low');
+    }
+    if (Number.isFinite(stepMeanPx) && stepMeanPx > WIND_REALISM_TARGETS.viz.stepMeanMaxPx) {
+      flags.push('step_mean_high');
+    }
+    if (Number.isFinite(stepP99Px) && stepP99Px > WIND_REALISM_TARGETS.viz.stepP99MaxPx) {
+      flags.push('step_p99_high');
+    }
+    if (Number.isFinite(clippedFrac) && clippedFrac > WIND_REALISM_TARGETS.viz.clippedMaxFrac) {
+      flags.push('clipped_high');
+    }
+    if (Number.isFinite(outOfBoundsFrac) && outOfBoundsFrac > WIND_REALISM_TARGETS.viz.outOfBoundsMaxFrac) {
+      flags.push('churn_high');
+    }
+
+    const payload = {
+      field,
+      frame,
+      flags
+    };
+    this._lastWindVizDiagPayload = payload;
+    return this.logWeatherEvent?.(
+      'windVizDiagnostics',
+      payload,
+      { simTimeSeconds }
+    );
+  }
+
+  _logWindTargetsStatus(simTimeSeconds) {
+    if (!this._lastWindModelDiagPayload || !this._lastWindVizDiagPayload) return false;
+    const modelPayload = this._lastWindModelDiagPayload;
+    const vizPayload = this._lastWindVizDiagPayload;
+    const speedPct = modelPayload.speedPercentiles || {};
+    const meanSpeed = modelPayload.meanSpeed;
+    const maxSpeed = modelPayload.maxSpeed;
+    const p90 = speedPct.p90 ?? null;
+    const p99 = speedPct.p99 ?? null;
+    const stepMeanPx = vizPayload.field?.meanStepPx ?? null;
+    const stepP99Px = vizPayload.field?.stepPercentiles?.p99 ?? null;
+    const outOfBoundsFrac = vizPayload.frame?.outOfBoundsFrac ?? null;
+    const clippedFrac = vizPayload.field?.clippedFrac ?? null;
+
+    const pass = {
+      model: {
+        mean: Number.isFinite(meanSpeed)
+          ? meanSpeed >= WIND_REALISM_TARGETS.model.meanMin && meanSpeed <= WIND_REALISM_TARGETS.model.meanMax
+          : false,
+        p90: Number.isFinite(p90)
+          ? p90 >= WIND_REALISM_TARGETS.model.p90Min && p90 <= WIND_REALISM_TARGETS.model.p90Max
+          : false,
+        p99: Number.isFinite(p99)
+          ? p99 >= WIND_REALISM_TARGETS.model.p99Min && p99 <= WIND_REALISM_TARGETS.model.p99Max
+          : false,
+        max: Number.isFinite(maxSpeed)
+          ? maxSpeed <= WIND_REALISM_TARGETS.model.maxMax
+          : false
+      },
+      viz: {
+        stepMean: Number.isFinite(stepMeanPx)
+          ? stepMeanPx >= WIND_REALISM_TARGETS.viz.stepMeanMinPx && stepMeanPx <= WIND_REALISM_TARGETS.viz.stepMeanMaxPx
+          : false,
+        stepP99: Number.isFinite(stepP99Px)
+          ? stepP99Px <= WIND_REALISM_TARGETS.viz.stepP99MaxPx
+          : false,
+        churn: Number.isFinite(outOfBoundsFrac)
+          ? outOfBoundsFrac <= WIND_REALISM_TARGETS.viz.outOfBoundsMaxFrac
+          : false,
+        clipped: Number.isFinite(clippedFrac)
+          ? clippedFrac <= WIND_REALISM_TARGETS.viz.clippedMaxFrac
+          : false
+      },
+      overall: false
+    };
+    pass.overall = Boolean(
+      pass.model.mean
+      && pass.model.p90
+      && pass.model.p99
+      && pass.model.max
+      && pass.viz.stepMean
+      && pass.viz.stepP99
+      && pass.viz.churn
+      && pass.viz.clipped
+    );
+
+    const failingReasons = [];
+    if (!pass.model.mean) {
+      if (Number.isFinite(meanSpeed) && meanSpeed < WIND_REALISM_TARGETS.model.meanMin) failingReasons.push('model_mean_low');
+      else failingReasons.push('model_mean_high');
+    }
+    if (!pass.model.p90) {
+      if (Number.isFinite(p90) && p90 < WIND_REALISM_TARGETS.model.p90Min) failingReasons.push('model_p90_low');
+      else failingReasons.push('model_p90_high');
+    }
+    if (!pass.model.p99) {
+      if (Number.isFinite(p99) && p99 < WIND_REALISM_TARGETS.model.p99Min) failingReasons.push('model_p99_low');
+      else failingReasons.push('model_p99_high');
+    }
+    if (!pass.model.max) failingReasons.push('model_max_high');
+    if (!pass.viz.stepMean) {
+      if (Number.isFinite(stepMeanPx) && stepMeanPx < WIND_REALISM_TARGETS.viz.stepMeanMinPx) failingReasons.push('viz_step_mean_low');
+      else failingReasons.push('viz_step_mean_high');
+    }
+    if (!pass.viz.stepP99) failingReasons.push('viz_step_p99_high');
+    if (!pass.viz.churn) failingReasons.push('viz_churn_high');
+    if (!pass.viz.clipped) failingReasons.push('viz_clipped_high');
+
+    const payload = {
+      targets: WIND_REALISM_TARGETS,
+      model: {
+        meanSpeed,
+        p90,
+        p99,
+        maxSpeed
+      },
+      viz: {
+        stepMeanPx,
+        stepP99Px,
+        outOfBoundsFrac,
+        clippedFrac
+      },
+      pass,
+      failingReasons
+    };
+    this._lastWindTargetsStatus = payload;
+    const core = this.analysisWeatherField?.core;
+    return this.logWeatherEvent?.(
+      'windTargetsStatus',
+      payload,
+      { simTimeSeconds, core }
+    );
+  }
+
+  getWindTargetsStatus() {
+    return this._lastWindTargetsStatus;
+  }
+
+  getWindReferenceDiagnostics() {
+    return this._lastWindReferenceDiagPayload;
+  }
+
+  getWindReferenceComparison() {
+    return this._lastWindReferenceComparison;
   }
 
   setRotationForSimTime(simTimeSeconds) {
@@ -1795,6 +2455,24 @@ class Earth {
     };
   }
 
+  getRadiosondeLaunchesLast24h(playerId, nowSimTimeSeconds = null) {
+    const pid = playerId != null ? String(playerId) : '';
+    if (!pid) return 0;
+    const now = Number.isFinite(nowSimTimeSeconds) ? nowSimTimeSeconds : this._lastSimTimeSeconds;
+    if (!Number.isFinite(now)) return 0;
+    const history = this._radiosondeLaunchHistoryByPlayerId.get(pid);
+    if (!history || history.length === 0) return 0;
+    const cutoff = now - 86400;
+    let sum = 0;
+    for (let i = 0; i < history.length; i++) {
+      const entry = history[i];
+      if (Number.isFinite(entry?.t) && entry.t >= cutoff) {
+        sum += Number.isFinite(entry.count) ? entry.count : 0;
+      }
+    }
+    return sum;
+  }
+
   setForecastOverlayVisible(visible) {
     this.forecastOverlayVisible = Boolean(visible);
     if (!this.forecastOverlayVisible) {
@@ -1875,7 +2553,7 @@ class Earth {
         valueMin: 0,
         valueMax: 1,
         alphaScale: 0.9,
-        alphaByValue: true,
+        alphaByValue: false,
         colorMap: CONFIDENCE_COLOR_MAP,
         scale: 2
       };
@@ -2103,6 +2781,10 @@ class Earth {
 
   getGroundRadarOriginLatLonRad(simTimeSeconds) {
     void simTimeSeconds;
+    const radarSite = this._sensorGating?.radarSites?.[0];
+    if (radarSite && Number.isFinite(radarSite.latRad) && Number.isFinite(radarSite.lonRad)) {
+      return { latRad: radarSite.latRad, lonRad: radarSite.lonRad, source: 'radarHub' };
+    }
     const hq = this._sensorGating?.hqSites?.[0];
     if (hq && Number.isFinite(hq.latRad) && Number.isFinite(hq.lonRad)) {
       return { latRad: hq.latRad, lonRad: hq.lonRad, source: 'hq' };
@@ -2352,6 +3034,17 @@ class Earth {
       simTimeSeconds
     });
     this._tickCloudIntel(simTimeSeconds);
+    if (this.windStreamlinesVisible) {
+      const sourceCore = this.windStreamlineSource === 'reference' && this.windReferenceCore?.ready
+        ? this.windReferenceCore
+        : this.analysisWeatherField?.core;
+      this.windStreamlineRenderer?.update({
+        core: sourceCore,
+        simTimeSeconds,
+        realDtSeconds
+      });
+    }
+    this._maybeLogWindDiagnostics(simTimeSeconds);
   }
 
   _syncAnalysisFromTruthIfReady() {
@@ -2367,8 +3060,12 @@ class Earth {
     const N = analysisCore.grid.count;
     this.analysisSigma2 = new Float32Array(N);
     this.analysisSigma2.fill(SIGMA2_INIT);
+    this.analysisSigma2Cloud = new Float32Array(N);
+    this.analysisSigma2Cloud.fill(SIGMA2_INIT);
     this.analysisObsLastSeenSimTimeSeconds = new Float32Array(N);
     this.analysisObsLastSeenSimTimeSeconds.fill(-1e9);
+    this.analysisObsLastSeenCloudSimTimeSeconds = new Float32Array(N);
+    this.analysisObsLastSeenCloudSimTimeSeconds.fill(-1e9);
     this._lastSigmaSimTimeSeconds = null;
 
     this._analysisSyncedFromTruth = true;
@@ -2436,26 +3133,29 @@ class Earth {
   }
 
   _updateAnalysisSigma2(simTimeSeconds) {
-    if (!this.analysisSigma2 || !Number.isFinite(simTimeSeconds)) return;
+    if (!Number.isFinite(simTimeSeconds)) return;
     if (this._lastSigmaSimTimeSeconds == null) {
       this._lastSigmaSimTimeSeconds = simTimeSeconds;
       return;
     }
     const dt = simTimeSeconds - this._lastSigmaSimTimeSeconds;
     if (!(dt > 0)) return;
-    const a = this.analysisSigma2;
-    const lastSeen = this.analysisObsLastSeenSimTimeSeconds;
-    const haveLastSeen = lastSeen && lastSeen.length === a.length;
-    for (let i = 0; i < a.length; i++) {
-      const seen = haveLastSeen ? lastSeen[i] : -1e9;
-      const age = simTimeSeconds - seen;
-      const stale01 = clamp01(age / OBS_STALE_SECONDS);
-      const rate = lerp(SIGMA2_GROWTH_RATE_FRESH_PER_SEC, SIGMA2_GROWTH_RATE_STALE_PER_SEC, stale01);
-      let v = a[i] + rate * dt;
-      if (v < SIGMA2_MIN) v = SIGMA2_MIN;
-      if (v > SIGMA2_MAX) v = SIGMA2_MAX;
-      a[i] = v;
-    }
+    const updateSigma = (arr, lastSeenArr) => {
+      if (!arr || !arr.length) return;
+      const haveLastSeen = lastSeenArr && lastSeenArr.length === arr.length;
+      for (let i = 0; i < arr.length; i++) {
+        const seen = haveLastSeen ? lastSeenArr[i] : -1e9;
+        const age = simTimeSeconds - seen;
+        const stale01 = clamp01(age / OBS_STALE_SECONDS);
+        const rate = lerp(SIGMA2_GROWTH_RATE_FRESH_PER_SEC, SIGMA2_GROWTH_RATE_STALE_PER_SEC, stale01);
+        let v = arr[i] + rate * dt;
+        if (v < SIGMA2_MIN) v = SIGMA2_MIN;
+        if (v > SIGMA2_MAX) v = SIGMA2_MAX;
+        arr[i] = v;
+      }
+    };
+    updateSigma(this.analysisSigma2, this.analysisObsLastSeenSimTimeSeconds);
+    updateSigma(this.analysisSigma2Cloud, this.analysisObsLastSeenCloudSimTimeSeconds);
 
     this._lastSigmaSimTimeSeconds = simTimeSeconds;
   }
@@ -2974,7 +3674,9 @@ class Earth {
     this._analysisSyncedFromTruth = false;
     this._analysisNoiseSeed = seed + 1337;
     this.analysisSigma2 = null;
+    this.analysisSigma2Cloud = null;
     this.analysisObsLastSeenSimTimeSeconds = null;
+    this.analysisObsLastSeenCloudSimTimeSeconds = null;
     this._lastSigmaSimTimeSeconds = null;
     this._lastAssimilatedObsKeyBySensor = new Map();
     this._stationInfluenceCache = null;
@@ -2984,6 +3686,23 @@ class Earth {
     this.forecastHistoryByPlayerId = new Map();
     this._forecastDisplayPlayerId = null;
     this._applyForecastOverlayTexture(null);
+  }
+
+  setTextureAnisotropy(anisotropy) {
+    const value = Number.isFinite(anisotropy) ? Math.max(1, Math.floor(anisotropy)) : 1;
+    this._textureAnisotropy = value;
+    const apply = (texture) => {
+      if (!texture) return;
+      texture.anisotropy = value;
+      texture.needsUpdate = true;
+    };
+    apply(this._baseMapTexture);
+    apply(this._bumpTexture);
+    apply(this._fogBaseTexture);
+    apply(this.fogTexture);
+    apply(this.windStreamlineRenderer?.texture);
+    apply(this.cloudObsMaterial?.map);
+    apply(this.forecastOverlayMaterial?.map);
   }
 
   startWeatherLogCapture(options) {

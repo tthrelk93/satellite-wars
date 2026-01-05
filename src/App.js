@@ -6,10 +6,12 @@ import Earth from './Earth';
 import { sampleV2AtLatLonSigma } from './sensors/radar/radarSampleCpu';
 import { DEFAULT_GROUND_DOPPLER_SPECS } from './sensors/radar/radarSpecs';
 import HQ from './HQ';
+import UplinkHub from './UplinkHub';
 import Player from './Player';
 import { UPKEEP_PER_SAT, INCOME_PER_COMM_IN_LINK, INCOME_PER_IMAGING_IN_LINK, BASE_INCOME_PER_TURN, MU_EARTH, RE_M, OMEGA_EARTH, LOSSES_MPS, DV_REF_MPS, DV_EXPONENT, COMM_RANGE_KM, SPACE_LOS_EPS, GROUND_LOS_EPS, CLOUD_WATCH_GRID_LON_OFFSET_RAD } from './constants';
 import SimClock from './SimClock';
 import { solarDeclination } from './weather/solar';
+import { loadNullschoolWind } from './weather/reference/loadNullschoolWind';
 
 import { EventBus } from './EventBus';
 import { TurnManager, AP_MAX } from './TurnManager';
@@ -30,12 +32,15 @@ import {
     Box,
     Typography,
     Paper,
+    Tooltip,
     Table,
     TableBody,
     TableCell,
     TableContainer,
     TableHead,
-    TableRow
+    TableRow,
+    ToggleButton,
+    ToggleButtonGroup
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -172,7 +177,8 @@ const AUTO_WARNING_CONFIG = {
     }
 };
 const SERVICE_RADIUS_KM = 2500;
-const DOPPLER_RADAR_RADIUS_KM = 350;
+const RADAR_RADIUS_KM = 350;
+const LOCAL_BACKHAUL_RADIUS_KM = 800;
 const RADAR_CADENCE_SECONDS = 300;
 const EVENT_SAMPLE_INTERVAL_SECONDS = 600;
 const EVENT_GAP_SECONDS = EVENT_SAMPLE_INTERVAL_SECONDS * 2;
@@ -239,6 +245,15 @@ const PRECISION_CONF_START = 0.6;
 const PRECISION_CONF_FULL = 0.9;
 const PRECISION_AREA_FULL_FRAC = 0.05;
 const PRECISION_AREA_NONE_FRAC = 0.20;
+const POSTMORTEM_HINT_IOU = 0.05;
+const TOO_BROAD_AREA_FRAC = 0.20;
+const TIME_FUZZ_SECONDS = 1800;
+const STREAK_BONUS_PER_HIT = 0.03;
+const STREAK_BONUS_CAP = 0.15;
+const DAILY_GOAL_HITS = 3;
+const DAILY_GOAL_REP_BONUS = 5;
+const FORECAST_REPORT_MAX_RUNS = 10;
+const FORECAST_REPORT_WINDOW_HOURS = 6;
 const PENALTY = {
     falseAlarmMoney: {
         heavyPrecip: 1_000_000,
@@ -262,6 +277,22 @@ const PENALTY = {
     }
 };
 
+const DEFAULT_TUNING = {
+    iouMatchMin: IOU_MATCH_MIN,
+    minComponentCells: AUTO_WARNING_CONFIG.minComponentCells,
+    areaCapsByHazardByLead: JSON.parse(JSON.stringify(AUTO_WARNING_CONFIG.maxAreaFracByHazardByLead)),
+    thresholdsByHazard: {
+        heavyPrecip: AUTO_WARNING_CONFIG.hazards.heavyPrecip.threshold,
+        highWinds: AUTO_WARNING_CONFIG.hazards.highWinds.threshold,
+        severeStormRisk: AUTO_WARNING_CONFIG.hazards.severeStormRisk.threshold
+    },
+    confidence: {
+        precisionBonusMax: PRECISION_BONUS_MAX,
+        precisionConfStart: PRECISION_CONF_START,
+        precisionConfFull: PRECISION_CONF_FULL
+    }
+};
+
 const App = () => {
     const mountRef = useRef(null);
     const [gameMode, setGameMode] = useState(null); // 'solo' or 'pvp'
@@ -270,11 +301,17 @@ const App = () => {
     const envSeedParam = process.env.REACT_APP_WEATHER_SEED;
     const fallbackSeed = Number.isFinite(Number.parseInt(envSeedParam, 10)) ? envSeedParam : '12345';
     const initialSeed = Number.isFinite(Number.parseInt(initialSeedParam, 10)) ? initialSeedParam : fallbackSeed;
+    const windRefEnabled = params.get('windRef') === '1';
     const [showMenu, setShowMenu] = useState(false);
     const [showSatPanel, setShowSatPanel] = useState(false);
-    const [showSatListPanel, setShowSatListPanel] = useState(false);
+    const [showSatListPanel, setShowSatListPanel] = useState(true);
+    const [showInfoPanel, setShowInfoPanel] = useState(true);
+    const [showForecastPanel, setShowForecastPanel] = useState(true);
     const [showFogLayer, setShowFogLayer] = useState(true);
     const [showWeatherLayer, setShowWeatherLayer] = useState(true);
+    const [showWindStreamlines, setShowWindStreamlines] = useState(true);
+    const [windStreamlineSource, setWindStreamlineSource] = useState('analysis');
+    const [windRefStatus, setWindRefStatus] = useState({ loading: false, loaded: false, error: null });
     const [weatherViewSource, setWeatherViewSource] = useState('truth');
     const [showStationObs, setShowStationObs] = useState(true);
     const [showCloudObs, setShowCloudObs] = useState(true);
@@ -295,12 +332,25 @@ const App = () => {
     });
     const [warningsByPlayerId, setWarningsByPlayerId] = useState({});
     const [draftWarningsByPlayerId, setDraftWarningsByPlayerId] = useState({});
-    const [alertsHistory, setAlertsHistory] = useState([]);
-    const [alertsUnreadCount, setAlertsUnreadCount] = useState(0);
-    const [showAlertsPanel, setShowAlertsPanel] = useState(false);
-    const [showDebugPanel, setShowDebugPanel] = useState(true);
+    const [autoWarningDiagnosticsByPlayerId, setAutoWarningDiagnosticsByPlayerId] = useState({});
+	const [activePostmortem, setActivePostmortem] = useState(null);
+	const [showPostmortemPanel, setShowPostmortemPanel] = useState(true);
+	const [postmortemQueueVersion, setPostmortemQueueVersion] = useState(0);
+    const [forecastReportVersion, setForecastReportVersion] = useState(0);
+    const [tuningParams, setTuningParams] = useState(DEFAULT_TUNING);
+	const [uplinkHubsVersion, setUplinkHubsVersion] = useState(0);
+	const [selectedUplinkHubId, setSelectedUplinkHubId] = useState(null);
+	const [alertsHistory, setAlertsHistory] = useState([]);
+	const [alertsUnreadCount, setAlertsUnreadCount] = useState(0);
+	const [showAlertsPanel, setShowAlertsPanel] = useState(false);
+	const [showObservingNetwork, setShowObservingNetwork] = useState(false);
+    const [showForecastReport, setShowForecastReport] = useState(false);
+	const [showDebugPanel, setShowDebugPanel] = useState(true);
     const [cloudWatchDebugEnabled, setCloudWatchDebugEnabled] = useState(false);
     const [cloudWatchDebugInfo, setCloudWatchDebugInfo] = useState([]);
+    const [windTargetsStatus, setWindTargetsStatus] = useState(null);
+    const [windReferenceDiagnostics, setWindReferenceDiagnostics] = useState(null);
+    const [windReferenceComparison, setWindReferenceComparison] = useState(null);
     const showFogLayerRef = useRef(true);
     const showWeatherLayerRef = useRef(true);
     const [weatherDebugMode, setWeatherDebugMode] = useState('clouds');
@@ -362,6 +412,7 @@ const App = () => {
     const alertsButtonRef = useRef(null);
     const cloudWatchDebugRef = useRef(false);
     const cloudWatchDebugInfoRef = useRef({ lastUpdateMs: 0 });
+    const windTargetsStatusRef = useRef({ lastUpdateMs: 0 });
     const showForecastOverlayRef = useRef(false);
     const forecastProductRef = useRef('cloudTau');
     const forecastLeadHoursRef = useRef(1);
@@ -375,9 +426,17 @@ const App = () => {
     const warningDraftRef = useRef(warningDraft);
     const warningsByPlayerIdRef = useRef({});
     const draftWarningsByPlayerIdRef = useRef({});
-    const eventsByPlayerIdRef = useRef({});
-    const forecastSkillSummaryRef = useRef({});
-    const serviceMaskRef = useRef({ playerId: null, gridKey: '', hqCount: 0, mask: null });
+    const autoWarningDiagnosticsByPlayerIdRef = useRef({});
+    const postmortemQueueRef = useRef([]);
+    const activePostmortemRef = useRef(null);
+    const postmortemCanvasRef = useRef(null);
+	const uplinkHubsByPlayerIdRef = useRef({});
+	const eventsByPlayerIdRef = useRef({});
+	const forecastSkillSummaryRef = useRef({});
+    const forecastReportByPlayerIdRef = useRef({});
+    const tuningParamsRef = useRef(DEFAULT_TUNING);
+	const scoringMetaByPlayerIdRef = useRef({});
+	const serviceMaskRef = useRef({ playerId: null, gridKey: '', hqCount: 0, mask: null });
     const lastEventSampleRef = useRef(null);
     const areaWeightsRef = useRef({ gridKey: '', weights: null });
     const cursorLatLonRef = useRef(null);
@@ -394,6 +453,9 @@ const App = () => {
     const selectionRaycasterRef = useRef(new THREE.Raycaster());
     const selectionMenuRef = useRef(null);
     const forecastHintShownRef = useRef(false);
+    const placeUplinkHubRef = useRef(false);
+    const uplinkHubGhostRef = useRef(null);
+    const selectedUplinkHubIdRef = useRef(null);
 
 
     const [launchCost, setLaunchCost] = useState(0);
@@ -458,23 +520,50 @@ const App = () => {
         // Reset shared refs/state when switching modes
         satellitesRef.current = [];
         hqSpheresRef.current = [];
+        Object.values(uplinkHubsByPlayerIdRef.current).forEach((hubs) => {
+            hubs.forEach((hub) => {
+                if (hub?.mesh) sceneRef.current?.remove(hub.mesh);
+            });
+        });
+        uplinkHubsByPlayerIdRef.current = {};
+        setSelectedUplinkHubId(null);
+        placeUplinkHubRef.current = false;
+        if (uplinkHubGhostRef.current) {
+            sceneRef.current?.remove(uplinkHubGhostRef.current);
+            uplinkHubGhostRef.current = null;
+        }
+        setUplinkHubsVersion(v => v + 1);
+        syncUplinkHubsToEarth();
         knownEnemyHQsRef.current = {};
         compromisedHQIdsRef.current = new Set();
         pendingWarningsRef.current = {};
         setSatellites([]);
         setPlayers([]);
         setToasts([]);
-        setAlertsHistory([]);
-        setAlertsUnreadCount(0);
-        setShowAlertsPanel(false);
-        setWarningsByPlayerId({});
-        warningsByPlayerIdRef.current = {};
-        setDraftWarningsByPlayerId({});
-        draftWarningsByPlayerIdRef.current = {};
-        eventsByPlayerIdRef.current = {};
-        serviceMaskRef.current = { playerId: null, gridKey: '', hqCount: 0, mask: null };
+	        setAlertsHistory([]);
+	        setAlertsUnreadCount(0);
+	        setShowAlertsPanel(false);
+	        setShowObservingNetwork(false);
+            setShowForecastReport(false);
+            setWindTargetsStatus(null);
+	        setWarningsByPlayerId({});
+	        warningsByPlayerIdRef.current = {};
+	        setDraftWarningsByPlayerId({});
+	        draftWarningsByPlayerIdRef.current = {};
+	        setAutoWarningDiagnosticsByPlayerId({});
+	        autoWarningDiagnosticsByPlayerIdRef.current = {};
+        postmortemQueueRef.current = [];
+        activePostmortemRef.current = null;
+        setActivePostmortem(null);
+        setShowPostmortemPanel(true);
+        setPostmortemQueueVersion(0);
+	        eventsByPlayerIdRef.current = {};
+            forecastReportByPlayerIdRef.current = {};
+            setForecastReportVersion(0);
+	        serviceMaskRef.current = { playerId: null, gridKey: '', hqCount: 0, mask: null };
         areaWeightsRef.current = { gridKey: '', weights: null };
         lastEventSampleRef.current = null;
+        scoringMetaByPlayerIdRef.current = {};
         setActivePlayerId(null);
         setCurrentTurn(0);
         setActionPoints(AP_MAX);
@@ -598,13 +687,20 @@ const App = () => {
         });
 
         const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000005);
         sceneRef.current = scene;
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.7, 100000);
         camera.position.set(0, 0, 20000); // Set camera far enough to view the entire Earth
         cameraRef.current = camera;
         scene.add(camera);
-        const renderer = new THREE.WebGLRenderer();
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        const initialDpr = Math.min(window.devicePixelRatio || 1, 2);
+        renderer.setPixelRatio(initialDpr);
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        renderer.setClearColor(0x000005, 1);
         rendererRef.current = renderer;
         const mountNode = mountRef.current;
         if (mountNode) {
@@ -629,6 +725,7 @@ const App = () => {
         });
         earth.render(scene);
         earthRef.current = earth;
+        earth.setTextureAnisotropy?.(renderer.capabilities?.getMaxAnisotropy?.() ?? 1);
         setSatellites([...satellitesRef.current]);
         const urlParams = new URLSearchParams(window.location.search);
         const radarDebug = process.env.NODE_ENV !== 'production' && urlParams.get('radarDebug') === '1';
@@ -854,6 +951,8 @@ const App = () => {
 
         // Handle window resize
         const handleResize = () => {
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            renderer.setPixelRatio(dpr);
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -1361,6 +1460,12 @@ const App = () => {
             sceneRef.current?.remove(hqSphereRef.current);
             hqSphereRef.current = null;
         }
+        // remove uplink hub placement ghost
+        placeUplinkHubRef.current = false;
+        if (uplinkHubGhostRef.current) {
+            uplinkHubGhostRef.current.parent?.remove?.(uplinkHubGhostRef.current);
+            uplinkHubGhostRef.current = null;
+        }
 
         // restore camera controls & cursor
         const controls = controlsRef.current;
@@ -1670,8 +1775,12 @@ const App = () => {
     useEffect(() => { sensorOnlyWeatherRef.current = sensorOnlyWeather; }, [sensorOnlyWeather]);
     useEffect(() => { warningDrawModeRef.current = warningDrawMode; }, [warningDrawMode]);
     useEffect(() => { warningDraftRef.current = warningDraft; }, [warningDraft]);
-    useEffect(() => { warningsByPlayerIdRef.current = warningsByPlayerId; }, [warningsByPlayerId]);
-    useEffect(() => { draftWarningsByPlayerIdRef.current = draftWarningsByPlayerId; }, [draftWarningsByPlayerId]);
+	    useEffect(() => { warningsByPlayerIdRef.current = warningsByPlayerId; }, [warningsByPlayerId]);
+	    useEffect(() => { draftWarningsByPlayerIdRef.current = draftWarningsByPlayerId; }, [draftWarningsByPlayerId]);
+	    useEffect(() => { autoWarningDiagnosticsByPlayerIdRef.current = autoWarningDiagnosticsByPlayerId; }, [autoWarningDiagnosticsByPlayerId]);
+        useEffect(() => { tuningParamsRef.current = tuningParams; }, [tuningParams]);
+	    useEffect(() => { activePostmortemRef.current = activePostmortem; }, [activePostmortem]);
+    useEffect(() => { selectedUplinkHubIdRef.current = selectedUplinkHubId; }, [selectedUplinkHubId]);
     useEffect(() => { selectionMenuRef.current = selectionMenu; }, [selectionMenu]);
     useEffect(() => {
         showAlertsPanelRef.current = showAlertsPanel;
@@ -1698,6 +1807,14 @@ const App = () => {
     }, [showStationObs, gameMode]);
     useEffect(() => {
         if (!earthRef.current) return;
+        earthRef.current.setWindStreamlinesVisible?.(showWindStreamlines);
+    }, [showWindStreamlines, gameMode]);
+    useEffect(() => {
+        if (!earthRef.current) return;
+        earthRef.current.setWindStreamlineSource?.(windStreamlineSource);
+    }, [windStreamlineSource, gameMode]);
+    useEffect(() => {
+        if (!earthRef.current) return;
         if (showCloudObs) {
             earthRef.current.logCloudSatStats?.('toggleOn');
         }
@@ -1720,6 +1837,32 @@ const App = () => {
             }
         }
     }, [showRadarObs, gameMode]);
+
+    const handleLoadWindReference = async () => {
+        const earth = earthRef.current;
+        if (!earth || windRefStatus.loading) return;
+        setWindRefStatus({ loading: true, loaded: false, error: null });
+        try {
+            const { grid, u, v, meta } = await loadNullschoolWind(
+                '/reference/wind/gfs10m/current-wind-surface-level-gfs-1.0.json'
+            );
+            earth.setWindReferenceWindCore?.({
+                ready: true,
+                grid,
+                fields: { u, v },
+                meta
+            });
+            earth.setWindStreamlineSource?.('reference');
+            earth.windStreamlineRenderer?.reset?.();
+            setWindStreamlineSource('reference');
+            setWindRefStatus({ loading: false, loaded: true, error: null });
+            notify('info', 'Loaded reference wind fixture.');
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to load reference wind fixture.';
+            setWindRefStatus({ loading: false, loaded: false, error: message });
+            notify('error', 'Failed to load reference wind fixture.');
+        }
+    };
     useEffect(() => {
         if (!earthRef.current) return;
         earthRef.current.setForecastOverlayVisible?.(showForecastOverlay);
@@ -1772,6 +1915,26 @@ const App = () => {
         const drafts = draftWarningsByPlayerId[playerId] || [];
         earth.setPlayerWarnings?.(playerId, [...visibleWarnings, ...drafts]);
     }, [warningsByPlayerId, draftWarningsByPlayerId, activePlayerId, gameMode]);
+    useEffect(() => {
+        const canvas = postmortemCanvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const grid = earthRef.current?.weatherField?.core?.grid;
+        if (!activePostmortem || !grid || !showPostmortemPanel) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+        const N = grid.nx * grid.ny;
+        let warningMask = activePostmortem.warningMask;
+        if (warningMask && warningMask.length !== N) warningMask = null;
+        let eventMask = activePostmortem.eventMask;
+        if (!eventMask && activePostmortem.eventIndices) {
+            eventMask = makeMaskFromIndices(activePostmortem.eventIndices, N);
+        }
+        if (eventMask && eventMask.length !== N) eventMask = null;
+        drawPostmortemMiniMap(canvas, grid, warningMask, eventMask);
+    }, [activePostmortem, showPostmortemPanel, postmortemQueueVersion]);
     useEffect(() => {
         if (earthRef.current) {
             const seedNum = Number.parseInt(weatherSeed, 10);
@@ -2262,6 +2425,28 @@ const App = () => {
             : [1, 3, 6];
     };
 
+    const segmentOccludedBySphere = (start, end, sphereRadius, epsilon = 1e-3) => {
+        const d = new THREE.Vector3().subVectors(end, start);
+        const f = start.clone();
+        const a = d.dot(d);
+        const b = 2 * f.dot(d);
+        const c = f.dot(f) - sphereRadius * sphereRadius;
+        const disc = b * b - 4 * a * c;
+        if (disc < 0) return false;
+        const sqrtDisc = Math.sqrt(disc);
+        const t1 = (-b - sqrtDisc) / (2 * a);
+        const t2 = (-b + sqrtDisc) / (2 * a);
+        return (t1 > epsilon && t1 < 1 - epsilon) || (t2 > epsilon && t2 < 1 - epsilon);
+    };
+
+    const equirectDistanceKm = (lat0Rad, lon0Rad, lat1Rad, lon1Rad) => {
+        const dLat = lat1Rad - lat0Rad;
+        const dLon = wrapRadToPi(lon1Rad - lon0Rad);
+        const x = dLon * Math.cos((lat0Rad + lat1Rad) * 0.5);
+        const y = dLat;
+        return (RE_M / 1000) * Math.sqrt(x * x + y * y);
+    };
+
 		const buildSensorGating = () => {
 	        const earth = earthRef.current;
 	        const player = currentPlayerRef.current;
@@ -2275,11 +2460,7 @@ const App = () => {
                 return latLon ? { latRad: latLon.latRad, lonRad: latLon.lonRad } : null;
             })
             .filter(Boolean);
-        const radarSites = hqSites.map((site) => ({
-            latRad: site.latRad,
-            lonRad: site.lonRad,
-            radiusKm: DOPPLER_RADAR_RADIUS_KM
-        }));
+        const radarSites = [];
 
         const hasComms = satellitesRef.current.some(
             s => s.ownerId === playerId && s.type === 'communication' && s.inHqRange === true
@@ -2291,6 +2472,119 @@ const App = () => {
             radarNowcast: forecastTechTier >= 3,
             denseSurface: forecastTechTier >= 4
         };
+
+        const uplinkHubSites = [];
+        const surfaceSites = [];
+        const radiosondeSites = [];
+        const hubs = uplinkHubsByPlayerIdRef.current[playerId] || [];
+        const earthRadiusKm = earth.earthRadiusKm;
+        const tmpHubWorld = new THREE.Vector3();
+        const tmpHubSurface = new THREE.Vector3();
+        const tmpSatWorld = new THREE.Vector3();
+        hubs.forEach((hub) => {
+            if (!hub) return;
+            const latRad = THREE.MathUtils.degToRad(hub.latDeg);
+            const lonRad = THREE.MathUtils.degToRad(hub.lonDeg);
+            const latDeg = hub.latDeg;
+            const lonDeg = hub.lonDeg;
+            if (hub.isHqHub) {
+                hub.setOnline(true, 'HQ hub');
+                uplinkHubSites.push({ latRad, lonRad });
+                if (hub.modules?.surface) {
+                    surfaceSites.push({
+                        id: hub.id,
+                        latDeg,
+                        lonDeg,
+                        denseSurface: hub.modules?.denseSurface === true && enabledWeatherSensors?.denseSurface === true
+                    });
+                }
+                if (hub.modules?.radiosonde) {
+                    radiosondeSites.push({ id: hub.id, latDeg, lonDeg });
+                }
+                if (hub.modules?.radar) {
+                    radarSites.push({
+                        latRad,
+                        lonRad,
+                        latDeg,
+                        lonDeg,
+                        radiusKm: RADAR_RADIUS_KM
+                    });
+                }
+                return;
+            }
+            let online = false;
+            let reason = '';
+            for (let h = 0; h < hqSites.length; h++) {
+                const hq = hqSites[h];
+                const distKm = equirectDistanceKm(latRad, lonRad, hq.latRad, hq.lonRad);
+                if (distKm <= LOCAL_BACKHAUL_RADIUS_KM) {
+                    online = true;
+                    reason = 'Terrestrial backhaul to HQ';
+                    break;
+                }
+            }
+            if (!online) {
+                const hubWorld = hub.mesh?.getWorldPosition
+                    ? hub.mesh.getWorldPosition(tmpHubWorld)
+                    : null;
+                if (hubWorld) {
+                    tmpHubSurface.copy(hubWorld).normalize().multiplyScalar(earthRadiusKm);
+                    for (let s = 0; s < satellitesRef.current.length; s++) {
+                        const sat = satellitesRef.current[s];
+                        if (!sat || sat.ownerId !== playerId) continue;
+                        if (sat.type !== 'communication') continue;
+                        if (sat.inHqRange !== true) continue;
+                        if (!sat.mesh) continue;
+                        if (sat.mesh.getWorldPosition) {
+                            sat.mesh.getWorldPosition(tmpSatWorld);
+                        } else {
+                            tmpSatWorld.copy(sat.mesh.position);
+                        }
+                        const maxRange = sat.getHqRangeKm?.() ?? 0;
+                        if (maxRange <= 0) continue;
+                        if (tmpHubSurface.distanceTo(tmpSatWorld) > maxRange) continue;
+                        const clear = !segmentOccludedBySphere(
+                            tmpHubSurface,
+                            tmpSatWorld,
+                            earthRadiusKm,
+                            GROUND_LOS_EPS
+                        );
+                        if (clear) {
+                            online = true;
+                            reason = 'Satellite backhaul';
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!online) {
+                reason = 'Offline: no backhaul (need comm sat visibility or be within 800 km of HQ)';
+            }
+            hub.setOnline(online, reason);
+            if (online) {
+                uplinkHubSites.push({ latRad, lonRad });
+                if (hub.modules?.surface) {
+                    surfaceSites.push({
+                        id: hub.id,
+                        latDeg,
+                        lonDeg,
+                        denseSurface: hub.modules?.denseSurface === true && enabledWeatherSensors?.denseSurface === true
+                    });
+                }
+                if (hub.modules?.radiosonde) {
+                    radiosondeSites.push({ id: hub.id, latDeg, lonDeg });
+                }
+                if (hub.modules?.radar) {
+                    radarSites.push({
+                        latRad,
+                        lonRad,
+                        latDeg,
+                        lonDeg,
+                        radiusKm: RADAR_RADIUS_KM
+                    });
+                }
+            }
+        });
 
 			const imagingFootprints = [];
 			const debugEntries = cloudWatchDebugRef.current ? [] : null;
@@ -2354,6 +2648,9 @@ const App = () => {
             playerId,
             hasComms,
             hqSites,
+            uplinkHubSites,
+            surfaceSites,
+            radiosondeSites,
             imagingFootprints,
             radarSites,
             radarCadenceSeconds: RADAR_CADENCE_SECONDS,
@@ -2399,13 +2696,118 @@ const App = () => {
         );
     };
 
+    const getUplinkHubInventory = (earth, playerId) => {
+        if (!earth || !playerId) {
+            return {
+                totalHubs: 0,
+                onlineHubs: 0,
+                modules: { metarTotal: 0, radiosondeTotal: 0, radarTotal: 0 }
+            };
+        }
+        const hubsMap = earth.uplinkHubsByPlayerId;
+        if (!hubsMap || typeof hubsMap.get !== 'function') {
+            return {
+                totalHubs: 0,
+                onlineHubs: 0,
+                modules: { metarTotal: 0, radiosondeTotal: 0, radarTotal: 0 }
+            };
+        }
+        const hubs = hubsMap.get(String(playerId)) || [];
+        const totalHubs = hubs.length;
+        let onlineHubs = 0;
+        let metarTotal = 0;
+        let radiosondeTotal = 0;
+        let radarTotal = 0;
+        for (let i = 0; i < hubs.length; i++) {
+            const hub = hubs[i];
+            if (hub?.isOnline) onlineHubs += 1;
+            if (hub?.modules?.metar || hub?.modules?.surface) metarTotal += 1;
+            if (hub?.modules?.radiosonde) radiosondeTotal += 1;
+            if (hub?.modules?.radar) radarTotal += 1;
+        }
+        return {
+            totalHubs,
+            onlineHubs,
+            modules: { metarTotal, radiosondeTotal, radarTotal }
+        };
+    };
+
+    const syncUplinkHubsToEarth = () => {
+        const earth = earthRef.current;
+        if (!earth) return;
+        if (!(earth.uplinkHubsByPlayerId instanceof Map)) {
+            earth.uplinkHubsByPlayerId = new Map();
+        }
+        earth.uplinkHubsByPlayerId.clear();
+        Object.keys(uplinkHubsByPlayerIdRef.current).forEach((playerId) => {
+            const hubs = uplinkHubsByPlayerIdRef.current[playerId] || [];
+            earth.uplinkHubsByPlayerId.set(String(playerId), hubs);
+        });
+    };
+
+    const getSelectedHubForPlayer = (playerId, hubId) => {
+        if (!playerId || !hubId) return null;
+        const hubs = uplinkHubsByPlayerIdRef.current[playerId] || [];
+        return hubs.find(hub => hub?.id === hubId) || null;
+    };
+
+    const getPlayerHasOnlineRadiosondeSite = (playerId) => {
+        if (!playerId) return false;
+        const hubs = uplinkHubsByPlayerIdRef.current[playerId] || [];
+        return hubs.some(hub => (
+            hub?.modules?.radiosonde === true
+            && (hub?.isHqHub === true || hub?.isOnline === true)
+        ));
+    };
+
+    const canUse24hLead = (player) => {
+        if (!player) return false;
+        if (getForecastTier(player) < 4) return false;
+        if (!getPlayerHasComms(player.id)) return false;
+        const hubs = uplinkHubsByPlayerIdRef.current[player.id] || [];
+        let onlineSurface = 0;
+        let onlineRadiosonde = 0;
+        hubs.forEach((hub) => {
+            if (!hub?.isOnline) return;
+            if (hub.modules?.surface) onlineSurface += 1;
+            if (hub.modules?.radiosonde) onlineRadiosonde += 1;
+        });
+        if (onlineSurface < 3 || onlineRadiosonde < 2) return false;
+        const inLinkCloudWatch = satellitesRef.current.filter(
+            sat => sat.ownerId === player.id && sat.type === 'cloudWatch' && sat.inHqRange === true
+        );
+        if (inLinkCloudWatch.length >= 3) return true;
+        const hasGeoLike = inLinkCloudWatch.some(
+            sat => (sat.cloudFootprintRadiusKm ?? 0) >= 7000
+        );
+        return hasGeoLike;
+    };
+
+    const ensureHqRadiosondeModuleInstalled = (playerId) => {
+        if (!playerId) return false;
+        const hubs = uplinkHubsByPlayerIdRef.current[playerId] || [];
+        const hqHub = hubs.find(hub => hub?.isHqHub === true);
+        if (!hqHub || hqHub.modules?.radiosonde === true) return false;
+        hqHub.modules = { ...hqHub.modules, radiosonde: true };
+        setUplinkHubsVersion(v => v + 1);
+        syncUplinkHubsToEarth();
+        return true;
+    };
+
     const getUnlockedForecastLeads = (player) => {
         const leads = player?.unlockedForecastLeadsHours;
         const base = Array.isArray(leads) && leads.length ? leads.slice() : DEFAULT_FORECAST_LEADS.slice();
         const hasComms = getPlayerHasComms(player?.id);
-        const filtered = hasComms
+        const hasRadiosondeOnline = getPlayerHasOnlineRadiosondeSite(player?.id);
+        let filtered = hasComms
             ? base
             : base.filter((h) => h !== 12 && h !== 24);
+        if (!hasRadiosondeOnline) {
+            filtered = filtered.filter((h) => h !== 12);
+        }
+        if (filtered.includes(24) && !canUse24hLead(player)) {
+            filtered = filtered.filter((h) => h !== 24);
+        }
         return filtered.sort((a, b) => a - b);
     };
 
@@ -2414,7 +2816,7 @@ const App = () => {
         return Array.isArray(hazards) && hazards.length ? hazards.slice() : ['heavyPrecip', 'highWinds'];
     };
 
-    const buildHazardHitMask = ({ hazardType, forecastResult, leadIdx, grid, config, serviceMask }) => {
+    const buildHazardHitMask = ({ hazardType, forecastResult, leadIdx, grid, config, serviceMask, mode }) => {
         if (!forecastResult || !grid || leadIdx < 0) return null;
         const hazardCfg = config.hazards[hazardType];
         if (!hazardCfg) return null;
@@ -2428,16 +2830,43 @@ const App = () => {
         const cloud = forecastResult.products.cloudTauByLead?.[leadIdx];
         const conf = forecastResult.products.confidenceByLead?.[leadIdx];
 
+        let serviceCellCount = 0;
+        let maxValueService = -Infinity;
+        for (let k = 0; k < N; k++) {
+            if (serviceMask[k] !== 1) continue;
+            serviceCellCount += 1;
+            const p = precip ? precip[k] : 0;
+            const w = wind ? wind[k] : 0;
+            const c = cloud ? cloud[k] : 0;
+            let hazardVal = 0;
+            if (hazardCfg.kind === 'precipRate') {
+                hazardVal = p;
+            } else if (hazardCfg.kind === 'windSpeed') {
+                hazardVal = w;
+            } else if (hazardCfg.kind === 'stormRisk') {
+                hazardVal = (w / 50) * (p / 2) + (c / 20);
+            }
+            if (hazardVal > maxValueService) maxValueService = hazardVal;
+        }
+
+	        const tuningThr = tuningParamsRef.current?.thresholdsByHazard?.[hazardType];
+	        const baseThr = Number.isFinite(tuningThr) ? tuningThr : hazardCfg.threshold;
+	        let thresholdUsed = baseThr;
+	        if (mode === 'draft' && hazardType === 'heavyPrecip') {
+	            const maxP = Number.isFinite(maxValueService) ? maxValueService : null;
+	            if (Number.isFinite(maxP) && maxP < baseThr) {
+                thresholdUsed = Math.max(0.08, 0.6 * maxP);
+            }
+        }
+
         const mask = new Uint8Array(N);
         const values = new Float32Array(N);
         let hitCount = 0;
-        let serviceCellCount = 0;
         let maxVal = -Infinity;
         let maxK = -1;
 
         for (let k = 0; k < N; k++) {
             if (serviceMask[k] !== 1) continue;
-            serviceCellCount += 1;
             const p = precip ? precip[k] : 0;
             const w = wind ? wind[k] : 0;
             const c = cloud ? cloud[k] : 0;
@@ -2455,7 +2884,7 @@ const App = () => {
 
             values[k] = hazardVal;
 
-            let hit = hazardVal >= hazardCfg.threshold;
+            let hit = hazardVal >= thresholdUsed;
             if (hazardCfg.requireStormy || hazardCfg.kind === 'stormRisk') {
                 hit = hit && stormy;
             }
@@ -2479,10 +2908,11 @@ const App = () => {
             hitCount,
             serviceCellCount,
             hitFracService: serviceCellCount ? hitCount / serviceCellCount : 0,
-            thresholdUsed: hazardCfg.threshold,
+            thresholdUsed,
             stormyGateUsed: Boolean(hazardCfg.requireStormy || hazardCfg.kind === 'stormRisk'),
             maxVal: Number.isFinite(maxVal) ? maxVal : null,
-            maxK
+            maxK,
+            maxValueService: Number.isFinite(maxValueService) ? maxValueService : null
         };
     };
 
@@ -2730,12 +3160,13 @@ const App = () => {
         return simplified;
     };
 
-    const getAutoWarningAreaCap = (hazardType, leadHours) => {
-        const table = AUTO_WARNING_CONFIG.maxAreaFracByHazardByLead?.[hazardType];
-        if (!table) return AUTO_WARNING_CONFIG.maxHitFracServiceArea;
-        const leads = Object.keys(table)
-            .map(Number)
-            .filter((v) => Number.isFinite(v))
+	    const getAutoWarningAreaCap = (hazardType, leadHours) => {
+	        const table = tuningParamsRef.current?.areaCapsByHazardByLead?.[hazardType]
+	            ?? AUTO_WARNING_CONFIG.maxAreaFracByHazardByLead?.[hazardType];
+	        if (!table) return AUTO_WARNING_CONFIG.maxHitFracServiceArea;
+	        const leads = Object.keys(table)
+	            .map(Number)
+	            .filter((v) => Number.isFinite(v))
             .sort((a, b) => a - b);
         if (leads.length === 0) return AUTO_WARNING_CONFIG.maxHitFracServiceArea;
         let chosen = leads[0];
@@ -2754,20 +3185,64 @@ const App = () => {
         allowedHazards,
         maxPolygonsPerHazard,
         mode = 'warning'
-    }) => {
-        if (!forecastResult || !grid) return [];
+	    }) => {
+	        const config = AUTO_WARNING_CONFIG;
+	        const hazardTypes = Array.isArray(allowedHazards) && allowedHazards.length
+	            ? allowedHazards
+	            : Object.keys(config.hazards);
+	        const maxPolygons = Number.isFinite(maxPolygonsPerHazard)
+	            ? maxPolygonsPerHazard
+	            : config.maxPolygonsPerHazard;
+            const minComponentCells = Number.isFinite(Number(tuningParamsRef.current?.minComponentCells))
+                ? Number(tuningParamsRef.current.minComponentCells)
+                : config.minComponentCells;
+	        const diagnostics = {
+	            playerId: forecastResult?.playerId ?? null,
+	            forecastRunId: forecastResult?.runId ?? null,
+	            leadHours,
+            serviceCellCount: 0,
+            hazards: {},
+            reason: null
+        };
+        hazardTypes.forEach((hazardType) => {
+            diagnostics.hazards[hazardType] = {
+                maxValue: null,
+                cellsOverThreshold: 0,
+                componentCount: 0,
+	                componentsDroppedTooSmall: 0,
+	                componentsDroppedAreaCap: 0,
+	                draftCount: 0,
+	                thresholdUsed: tuningParamsRef.current?.thresholdsByHazard?.[hazardType]
+	                    ?? config.hazards[hazardType]?.threshold
+	                    ?? null
+	            };
+	        });
+        const logDiagnostics = () => {
+            earthRef.current?.logWeatherEvent?.(
+                'autoWarningDiagnostics',
+                diagnostics,
+                { simTimeSeconds: issuedAtSimTimeSeconds }
+            );
+        };
+        if (!forecastResult) {
+            diagnostics.reason = 'missingForecast';
+            logDiagnostics();
+            return { drafts: [], diagnostics };
+        }
+        if (!grid) {
+            diagnostics.reason = 'missingGrid';
+            logDiagnostics();
+            return { drafts: [], diagnostics };
+        }
         const leadIdx = forecastResult.leadHours.indexOf(leadHours);
-        if (leadIdx < 0) return [];
+        if (leadIdx < 0) {
+            diagnostics.reason = 'leadNotFound';
+            logDiagnostics();
+            return { drafts: [], diagnostics };
+        }
         const confValues = forecastResult.products?.confidenceByLead?.[leadIdx] ?? null;
 
         const nextWarnings = [];
-        const config = AUTO_WARNING_CONFIG;
-        const hazardTypes = Array.isArray(allowedHazards) && allowedHazards.length
-            ? allowedHazards
-            : Object.keys(config.hazards);
-        const maxPolygons = Number.isFinite(maxPolygonsPerHazard)
-            ? maxPolygonsPerHazard
-            : config.maxPolygonsPerHazard;
         const serviceMask = getServiceMask(grid);
         if (!serviceMask || serviceMask.length !== grid.nx * grid.ny) {
             hazardTypes.forEach((hazardType) => {
@@ -2784,12 +3259,15 @@ const App = () => {
                     { simTimeSeconds: issuedAtSimTimeSeconds }
                 );
             });
-            return [];
+            diagnostics.reason = 'noServiceMask';
+            logDiagnostics();
+            return { drafts: [], diagnostics };
         }
         let serviceCellCount = 0;
         for (let k = 0; k < serviceMask.length; k++) {
             if (serviceMask[k] === 1) serviceCellCount += 1;
         }
+        diagnostics.serviceCellCount = serviceCellCount;
         if (serviceCellCount === 0) {
             hazardTypes.forEach((hazardType) => {
                 earthRef.current?.logWeatherEvent?.(
@@ -2805,7 +3283,9 @@ const App = () => {
                     { simTimeSeconds: issuedAtSimTimeSeconds }
                 );
             });
-            return [];
+            diagnostics.reason = 'noServiceArea';
+            logDiagnostics();
+            return { drafts: [], diagnostics };
         }
         const weights = getAreaWeights(grid);
         let serviceAreaW = 0;
@@ -2837,7 +3317,8 @@ const App = () => {
                 leadIdx,
                 grid,
                 config,
-                serviceMask
+                serviceMask,
+                mode
             });
             if (!maskResult || !maskResult.mask) return;
 
@@ -2862,6 +3343,16 @@ const App = () => {
                 hitFracService,
                 grid: { nx: grid.nx, ny: grid.ny }
             };
+            const hazardDiag = {
+                maxValue: maskResult.maxValueService,
+                cellsOverThreshold: maskResult.hitCount,
+                componentCount: 0,
+                componentsDroppedTooSmall: 0,
+                componentsDroppedAreaCap: 0,
+                draftCount: 0,
+                thresholdUsed: maskResult.thresholdUsed
+            };
+            diagnostics.hazards[hazardType] = hazardDiag;
 
             if (reason) {
                 earthRef.current?.logWeatherEvent?.(
@@ -2877,9 +3368,13 @@ const App = () => {
 
             const { labels, components } = labelConnectedComponents(maskResult.mask, grid.nx, grid.ny, maskResult.values);
             const cap = getAutoWarningAreaCap(hazardType, leadHours);
+            hazardDiag.componentCount = components.length;
             const filtered = [];
-            for (const component of components) {
-                if (component.cellCount < config.minComponentCells) continue;
+	            for (const component of components) {
+	                if (component.cellCount < minComponentCells) {
+	                    hazardDiag.componentsDroppedTooSmall += 1;
+	                    continue;
+	                }
                 const { indices } = extractComponentMaskAndIndices(
                     labels,
                     component.id,
@@ -2897,6 +3392,7 @@ const App = () => {
                 }
                 const compFrac = serviceAreaW > 0 ? compAreaW / serviceAreaW : 0;
                 if (compFrac > cap) {
+                    hazardDiag.componentsDroppedAreaCap += 1;
                     earthRef.current?.logWeatherEvent?.(
                         'autoWarningCandidate',
                         {
@@ -2910,10 +3406,10 @@ const App = () => {
                         { simTimeSeconds: issuedAtSimTimeSeconds }
                     );
                     continue;
+                }
+                filtered.push(component);
             }
-            filtered.push(component);
-        }
-        filtered.sort((a, b) => (b.maxVal ?? 0) - (a.maxVal ?? 0));
+            filtered.sort((a, b) => (b.maxVal ?? 0) - (a.maxVal ?? 0));
             const limited = filtered.slice(0, maxPolygons);
 
             if (limited.length === 0) {
@@ -2985,6 +3481,7 @@ const App = () => {
                     }
                     warningFrac = serviceAreaW > 0 ? warningAreaW / serviceAreaW : 0;
                     if (warningFrac > cap) {
+                        hazardDiag.componentsDroppedAreaCap += 1;
                         earthRef.current?.logWeatherEvent?.(
                             'autoWarningCandidate',
                             {
@@ -3022,6 +3519,7 @@ const App = () => {
                         _gridMaskNy: maskResult?.ny ?? null
                     };
                     nextWarnings.push(draft);
+                    hazardDiag.draftCount += 1;
                     earthRef.current?.logWeatherEvent?.(
                         'autoWarningDraftCreated',
                         {
@@ -3068,8 +3566,13 @@ const App = () => {
                 { simTimeSeconds: issuedAtSimTimeSeconds }
             );
         });
+        earthRef.current?.logWeatherEvent?.(
+            'autoWarningDiagnostics',
+            diagnostics,
+            { simTimeSeconds: issuedAtSimTimeSeconds }
+        );
 
-        return nextWarnings;
+        return { drafts: nextWarnings, diagnostics };
     };
 
     const getServiceMask = (grid) => {
@@ -3150,11 +3653,19 @@ const App = () => {
             .filter(Boolean);
     };
 
-    const buildRadarCoverageMask = (grid, hqLocs, radiusKm = DOPPLER_RADAR_RADIUS_KM) => {
+    const getPlayerRadarHubLatLonDegList = (playerId) => {
+        if (!playerId) return [];
+        const hubs = uplinkHubsByPlayerIdRef.current[playerId] || [];
+        return hubs
+            .filter(hub => hub?.isOnline && hub?.modules?.radar)
+            .map(hub => ({ latDeg: hub.latDeg, lonDeg: hub.lonDeg }));
+    };
+
+    const buildRadarCoverageMask = (grid, radarLocs, radiusKm = RADAR_RADIUS_KM) => {
         if (!grid?.nx || !grid?.ny) return null;
         const N = grid.nx * grid.ny;
         const mask = new Uint8Array(N);
-        if (!hqLocs || hqLocs.length === 0) return mask;
+        if (!radarLocs || radarLocs.length === 0) return mask;
         const latDeg = grid.latDeg;
         const lonDeg = grid.lonDeg;
         const reKm = RE_M / 1000;
@@ -3166,10 +3677,10 @@ const App = () => {
             for (let i = 0; i < grid.nx; i++) {
                 const lon = lonDeg ? lonDeg[i] : -180 + (i + 0.5) * (360 / grid.nx);
                 let inRange = false;
-                for (let h = 0; h < hqLocs.length; h++) {
-                    const hq = hqLocs[h];
-                    const dLat = THREE.MathUtils.degToRad(lat - hq.latDeg);
-                    const dLon = THREE.MathUtils.degToRad(wrapLonDeltaDeg(lon, hq.lonDeg));
+                for (let h = 0; h < radarLocs.length; h++) {
+                    const site = radarLocs[h];
+                    const dLat = THREE.MathUtils.degToRad(lat - site.latDeg);
+                    const dLon = THREE.MathUtils.degToRad(wrapLonDeltaDeg(lon, site.lonDeg));
                     const distKm = reKm * Math.sqrt(dLat * dLat + (cosLat * dLon) * (cosLat * dLon));
                     if (distKm <= radiusKm) {
                         inRange = true;
@@ -3375,6 +3886,364 @@ const App = () => {
 		}
 		return best;
 	};
+
+    const computeBestEventOverlapInWindowDetailed = (event, warningMask, warningArea, grid, windowStart, windowEnd) => {
+        if (!event || !warningMask || !grid?.nx || !grid?.ny) {
+            return { bestIoU: 0, bestSimTimeSeconds: null, bestIndices: null, bestMaskFallback: null };
+        }
+        const t0 = Number(windowStart);
+        const t1 = Number(windowEnd);
+        const start = Number.isFinite(t0) ? t0 : -Infinity;
+        const end = Number.isFinite(t1) ? t1 : Infinity;
+        let bestIoU = 0;
+        let bestSimTimeSeconds = null;
+        let bestIndices = null;
+        const samples = event.footprintSamples;
+        if (Array.isArray(samples) && samples.length > 0) {
+            for (let i = 0; i < samples.length; i++) {
+                const s = samples[i];
+                if (!s) continue;
+                const t = s.t;
+                if (Number.isFinite(t) && (t < start || t > end)) continue;
+                const iou = computeWeightedIoUFromIndices(warningMask, warningArea, s, grid);
+                if (iou > bestIoU) {
+                    bestIoU = iou;
+                    bestSimTimeSeconds = Number.isFinite(t) ? t : null;
+                    bestIndices = s.indices || null;
+                }
+            }
+        }
+        if (bestIoU > 0) {
+            return { bestIoU, bestSimTimeSeconds, bestIndices, bestMaskFallback: null };
+        }
+
+        let bestMaskFallback = null;
+        let bestMaskTime = null;
+        const masks = [];
+        if (event.maskAtPeak && Number.isFinite(event.peakSimTimeSeconds) && event.peakSimTimeSeconds >= start && event.peakSimTimeSeconds <= end) {
+            masks.push({ mask: event.maskAtPeak, t: event.peakSimTimeSeconds });
+        }
+        if (event.lastMask && Number.isFinite(event.lastSeenSimTimeSeconds) && event.lastSeenSimTimeSeconds >= start && event.lastSeenSimTimeSeconds <= end) {
+            masks.push({ mask: event.lastMask, t: event.lastSeenSimTimeSeconds });
+        }
+        for (let i = 0; i < masks.length; i++) {
+            const entry = masks[i];
+            const iou = computeWeightedIoU(warningMask, entry.mask, grid);
+            if (iou > bestIoU) {
+                bestIoU = iou;
+                bestMaskFallback = entry.mask;
+                bestMaskTime = entry.t ?? null;
+            }
+        }
+        return {
+            bestIoU,
+            bestSimTimeSeconds: bestMaskTime,
+            bestIndices: null,
+            bestMaskFallback
+        };
+    };
+
+    const makeMaskFromIndices = (indices, N) => {
+        if (!indices || !Number.isFinite(N) || N <= 0) return null;
+        const mask = new Uint8Array(N);
+        for (let i = 0; i < indices.length; i++) {
+            const k = indices[i];
+            if (k >= 0 && k < N) mask[k] = 1;
+        }
+        return mask;
+    };
+
+    const classifyFalseAlarm = ({ warning, warningMask, warningArea, grid, allEvents, simTimeSeconds, bestOverlapEvent, bestOverlapIoU }) => {
+        const warningStart = warning.validStartSimTimeSeconds;
+        const warningEnd = warning.validEndSimTimeSeconds;
+        const detailLines = [];
+        const weights = getAreaWeights(grid);
+        const serviceMask = getServiceMask(grid);
+        const areaFracService = Number.isFinite(warning.areaFracService)
+            ? warning.areaFracService
+            : (weights && serviceMask ? computeWarningAreaFracService(warningMask, grid, serviceMask, weights) : null);
+
+        if (Number.isFinite(areaFracService) && areaFracService >= TOO_BROAD_AREA_FRAC) {
+            detailLines.push(`Covered ${Math.round(areaFracService * 100)}% of service area; smaller polygons score better.`);
+            return { primaryTag: 'tooBroad', detailLines, bestEvent: null, bestOverlap: null };
+        }
+
+        const sameHazardEvents = allEvents.filter(e => e.confirmed && e.hazardType === warning.hazardType);
+        let overlapEvent = bestOverlapEvent ?? null;
+        let overlapIoU = Number.isFinite(bestOverlapIoU) ? bestOverlapIoU : 0;
+        if (!overlapEvent && sameHazardEvents.length) {
+            sameHazardEvents.forEach((event) => {
+                const eventEnd = event.endSimTimeSeconds ?? simTimeSeconds;
+                if (event.startSimTimeSeconds > warningEnd || eventEnd < warningStart) return;
+                const overlapStart = Math.max(warningStart, event.startSimTimeSeconds);
+                const overlapEnd = Math.min(warningEnd, eventEnd);
+                const iou = computeBestEventIoUInWindow(event, warningMask, warningArea, grid, overlapStart, overlapEnd);
+                if (iou > overlapIoU) {
+                    overlapIoU = iou;
+                    overlapEvent = event;
+                }
+            });
+        }
+
+	        const iouMatchMin = tuningParamsRef.current?.iouMatchMin ?? IOU_MATCH_MIN;
+	        if (overlapEvent && overlapIoU >= POSTMORTEM_HINT_IOU && overlapIoU < iouMatchMin) {
+	            detailLines.push('Event occurred during your window but your polygon missed it.');
+	            const overlapStart = Math.max(warningStart, overlapEvent.startSimTimeSeconds);
+	            const overlapEnd = Math.min(warningEnd, overlapEvent.endSimTimeSeconds ?? simTimeSeconds);
+	            const bestOverlap = computeBestEventOverlapInWindowDetailed(
+                overlapEvent,
+                warningMask,
+                warningArea,
+                grid,
+                overlapStart,
+                overlapEnd
+            );
+            return { primaryTag: 'misplaced', detailLines, bestEvent: overlapEvent, bestOverlap };
+        }
+
+        let bestOutsideEvent = null;
+        let bestOutsideOverlap = null;
+        let bestOutsideIoU = 0;
+        sameHazardEvents.forEach((event) => {
+            const eventEnd = event.endSimTimeSeconds ?? simTimeSeconds;
+            if (eventEnd >= warningStart && event.startSimTimeSeconds <= warningEnd) return;
+            const overlap = computeBestEventOverlapInWindowDetailed(
+                event,
+                warningMask,
+                warningArea,
+                grid,
+                event.startSimTimeSeconds,
+                eventEnd
+            );
+            if (overlap.bestIoU > bestOutsideIoU) {
+                bestOutsideIoU = overlap.bestIoU;
+                bestOutsideEvent = event;
+                bestOutsideOverlap = overlap;
+            }
+        });
+
+        if (bestOutsideEvent && bestOutsideOverlap && bestOutsideIoU >= POSTMORTEM_HINT_IOU) {
+            const bestTime = bestOutsideOverlap.bestSimTimeSeconds;
+            if (Number.isFinite(bestTime) && bestTime > warningEnd + TIME_FUZZ_SECONDS) {
+                detailLines.push('Your window ended before the event.');
+                return { primaryTag: 'tooEarly', detailLines, bestEvent: bestOutsideEvent, bestOverlap: bestOutsideOverlap };
+            }
+            if (Number.isFinite(bestTime) && bestTime < warningStart - TIME_FUZZ_SECONDS) {
+                detailLines.push('The event had already occurred before your window.');
+                return { primaryTag: 'tooLate', detailLines, bestEvent: bestOutsideEvent, bestOverlap: bestOutsideOverlap };
+            }
+        }
+
+        let bestOtherEvent = null;
+        let bestOtherOverlap = null;
+        let bestOtherIoU = 0;
+        const otherEvents = allEvents.filter(e => e.confirmed && e.hazardType !== warning.hazardType);
+        otherEvents.forEach((event) => {
+            const eventEnd = event.endSimTimeSeconds ?? simTimeSeconds;
+            if (event.startSimTimeSeconds > warningEnd || eventEnd < warningStart) return;
+            const overlapStart = Math.max(warningStart, event.startSimTimeSeconds);
+            const overlapEnd = Math.min(warningEnd, eventEnd);
+            const overlap = computeBestEventOverlapInWindowDetailed(
+                event,
+                warningMask,
+                warningArea,
+                grid,
+                overlapStart,
+                overlapEnd
+            );
+            if (overlap.bestIoU > bestOtherIoU) {
+                bestOtherIoU = overlap.bestIoU;
+                bestOtherEvent = event;
+                bestOtherOverlap = overlap;
+            }
+        });
+        if (bestOtherEvent && bestOtherOverlap && bestOtherIoU >= POSTMORTEM_HINT_IOU) {
+            const hazardLabel = HAZARD_LABELS[bestOtherEvent.hazardType] ?? bestOtherEvent.hazardType;
+            detailLines.push(`A different hazard occurred here: ${hazardLabel}.`);
+            return { primaryTag: 'wrongHazard', detailLines, bestEvent: bestOtherEvent, bestOverlap: bestOtherOverlap };
+        }
+
+        detailLines.push('No matching event occurred in your service area during that window.');
+        return { primaryTag: 'misplaced', detailLines, bestEvent: null, bestOverlap: null };
+    };
+
+    const classifyMissedEvent = ({ event, warnings, grid, simTimeSeconds }) => {
+        if (!event || !grid) {
+            return { primaryTag: 'misplaced', detailLines: ['No warning issued.'], warningMask: null, bestOverlapSimTimeSeconds: null };
+        }
+        const eventStart = event.startSimTimeSeconds;
+        const eventEnd = event.endSimTimeSeconds ?? simTimeSeconds;
+        const detailLines = [];
+        const sameHazardWarnings = warnings.filter(w => w.hazardType === event.hazardType);
+
+        let bestOverlapWarning = null;
+        let bestOverlapIoU = 0;
+        let bestOverlap = null;
+        let bestOverlapWarningMask = null;
+        sameHazardWarnings.forEach((warning) => {
+            const warningEnd = warning.validEndSimTimeSeconds;
+            const warningStart = warning.validStartSimTimeSeconds;
+            if (warningStart > eventEnd || warningEnd < eventStart) return;
+            const warningMask = getWarningMaskForScoring(warning, grid);
+            if (!warningMask) return;
+            const warningArea = getWarningWeightedArea(warning, warningMask, grid);
+            const overlapStart = Math.max(eventStart, warningStart);
+            const overlapEnd = Math.min(eventEnd, warningEnd);
+            const iou = computeBestEventIoUInWindow(event, warningMask, warningArea, grid, overlapStart, overlapEnd);
+            if (iou > bestOverlapIoU) {
+                bestOverlapIoU = iou;
+                bestOverlapWarning = warning;
+                bestOverlapWarningMask = warningMask;
+                bestOverlap = computeBestEventOverlapInWindowDetailed(
+                    event,
+                    warningMask,
+                    warningArea,
+                    grid,
+                    overlapStart,
+                    overlapEnd
+                );
+            }
+        });
+
+	        const iouMatchMin = tuningParamsRef.current?.iouMatchMin ?? IOU_MATCH_MIN;
+	        if (bestOverlapWarning && bestOverlapIoU >= POSTMORTEM_HINT_IOU && bestOverlapIoU < iouMatchMin) {
+	            detailLines.push('A warning was issued during the event but missed it.');
+	            return {
+	                primaryTag: 'misplaced',
+	                detailLines,
+	                warningMask: bestOverlapWarningMask,
+                bestOverlapSimTimeSeconds: bestOverlap?.bestSimTimeSeconds ?? null
+            };
+        }
+
+        let bestOutsideWarning = null;
+        let bestOutsideIoU = 0;
+        let bestOutsideOverlap = null;
+        let bestOutsideWarningMask = null;
+        sameHazardWarnings.forEach((warning) => {
+            const warningEnd = warning.validEndSimTimeSeconds;
+            const warningStart = warning.validStartSimTimeSeconds;
+            if (warningStart <= eventEnd && warningEnd >= eventStart) return;
+            const warningMask = getWarningMaskForScoring(warning, grid);
+            if (!warningMask) return;
+            const warningArea = getWarningWeightedArea(warning, warningMask, grid);
+            const overlap = computeBestEventOverlapInWindowDetailed(
+                event,
+                warningMask,
+                warningArea,
+                grid,
+                eventStart,
+                eventEnd
+            );
+            if (overlap.bestIoU > bestOutsideIoU) {
+                bestOutsideIoU = overlap.bestIoU;
+                bestOutsideWarning = warning;
+                bestOutsideWarningMask = warningMask;
+                bestOutsideOverlap = overlap;
+            }
+        });
+        if (bestOutsideWarning && bestOutsideOverlap && bestOutsideIoU >= POSTMORTEM_HINT_IOU) {
+            const bestTime = bestOutsideOverlap.bestSimTimeSeconds;
+            if (Number.isFinite(bestTime) && bestTime > bestOutsideWarning.validEndSimTimeSeconds + TIME_FUZZ_SECONDS) {
+                detailLines.push('Warnings ended before the event.');
+                return {
+                    primaryTag: 'tooEarly',
+                    detailLines,
+                    warningMask: bestOutsideWarningMask,
+                    bestOverlapSimTimeSeconds: bestTime
+                };
+            }
+            if (Number.isFinite(bestTime) && bestTime < bestOutsideWarning.validStartSimTimeSeconds - TIME_FUZZ_SECONDS) {
+                detailLines.push('Warnings came after the event.');
+                return {
+                    primaryTag: 'tooLate',
+                    detailLines,
+                    warningMask: bestOutsideWarningMask,
+                    bestOverlapSimTimeSeconds: bestTime
+                };
+            }
+        }
+
+        let bestOtherWarning = null;
+        let bestOtherIoU = 0;
+        let bestOtherWarningMask = null;
+        warnings.forEach((warning) => {
+            if (warning.hazardType === event.hazardType) return;
+            const warningEnd = warning.validEndSimTimeSeconds;
+            const warningStart = warning.validStartSimTimeSeconds;
+            if (warningStart > eventEnd || warningEnd < eventStart) return;
+            const warningMask = getWarningMaskForScoring(warning, grid);
+            if (!warningMask) return;
+            const warningArea = getWarningWeightedArea(warning, warningMask, grid);
+            const overlapStart = Math.max(eventStart, warningStart);
+            const overlapEnd = Math.min(eventEnd, warningEnd);
+            const iou = computeBestEventIoUInWindow(event, warningMask, warningArea, grid, overlapStart, overlapEnd);
+            if (iou > bestOtherIoU) {
+                bestOtherIoU = iou;
+                bestOtherWarning = warning;
+                bestOtherWarningMask = warningMask;
+            }
+        });
+        if (bestOtherWarning && bestOtherIoU >= POSTMORTEM_HINT_IOU) {
+            const hazardLabel = HAZARD_LABELS[bestOtherWarning.hazardType] ?? bestOtherWarning.hazardType;
+            detailLines.push(`A warning for ${hazardLabel} was issued during this event.`);
+            return {
+                primaryTag: 'wrongHazard',
+                detailLines,
+                warningMask: bestOtherWarningMask,
+                bestOverlapSimTimeSeconds: null
+            };
+        }
+
+        detailLines.push('No warning issued.');
+        return { primaryTag: 'misplaced', detailLines, warningMask: null, bestOverlapSimTimeSeconds: null };
+    };
+
+    const drawPostmortemMiniMap = (canvas, grid, warningMask, eventMask) => {
+        if (!canvas || !grid?.nx || !grid?.ny) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const width = canvas.width;
+        const height = canvas.height;
+        ctx.clearRect(0, 0, width, height);
+
+        const nx = grid.nx;
+        const ny = grid.ny;
+        const cellW = width / nx;
+        const cellH = height / ny;
+
+        if (eventMask) {
+            ctx.fillStyle = 'rgba(0,255,255,0.35)';
+            for (let j = 0; j < ny; j++) {
+                const row = j * nx;
+                const y = j * cellH;
+                for (let i = 0; i < nx; i++) {
+                    const k = row + i;
+                    if (eventMask[k] === 1) {
+                        ctx.fillRect(i * cellW, y, Math.ceil(cellW), Math.ceil(cellH));
+                    }
+                }
+            }
+        }
+
+        if (warningMask) {
+            ctx.fillStyle = 'rgba(255,0,255,0.85)';
+            for (let j = 0; j < ny; j++) {
+                const row = j * nx;
+                const y = j * cellH;
+                for (let i = 0; i < nx; i++) {
+                    const k = row + i;
+                    if (warningMask[k] !== 1) continue;
+                    const north = j > 0 ? warningMask[k - nx] === 1 : false;
+                    const south = j < ny - 1 ? warningMask[k + nx] === 1 : false;
+                    const west = i > 0 ? warningMask[k - 1] === 1 : false;
+                    const east = i < nx - 1 ? warningMask[k + 1] === 1 : false;
+                    if (north && south && west && east) continue;
+                    ctx.fillRect(i * cellW, y, Math.ceil(cellW), Math.ceil(cellH));
+                }
+            }
+        }
+    };
 
     const computeMaskCentroid = (mask, grid) => {
         const { nx, ny, latDeg, lonDeg } = grid;
@@ -3670,8 +4539,194 @@ const App = () => {
         }
     };
 
-	const updateTruthEvents = (simTimeSeconds) => {
-        if (!Number.isFinite(simTimeSeconds)) return;
+    const getScoringMeta = (playerId, simTimeSeconds) => {
+        if (!playerId) return null;
+        const store = scoringMetaByPlayerIdRef.current;
+        if (!store[playerId]) {
+            store[playerId] = {
+                hitStreak: 0,
+                dayIndex: Number.isFinite(simTimeSeconds) ? Math.floor(simTimeSeconds / 86400) : 0,
+                hitsToday: 0,
+                dailyGoalAwardedDayIndex: null
+            };
+        }
+        const meta = store[playerId];
+        if (Number.isFinite(simTimeSeconds)) {
+            const dayIndex = Math.floor(simTimeSeconds / 86400);
+            if (meta.dayIndex !== dayIndex) {
+                meta.dayIndex = dayIndex;
+                meta.hitsToday = 0;
+                meta.dailyGoalAwardedDayIndex = null;
+            }
+        }
+        return meta;
+    };
+
+    const enqueuePostmortem = (entry) => {
+        if (!entry) return;
+        postmortemQueueRef.current.push(entry);
+        if (!activePostmortemRef.current) {
+            const next = postmortemQueueRef.current.shift() || null;
+            setActivePostmortem(next);
+        }
+        setShowPostmortemPanel(true);
+        setPostmortemQueueVersion(v => v + 1);
+    };
+
+    const nextPostmortem = () => {
+        if (postmortemQueueRef.current.length > 0) {
+            const next = postmortemQueueRef.current.shift();
+            setActivePostmortem(next);
+        } else {
+            setActivePostmortem(null);
+        }
+        setPostmortemQueueVersion(v => v + 1);
+    };
+
+	    const clearPostmortems = () => {
+	        postmortemQueueRef.current = [];
+	        setActivePostmortem(null);
+	        setPostmortemQueueVersion(v => v + 1);
+	    };
+
+        const getRecentForecastRuns = (playerId) => {
+            const pid = playerId != null ? String(playerId) : null;
+            if (!pid) return [];
+            const earth = earthRef.current;
+            const runs = earth?.getForecastHistory?.(pid) || [];
+            return runs
+                .slice()
+                .sort((a, b) => (Number(b?.baseSimTimeSeconds) || 0) - (Number(a?.baseSimTimeSeconds) || 0))
+                .slice(0, FORECAST_REPORT_MAX_RUNS);
+        };
+
+        const computeRunMetrics = ({ run, warnings, events, grid }) => {
+            const runId = run?.runId ?? null;
+            const baseSimTimeSeconds = Number(run?.baseSimTimeSeconds);
+            const leadHoursList = Array.isArray(run?.leadHours) ? run.leadHours.slice() : [];
+            const hazardTypes = Object.keys(HAZARD_LABELS);
+
+            const output = {
+                runId,
+                baseSimTimeSeconds: Number.isFinite(baseSimTimeSeconds) ? baseSimTimeSeconds : null,
+                leadHours: leadHoursList,
+                byHazard: {}
+            };
+
+            if (!runId || !Number.isFinite(baseSimTimeSeconds) || !grid?.nx || !grid?.ny) {
+                hazardTypes.forEach((hazardType) => {
+                    output.byHazard[hazardType] = {};
+                    leadHoursList.forEach((leadHours) => {
+                        output.byHazard[hazardType][leadHours] = {
+                            hits: 0,
+                            falseAlarms: 0,
+                            totalEvents: 0,
+                            warnedEvents: 0,
+                            misses: 0,
+                            precision: 0,
+                            recall: 0,
+                            missRate: 0,
+                            meanIoU: 0,
+                            meanLeadHours: 0
+                        };
+                    });
+                });
+                return output;
+            }
+
+            const endedEvents = Array.isArray(events)
+                ? events.filter(e => e && e.confirmed === true && Number.isFinite(e.endSimTimeSeconds))
+                : [];
+            const scoredWarnings = Array.isArray(warnings)
+                ? warnings.filter(w => w && String(w.forecastRunId) === String(runId) && (w.outcome === 'hit' || w.outcome === 'falseAlarm'))
+                : [];
+            const warningsById = new Map(scoredWarnings.map(w => [w.id, w]));
+            const windowDurationSeconds = FORECAST_REPORT_WINDOW_HOURS * 3600;
+
+            hazardTypes.forEach((hazardType) => {
+                output.byHazard[hazardType] = {};
+                leadHoursList.forEach((leadHoursRaw) => {
+                    const leadHours = Number(leadHoursRaw);
+                    const leadKey = Number.isFinite(leadHours) ? leadHours : leadHoursRaw;
+                    const warningsForBucket = scoredWarnings.filter(
+                        w => w.hazardType === hazardType && Number(w.forecastLeadHours) === leadHours
+                    );
+                    const hits = warningsForBucket.filter(w => w.outcome === 'hit');
+                    const falseAlarms = warningsForBucket.filter(w => w.outcome === 'falseAlarm');
+
+                    const windowStart = baseSimTimeSeconds + leadHours * 3600;
+                    const windowEnd = windowStart + windowDurationSeconds;
+                    const eventsInWindow = endedEvents.filter((event) => {
+                        if (event.hazardType !== hazardType) return false;
+                        const start = event.startSimTimeSeconds;
+                        const end = event.endSimTimeSeconds;
+                        return start <= windowEnd && end >= windowStart;
+                    });
+                    const totalEvents = eventsInWindow.length;
+                    const warnedEvents = eventsInWindow.reduce((count, event) => {
+                        const wid = event.matchedWarningId;
+                        if (!wid) return count;
+                        const warning = warningsById.get(wid);
+                        if (!warning) return count;
+                        if (String(warning.forecastRunId) !== String(runId)) return count;
+                        if (Number(warning.forecastLeadHours) !== leadHours) return count;
+                        if (warning.outcome !== 'hit') return count;
+                        return count + 1;
+                    }, 0);
+                    const misses = totalEvents - warnedEvents;
+
+                    const hitsCount = hits.length;
+                    const falseAlarmCount = falseAlarms.length;
+                    const precisionDenom = hitsCount + falseAlarmCount;
+                    const precision = precisionDenom > 0 ? hitsCount / precisionDenom : 0;
+                    const recall = totalEvents > 0 ? warnedEvents / totalEvents : 0;
+                    const missRate = totalEvents > 0 ? misses / totalEvents : 0;
+                    const meanIoU = hitsCount > 0
+                        ? hits.reduce((sum, w) => sum + (Number(w.iou) || 0), 0) / hitsCount
+                        : 0;
+                    const meanLeadHours = hitsCount > 0
+                        ? hits.reduce((sum, w) => {
+                            const h = Number.isFinite(w.advanceNoticeHours) ? w.advanceNoticeHours : Number(w.forecastLeadHours);
+                            return sum + (Number.isFinite(h) ? h : 0);
+                        }, 0) / hitsCount
+                        : 0;
+
+                    output.byHazard[hazardType][leadKey] = {
+                        hits: hitsCount,
+                        falseAlarms: falseAlarmCount,
+                        totalEvents,
+                        warnedEvents,
+                        misses,
+                        precision,
+                        recall,
+                        missRate,
+                        meanIoU,
+                        meanLeadHours
+                    };
+                });
+            });
+
+            return output;
+        };
+
+        const refreshForecastReport = (playerId) => {
+            const pid = playerId != null ? String(playerId) : null;
+            if (!pid) return;
+            const earth = earthRef.current;
+            const grid = earth?.weatherField?.core?.grid;
+            if (!earth || !grid) return;
+
+            const runs = getRecentForecastRuns(pid);
+            const warnings = warningsByPlayerIdRef.current[pid] || [];
+            const eventsHistory = eventsByPlayerIdRef.current[pid]?.history || [];
+            const metrics = runs.map(run => computeRunMetrics({ run, warnings, events: eventsHistory, grid }));
+
+            forecastReportByPlayerIdRef.current[pid] = metrics;
+            setForecastReportVersion(v => v + 1);
+        };
+
+		const updateTruthEvents = (simTimeSeconds) => {
+	        if (!Number.isFinite(simTimeSeconds)) return;
         const lastSample = lastEventSampleRef.current;
         if (Number.isFinite(lastSample) && simTimeSeconds - lastSample < EVENT_SAMPLE_INTERVAL_SECONDS) return;
         lastEventSampleRef.current = simTimeSeconds;
@@ -3692,14 +4747,15 @@ const App = () => {
         const hazards = getUnlockedWarningHazards(currentPlayerRef.current);
         store.active = store.active.filter(e => hazards.includes(e.hazardType));
         store.history = store.history.filter(e => hazards.includes(e.hazardType));
-        const N = grid.nx * grid.ny;
-        const minCells = 25;
-		const matchIoUMin = 0.12;
-		const footprintCutoff = simTimeSeconds - EVENT_FOOTPRINT_RETENTION_SECONDS;
+	        const N = grid.nx * grid.ny;
+	        const minCells = 25;
+			const matchIoUMin = 0.12;
+			const footprintCutoff = simTimeSeconds - EVENT_FOOTPRINT_RETENTION_SECONDS;
+            let closedAnyEvent = false;
 
-		hazards.forEach((hazardType) => {
-			const maskResult = buildTruthEventMask({ hazardType, grid, fields, serviceMask });
-			if (!maskResult) return;
+			hazards.forEach((hazardType) => {
+				const maskResult = buildTruthEventMask({ hazardType, grid, fields, serviceMask });
+				if (!maskResult) return;
 
 			const { labels, components } = labelConnectedComponents(maskResult.mask, grid.nx, grid.ny, maskResult.values);
 			const filtered = components.filter(c => c.cellCount >= minCells);
@@ -3843,20 +4899,81 @@ const App = () => {
                                     matchedWarningId = warning.id;
                                 }
                             });
-                            if (bestIoU >= IOU_MATCH_MIN) {
-                                event.matched = true;
-                                event.matchedWarningId = matchedWarningId;
-                            } else {
-                                const player = currentPlayerRef.current;
-                                const penaltyMoney = -(PENALTY.missMoney[event.hazardType] ?? 0);
+	                            const iouMatchMin = tuningParamsRef.current?.iouMatchMin ?? IOU_MATCH_MIN;
+	                            if (bestIoU >= iouMatchMin) {
+	                                event.matched = true;
+	                                event.matchedWarningId = matchedWarningId;
+	                            } else {
+	                                const player = currentPlayerRef.current;
+	                                const penaltyMoney = -(PENALTY.missMoney[event.hazardType] ?? 0);
                                 const repDelta = PENALTY.missRep[event.hazardType] ?? 0;
                                 applyPlayerScoreDelta(player, penaltyMoney, repDelta);
+                                const meta = getScoringMeta(playerId, simTimeSeconds);
+                                if (meta) {
+                                    const prevStreak = meta.hitStreak ?? 0;
+                                    if (prevStreak !== 0) {
+                                        earth.logWeatherEvent?.(
+                                            'hitStreak',
+                                            { playerId, prevStreak, nextStreak: 0, streakMult: 1 },
+                                            { simTimeSeconds }
+                                        );
+                                    }
+                                    meta.hitStreak = 0;
+                                }
                                 event.outcome = 'miss';
                                 event.moneyDelta = penaltyMoney;
                                 event.repDelta = repDelta;
                                 notify(
                                     'warning',
                                     `Missed event: ${event.hazardType}, ${formatMoneyDelta(penaltyMoney)}, ${formatRepDelta(repDelta)} rep`
+                                );
+                                const warnings = warningsByPlayerIdRef.current[playerId] || [];
+                                const missClassification = classifyMissedEvent({
+                                    event,
+                                    warnings,
+                                    grid,
+                                    simTimeSeconds
+                                });
+                                let eventMask = event.maskAtPeak || event.lastMask || null;
+                                if (!eventMask && Array.isArray(event.footprintSamples) && event.footprintSamples.length > 0) {
+                                    const lastSample = event.footprintSamples[event.footprintSamples.length - 1];
+                                    if (lastSample?.indices) {
+                                        eventMask = makeMaskFromIndices(lastSample.indices, grid.nx * grid.ny);
+                                    }
+                                }
+                                const eventCentroid = eventMask ? computeMaskCentroid(eventMask, grid).centroid : null;
+                                const postmortemEntry = {
+                                    kind: 'miss',
+                                    playerId,
+                                    eventId: event.id,
+                                    hazardType: event.hazardType,
+                                    outcome: 'miss',
+                                    startSimTimeSeconds: event.startSimTimeSeconds,
+                                    endSimTimeSeconds: event.endSimTimeSeconds,
+                                    peakSimTimeSeconds: event.peakSimTimeSeconds ?? null,
+                                    maxSeverityValue: event.maxSeverityValue ?? null,
+                                    maxSeverityLatLonDeg: event.maxSeverityLatLonDeg ?? null,
+                                    eventCentroid,
+                                    bestOverlapSimTimeSeconds: missClassification.bestOverlapSimTimeSeconds ?? event.peakSimTimeSeconds ?? null,
+                                    classification: {
+                                        primaryTag: missClassification.primaryTag,
+                                        detailLines: missClassification.detailLines
+                                    },
+                                    warningMask: missClassification.warningMask ?? null,
+                                    eventMask
+                                };
+                                enqueuePostmortem(postmortemEntry);
+                                earth.logWeatherEvent?.(
+                                    'postmortem',
+                                    {
+                                        playerId,
+                                        kind: 'miss',
+                                        eventId: event.id,
+                                        hazardType: event.hazardType,
+                                        bestOverlapSimTimeSeconds: postmortemEntry.bestOverlapSimTimeSeconds,
+                                        classificationTag: missClassification.primaryTag
+                                    },
+                                    { simTimeSeconds: event.endSimTimeSeconds ?? simTimeSeconds }
                                 );
                             }
                         }
@@ -3878,21 +4995,25 @@ const App = () => {
                             repDelta: event.repDelta ?? null
                         },
                         { simTimeSeconds: event.endSimTimeSeconds }
-                    );
-                }
-				store.history.push(event);
-				return false;
+	                    );
+	                }
+					store.history.push(event);
+                    closedAnyEvent = true;
+					return false;
+				});
 			});
-		});
 
-		if (Array.isArray(store.history) && store.history.length > 0) {
+			if (Array.isArray(store.history) && store.history.length > 0) {
 			const historyCutoff = simTimeSeconds - EVENT_HISTORY_RETENTION_SECONDS;
 			store.history = store.history.filter((event) => {
 				const tEnd = event.endSimTimeSeconds ?? event.lastSeenSimTimeSeconds;
 				return !Number.isFinite(tEnd) || tEnd >= historyCutoff;
-			});
-		}
-	};
+				});
+			}
+            if (closedAnyEvent) {
+                refreshForecastReport(playerId);
+            }
+		};
 
     const updateForecastSkillTelemetry = () => {
         const earth = earthRef.current;
@@ -4147,6 +5268,7 @@ const App = () => {
         const player = currentPlayerRef.current;
         const playerId = player?.id;
         if (!playerId) return;
+        const scoringMeta = getScoringMeta(playerId, simTimeSeconds);
         const warnings = warningsByPlayerIdRef.current[playerId];
         if (!warnings || warnings.length === 0) return;
         const truthCore = earthRef.current?.weatherField?.core;
@@ -4203,10 +5325,12 @@ const App = () => {
             const iouFactor = Math.max(0, Math.min(1, bestIoU));
 
             let next = warning;
-            if (bestEvent && bestIoU >= IOU_MATCH_MIN) {
-                const base = PAYOUT.hitBase[warning.hazardType] ?? 0;
-                let areaFracService = warning.areaFracService;
-                let meanConfidence = warning.meanConfidence;
+            let postmortemEntry = null;
+	            const iouMatchMin = tuningParamsRef.current?.iouMatchMin ?? IOU_MATCH_MIN;
+	            if (bestEvent && bestIoU >= iouMatchMin) {
+	                const base = PAYOUT.hitBase[warning.hazardType] ?? 0;
+	                let areaFracService = warning.areaFracService;
+	                let meanConfidence = warning.meanConfidence;
                 if (!Number.isFinite(areaFracService) || !Number.isFinite(meanConfidence)) {
                     const weights = getAreaWeights(grid);
                     const serviceMask = getServiceMask(grid);
@@ -4235,22 +5359,59 @@ const App = () => {
                             }
                         }
                     }
+	                }
+	                const confValue = Number.isFinite(meanConfidence) ? meanConfidence : 0;
+	                const areaValue = Number.isFinite(areaFracService) ? areaFracService : PRECISION_AREA_NONE_FRAC;
+	                const confidenceTuning = tuningParamsRef.current?.confidence || {};
+	                const precisionBonusMax = Number.isFinite(confidenceTuning.precisionBonusMax)
+	                    ? confidenceTuning.precisionBonusMax
+	                    : PRECISION_BONUS_MAX;
+	                const precisionConfStart = Number.isFinite(confidenceTuning.precisionConfStart)
+	                    ? confidenceTuning.precisionConfStart
+	                    : PRECISION_CONF_START;
+	                const precisionConfFull = Number.isFinite(confidenceTuning.precisionConfFull)
+	                    ? confidenceTuning.precisionConfFull
+	                    : PRECISION_CONF_FULL;
+	                const confSpan = precisionConfFull - precisionConfStart;
+	                const confFactor = Math.max(
+	                    0,
+	                    Math.min(1, confSpan > 0 ? (confValue - precisionConfStart) / confSpan : 0)
+	                );
+	                const areaFactor = Math.max(
+	                    0,
+	                    Math.min(1, (PRECISION_AREA_NONE_FRAC - areaValue) / (PRECISION_AREA_NONE_FRAC - PRECISION_AREA_FULL_FRAC))
+	                );
+	                const precisionMult = 1 + precisionBonusMax * confFactor * areaFactor;
+	                let streakMult = 1;
+                let nextStreak = scoringMeta?.hitStreak ?? 0;
+                if (scoringMeta) {
+                    const prevStreak = scoringMeta.hitStreak ?? 0;
+                    nextStreak = prevStreak + 1;
+                    streakMult = 1 + Math.min(STREAK_BONUS_PER_HIT * Math.max(0, nextStreak - 1), STREAK_BONUS_CAP);
+                    scoringMeta.hitStreak = nextStreak;
+                    earthRef.current?.logWeatherEvent?.(
+                        'hitStreak',
+                        { playerId, prevStreak, nextStreak, streakMult },
+                        { simTimeSeconds }
+                    );
                 }
-                const confValue = Number.isFinite(meanConfidence) ? meanConfidence : 0;
-                const areaValue = Number.isFinite(areaFracService) ? areaFracService : PRECISION_AREA_NONE_FRAC;
-                const confFactor = Math.max(
-                    0,
-                    Math.min(1, (confValue - PRECISION_CONF_START) / (PRECISION_CONF_FULL - PRECISION_CONF_START))
-                );
-                const areaFactor = Math.max(
-                    0,
-                    Math.min(1, (PRECISION_AREA_NONE_FRAC - areaValue) / (PRECISION_AREA_NONE_FRAC - PRECISION_AREA_FULL_FRAC))
-                );
-                const precisionMult = 1 + PRECISION_BONUS_MAX * confFactor * areaFactor;
-                const payout = base * Math.pow(iouFactor, 1.2) * (0.6 + 0.4 * noticeFactor) * precisionMult;
+                const payout = base * Math.pow(iouFactor, 1.2) * (0.6 + 0.4 * noticeFactor) * precisionMult * streakMult;
                 const repBase = HIT_REP_BASE[warning.hazardType] ?? 2;
                 const repDelta = Math.round(repBase * iouFactor * (0.6 + 0.4 * noticeFactor));
                 applyPlayerScoreDelta(player, payout, repDelta);
+                if (scoringMeta) {
+                    scoringMeta.hitsToday += 1;
+                    if (scoringMeta.hitsToday >= DAILY_GOAL_HITS && scoringMeta.dailyGoalAwardedDayIndex !== scoringMeta.dayIndex) {
+                        applyPlayerScoreDelta(player, 0, DAILY_GOAL_REP_BONUS);
+                        scoringMeta.dailyGoalAwardedDayIndex = scoringMeta.dayIndex;
+                        notify('success', `Daily goal achieved: ${DAILY_GOAL_HITS} hits today (+${DAILY_GOAL_REP_BONUS} rep).`);
+                        earthRef.current?.logWeatherEvent?.(
+                            'dailyGoalAchieved',
+                            { playerId, dayIndex: scoringMeta.dayIndex, repBonus: DAILY_GOAL_REP_BONUS },
+                            { simTimeSeconds }
+                        );
+                    }
+                }
                 bestEvent.matched = true;
                 next = {
                     ...warning,
@@ -4260,6 +5421,8 @@ const App = () => {
                     advanceNoticeHours,
                     moneyDelta: payout,
                     repDelta,
+                    hitStreak: nextStreak,
+                    streakMultiplier: streakMult,
                     areaFracService: Number.isFinite(areaFracService) ? areaFracService : null,
                     meanConfidence: Number.isFinite(meanConfidence) ? meanConfidence : null,
                     precisionMultiplier: precisionMult,
@@ -4269,10 +5432,77 @@ const App = () => {
                     'success',
                     `Hit: ${warning.hazardType}, ${formatHoursLabel(Math.round(advanceNoticeHours))}, ${formatMoneyDelta(payout)}, ${formatRepDelta(repDelta)} rep, precision x${precisionMult.toFixed(2)}`
                 );
+                const classification = (() => {
+                    const areaValueSafe = Number.isFinite(areaFracService) ? areaFracService : null;
+                    if (Number.isFinite(areaValueSafe) && areaValueSafe >= TOO_BROAD_AREA_FRAC) {
+                        return {
+                            primaryTag: 'tooBroad',
+                            detailLines: [`Covered ${Math.round(areaValueSafe * 100)}% of service area; smaller polygons score better.`]
+                        };
+                    }
+                    return { primaryTag: null, detailLines: ['Clean hit.'] };
+                })();
+                const overlapStart = Math.max(warning.validStartSimTimeSeconds, bestEvent.startSimTimeSeconds);
+                const overlapEnd = Math.min(warning.validEndSimTimeSeconds, bestEvent.endSimTimeSeconds ?? simTimeSeconds);
+                const overlapDetail = computeBestEventOverlapInWindowDetailed(
+                    bestEvent,
+                    warningMask,
+                    warningArea,
+                    grid,
+                    overlapStart,
+                    overlapEnd
+                );
+                const eventMask = overlapDetail.bestMaskFallback
+                    || (overlapDetail.bestIndices ? makeMaskFromIndices(overlapDetail.bestIndices, grid.nx * grid.ny) : null)
+                    || bestEvent.maskAtPeak
+                    || bestEvent.lastMask
+                    || null;
+                const eventCentroid = eventMask ? computeMaskCentroid(eventMask, grid).centroid : null;
+                postmortemEntry = {
+                    kind: 'warning',
+                    playerId,
+                    warningId: next.id,
+                    hazardType: next.hazardType,
+                    outcome: next.outcome,
+                    issuedAtSimTimeSeconds: warning.issuedAtSimTimeSeconds,
+                    validStartSimTimeSeconds: warning.validStartSimTimeSeconds,
+                    validEndSimTimeSeconds: warning.validEndSimTimeSeconds,
+                    forecastLeadHours: warning.forecastLeadHours,
+                    iou: next.iou,
+                    moneyDelta: next.moneyDelta,
+                    repDelta: next.repDelta,
+                    areaFracService: next.areaFracService ?? null,
+                    meanConfidence: next.meanConfidence ?? null,
+                    hitStreak: next.hitStreak ?? null,
+                    streakMultiplier: next.streakMultiplier ?? null,
+                    eventId: bestEvent.id,
+                    eventHazardType: bestEvent.hazardType,
+                    bestOverlapSimTimeSeconds: overlapDetail.bestSimTimeSeconds ?? bestEvent.peakSimTimeSeconds ?? null,
+                    bestIoU: overlapDetail.bestIoU ?? null,
+                    eventMaxSeverityValue: bestEvent.maxSeverityValue ?? null,
+                    eventMaxSeverityLatLonDeg: bestEvent.maxSeverityLatLonDeg ?? null,
+                    eventCentroid,
+                    classification,
+                    warningMask,
+                    eventMask,
+                    eventIndices: overlapDetail.bestIndices ?? null
+                };
             } else {
                 const penaltyMoney = -(PENALTY.falseAlarmMoney[warning.hazardType] ?? 0);
                 const repDelta = PENALTY.falseAlarmRep[warning.hazardType] ?? 0;
                 applyPlayerScoreDelta(player, penaltyMoney, repDelta);
+                if (scoringMeta) {
+                    const prevStreak = scoringMeta.hitStreak ?? 0;
+                    if (prevStreak !== 0) {
+                        scoringMeta.hitStreak = 0;
+                        earthRef.current?.logWeatherEvent?.(
+                            'hitStreak',
+                            { playerId, prevStreak, nextStreak: 0, streakMult: 1 },
+                            { simTimeSeconds }
+                        );
+                    }
+                    scoringMeta.hitStreak = 0;
+                }
                 next = {
                     ...warning,
                     outcome: 'falseAlarm',
@@ -4286,6 +5516,67 @@ const App = () => {
                     'warning',
                     `False alarm: ${warning.hazardType}, ${formatMoneyDelta(penaltyMoney)}, ${formatRepDelta(repDelta)} rep`
                 );
+                const classification = classifyFalseAlarm({
+                    warning,
+                    warningMask,
+                    warningArea,
+                    grid,
+                    allEvents,
+                    simTimeSeconds,
+                    bestOverlapEvent: bestEvent,
+                    bestOverlapIoU: bestIoU
+                });
+                const altEvent = classification.bestEvent ?? null;
+                let overlapDetail = classification.bestOverlap ?? null;
+                if (altEvent && !overlapDetail) {
+                    const altEventEnd = altEvent.endSimTimeSeconds ?? simTimeSeconds;
+                    const overlapStart = Math.max(warning.validStartSimTimeSeconds, altEvent.startSimTimeSeconds);
+                    const overlapEnd = Math.min(warning.validEndSimTimeSeconds, altEventEnd);
+                    overlapDetail = computeBestEventOverlapInWindowDetailed(
+                        altEvent,
+                        warningMask,
+                        warningArea,
+                        grid,
+                        overlapStart,
+                        overlapEnd
+                    );
+                }
+                const eventMask = overlapDetail?.bestMaskFallback
+                    || (overlapDetail?.bestIndices ? makeMaskFromIndices(overlapDetail.bestIndices, grid.nx * grid.ny) : null)
+                    || altEvent?.maskAtPeak
+                    || altEvent?.lastMask
+                    || null;
+                const eventCentroid = eventMask ? computeMaskCentroid(eventMask, grid).centroid : null;
+                postmortemEntry = {
+                    kind: 'warning',
+                    playerId,
+                    warningId: next.id,
+                    hazardType: next.hazardType,
+                    outcome: next.outcome,
+                    issuedAtSimTimeSeconds: warning.issuedAtSimTimeSeconds,
+                    validStartSimTimeSeconds: warning.validStartSimTimeSeconds,
+                    validEndSimTimeSeconds: warning.validEndSimTimeSeconds,
+                    forecastLeadHours: warning.forecastLeadHours,
+                    iou: next.iou,
+                    moneyDelta: next.moneyDelta,
+                    repDelta: next.repDelta,
+                    areaFracService: warning.areaFracService ?? null,
+                    meanConfidence: warning.meanConfidence ?? null,
+                    eventId: altEvent?.id ?? null,
+                    eventHazardType: altEvent?.hazardType ?? null,
+                    bestOverlapSimTimeSeconds: overlapDetail?.bestSimTimeSeconds ?? null,
+                    bestIoU: overlapDetail?.bestIoU ?? null,
+                    eventMaxSeverityValue: altEvent?.maxSeverityValue ?? null,
+                    eventMaxSeverityLatLonDeg: altEvent?.maxSeverityLatLonDeg ?? null,
+                    eventCentroid,
+                    classification: {
+                        primaryTag: classification.primaryTag,
+                        detailLines: classification.detailLines
+                    },
+                    warningMask,
+                    eventMask,
+                    eventIndices: overlapDetail?.bestIndices ?? null
+                };
             }
 
             earthRef.current?.logWeatherEvent?.(
@@ -4306,21 +5597,39 @@ const App = () => {
                 },
                 { simTimeSeconds }
             );
+            if (postmortemEntry) {
+                enqueuePostmortem(postmortemEntry);
+                earthRef.current?.logWeatherEvent?.(
+                    'postmortem',
+                    {
+                        playerId,
+                        kind: 'warning',
+                        warningId: next.id,
+                        outcome: next.outcome,
+                        hazardType: next.hazardType,
+                        bestOverlapSimTimeSeconds: postmortemEntry.bestOverlapSimTimeSeconds ?? null,
+                        iou: next.iou,
+                        classificationTag: postmortemEntry.classification?.primaryTag ?? null
+                    },
+                    { simTimeSeconds }
+                );
+            }
             changed = true;
             return next;
         });
 
-        if (changed) {
-            setWarningsByPlayerId(prev => ({
-                ...prev,
-                [playerId]: nextWarnings
-            }));
-            warningsByPlayerIdRef.current = {
-                ...warningsByPlayerIdRef.current,
-                [playerId]: nextWarnings
-            };
-        }
-    };
+	        if (changed) {
+	            setWarningsByPlayerId(prev => ({
+	                ...prev,
+	                [playerId]: nextWarnings
+	            }));
+	            warningsByPlayerIdRef.current = {
+	                ...warningsByPlayerIdRef.current,
+	                [playerId]: nextWarnings
+	            };
+                refreshForecastReport(playerId);
+	        }
+	    };
 
 	useEffect(() => {
 		const focus = warningOverlayFocusRef.current;
@@ -4542,6 +5851,13 @@ const App = () => {
                         setCloudWatchDebugInfo(uiEntries);
                     }
                 }
+                const nowMs = performance.now();
+                if (nowMs - windTargetsStatusRef.current.lastUpdateMs > 500) {
+                    windTargetsStatusRef.current.lastUpdateMs = nowMs;
+                    setWindTargetsStatus(earth.getWindTargetsStatus?.() ?? null);
+                    setWindReferenceDiagnostics(earth.getWindReferenceDiagnostics?.() ?? null);
+                    setWindReferenceComparison(earth.getWindReferenceComparison?.() ?? null);
+                }
             }
 
             updateTruthEvents(simTimeSeconds);
@@ -4703,12 +6019,40 @@ const App = () => {
             if (intersects.length > 0) {
                 const intersectPoint = intersects[0].point;
                 hqSphereRef.current.position.copy(intersectPoint);
+                if (placeUplinkHubRef.current && uplinkHubGhostRef.current) {
+                    const localPoint = intersectPoint.clone();
+                    earth.parentObject.worldToLocal(localPoint);
+                    const latLon = vectorToLatLonRad(localPoint);
+                    if (latLon) {
+                        const latDeg = THREE.MathUtils.radToDeg(latLon.latRad);
+                        const lonDeg = THREE.MathUtils.radToDeg(latLon.lonRad);
+                        positionUplinkHubMesh(uplinkHubGhostRef.current, latDeg, lonDeg, earth);
+                    }
+                }
             } else {
                 const vector = new THREE.Vector3(mouse.x, mouse.y, 0.5).unproject(cameraRef.current);
                 vector.sub(cameraRef.current.position).normalize();
                 const distance = -cameraRef.current.position.z / vector.z;
                 const pos = cameraRef.current.position.clone().add(vector.multiplyScalar(distance));
                 hqSphereRef.current.position.copy(pos);
+            }
+        } else if (placeUplinkHubRef.current && uplinkHubGhostRef.current) {
+            const mouse = new THREE.Vector2(
+                (event.clientX / window.innerWidth) * 2 - 1,
+                -(event.clientY / window.innerHeight) * 2 + 1
+            );
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, cameraRef.current);
+            const intersects = raycaster.intersectObject(earth.mesh);
+            if (intersects.length > 0) {
+                const localPoint = intersects[0].point.clone();
+                earth.parentObject.worldToLocal(localPoint);
+                const latLon = vectorToLatLonRad(localPoint);
+                if (latLon) {
+                    const latDeg = THREE.MathUtils.radToDeg(latLon.latRad);
+                    const lonDeg = THREE.MathUtils.radToDeg(latLon.lonRad);
+                    positionUplinkHubMesh(uplinkHubGhostRef.current, latDeg, lonDeg, earth);
+                }
             }
         }
 
@@ -4933,15 +6277,16 @@ const App = () => {
             const nextLead = leadList.includes(forecastLeadHoursRef.current)
                 ? forecastLeadHoursRef.current
                 : leadList[0];
-            setForecastLeadHours(nextLead);
-            earth.setForecastDisplayLeadHours?.(nextLead);
-            earth.setForecastDisplayProduct?.(forecastProductRef.current);
-            earth.setForecastOverlayVisible?.(showForecastOverlayRef.current);
+	            setForecastLeadHours(nextLead);
+	            earth.setForecastDisplayLeadHours?.(nextLead);
+	            earth.setForecastDisplayProduct?.(forecastProductRef.current);
+	            earth.setForecastOverlayVisible?.(showForecastOverlayRef.current);
+                refreshForecastReport(player.id);
 
-            const grid = earth.weatherField?.core?.grid;
-            const leadHours = result.leadHours.includes(nextLead) ? nextLead : result.leadHours[0];
-            const unlockedHazards = getUnlockedWarningHazards(player);
-            const autoDrafts = buildAutoWarningsFromForecast({
+	            const grid = earth.weatherField?.core?.grid;
+	            const leadHours = result.leadHours.includes(nextLead) ? nextLead : result.leadHours[0];
+	            const unlockedHazards = getUnlockedWarningHazards(player);
+            const { drafts: autoDrafts = [], diagnostics } = buildAutoWarningsFromForecast({
                 forecastResult: result,
                 grid,
                 issuedAtSimTimeSeconds: simTimeSeconds,
@@ -4950,6 +6295,16 @@ const App = () => {
                 maxPolygonsPerHazard: MAX_DRAFTS_PER_HAZARD,
                 mode: 'draft'
             });
+            if (diagnostics) {
+                setAutoWarningDiagnosticsByPlayerId(prev => ({
+                    ...prev,
+                    [player.id]: diagnostics
+                }));
+                autoWarningDiagnosticsByPlayerIdRef.current = {
+                    ...autoWarningDiagnosticsByPlayerIdRef.current,
+                    [player.id]: diagnostics
+                };
+            }
             if (autoDrafts.length > 0) {
                 setDraftWarningsByPlayerId(prev => ({
                     ...prev,
@@ -4970,43 +6325,82 @@ const App = () => {
                 };
             }
 
-            const weights = getAreaWeights(grid);
-            const confValues = result.products.confidenceByLead?.[result.leadHours.indexOf(leadHours)];
-            if (weights && confValues) {
-                const serviceMask = getServiceMask(grid);
-                const hqLocs = getPlayerHqLatLonDegList(player.id);
-                const radarMask = buildRadarCoverageMask(grid, hqLocs, DOPPLER_RADAR_RADIUS_KM);
-                const restMask = serviceMask ? new Uint8Array(serviceMask.length) : null;
-                if (serviceMask && restMask) {
-                    for (let k = 0; k < serviceMask.length; k++) {
-                        restMask[k] = serviceMask[k] === 1 && radarMask[k] !== 1 ? 1 : 0;
+            const noDrafts = autoDrafts.length === 0;
+            if (noDrafts) {
+                const diag = diagnostics;
+                const hazardsDiag = diag?.hazards || {};
+                if (!diag || diag.reason === 'missingForecast') {
+                    notify('info', 'No drafts: forecast data unavailable');
+                } else if (diag.reason === 'missingGrid') {
+                    notify('info', 'No drafts: forecast grid unavailable');
+                } else if (diag.reason === 'leadNotFound') {
+                    notify('info', 'No drafts: lead time not found in forecast');
+                } else if (diag.serviceCellCount === 0) {
+                    notify('info', 'No drafts: service area is empty (place an HQ)');
+                } else {
+                    const allZero = unlockedHazards.length > 0 && unlockedHazards.every((haz) => {
+                        const h = hazardsDiag[haz];
+                        return !h || h.cellsOverThreshold === 0;
+                    });
+                    if (allZero) {
+                        notify('info', 'No drafts: hazard never exceeded threshold in service area');
+                    } else {
+                        const nonZeroHazards = unlockedHazards.filter((haz) => {
+                            const h = hazardsDiag[haz];
+                            return h && h.cellsOverThreshold > 0;
+                        });
+                        const allTooSmall = nonZeroHazards.length > 0 && nonZeroHazards.every((haz) => {
+                            const h = hazardsDiag[haz];
+                            return h.componentCount > 0
+                                && h.draftCount === 0
+                                && h.componentsDroppedTooSmall === h.componentCount;
+                        });
+                        if (allTooSmall) {
+                            notify('info', 'No drafts: all components were below minimum size');
+                        } else {
+                            notify('info', 'No drafts: all components exceeded area cap');
+                        }
                     }
                 }
-                const radarMean = computeWeightedMeanWithMask(
-                    confValues,
-                    weights,
-                    radarMask,
-                    grid.nx,
-                    grid.ny
-                );
-                const serviceMean = serviceMask
-                    ? computeWeightedMeanWithMask(confValues, weights, serviceMask, grid.nx, grid.ny)
-                    : null;
-                const serviceRestMean = restMask
-                    ? computeWeightedMeanWithMask(confValues, weights, restMask, grid.nx, grid.ny)
-                    : null;
-                if (Number.isFinite(radarMean) && Number.isFinite(serviceRestMean) && radarMean >= 0.75 && serviceRestMean < 0.55) {
-                    notify('info', 'Radar confidence is high near HQ — issue a small 1–3h polygon there.');
-                } else if (Number.isFinite(serviceMean) && serviceMean >= 0.6) {
-                    notify('info', 'Confidence is high — smaller polygons score better. Tighten your warning.');
-                } else {
-                    notify('info', 'Confidence is low — stick to 1h and avoid over-precise polygons.');
+            } else {
+                const weights = getAreaWeights(grid);
+                const confValues = result.products.confidenceByLead?.[result.leadHours.indexOf(leadHours)];
+                if (weights && confValues) {
+                    const serviceMask = getServiceMask(grid);
+                    const radarLocs = getPlayerRadarHubLatLonDegList(player.id);
+                    const radarMask = buildRadarCoverageMask(grid, radarLocs, RADAR_RADIUS_KM);
+                    const restMask = serviceMask ? new Uint8Array(serviceMask.length) : null;
+                    if (serviceMask && restMask) {
+                        for (let k = 0; k < serviceMask.length; k++) {
+                            restMask[k] = serviceMask[k] === 1 && radarMask[k] !== 1 ? 1 : 0;
+                        }
+                    }
+                    const radarMean = computeWeightedMeanWithMask(
+                        confValues,
+                        weights,
+                        radarMask,
+                        grid.nx,
+                        grid.ny
+                    );
+                    const serviceMean = serviceMask
+                        ? computeWeightedMeanWithMask(confValues, weights, serviceMask, grid.nx, grid.ny)
+                        : null;
+                    const serviceRestMean = restMask
+                        ? computeWeightedMeanWithMask(confValues, weights, restMask, grid.nx, grid.ny)
+                        : null;
+                    if (Number.isFinite(radarMean) && Number.isFinite(serviceRestMean) && radarMean >= 0.75 && serviceRestMean < 0.55) {
+                        notify('info', 'Radar confidence is high near HQ — issue a small 1–3h polygon there.');
+                    } else if (Number.isFinite(serviceMean) && serviceMean >= 0.6) {
+                        notify('info', 'Confidence is high — smaller polygons score better. Tighten your warning.');
+                    } else {
+                        notify('info', 'Confidence is low — stick to 1h and avoid over-precise polygons.');
+                    }
                 }
-            }
-            if (!forecastHintShownRef.current) {
-                forecastHintShownRef.current = true;
-                notify('info', 'Draft warnings don’t score until you Issue them.');
-                notify('info', 'Use Confidence (Advanced) to find where small warnings pay more.');
+                if (!forecastHintShownRef.current) {
+                    forecastHintShownRef.current = true;
+                    notify('info', 'Draft warnings don’t score until you Issue them.');
+                    notify('info', 'Use Confidence (Advanced) to find where small warnings pay more.');
+                }
             }
         };
 
@@ -5019,6 +6413,78 @@ const App = () => {
         } else {
             runFn();
         }
+    };
+
+    const addRadiosondeModuleToSelectedHub = () => {
+        const player = currentPlayerRef.current;
+        const earth = earthRef.current;
+        if (!player) return;
+        const hub = getSelectedHubForPlayer(player.id, selectedUplinkHubIdRef.current);
+        if (!hub || hub.ownerId !== player.id) {
+            notify('warning', 'Select one of your hubs to add a radiosonde module.');
+            return;
+        }
+        if (hub.modules?.radiosonde === true) return;
+        const simTimeSeconds = simClockRef.current?.simTimeSeconds ?? 0;
+        const applyFn = () => {
+            hub.modules = { ...hub.modules, radiosonde: true };
+            setUplinkHubsVersion(v => v + 1);
+            syncUplinkHubsToEarth();
+            earth?.logWeatherEvent?.(
+                'uplinkHubModuleAdded',
+                { playerId: player.id, hubId: hub.id, module: 'radiosonde' },
+                { simTimeSeconds }
+            );
+            notify('info', 'Radiosonde module installed.');
+        };
+        const registry = actionRegistryRef.current;
+        if (registry?.perform) {
+            const ok = registry.perform('ADD_RADIOSONDE_MODULE', player.id, { applyFn });
+            if (!ok) {
+                notify('warning', 'Upgrade blocked: not your turn, insufficient AP, or insufficient funds.');
+            }
+        } else {
+            applyFn();
+        }
+    };
+
+    const addRadarModuleToSelectedHub = () => {
+        const player = currentPlayerRef.current;
+        const earth = earthRef.current;
+        if (!player) return;
+        const hub = getSelectedHubForPlayer(player.id, selectedUplinkHubIdRef.current);
+        if (!hub || hub.ownerId !== player.id) return;
+        if (hub.isHqHub === true || hub.modules?.radar === true) return;
+        hub.modules = { ...hub.modules, radar: true };
+        const simTimeSeconds = simClockRef.current?.simTimeSeconds ?? 0;
+        syncUplinkHubsToEarth();
+        setUplinkHubsVersion(v => v + 1);
+        renderPlayerObjects();
+        earth?.logWeatherEvent?.(
+            'uplinkHubModuleAdded',
+            { playerId: player.id, hubId: hub.id, module: 'radar' },
+            { simTimeSeconds }
+        );
+    };
+
+    const upgradeDenseSurfaceForSelectedHub = () => {
+        const player = currentPlayerRef.current;
+        const earth = earthRef.current;
+        if (!player) return;
+        if (getForecastTier(player) < 4) return;
+        const hub = getSelectedHubForPlayer(player.id, selectedUplinkHubIdRef.current);
+        if (!hub || hub.ownerId !== player.id) return;
+        if (hub.modules?.denseSurface === true) return;
+        hub.modules = { ...hub.modules, denseSurface: true };
+        const simTimeSeconds = simClockRef.current?.simTimeSeconds ?? 0;
+        syncUplinkHubsToEarth();
+        setUplinkHubsVersion(v => v + 1);
+        renderPlayerObjects();
+        earth?.logWeatherEvent?.(
+            'uplinkHubModuleAdded',
+            { playerId: player.id, hubId: hub.id, module: 'denseSurface' },
+            { simTimeSeconds }
+        );
     };
 
     const upgradeForecastTech = () => {
@@ -5054,6 +6520,9 @@ const App = () => {
                 { simTimeSeconds }
             );
             notify('info', toastByTier[nextTier] || 'Forecast tech upgraded.');
+            if (nextTier === 2 && ensureHqRadiosondeModuleInstalled(player.id)) {
+                notify('info', 'HQ begins scheduled radiosonde launches.');
+            }
         };
         const registry = actionRegistryRef.current;
         if (registry?.perform) {
@@ -5544,9 +7013,94 @@ const App = () => {
             }));
             return;
         }
+        if (placeUplinkHubRef.current) {
+            const earth = earthRef.current;
+            const player = currentPlayerRef.current;
+            if (!earth?.mesh || !player) {
+                notify('error', 'Earth not ready yet.');
+                return;
+            }
+            const latLon = getEarthClickLatLonDeg(event);
+            if (!latLon) {
+                notify('warning', 'Click the Earth surface to place a hub.');
+                return;
+            }
+            const { latDeg, lonDeg } = latLon;
+            const buildFn = () => {
+                const hub = new UplinkHub({
+                    id: `uplink-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+                    ownerId: player.id,
+                    latDeg,
+                    lonDeg,
+                    earth,
+                    modules: { surface: true, radiosonde: false, radar: false, denseSurface: false }
+                });
+                const list = uplinkHubsByPlayerIdRef.current[player.id] || [];
+                uplinkHubsByPlayerIdRef.current[player.id] = [...list, hub];
+                if (hub.mesh && earth.parentObject) {
+                    earth.parentObject.add(hub.mesh);
+                }
+                syncUplinkHubsToEarth();
+                setUplinkHubsVersion(v => v + 1);
+                renderPlayerObjects();
+            };
+            const registry = actionRegistryRef.current;
+            if (registry?.perform) {
+                const ok = registry.perform('BUILD_UPLINK_HUB', player.id, { buildFn });
+                if (!ok) {
+                    notify('warning', 'Build blocked: not your turn, insufficient AP, or insufficient funds.');
+                    return;
+                }
+            } else {
+                buildFn();
+            }
+            placeUplinkHubRef.current = false;
+            if (uplinkHubGhostRef.current) {
+                uplinkHubGhostRef.current.parent?.remove?.(uplinkHubGhostRef.current);
+                uplinkHubGhostRef.current = null;
+            }
+            return;
+        }
 		if (!showHQSphereRef.current && !orbitDragRef.current.active) {
 			const latLon = getEarthClickLatLonDeg(event);
 			if (latLon) {
+                if (!warningDrawModeRef.current && !placeUplinkHubRef.current) {
+                    const player = currentPlayerRef.current;
+                    const hubs = player ? (uplinkHubsByPlayerIdRef.current[player.id] || []) : [];
+                    if (hubs.length) {
+                        const mouse = new THREE.Vector2(
+                            (event.clientX / window.innerWidth) * 2 - 1,
+                            -(event.clientY / window.innerHeight) * 2 + 1
+                        );
+                        const raycaster = new THREE.Raycaster();
+                        raycaster.setFromCamera(mouse, cameraRef.current);
+                        const meshes = hubs.map(hub => hub.mesh).filter(Boolean);
+                        const intersects = raycaster.intersectObjects(meshes);
+                        if (intersects.length > 0) {
+                            const hitMesh = intersects[0].object;
+                            const hitHub = hubs.find(hub => hub.id === hitMesh.userData.uplinkHubId || hub.mesh === hitMesh);
+                            if (hitHub) {
+                                setSelectedUplinkHubId(hitHub.id);
+                                hubs.forEach(hub => {
+                                    if (hub?.mesh) {
+                                        const scale = hub.id === hitHub.id ? 1.25 : 1.0;
+                                        hub.mesh.scale.set(scale, scale, scale);
+                                    }
+                                });
+                                return;
+                            }
+                        } else if (selectedUplinkHubId) {
+                            setSelectedUplinkHubId(null);
+                            hubs.forEach(hub => {
+                                if (hub?.mesh) {
+                                    hub.mesh.scale.set(1, 1, 1);
+                                }
+                            });
+                        }
+                    } else if (selectedUplinkHubId) {
+                        setSelectedUplinkHubId(null);
+                    }
+                }
 				const playerId = currentPlayerRef.current?.id;
 				const warnings = getVisibleWarningsForPlayer(playerId);
 				const matched = findWarningAtPoint(latLon.latDeg, latLon.lonDeg, warnings);
@@ -5613,6 +7167,24 @@ const App = () => {
             'success',
             `HQ placed at lat ${newHQ.latitude.toFixed(1)}°, lon ${newHQ.longitude.toFixed(1)}°`
         );
+        notify('info', 'Engineers deployed a starter observing site at HQ: surface instruments + Doppler radar.');
+
+        const hqHub = new UplinkHub({
+            id: `uplink-hq-${newHQ.id}`,
+            ownerId: currentPlayerRef.current?.id,
+            latDeg: newHQ.latitude,
+            lonDeg: newHQ.longitude,
+            earth,
+            isHqHub: true,
+            modules: { surface: true, radiosonde: false, radar: true, denseSurface: false }
+        });
+        const hubList = uplinkHubsByPlayerIdRef.current[currentPlayerRef.current?.id] || [];
+        uplinkHubsByPlayerIdRef.current[currentPlayerRef.current?.id] = [...hubList, hqHub];
+        if (hqHub.mesh && earth.parentObject) {
+            earth.parentObject.add(hqHub.mesh);
+        }
+        syncUplinkHubsToEarth();
+        setUplinkHubsVersion(v => v + 1);
 
         // Turn off placement preview + remove the draggable ghost sphere
         showHQSphereRef.current = false;
@@ -5623,6 +7195,30 @@ const App = () => {
 
         renderPlayerObjects();
     }
+
+    const positionUplinkHubMesh = (mesh, latDeg, lonDeg, earth) => {
+        if (!mesh || !earth?._latLonToVector3) return;
+        const radius = earth.earthRadiusKm + 8;
+        const localPos = earth._latLonToVector3(latDeg, lonDeg, radius);
+        const normal = localPos.clone().normalize();
+        const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+        mesh.position.copy(localPos);
+        mesh.quaternion.copy(quat);
+    };
+
+    const createUplinkHubGhostMesh = (earth, latDeg, lonDeg) => {
+        const geometry = new THREE.PlaneGeometry(140, 140);
+        const material = new THREE.MeshBasicMaterial({
+            color: 0x94a3b8,
+            transparent: true,
+            opacity: 0.45,
+            depthWrite: false
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.renderOrder = 5;
+        positionUplinkHubMesh(mesh, latDeg, lonDeg, earth);
+        return mesh;
+    };
 
     function handleMouseClick(event) {
         if (event.button === 2) return;
@@ -5738,6 +7334,20 @@ const App = () => {
             hq.sphere.material.needsUpdate = true;
         });
 
+        const hubMap = uplinkHubsByPlayerIdRef.current;
+        Object.keys(hubMap).forEach((playerId) => {
+            const hubs = hubMap[playerId] || [];
+            const isMine = String(playerId) === String(currentPlayer.id);
+            hubs.forEach((hub) => {
+                if (!hub?.mesh) return;
+                if (hub.mesh.parent !== earth.parentObject) earth.parentObject.add(hub.mesh);
+                hub.mesh.visible = isMine;
+                const selected = isMine && hub.id === selectedUplinkHubIdRef.current;
+                const scale = selected ? 1.25 : 1.0;
+                hub.mesh.scale.set(scale, scale, scale);
+            });
+        });
+
         // Add only the current player's satellites back (cones for imaging/cloudWatch/sar)
         currentPlayer.getSatellites().forEach(satellite => {
             scene.add(satellite.mesh);
@@ -5771,112 +7381,77 @@ const App = () => {
         const playerSatellites = currentPlayer.getSatellites();
         const fmtCoord = (v) => (Number.isFinite(v) ? v.toFixed(1) : '—');
 
-        const panelStyle = {
-            position: 'absolute',
-            top: 150,
-            right: 10,
-            width: '26%',
-            minWidth: 260,
-            maxWidth: 420,
-            height: showSatListPanel ? '40%' : 'auto',
-            padding: 12,
-            overflow: 'hidden',
-            zIndex: 1000,
-            ...panelSurfaceStyle
-        };
-
         return (
-            <Paper style={panelStyle}>
-                <Box display="flex" alignItems="center" justifyContent="space-between" mb={showSatListPanel ? 1 : 0}>
-                    <Typography variant="caption" style={panelTitleStyle}>Satellites</Typography>
-                    <IconButton
-                        size="small"
-                        onClick={() => setShowSatListPanel(prev => !prev)}
-                        aria-label="Toggle satellites panel"
-                        sx={{
-                            color: 'rgba(226,232,240,0.85)',
-                            border: '1px solid rgba(148,163,184,0.3)',
-                            borderRadius: 2,
-                            padding: '2px',
-                            '&:hover': { backgroundColor: 'rgba(30,41,59,0.8)' }
-                        }}
-                    >
-                        {showSatListPanel ? <RemoveIcon fontSize="small" /> : <AddIcon fontSize="small" />}
-                    </IconButton>
-                </Box>
-                {showSatListPanel && (
-                    <TableContainer
-                        component={Box}
-                        sx={{
-                            maxHeight: 'calc(40vh - 54px)',
-                            overflowY: 'auto',
-                            borderRadius: 2,
-                            border: '1px solid rgba(148,163,184,0.2)',
-                            backgroundColor: 'rgba(15,23,42,0.5)'
-                        }}
-                    >
-                        <Table size="small" aria-label="satellites table">
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell sx={{ color: 'rgba(226,232,240,0.75)', borderBottom: '1px solid rgba(148,163,184,0.2)' }}>Sat ID</TableCell>
-                                    <TableCell sx={{ color: 'rgba(226,232,240,0.75)', borderBottom: '1px solid rgba(148,163,184,0.2)' }}>Owner</TableCell>
-                                    <TableCell sx={{ color: 'rgba(226,232,240,0.75)', borderBottom: '1px solid rgba(148,163,184,0.2)' }}>Lat/Lon</TableCell>
-                                    <TableCell sx={{ color: 'rgba(226,232,240,0.75)', borderBottom: '1px solid rgba(148,163,184,0.2)' }}>Neighbors</TableCell>
-                                    <TableCell sx={{ color: 'rgba(226,232,240,0.75)', borderBottom: '1px solid rgba(148,163,184,0.2)' }}>Cone</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {playerSatellites.map(sat => (
-                                    <TableRow
-                                        key={sat.id}
-                                        hover
-                                        onClick={() => setSelectedSatelliteId(prev => (prev === sat.id ? null : sat.id))}
-                                        sx={{
-                                            cursor: 'pointer',
-                                            backgroundColor: sat.id === selectedSatelliteId
-                                                ? 'rgba(56,189,248,0.12)'
-                                                : 'transparent'
-                                        }}
-                                    >
-                                        <TableCell sx={{ color: 'white', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>{sat.id}</TableCell>
-                                        <TableCell sx={{ color: 'rgba(226,232,240,0.85)', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>{sat.ownerId}</TableCell>
-                                        <TableCell
-                                            sx={{
-                                                color: 'rgba(226,232,240,0.85)',
-                                                borderBottom: '1px solid rgba(148,163,184,0.1)',
-                                                whiteSpace: 'nowrap'
+            <TableContainer
+                component={Box}
+                sx={{
+                    maxHeight: 240,
+                    overflowY: 'auto',
+                    borderRadius: 2,
+                    border: '1px solid rgba(148,163,184,0.2)',
+                    backgroundColor: 'rgba(15,23,42,0.5)'
+                }}
+            >
+                <Table size="small" aria-label="satellites table">
+                    <TableHead>
+                        <TableRow>
+                            <TableCell sx={{ color: 'rgba(226,232,240,0.75)', borderBottom: '1px solid rgba(148,163,184,0.2)' }}>Sat ID</TableCell>
+                            <TableCell sx={{ color: 'rgba(226,232,240,0.75)', borderBottom: '1px solid rgba(148,163,184,0.2)' }}>Owner</TableCell>
+                            <TableCell sx={{ color: 'rgba(226,232,240,0.75)', borderBottom: '1px solid rgba(148,163,184,0.2)' }}>Lat/Lon</TableCell>
+                            <TableCell sx={{ color: 'rgba(226,232,240,0.75)', borderBottom: '1px solid rgba(148,163,184,0.2)' }}>Neighbors</TableCell>
+                            <TableCell sx={{ color: 'rgba(226,232,240,0.75)', borderBottom: '1px solid rgba(148,163,184,0.2)' }}>Cone</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {playerSatellites.map(sat => (
+                            <TableRow
+                                key={sat.id}
+                                hover
+                                onClick={() => setSelectedSatelliteId(prev => (prev === sat.id ? null : sat.id))}
+                                sx={{
+                                    cursor: 'pointer',
+                                    backgroundColor: sat.id === selectedSatelliteId
+                                        ? 'rgba(56,189,248,0.12)'
+                                        : 'transparent'
+                                }}
+                            >
+                                <TableCell sx={{ color: 'white', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>{sat.id}</TableCell>
+                                <TableCell sx={{ color: 'rgba(226,232,240,0.85)', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>{sat.ownerId}</TableCell>
+                                <TableCell
+                                    sx={{
+                                        color: 'rgba(226,232,240,0.85)',
+                                        borderBottom: '1px solid rgba(148,163,184,0.1)',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    {`Lat: ${fmtCoord(sat.latitude)}°, Lon: ${fmtCoord(sat.longitude)}°`}
+                                </TableCell>
+                                <TableCell sx={{ color: 'rgba(226,232,240,0.75)', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
+                                    {Array.from(sat.neighbors).join(', ') || '—'}
+                                </TableCell>
+                                <TableCell sx={{ borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
+                                    {(sat.type === 'imaging' || sat.type === 'cloudWatch' || sat.type === 'sar') && sat.viewCone ? (
+                                        <Switch
+                                            size="small"
+                                            checked={sat.coneEnabled !== false}
+                                            onClick={(event) => event.stopPropagation()}
+                                            onChange={(_, checked) => {
+                                                sat.coneEnabled = checked;
+                                                if (sat.viewCone) sat.viewCone.visible = checked;
+                                                renderPlayerObjects();
+                                                setSatellites([...satellitesRef.current]);
                                             }}
-                                        >
-                                            {`Lat: ${fmtCoord(sat.latitude)}°, Lon: ${fmtCoord(sat.longitude)}°`}
-                                        </TableCell>
-                                        <TableCell sx={{ color: 'rgba(226,232,240,0.75)', borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
-                                            {Array.from(sat.neighbors).join(', ') || '—'}
-                                        </TableCell>
-                                        <TableCell sx={{ borderBottom: '1px solid rgba(148,163,184,0.1)' }}>
-                                            {(sat.type === 'imaging' || sat.type === 'cloudWatch' || sat.type === 'sar') && sat.viewCone ? (
-                                                <Switch
-                                                    size="small"
-                                                    checked={sat.coneEnabled !== false}
-                                                    onClick={(event) => event.stopPropagation()}
-                                                    onChange={(_, checked) => {
-                                                        sat.coneEnabled = checked;
-                                                        if (sat.viewCone) sat.viewCone.visible = checked;
-                                                        renderPlayerObjects();
-                                                        setSatellites([...satellitesRef.current]);
-                                                    }}
-                                                    color="primary"
-                                                />
-                                            ) : (
-                                                <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.6)' }}>—</Typography>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                )}
-            </Paper>
+                                            color="primary"
+                                        />
+                                    ) : (
+                                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.6)' }}>—</Typography>
+                                    )}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </TableContainer>
         );
     };
 
@@ -5930,6 +7505,28 @@ const App = () => {
     const panelSliderSx = {
         color: 'rgba(125,211,252,0.9)'
     };
+    const renderRightPanelSection = ({ title, open, onToggle, children }) => (
+        <Paper style={{ padding: 10, ...panelSurfaceStyle }}>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={open ? 1 : 0}>
+                <Typography variant="caption" style={panelTitleStyle}>{title}</Typography>
+                <IconButton
+                    size="small"
+                    onClick={onToggle}
+                    aria-label={`Toggle ${title} panel`}
+                    sx={{
+                        color: 'rgba(226,232,240,0.85)',
+                        border: '1px solid rgba(148,163,184,0.3)',
+                        borderRadius: 2,
+                        padding: '2px',
+                        '&:hover': { backgroundColor: 'rgba(30,41,59,0.8)' }
+                    }}
+                >
+                    {open ? <RemoveIcon fontSize="small" /> : <AddIcon fontSize="small" />}
+                </IconButton>
+            </Box>
+            {open && children}
+        </Paper>
+    );
 	const overlayProductLabel = FORECAST_PRODUCT_LABELS[forecastProduct] ?? forecastProduct;
 	const overlayLabelText = showForecastOverlay
 		? `Overlay: ${overlayProductLabel} — ${formatHoursLabel(forecastLeadHours)}`
@@ -5947,9 +7544,17 @@ const App = () => {
     const currentTier = getForecastTier(currentPlayer);
     const currentTierSpec = getTierSpec(currentTier);
     const nextTierSpec = currentTier < 4 ? getTierSpec(currentTier + 1) : null;
+    const tierUnlockStatus = {
+        amv: currentTier >= 1,
+        soundings: currentTier >= 2,
+        radarNowcast: currentTier >= 3,
+        denseSurface: currentTier >= 4
+    };
     const playerHasComms = getPlayerHasComms(currentPlayer?.id);
+    const playerHasRadiosondeOnline = getPlayerHasOnlineRadiosondeSite(currentPlayer?.id);
     const longRangeLocked = !playerHasComms && Array.isArray(currentPlayer?.unlockedForecastLeadsHours)
         && currentPlayer.unlockedForecastLeadsHours.some(h => h >= 12);
+    const radiosonde12Locked = currentTier >= 2 && playerHasComms && !playerHasRadiosondeOnline;
     const canUpgradeForecast = Boolean(
         currentPlayer
         && nextTierSpec
@@ -5957,10 +7562,155 @@ const App = () => {
     );
     const hasHqForUpgrade = (currentPlayer?.getHQs?.().length ?? 0) > 0;
     const draftWarnings = activePlayerId ? (draftWarningsByPlayerId[activePlayerId] || []) : [];
+    const autoWarningDiagnostics = activePlayerId ? (autoWarningDiagnosticsByPlayerId[activePlayerId] || null) : null;
+    const hasForecastRun = Boolean(forecastStatus.lastRunId);
+    const observingPlayerId = activePlayerId ?? currentPlayer?.id ?? null;
+    const playerSatellites = currentPlayer?.getSatellites?.() ?? [];
+    const satCounts = playerSatellites.reduce((acc, sat) => {
+        if (!sat) return acc;
+        const inLink = sat.inHqRange === true;
+        if (sat.type === 'cloudWatch') {
+            acc.cloudWatchOwned += 1;
+            if (inLink) acc.cloudWatchLinked += 1;
+        } else if (sat.type === 'communication') {
+            acc.commsOwned += 1;
+            if (inLink) acc.commsLinked += 1;
+        } else if (sat.type === 'imaging') {
+            acc.imagingOwned += 1;
+            if (inLink) acc.imagingLinked += 1;
+        } else if (sat.type === 'sar') {
+            acc.sarOwned += 1;
+            if (inLink) acc.sarLinked += 1;
+        }
+        return acc;
+    }, {
+        cloudWatchOwned: 0,
+        cloudWatchLinked: 0,
+        commsOwned: 0,
+        commsLinked: 0,
+        imagingOwned: 0,
+        imagingLinked: 0,
+        sarOwned: 0,
+        sarLinked: 0
+    });
+    const earth = earthRef.current;
+    const sensorStatus = earth?.getSensorStatus?.() ?? null;
+    const cloudCoverageFrac = Number.isFinite(sensorStatus?.cloudIntel?.coverageFrac)
+        ? sensorStatus.cloudIntel.coverageFrac
+        : null;
+    const uplinkInventory = getUplinkHubInventory(earth, observingPlayerId);
+    const grid = earth?.weatherField?.core?.grid ?? null;
+    let radarCoverageFracService = null;
+    if (grid && observingPlayerId) {
+        const serviceMask = getServiceMask(grid);
+        if (serviceMask && serviceMask.length) {
+            const radarLocs = getPlayerRadarHubLatLonDegList(observingPlayerId);
+            const radarMask = buildRadarCoverageMask(grid, radarLocs, RADAR_RADIUS_KM);
+            let serviceCount = 0;
+            let coveredCount = 0;
+            for (let k = 0; k < serviceMask.length; k++) {
+                if (serviceMask[k] === 1) {
+                    serviceCount += 1;
+                    if (radarMask && radarMask[k] === 1) coveredCount += 1;
+                }
+            }
+            radarCoverageFracService = serviceCount > 0 ? coveredCount / serviceCount : null;
+        }
+    }
+    const radiosondeLaunches24h = earth?.getRadiosondeLaunchesLast24h?.(observingPlayerId) ?? 0;
+    const simTimeSecondsNow = simClockRef.current?.simTimeSeconds ?? 0;
+    const dayIndexNow = Math.floor(simTimeSecondsNow / 86400);
+    const scoringMetaNow = currentPlayer?.id ? scoringMetaByPlayerIdRef.current[currentPlayer.id] : null;
+    const hitsTodayDisplay = scoringMetaNow && scoringMetaNow.dayIndex === dayIndexNow
+        ? scoringMetaNow.hitsToday
+        : 0;
+    const tierUnlockedLeads = currentTierSpec?.unlockedLeads ?? [];
+    const availableLeadsNow = getUnlockedForecastLeads(currentPlayer);
+    const lead24Locked = Array.isArray(currentPlayer?.unlockedForecastLeadsHours)
+        && currentPlayer.unlockedForecastLeadsHours.includes(24)
+        && !availableLeadsNow.includes(24);
+    const postmortemQueueSize = (() => {
+        void postmortemQueueVersion;
+        return postmortemQueueRef.current.length;
+    })();
+    const selectedUplinkHub = (() => {
+        void uplinkHubsVersion;
+        if (!selectedUplinkHubId || !observingPlayerId) return null;
+        const hubs = uplinkHubsByPlayerIdRef.current[observingPlayerId] || [];
+        return hubs.find(hub => hub.id === selectedUplinkHubId) || null;
+    })();
+    const postmortemLabel = (() => {
+        if (!activePostmortem) return '';
+        const hazardLabel = HAZARD_LABELS[activePostmortem.hazardType] ?? activePostmortem.hazardType;
+        if (activePostmortem.kind === 'miss') {
+            return `Missed event — ${hazardLabel}`;
+        }
+        const outcomeLabel = activePostmortem.outcome === 'hit' ? 'Hit' : 'False alarm';
+        return `${outcomeLabel} — ${hazardLabel}`;
+    })();
+    const postmortemBestOverlapLabel = activePostmortem?.bestOverlapSimTimeSeconds != null
+        ? formatSimTime(activePostmortem.bestOverlapSimTimeSeconds)
+        : '—';
+    const postmortemClassLabel = formatPostmortemTag(activePostmortem?.classification?.primaryTag ?? null);
+    const postmortemDetailLines = Array.isArray(activePostmortem?.classification?.detailLines)
+        ? activePostmortem.classification.detailLines
+        : [];
+    const canAddRadiosondeModule = (() => {
+        if (!currentPlayer || !selectedUplinkHub || selectedUplinkHub.ownerId !== currentPlayer.id) return false;
+        if (selectedUplinkHub.modules?.radiosonde === true) return false;
+        return Boolean(
+            actionRegistryRef.current?.canPerform?.(
+                'ADD_RADIOSONDE_MODULE',
+                currentPlayer.id,
+                { applyFn: () => {} }
+            )
+        );
+    })();
+    const canAddRadarModule = (() => {
+        if (!currentPlayer || !selectedUplinkHub || selectedUplinkHub.ownerId !== currentPlayer.id) return false;
+        if (selectedUplinkHub.isHqHub || selectedUplinkHub.modules?.radar === true) return false;
+        return Boolean(
+            actionRegistryRef.current?.canPerform?.(
+                'ADD_RADAR_MODULE',
+                currentPlayer.id,
+                { applyFn: () => {}, moneyCost: 22_000_000 }
+            )
+        );
+    })();
+    const canUpgradeDenseSurface = (() => {
+        if (!currentPlayer || !selectedUplinkHub || selectedUplinkHub.ownerId !== currentPlayer.id) return false;
+        if (getForecastTier(currentPlayer) < 4) return false;
+        if (selectedUplinkHub.modules?.denseSurface === true) return false;
+        return Boolean(
+            actionRegistryRef.current?.canPerform?.(
+                'UPGRADE_DENSE_SURFACE',
+                currentPlayer.id,
+                { applyFn: () => {}, moneyCost: 30_000_000 }
+            )
+        );
+    })();
     const formatLatLonText = (latLon) => {
         if (!latLon || !Number.isFinite(latLon.latDeg) || !Number.isFinite(latLon.lonDeg)) return '—';
         return `${latLon.latDeg.toFixed(1)}°, ${latLon.lonDeg.toFixed(1)}°`;
     };
+    function formatPostmortemTag(tag) {
+        switch (tag) {
+            case 'tooEarly':
+                return 'Too early';
+            case 'tooLate':
+                return 'Too late';
+            case 'misplaced':
+                return 'Misplaced';
+            case 'tooBroad':
+                return 'Too broad';
+            case 'wrongHazard':
+                return 'Wrong hazard';
+            default:
+                return 'Clean hit';
+        }
+    }
+    const formatDiagNumber = (value, digits = 2) => (Number.isFinite(value) ? value.toFixed(digits) : '—');
+    const formatDiagCount = (value) => (Number.isFinite(value) ? Math.round(value).toString() : '—');
     const formatDebugDeg = (value) => (Number.isFinite(value) ? value.toFixed(1) : '—');
     const formatDebugSep = (value) => (Number.isFinite(value) ? value.toFixed(2) : '—');
     const cursorReadout = `Cursor: ${formatLatLonText(cursorLatLon)}`;
@@ -5969,8 +7719,15 @@ const App = () => {
         if (!sensorHudInfo) return null;
         const cloud = sensorHudInfo.cloudIntel;
         const active = Array.isArray(sensorHudInfo.activeSensors) ? sensorHudInfo.activeSensors : [];
+        const surfaceObs = earth?.getLatestWeatherObservation?.('surfaceStations');
+        const surfaceCount = Number.isFinite(surfaceObs?.products?.ps?.meta?.N_STATIONS)
+            ? Math.round(surfaceObs.products.ps.meta.N_STATIONS)
+            : null;
+        const surfaceLabel = Number.isFinite(surfaceCount)
+            ? `Surface sites (${surfaceCount})`
+            : 'Surface sites';
         const labels = {
-            surfaceStations: 'Stations',
+            surfaceStations: surfaceLabel,
             cloudSat: 'CloudWatch',
             soundings: 'Soundings',
             amv: 'AMVs',
@@ -5992,9 +7749,21 @@ const App = () => {
     const runScoreLabel = Number.isFinite(runScore)
         ? `Run: $${Math.round(runScore / 1_000_000)}M`
         : null;
-    const bestScoreLabel = Number.isFinite(bestScore)
-        ? `Best: $${Math.round(bestScore / 1_000_000)}M`
-        : null;
+	const bestScoreLabel = Number.isFinite(bestScore)
+	    ? `Best: $${Math.round(bestScore / 1_000_000)}M`
+	    : null;
+    const windTargets = windTargetsStatus?.targets ?? null;
+    const windStatusPass = windTargetsStatus?.pass ?? null;
+    const windFailReasons = windTargetsStatus?.failingReasons ?? [];
+    const windRefComparison = windReferenceComparison;
+    const windRefModel = windRefComparison?.model ?? null;
+    const windRef = windRefComparison?.reference ?? null;
+    const windRefDelta = windRefComparison?.delta ?? null;
+    const formatWindDelta = (value) => {
+        if (!Number.isFinite(value)) return '—';
+        const sign = value > 0 ? '+' : '';
+        return `${sign}${value.toFixed(2)}`;
+    };
 
     if (!gameMode) {
         return (
@@ -6081,13 +7850,41 @@ const App = () => {
 	                >
 	                    Alerts{alertsUnreadCount > 0 ? ` (${alertsUnreadCount})` : ''}
 	                </Button>
-	            </Box>
-	            {showAlertsPanel && (
-	                <Paper
-	                    style={{
-	                        position: 'absolute',
-	                        top: alertsPanelTop,
-	                        left: alertsPanelLeft,
+		                <Button
+		                    variant="outlined"
+		                    color="inherit"
+		                    onClick={() => setShowObservingNetwork(true)}
+		                    sx={{
+		                        color: 'white',
+		                        borderColor: 'rgba(255,255,255,0.6)',
+		                        backgroundColor: 'rgba(0,0,0,0.4)',
+		                        textTransform: 'none',
+		                        fontWeight: 600
+		                    }}
+		                >
+		                    Observing Network
+		                </Button>
+                        <Button
+                            variant="outlined"
+                            color="inherit"
+                            onClick={() => setShowForecastReport(prev => !prev)}
+                            sx={{
+                                color: 'white',
+                                borderColor: 'rgba(255,255,255,0.6)',
+                                backgroundColor: 'rgba(0,0,0,0.4)',
+                                textTransform: 'none',
+                                fontWeight: 600
+                            }}
+                        >
+                            Forecast Report
+                        </Button>
+		            </Box>
+            {showAlertsPanel && (
+                <Paper
+                    style={{
+                        position: 'absolute',
+                        top: alertsPanelTop,
+                        left: alertsPanelLeft,
 	                        width: 340,
 	                        maxHeight: '50vh',
 	                        overflowY: 'auto',
@@ -6145,6 +7942,272 @@ const App = () => {
                             );
                         })
                     )}
+                </Paper>
+            )}
+            {showObservingNetwork && (
+                <Paper
+                    style={{
+                        position: 'absolute',
+                        top: 120,
+                        right: 10,
+                        width: 360,
+                        maxHeight: '70vh',
+                        overflowY: 'auto',
+                        padding: 12,
+                        zIndex: 1200,
+                        pointerEvents: 'auto',
+                        ...panelSurfaceStyle
+                    }}
+                >
+                    <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                        <Typography variant="subtitle2" style={panelTitleStyle}>
+                            Observing Network
+                        </Typography>
+                        <IconButton
+                            size="small"
+                            onClick={() => setShowObservingNetwork(false)}
+                            sx={{
+                                color: 'rgba(226,232,240,0.85)',
+                                border: '1px solid rgba(148,163,184,0.3)',
+                                borderRadius: 2,
+                                padding: '2px',
+                                '&:hover': { backgroundColor: 'rgba(30,41,59,0.8)' }
+                            }}
+                        >
+                            <RemoveIcon fontSize="small" />
+                        </IconButton>
+                    </Box>
+
+                    <Box mb={1.5}>
+                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)' }}>
+                            Satellites
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            CloudWatch: {satCounts.cloudWatchOwned} owned, {satCounts.cloudWatchLinked} in link
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            Comms: {satCounts.commsOwned} owned, {satCounts.commsLinked} in link
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            Imaging: {satCounts.imagingOwned} owned, {satCounts.imagingLinked} in link
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            SAR: {satCounts.sarOwned} owned, {satCounts.sarLinked} in link
+                        </Typography>
+                    </Box>
+
+                    <Box mb={1.5}>
+                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)' }}>
+                            Ground Assets
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            Uplink Hubs: {uplinkInventory.totalHubs} total, {uplinkInventory.onlineHubs} online
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            Modules: METAR {uplinkInventory.modules.metarTotal}, Radiosonde {uplinkInventory.modules.radiosondeTotal}, Radar {uplinkInventory.modules.radarTotal}
+                        </Typography>
+                    </Box>
+
+                    <Box mb={1.5}>
+                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)' }}>
+                            Live Coverage
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            CloudWatch live coverage: {Number.isFinite(cloudCoverageFrac) ? `${Math.round(cloudCoverageFrac * 100)}%` : '—'}
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            Radar coverage: {Number.isFinite(radarCoverageFracService) ? `${Math.round(radarCoverageFracService * 100)}%` : '—'} of service area
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            Radiosonde launches (24h): {radiosondeLaunches24h}
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            <Tooltip title="Confidence = analysis certainty; increases where observations recently constrained analysis.">
+                                <span>Confidence</span>
+                            </Tooltip>{' '}
+                            is shown in Forecast overlays.
+                        </Typography>
+                    </Box>
+
+                    <Box mb={1.5}>
+                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)' }}>
+                            Wind realism targets
+                        </Typography>
+                        {!windTargetsStatus || !windTargets ? (
+                            <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', display: 'block' }}>
+                                Waiting for wind diagnostics…
+                            </Typography>
+                        ) : (
+                            <>
+                                <Typography
+                                    variant="caption"
+                                    style={{
+                                        color: windStatusPass?.model?.mean ? 'rgba(74,222,128,0.9)' : 'rgba(248,113,113,0.9)',
+                                        display: 'block'
+                                    }}
+                                >
+                                    Mean: {Number.isFinite(windTargetsStatus.model?.meanSpeed) ? windTargetsStatus.model.meanSpeed.toFixed(2) : '—'} (target {windTargets.model.meanMin}–{windTargets.model.meanMax})
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    style={{
+                                        color: windStatusPass?.model?.p90 ? 'rgba(74,222,128,0.9)' : 'rgba(248,113,113,0.9)',
+                                        display: 'block'
+                                    }}
+                                >
+                                    P90: {Number.isFinite(windTargetsStatus.model?.p90) ? windTargetsStatus.model.p90.toFixed(2) : '—'} (target {windTargets.model.p90Min}–{windTargets.model.p90Max})
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    style={{
+                                        color: windStatusPass?.model?.p99 ? 'rgba(74,222,128,0.9)' : 'rgba(248,113,113,0.9)',
+                                        display: 'block'
+                                    }}
+                                >
+                                    P99: {Number.isFinite(windTargetsStatus.model?.p99) ? windTargetsStatus.model.p99.toFixed(2) : '—'} (target {windTargets.model.p99Min}–{windTargets.model.p99Max})
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    style={{
+                                        color: windStatusPass?.model?.max ? 'rgba(74,222,128,0.9)' : 'rgba(248,113,113,0.9)',
+                                        display: 'block'
+                                    }}
+                                >
+                                    Max: {Number.isFinite(windTargetsStatus.model?.maxSpeed) ? windTargetsStatus.model.maxSpeed.toFixed(2) : '—'} (max ≤ {windTargets.model.maxMax})
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    style={{
+                                        color: windStatusPass?.viz?.stepMean ? 'rgba(74,222,128,0.9)' : 'rgba(248,113,113,0.9)',
+                                        display: 'block',
+                                        marginTop: 4
+                                    }}
+                                >
+                                    Step mean: {Number.isFinite(windTargetsStatus.viz?.stepMeanPx) ? windTargetsStatus.viz.stepMeanPx.toFixed(2) : '—'}px (target {windTargets.viz.stepMeanMinPx}–{windTargets.viz.stepMeanMaxPx}px)
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    style={{
+                                        color: windStatusPass?.viz?.stepP99 ? 'rgba(74,222,128,0.9)' : 'rgba(248,113,113,0.9)',
+                                        display: 'block'
+                                    }}
+                                >
+                                    Step P99: {Number.isFinite(windTargetsStatus.viz?.stepP99Px) ? windTargetsStatus.viz.stepP99Px.toFixed(2) : '—'}px (max ≤ {windTargets.viz.stepP99MaxPx}px)
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    style={{
+                                        color: windStatusPass?.viz?.churn ? 'rgba(74,222,128,0.9)' : 'rgba(248,113,113,0.9)',
+                                        display: 'block'
+                                    }}
+                                >
+                                    Out-of-bounds: {Number.isFinite(windTargetsStatus.viz?.outOfBoundsFrac) ? `${Math.round(windTargetsStatus.viz.outOfBoundsFrac * 100)}%` : '—'} (max {Math.round(windTargets.viz.outOfBoundsMaxFrac * 100)}%)
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    style={{
+                                        color: windStatusPass?.viz?.clipped ? 'rgba(74,222,128,0.9)' : 'rgba(248,113,113,0.9)',
+                                        display: 'block'
+                                    }}
+                                >
+                                    Clipped: {Number.isFinite(windTargetsStatus.viz?.clippedFrac) ? `${Math.round(windTargetsStatus.viz.clippedFrac * 100)}%` : '—'} (max {Math.round(windTargets.viz.clippedMaxFrac * 100)}%)
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    style={{
+                                        color: windStatusPass?.overall ? 'rgba(74,222,128,0.9)' : 'rgba(248,113,113,0.9)',
+                                        display: 'block',
+                                        marginTop: 4
+                                    }}
+                                >
+                                    Status: {windStatusPass?.overall ? 'PASS' : 'FAIL'}{windStatusPass?.overall
+                                        ? ''
+                                        : windFailReasons.length ? ` (${windFailReasons.join(', ')})` : ''}
+                                </Typography>
+                                {windRefModel && windRef && (
+                                    <>
+                                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)', display: 'block', marginTop: 6 }}>
+                                            Reference vs Model (Δ = model − ref)
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                                            Mean: {Number.isFinite(windRefModel.meanSpeed) ? windRefModel.meanSpeed.toFixed(2) : '—'} / {Number.isFinite(windRef.meanSpeed) ? windRef.meanSpeed.toFixed(2) : '—'} (Δ {formatWindDelta(windRefDelta?.meanSpeed)})
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                                            P90: {Number.isFinite(windRefModel.p90) ? windRefModel.p90.toFixed(2) : '—'} / {Number.isFinite(windRef.p90) ? windRef.p90.toFixed(2) : '—'} (Δ {formatWindDelta(windRefDelta?.p90)})
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                                            P99: {Number.isFinite(windRefModel.p99) ? windRefModel.p99.toFixed(2) : '—'} / {Number.isFinite(windRef.p99) ? windRef.p99.toFixed(2) : '—'} (Δ {formatWindDelta(windRefDelta?.p99)})
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                                            Max: {Number.isFinite(windRefModel.maxSpeed) ? windRefModel.maxSpeed.toFixed(2) : '—'} / {Number.isFinite(windRef.maxSpeed) ? windRef.maxSpeed.toFixed(2) : '—'} (Δ {formatWindDelta(windRefDelta?.maxSpeed)})
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                                            EKE: {Number.isFinite(windRefModel.ekeMean) ? windRefModel.ekeMean.toFixed(2) : '—'} / {Number.isFinite(windRef.ekeMean) ? windRef.ekeMean.toFixed(2) : '—'} (Δ {formatWindDelta(windRefDelta?.ekeMean)})
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                                            Roughness: {Number.isFinite(windRefModel.roughness) ? windRefModel.roughness.toFixed(2) : '—'} / {Number.isFinite(windRef.roughness) ? windRef.roughness.toFixed(2) : '—'} (Δ {formatWindDelta(windRefDelta?.roughness)})
+                                        </Typography>
+                                    </>
+                                )}
+                            </>
+                        )}
+                    </Box>
+
+                    <Box mb={1.5}>
+                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)' }}>
+                            Tier Summary
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            Current tier: Tier {currentTier} — {currentTierSpec?.name ?? 'Unknown'}
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block', marginTop: 2 }}>
+                            Unlocked capabilities:
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', display: 'block' }}>
+                            AMVs: {tierUnlockStatus.amv ? 'On' : 'Off'} · Soundings: {tierUnlockStatus.soundings ? 'On' : 'Off'}
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', display: 'block' }}>
+                            Radar nowcast: {tierUnlockStatus.radarNowcast ? 'On' : 'Off'} · Dense surface: {tierUnlockStatus.denseSurface ? 'On' : 'Off'}
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            Unlocked lead times: {tierUnlockedLeads.map(h => formatHoursLabel(h)).join(', ') || '—'}
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            Available lead times now: {availableLeadsNow.map(h => formatHoursLabel(h)).join(', ') || '—'}
+                        </Typography>
+                        {nextTierSpec && (
+                            <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.75)', display: 'block', marginTop: 2 }}>
+                                Next tier unlocks: {currentTier + 1} — {nextTierSpec.name} (leads {nextTierSpec.unlockedLeads.map(h => formatHoursLabel(h)).join(', ')})
+                            </Typography>
+                        )}
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', display: 'block', marginTop: 2 }}>
+                            12h requires: Tier ≥ 2 AND Comms Online
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', display: 'block' }}>
+                            24h requires: Tier ≥ 4 AND Comms Online
+                        </Typography>
+                    </Box>
+
+                    <Box>
+                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)' }}>
+                            What these do
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            CloudWatch: observes cloud optical depth/coverage → improves “what’s happening now.”
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            AMVs: derived winds in cloudy regions → improves storm motion (reduces displacement errors).
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            Radiosondes: vertical profiles → improves intensity/structure (reduces phantom storms).
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            Radar: precip structure now → improves 0–3h precip nowcast/verification near radar.
+                        </Typography>
+                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                            Surface sites primarily constrain pressure patterns (synoptic).
+                        </Typography>
+                    </Box>
                 </Paper>
             )}
 
@@ -6264,6 +8327,63 @@ const App = () => {
                             control={
                                 <Switch
                                     size="small"
+                                    checked={showWindStreamlines}
+                                    onChange={(_, v) => setShowWindStreamlines(v)}
+                                    color="primary"
+                                />
+                            }
+                            label={<Typography variant="caption" style={{ color: 'white' }}>Wind Streamlines</Typography>}
+                        />
+                        {windRefEnabled && (
+                            <Box mt={0.5} ml={1}>
+                                <Typography variant="caption" style={{ color: 'white', fontWeight: 600 }}>
+                                    Wind Source
+                                </Typography>
+                                <ToggleButtonGroup
+                                    size="small"
+                                    exclusive
+                                    value={windStreamlineSource}
+                                    onChange={(_, value) => {
+                                        if (!value) return;
+                                        if (value === 'reference' && !windRefStatus.loaded) return;
+                                        setWindStreamlineSource(value);
+                                        earthRef.current?.setWindStreamlineSource?.(value);
+                                        earthRef.current?.windStreamlineRenderer?.reset?.();
+                                    }}
+                                    sx={{ mt: 0.5 }}
+                                >
+                                    <ToggleButton value="analysis" sx={{ color: 'white' }}>
+                                        Model
+                                    </ToggleButton>
+                                    <ToggleButton value="reference" disabled={!windRefStatus.loaded} sx={{ color: 'white' }}>
+                                        Reference (GFS)
+                                    </ToggleButton>
+                                </ToggleButtonGroup>
+                                <Box mt={0.5}>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={handleLoadWindReference}
+                                        disabled={windRefStatus.loading}
+                                        sx={{
+                                            color: 'white',
+                                            borderColor: 'rgba(255,255,255,0.4)'
+                                        }}
+                                    >
+                                        {windRefStatus.loading ? 'Loading...' : 'Load Reference Fixture'}
+                                    </Button>
+                                </Box>
+                                {windRefStatus.error && (
+                                    <Typography variant="caption" style={{ color: '#ff8080', display: 'block', marginTop: 4 }}>
+                                        {windRefStatus.error}
+                                    </Typography>
+                                )}
+                            </Box>
+                        )}
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    size="small"
                                     checked={weatherViewSource === 'analysis'}
                                     onChange={(_, v) => setWeatherViewSource(v ? 'analysis' : 'truth')}
                                     color="primary"
@@ -6298,7 +8418,7 @@ const App = () => {
                                         color="primary"
                                     />
                                 }
-                                label={<Typography variant="caption" style={{ color: 'white' }}>Stations</Typography>}
+                                label={<Typography variant="caption" style={{ color: 'white' }}>Surface sites</Typography>}
                             />
                             <FormControlLabel
                                 control={
@@ -6774,6 +8894,37 @@ const App = () => {
                         >
                             Satellites
                         </Button>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            sx={panelButtonSx}
+                            onClick={(event) => {
+                                setShowSatPanel(false);
+                                setShowStrikePad(false);
+                                removeOrbitPreview();
+                                showHQSphereRef.current = false;
+                                if (hqSphereRef.current) {
+                                    sceneRef.current?.remove(hqSphereRef.current);
+                                    hqSphereRef.current = null;
+                                }
+                                const next = !placeUplinkHubRef.current;
+                                placeUplinkHubRef.current = next;
+                                const earth = earthRef.current;
+                                if (next) {
+                                    const latLon = getEarthClickLatLonDeg(event) || { latDeg: 0, lonDeg: 0 };
+                                    if (earth?.parentObject) {
+                                        const ghost = createUplinkHubGhostMesh(earth, latLon.latDeg, latLon.lonDeg);
+                                        uplinkHubGhostRef.current = ghost;
+                                        earth.parentObject.add(ghost);
+                                    }
+                                } else if (uplinkHubGhostRef.current) {
+                                    uplinkHubGhostRef.current.parent?.remove?.(uplinkHubGhostRef.current);
+                                    uplinkHubGhostRef.current = null;
+                                }
+                            }}
+                        >
+                            Build Uplink Hub
+                        </Button>
 
                         {gameMode === 'pvp' && (
                             <Button
@@ -6803,198 +8954,686 @@ const App = () => {
                 <Box
                     style={{
                         position: 'absolute',
-                        bottom: 120,
+                        top: 120,
                         right: 10,
                         width: 260,
-                        zIndex: 1000
+                        zIndex: 1000,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                        maxHeight: 'calc(100vh - 140px)',
+                        overflowY: 'auto',
+                        pointerEvents: 'auto'
                     }}
                 >
-                    {focusedWarningInfo && (
-                        <Paper style={{ padding: 10, marginBottom: 8, ...panelSurfaceStyle }}>
-                            <Typography variant="caption" style={panelTitleStyle}>
-                                Warning Focus
-                            </Typography>
-                            <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)', display: 'block' }}>
-                                {HAZARD_LABELS[focusedWarningInfo.hazardType] || focusedWarningInfo.hazardType}
-                            </Typography>
-                            <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.75)', display: 'block' }}>
-                                Issued: {formatSimTime(focusedWarningInfo.issuedAtSimTimeSeconds)}
-                            </Typography>
-                            <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.75)', display: 'block' }}>
-                                Valid: {formatSimTime(focusedWarningInfo.validStartSimTimeSeconds)} → {formatSimTime(focusedWarningInfo.validEndSimTimeSeconds)}
-                            </Typography>
-                            <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.75)', display: 'block' }}>
-                                {formatHoursLabel(focusedWarningInfo.forecastLeadHours)} {focusedWarningInfo.autoIssued ? '(auto)' : ''}
-                            </Typography>
-                        </Paper>
-                    )}
-	                    <Paper style={{ padding: 12, ...panelSurfaceStyle }}>
-	                        <Typography variant="subtitle2" style={panelTitleStyle} gutterBottom>
-	                            Forecast
-	                        </Typography>
-	                        <FormControl fullWidth size="small" sx={{ mb: 1 }}>
-	                            <InputLabel sx={panelLabelSx}>In X hours</InputLabel>
-	                            <Select
-	                                value={forecastLeadHours}
-	                                onChange={(e) => setForecastLeadHours(Number(e.target.value))}
-	                                label="In X hours"
-	                                sx={panelInputSx}
-	                            >
-	                                {unlockedForecastLeads.map((h) => (
-	                                    <MenuItem key={h} value={h}>{formatHoursLabel(h)}</MenuItem>
-	                                ))}
-	                            </Select>
-	                        </FormControl>
-	                        <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
-	                            <Button
-	                                size="small"
-	                                variant="outlined"
-	                                disabled={forecastStatus.running}
-	                                onClick={runForecast}
-	                                sx={panelButtonSx}
-	                            >
-	                                {forecastStatus.running ? 'Running...' : 'Run Forecast'}
-	                            </Button>
-	                            <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.7)' }}>
-	                                {forecastStatus.running
-	                                    ? `${Math.round((forecastStatus.progress01 || 0) * 100)}% ${forecastStatus.message || ''}`
-	                                    : formatHoursLabel(forecastLeadHours)}
-	                            </Typography>
-	                        </Box>
-                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.7)', marginTop: 6, display: 'block' }}>
-                            Base: {forecastBaseTimeSeconds != null ? formatSimTime(forecastBaseTimeSeconds) : 'n/a'}
-                        </Typography>
-                        <Box mt={1}>
-                            <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)' }}>
-                                Forecast Tech: Tier {currentTier} — {currentTierSpec?.name ?? 'Unknown'}
-                            </Typography>
-                            {nextTierSpec ? (
-                                <>
-                                    <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.9)', display: 'block', marginTop: 2 }}>
-                                        Next: Tier {currentTier + 1} — {nextTierSpec.name} (${Math.round((nextTierSpec.costMoney ?? 0) / 1_000_000)}M, 1 AP)
+                    {activePostmortem && renderRightPanelSection({
+                        title: 'Postmortem',
+                        open: showPostmortemPanel,
+                        onToggle: () => setShowPostmortemPanel(prev => !prev),
+                        children: (
+                            <Box display="flex" flexDirection="column" gap={0.6}>
+                                <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.9)' }}>
+                                    {postmortemLabel}
+                                </Typography>
+                                <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)' }}>
+                                    Best overlap: {postmortemBestOverlapLabel}
+                                </Typography>
+                                <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.7)' }}>
+                                    Event footprint vs warning outline
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        border: '1px solid rgba(148,163,184,0.35)',
+                                        borderRadius: 1,
+                                        overflow: 'hidden',
+                                        width: 240,
+                                        height: 120
+                                    }}
+                                >
+                                    <canvas ref={postmortemCanvasRef} width={240} height={120} />
+                                </Box>
+                                <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)', marginTop: 4 }}>
+                                    Classification: {postmortemClassLabel}
+                                </Typography>
+                                {postmortemDetailLines.map((line, idx) => (
+                                    <Typography key={`postmortem-detail-${idx}`} variant="caption" style={{ color: 'rgba(148,163,184,0.8)' }}>
+                                        {line}
                                     </Typography>
+                                ))}
+                                <Box display="flex" gap={0.5} mt={0.5}>
+                                    {postmortemQueueSize > 0 && (
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            sx={panelButtonSx}
+                                            onClick={() => {
+                                                setShowPostmortemPanel(true);
+                                                nextPostmortem();
+                                            }}
+                                        >
+                                            Next
+                                        </Button>
+                                    )}
                                     <Button
                                         size="small"
                                         variant="outlined"
-                                        sx={{ ...panelButtonSx, marginTop: 0.5 }}
-                                        onClick={upgradeForecastTech}
-                                        disabled={!canUpgradeForecast || !hasHqForUpgrade}
+                                        sx={panelButtonSx}
+                                        onClick={() => {
+                                            clearPostmortems();
+                                            setShowPostmortemPanel(false);
+                                        }}
                                     >
-                                        Upgrade
+                                        Close
                                     </Button>
-                                </>
-                            ) : (
-                                <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.9)', display: 'block', marginTop: 2 }}>
-                                    Forecast tech is fully upgraded.
-                                </Typography>
-                            )}
-                        </Box>
-                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.75)', marginTop: 4, display: 'block' }}>
-                            Confidence = analysis certainty here; better sensors raise it.
-                        </Typography>
-                        <Typography
-                            variant="caption"
-                            style={{
-                                color: playerHasComms ? 'rgba(74,222,128,0.9)' : 'rgba(251,191,36,0.9)',
-                                marginTop: 2,
-                                display: 'block'
-                            }}
-                        >
-                            Comms: {playerHasComms ? 'Online' : 'Offline'}
-                        </Typography>
-                        {longRangeLocked && (
-                            <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', marginTop: 2, display: 'block' }}>
-                                Long-range (12–24h) requires a comm satellite in link.
-                            </Typography>
-                        )}
-                        <Box mt={1}>
-                            <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.8)' }}>
-                                Drafts
-                            </Typography>
-                                {draftWarnings.length === 0 ? (
-                                    <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', display: 'block' }}>
-                                        No draft warnings yet.
+                                </Box>
+                            </Box>
+                        )
+                    })}
+                    {renderRightPanelSection({
+                        title: 'Satellites',
+                        open: showSatListPanel,
+                        onToggle: () => setShowSatListPanel(prev => !prev),
+                        children: renderSatellitesPanel()
+                    })}
+                    {renderRightPanelSection({
+                        title: 'Info',
+                        open: showInfoPanel,
+                        onToggle: () => setShowInfoPanel(prev => !prev),
+                        children: (
+                            <Box display="flex" flexDirection="column" gap={1}>
+                                {!selectedUplinkHub && !focusedWarningInfo && (
+                                    <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)' }}>
+                                        No hub or warning selected.
                                     </Typography>
-                                ) : (
-                                    <Box mt={0.5} display="flex" flexDirection="column" gap={0.5}>
-                                        {draftWarnings.map((draft) => (
-                                            <Box key={draft.id} display="flex" alignItems="center" justifyContent="space-between" gap={1}>
-                                                <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.8)' }}>
-                                                    {HAZARD_LABELS[draft.hazardType] ?? draft.hazardType} · {formatHoursLabel(draft.forecastLeadHours)} · {Number.isFinite(draft.areaFracService) ? `${Math.round(draft.areaFracService * 100)}%` : '—'}
-                                                </Typography>
-                                                <Box display="flex" gap={0.5}>
-                                                    <Button
-                                                        size="small"
-                                                        variant="outlined"
-                                                        sx={panelButtonSx}
-                                                        onClick={() => issueDraftWarning(draft)}
-                                                    >
-                                                        Issue
-                                                    </Button>
-                                                    <Button
-                                                        size="small"
-                                                        variant="outlined"
-                                                        sx={panelButtonSx}
-                                                        onClick={() => discardDraftWarning(draft)}
-                                                    >
-                                                        Discard
-                                                    </Button>
-                                                </Box>
-                                            </Box>
-                                        ))}
+                                )}
+                                {selectedUplinkHub && (
+                                    <Box>
+                                        <Typography variant="caption" style={panelTitleStyle}>
+                                            Uplink Hub
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)', display: 'block' }}>
+                                            Lat {selectedUplinkHub.latDeg.toFixed(1)}°, Lon {selectedUplinkHub.lonDeg.toFixed(1)}°
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', display: 'block' }}>
+                                            Surface: {selectedUplinkHub.modules?.surface ? 'On' : 'Off'} · Radiosonde: {selectedUplinkHub.modules?.radiosonde ? 'On' : 'Off'}
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', display: 'block' }}>
+                                            Radar: {selectedUplinkHub.modules?.radar ? 'On' : 'Off'} · Dense Surface: {selectedUplinkHub.modules?.denseSurface ? 'On' : 'Off'}
+                                        </Typography>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ ...panelButtonSx, marginTop: 0.5 }}
+                                            disabled={!canAddRadiosondeModule}
+                                            onClick={addRadiosondeModuleToSelectedHub}
+                                        >
+                                            Add Radiosonde Module ($18M, 1 AP)
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ ...panelButtonSx, marginTop: 0.5 }}
+                                            disabled={!canAddRadarModule}
+                                            onClick={() => {
+                                                const player = currentPlayerRef.current;
+                                                const registry = actionRegistryRef.current;
+                                                if (!player) return;
+                                                if (registry?.perform) {
+                                                    const ok = registry.perform('ADD_RADAR_MODULE', player.id, {
+                                                        applyFn: addRadarModuleToSelectedHub,
+                                                        moneyCost: 22_000_000
+                                                    });
+                                                    if (!ok) {
+                                                        notify('warning', 'Upgrade blocked: not your turn, insufficient AP, or insufficient funds.');
+                                                    }
+                                                } else {
+                                                    addRadarModuleToSelectedHub();
+                                                }
+                                            }}
+                                        >
+                                            Add Radar Module ($22M, 1 AP)
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ ...panelButtonSx, marginTop: 0.5 }}
+                                            disabled={!canUpgradeDenseSurface}
+                                            onClick={() => {
+                                                const player = currentPlayerRef.current;
+                                                const registry = actionRegistryRef.current;
+                                                if (!player) return;
+                                                if (registry?.perform) {
+                                                    const ok = registry.perform('UPGRADE_DENSE_SURFACE', player.id, {
+                                                        applyFn: upgradeDenseSurfaceForSelectedHub,
+                                                        moneyCost: 30_000_000
+                                                    });
+                                                    if (!ok) {
+                                                        notify('warning', 'Upgrade blocked: not your turn, insufficient AP, or insufficient funds.');
+                                                    }
+                                                } else {
+                                                    upgradeDenseSurfaceForSelectedHub();
+                                                }
+                                            }}
+                                        >
+                                            Upgrade Dense Surface ($30M, 1 AP)
+                                        </Button>
+                                        {!selectedUplinkHub.isOnline && (
+                                            <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.7)', display: 'block', marginTop: 2 }}>
+                                                Hub is offline — modules won't contribute until backhaul is online.
+                                            </Typography>
+                                        )}
+                                        <Typography
+                                            variant="caption"
+                                            style={{
+                                                color: selectedUplinkHub.isOnline ? 'rgba(74,222,128,0.9)' : 'rgba(148,163,184,0.7)',
+                                                display: 'block'
+                                            }}
+                                        >
+                                            {selectedUplinkHub.isOnline ? 'Online' : 'Offline'} — {selectedUplinkHub.onlineReason || 'Status unknown'}
+                                        </Typography>
+                                    </Box>
+                                )}
+                                {focusedWarningInfo && (
+                                    <Box>
+                                        <Typography variant="caption" style={panelTitleStyle}>
+                                            Warning Focus
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)', display: 'block' }}>
+                                            {HAZARD_LABELS[focusedWarningInfo.hazardType] || focusedWarningInfo.hazardType}
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.75)', display: 'block' }}>
+                                            Issued: {formatSimTime(focusedWarningInfo.issuedAtSimTimeSeconds)}
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.75)', display: 'block' }}>
+                                            Valid: {formatSimTime(focusedWarningInfo.validStartSimTimeSeconds)} → {formatSimTime(focusedWarningInfo.validEndSimTimeSeconds)}
+                                        </Typography>
+                                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.75)', display: 'block' }}>
+                                            {formatHoursLabel(focusedWarningInfo.forecastLeadHours)} {focusedWarningInfo.autoIssued ? '(auto)' : ''}
+                                        </Typography>
                                     </Box>
                                 )}
                             </Box>
-	                        <Box mt={1}>
-	                            <Button
-	                                size="small"
-	                                variant="outlined"
-	                                onClick={() => setShowForecastAdvanced(prev => !prev)}
-	                                endIcon={showForecastAdvanced ? <RemoveIcon fontSize="small" /> : <AddIcon fontSize="small" />}
-	                                sx={panelButtonSx}
-	                            >
-	                                Advanced
-	                            </Button>
-	                        </Box>
-	                        {showForecastAdvanced && (
-	                            <Box mt={1}>
-	                                <FormControl fullWidth size="small" sx={{ mb: 1 }}>
-	                                    <InputLabel sx={panelLabelSx}>Product</InputLabel>
-	                                    <Select
-	                                        value={forecastProduct}
-	                                        onChange={(e) => {
-	                                            warningOverlayFocusRef.current.activeHazardType = null;
-	                                            setForecastProduct(e.target.value);
-	                                        }}
-	                                        label="Product"
-	                                        sx={panelInputSx}
-	                                    >
-	                                        {['precipRate', 'windSpeed', 'cloudTau', 'confidence'].map((value) => (
-	                                            <MenuItem key={value} value={value}>
-	                                                {FORECAST_PRODUCT_LABELS[value] ?? value}
-	                                            </MenuItem>
-	                                        ))}
-	                                    </Select>
-	                                </FormControl>
-	                                <FormControlLabel
-	                                    control={
-	                                        <Switch
-	                                            size="small"
-	                                            checked={showForecastOverlay}
-	                                            onChange={(_, v) => {
-	                                                warningOverlayFocusRef.current.activeHazardType = null;
-	                                                setShowForecastOverlay(v);
-	                                            }}
-	                                            color="primary"
-	                                        />
-	                                    }
-	                                    label={<Typography variant="caption" style={{ color: 'rgba(226,232,240,0.8)' }}>Show overlay</Typography>}
-	                                />
-	                            </Box>
-	                        )}
-	                    </Paper>
-                </Box>
-            )}
+                        )
+                    })}
+                    {renderRightPanelSection({
+                        title: 'Forecast',
+                        open: showForecastPanel,
+                        onToggle: () => setShowForecastPanel(prev => !prev),
+                        children: (
+                            <>
+                                <FormControl fullWidth size="small" sx={{ mb: 1 }}>
+                                    <InputLabel sx={panelLabelSx}>In X hours</InputLabel>
+                                    <Select
+                                        value={forecastLeadHours}
+                                        onChange={(e) => setForecastLeadHours(Number(e.target.value))}
+                                        label="In X hours"
+                                        sx={panelInputSx}
+                                    >
+                                        {unlockedForecastLeads.map((h) => (
+                                            <MenuItem key={h} value={h}>{formatHoursLabel(h)}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        disabled={forecastStatus.running}
+                                        onClick={runForecast}
+                                        sx={panelButtonSx}
+                                    >
+                                        {forecastStatus.running ? 'Running...' : 'Run Forecast'}
+                                    </Button>
+                                    <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.7)' }}>
+                                        {forecastStatus.running
+                                            ? `${Math.round((forecastStatus.progress01 || 0) * 100)}% ${forecastStatus.message || ''}`
+                                            : formatHoursLabel(forecastLeadHours)}
+                                    </Typography>
+                                </Box>
+                                <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.7)', marginTop: 6, display: 'block' }}>
+                                    Base: {forecastBaseTimeSeconds != null ? formatSimTime(forecastBaseTimeSeconds) : 'n/a'}
+                                </Typography>
+                                <Box mt={1}>
+                                    <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)' }}>
+                                        Forecast Tech: Tier {currentTier} — {currentTierSpec?.name ?? 'Unknown'}
+                                    </Typography>
+                                    {nextTierSpec ? (
+                                        <>
+                                            <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.9)', display: 'block', marginTop: 2 }}>
+                                                Next: Tier {currentTier + 1} — {nextTierSpec.name} (${Math.round((nextTierSpec.costMoney ?? 0) / 1_000_000)}M, 1 AP)
+                                            </Typography>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                sx={{ ...panelButtonSx, marginTop: 0.5 }}
+                                                onClick={upgradeForecastTech}
+                                                disabled={!canUpgradeForecast || !hasHqForUpgrade}
+                                            >
+                                                Upgrade
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.9)', display: 'block', marginTop: 2 }}>
+                                            Forecast tech is fully upgraded.
+                                        </Typography>
+                                    )}
+                                </Box>
+                                <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.75)', marginTop: 4, display: 'block' }}>
+                                    Confidence = analysis certainty here; better sensors raise it.
+                                </Typography>
+                                <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.7)', marginTop: 2, display: 'block' }}>
+                                    Daily goal: {hitsTodayDisplay}/{DAILY_GOAL_HITS} hits today
+                                </Typography>
+                                <Typography
+                                    variant="caption"
+                                    style={{
+                                        color: playerHasComms ? 'rgba(74,222,128,0.9)' : 'rgba(251,191,36,0.9)',
+                                        marginTop: 2,
+                                        display: 'block'
+                                    }}
+                                >
+                                    Comms: {playerHasComms ? 'Online' : 'Offline'}
+                                </Typography>
+                                {longRangeLocked && (
+                                    <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', marginTop: 2, display: 'block' }}>
+                                        Long-range (12–24h) requires a comm satellite in link.
+                                    </Typography>
+                                )}
+                                {radiosonde12Locked && (
+                                    <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', marginTop: 2, display: 'block' }}>
+                                        12h requires an online radiosonde site.
+                                    </Typography>
+                                )}
+                                {lead24Locked && (
+                                    <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', marginTop: 2, display: 'block' }}>
+                                        24h requires: broader network (surface + radiosondes) + sustained CloudWatch coverage.
+                                    </Typography>
+                                )}
+                                <Box mt={1}>
+                                    <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.8)' }}>
+                                        Drafts
+                                    </Typography>
+                                    {draftWarnings.length === 0 ? (
+                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', display: 'block' }}>
+                                            No draft warnings yet.
+                                        </Typography>
+                                    ) : (
+                                        <Box mt={0.5} display="flex" flexDirection="column" gap={0.5}>
+                                            {draftWarnings.map((draft) => (
+                                                <Box key={draft.id} display="flex" alignItems="center" justifyContent="space-between" gap={1}>
+                                                    <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.8)' }}>
+                                                        {HAZARD_LABELS[draft.hazardType] ?? draft.hazardType} · {formatHoursLabel(draft.forecastLeadHours)} · {Number.isFinite(draft.areaFracService) ? `${Math.round(draft.areaFracService * 100)}%` : '—'}
+                                                    </Typography>
+                                                    <Box display="flex" gap={0.5}>
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            sx={panelButtonSx}
+                                                            onClick={() => issueDraftWarning(draft)}
+                                                        >
+                                                            Issue
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            sx={panelButtonSx}
+                                                            onClick={() => discardDraftWarning(draft)}
+                                                        >
+                                                            Discard
+                                                        </Button>
+                                                    </Box>
+                                                </Box>
+                                            ))}
+                                        </Box>
+                                    )}
+                                </Box>
+                                {hasForecastRun && (
+                                    <Box mt={1}>
+                                        <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.8)' }}>
+                                            Auto-warning diagnostics
+                                        </Typography>
+                                        {autoWarningDiagnostics ? (
+                                            <Box mt={0.5} display="flex" flexDirection="column" gap={0.5}>
+                                                <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)' }}>
+                                                    Service area cells: {formatDiagCount(autoWarningDiagnostics.serviceCellCount)}
+                                                </Typography>
+                                                {unlockedWarningHazards.map((hazardType) => {
+                                                    const diag = autoWarningDiagnostics.hazards?.[hazardType];
+                                                    return (
+                                                        <Box key={hazardType} display="flex" flexDirection="column" gap={0.2}>
+                                                            <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.8)' }}>
+                                                                {HAZARD_LABELS[hazardType] ?? hazardType}
+                                                            </Typography>
+                                                            <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)' }}>
+                                                                max {formatDiagNumber(diag?.maxValue)} · thr {formatDiagNumber(diag?.thresholdUsed)} · cells {formatDiagCount(diag?.cellsOverThreshold)}
+                                                            </Typography>
+                                                            <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.75)' }}>
+                                                                comps {formatDiagCount(diag?.componentCount)} · drop&lt;min {formatDiagCount(diag?.componentsDroppedTooSmall)} · drop&gt;cap {formatDiagCount(diag?.componentsDroppedAreaCap)} · drafts {formatDiagCount(diag?.draftCount)}
+                                                            </Typography>
+                                                        </Box>
+                                                    );
+                                                })}
+                                            </Box>
+                                        ) : (
+                                            <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', display: 'block' }}>
+                                                Run a forecast to see auto-warning diagnostics.
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                )}
+                                <Box mt={1}>
+                                    <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => setShowForecastAdvanced(prev => !prev)}
+                                        endIcon={showForecastAdvanced ? <RemoveIcon fontSize="small" /> : <AddIcon fontSize="small" />}
+                                        sx={panelButtonSx}
+                                    >
+                                        Advanced
+                                    </Button>
+                                </Box>
+                                {showForecastAdvanced && (
+                                    <Box mt={1}>
+                                        <FormControl fullWidth size="small" sx={{ mb: 1 }}>
+                                            <InputLabel sx={panelLabelSx}>Product</InputLabel>
+                                            <Select
+                                                value={forecastProduct}
+                                                onChange={(e) => {
+                                                    warningOverlayFocusRef.current.activeHazardType = null;
+                                                    setForecastProduct(e.target.value);
+                                                }}
+                                                label="Product"
+                                                sx={panelInputSx}
+                                            >
+                                                {['precipRate', 'windSpeed', 'cloudTau', 'confidence'].map((value) => (
+                                                    <MenuItem key={value} value={value}>
+                                                        {FORECAST_PRODUCT_LABELS[value] ?? value}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    size="small"
+                                                    checked={showForecastOverlay}
+                                                    onChange={(_, v) => {
+                                                        warningOverlayFocusRef.current.activeHazardType = null;
+                                                        setShowForecastOverlay(v);
+                                                    }}
+                                                    color="primary"
+                                                />
+                                            }
+                                            label={<Typography variant="caption" style={{ color: 'rgba(226,232,240,0.8)' }}>Show overlay</Typography>}
+                                        />
+                                    </Box>
+	                                )}
+	                            </>
+	                        )
+	                    })}
+                        {showForecastReport && renderRightPanelSection({
+                            title: 'Forecast Report',
+                            open: true,
+                            onToggle: () => setShowForecastReport(false),
+                            children: (() => {
+                                const pid = currentPlayer?.id != null ? String(currentPlayer.id) : null;
+                                const reportRuns = pid ? (forecastReportByPlayerIdRef.current[pid] || []) : [];
+                                const hubs = pid ? (uplinkHubsByPlayerIdRef.current[pid] || []) : [];
+                                const totalHubs = hubs.length;
+                                const onlineHubs = hubs.filter(h => h?.isOnline).length;
+                                const onlineSurface = hubs.filter(h => h?.isOnline && h?.modules?.surface).length;
+                                const onlineRadiosonde = hubs.filter(h => h?.isOnline && h?.modules?.radiosonde).length;
+                                const onlineRadar = hubs.filter(h => h?.isOnline && h?.modules?.radar).length;
+                                const onlineDenseSurface = hubs.filter(h => h?.isOnline && h?.modules?.denseSurface).length;
+                                const fmtPct = (v) => (Number.isFinite(v) ? `${Math.round(v * 100)}%` : '—');
+                                const fmtNum = (v, digits = 2) => (Number.isFinite(v) ? v.toFixed(digits) : '—');
+
+                                const unlockedLeads = Array.isArray(currentTierSpec?.unlockedLeads)
+                                    ? currentTierSpec.unlockedLeads
+                                    : [];
+
+                                return (
+                                    <Box key={`forecast-report-${forecastReportVersion}`} display="flex" flexDirection="column" gap={1}>
+                                        <Box>
+                                            <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)' }}>
+                                                Tier {currentTier}: {currentTierSpec?.name ?? 'Unknown'}
+                                            </Typography>
+                                            <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                                                Unlocked leads: {unlockedLeads.length ? unlockedLeads.map(formatHoursLabel).join(', ') : '—'}
+                                            </Typography>
+                                        </Box>
+
+                                        <Box>
+                                            <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)' }}>
+                                                Sensor network
+                                            </Typography>
+                                            <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                                                Hubs: {totalHubs} total, {onlineHubs} online
+                                            </Typography>
+                                            <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.85)', display: 'block' }}>
+                                                Online modules: Surface {onlineSurface}, Radiosonde {onlineRadiosonde}, Radar {onlineRadar}, Dense {onlineDenseSurface}
+                                            </Typography>
+                                        </Box>
+
+	                                        <Box>
+	                                            <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)' }}>
+	                                                Last {FORECAST_REPORT_MAX_RUNS} forecasts
+	                                            </Typography>
+                                            {reportRuns.length === 0 ? (
+                                                <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.8)', display: 'block' }}>
+                                                    Run a forecast to generate metrics.
+                                                </Typography>
+                                            ) : (
+                                                <Box mt={0.5} display="flex" flexDirection="column" gap={1}>
+                                                    {reportRuns.map((run) => {
+                                                        const baseLabel = Number.isFinite(run.baseSimTimeSeconds)
+                                                            ? formatSimTime(run.baseSimTimeSeconds)
+                                                            : 'Time unknown';
+                                                        const hazards = run.byHazard || {};
+                                                        const leadList = Array.isArray(run.leadHours) ? run.leadHours : [];
+                                                        return (
+                                                            <Box key={run.runId || baseLabel}>
+                                                                <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.8)' }}>
+                                                                    Run {baseLabel}
+                                                                </Typography>
+                                                                {Object.keys(HAZARD_LABELS).map((hazardType) => {
+                                                                    const hazardLabel = HAZARD_LABELS[hazardType] ?? hazardType;
+                                                                    const byLead = hazards[hazardType] || {};
+                                                                    return (
+                                                                        <Box key={`${run.runId}-${hazardType}`} mt={0.25}>
+                                                                            <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.9)' }}>
+                                                                                {hazardLabel}
+                                                                            </Typography>
+                                                                            {leadList.map((leadHours) => {
+                                                                                const bucket = byLead[leadHours] || null;
+                                                                                if (!bucket) return null;
+                                                                                return (
+                                                                                    <Typography
+                                                                                        key={`${run.runId}-${hazardType}-${leadHours}`}
+                                                                                        variant="caption"
+                                                                                        style={{ color: 'rgba(148,163,184,0.75)', display: 'block' }}
+                                                                                    >
+                                                                                        {formatHoursLabel(leadHours)} · P {fmtPct(bucket.precision)} / R {fmtPct(bucket.recall)} · IoU {fmtNum(bucket.meanIoU)} · Lead {fmtNum(bucket.meanLeadHours, 1)}h · Miss {fmtPct(bucket.missRate)}
+                                                                                    </Typography>
+                                                                                );
+                                                                            })}
+                                                                        </Box>
+                                                                    );
+                                                                })}
+                                                            </Box>
+                                                        );
+                                                    })}
+                                                </Box>
+	                                            )}
+	                                        </Box>
+                                        {process.env.NODE_ENV !== 'production' && (
+                                            <Box mt={1}>
+                                                <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.85)' }}>
+                                                    Tuning (dev)
+                                                </Typography>
+                                                <Box mt={0.5} display="flex" flexDirection="column" gap={0.75}>
+                                                    <TextField
+                                                        size="small"
+                                                        type="number"
+                                                        label="IoU match min"
+                                                        value={tuningParams.iouMatchMin}
+                                                        onChange={(e) => {
+                                                            const next = Number(e.target.value);
+                                                            if (!Number.isFinite(next)) return;
+                                                            setTuningParams(prev => ({ ...prev, iouMatchMin: next }));
+                                                        }}
+                                                        sx={panelInputSx}
+                                                        InputLabelProps={{ sx: panelLabelSx }}
+                                                    />
+                                                    <TextField
+                                                        size="small"
+                                                        type="number"
+                                                        label="Min component cells"
+                                                        value={tuningParams.minComponentCells}
+                                                        onChange={(e) => {
+                                                            const next = Math.round(Number(e.target.value));
+                                                            if (!Number.isFinite(next)) return;
+                                                            setTuningParams(prev => ({ ...prev, minComponentCells: next }));
+                                                        }}
+                                                        sx={panelInputSx}
+                                                        InputLabelProps={{ sx: panelLabelSx }}
+                                                    />
+                                                    <Box>
+                                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.9)' }}>
+                                                            Hazard thresholds
+                                                        </Typography>
+                                                        {Object.keys(HAZARD_LABELS).map((hazardType) => (
+                                                            <TextField
+                                                                key={`thr-${hazardType}`}
+                                                                size="small"
+                                                                type="number"
+                                                                label={HAZARD_LABELS[hazardType] ?? hazardType}
+                                                                value={tuningParams.thresholdsByHazard?.[hazardType] ?? ''}
+                                                                onChange={(e) => {
+                                                                    const next = Number(e.target.value);
+                                                                    if (!Number.isFinite(next)) return;
+                                                                    setTuningParams(prev => ({
+                                                                        ...prev,
+                                                                        thresholdsByHazard: {
+                                                                            ...(prev.thresholdsByHazard || {}),
+                                                                            [hazardType]: next
+                                                                        }
+                                                                    }));
+                                                                }}
+                                                                sx={{ ...panelInputSx, mt: 0.5 }}
+                                                                InputLabelProps={{ sx: panelLabelSx }}
+                                                            />
+                                                        ))}
+                                                    </Box>
+                                                    <Box>
+                                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.9)' }}>
+                                                            Area caps (service fraction)
+                                                        </Typography>
+                                                        {Object.keys(HAZARD_LABELS).map((hazardType) => (
+                                                            <Box key={`caps-${hazardType}`} mt={0.5}>
+                                                                <Typography variant="caption" style={{ color: 'rgba(226,232,240,0.8)' }}>
+                                                                    {HAZARD_LABELS[hazardType] ?? hazardType}
+                                                                </Typography>
+                                                                <Box display="flex" flexWrap="wrap" gap={0.5} mt={0.25}>
+                                                                    {[1, 3, 6, 12, 24].map((lead) => (
+                                                                        <TextField
+                                                                            key={`cap-${hazardType}-${lead}`}
+                                                                            size="small"
+                                                                            type="number"
+                                                                            label={formatHoursLabel(lead)}
+                                                                            value={tuningParams.areaCapsByHazardByLead?.[hazardType]?.[lead] ?? ''}
+                                                                            onChange={(e) => {
+                                                                                const next = Number(e.target.value);
+                                                                                if (!Number.isFinite(next)) return;
+                                                                                setTuningParams(prev => ({
+                                                                                    ...prev,
+                                                                                    areaCapsByHazardByLead: {
+                                                                                        ...(prev.areaCapsByHazardByLead || {}),
+                                                                                        [hazardType]: {
+                                                                                            ...((prev.areaCapsByHazardByLead || {})[hazardType] || {}),
+                                                                                            [lead]: next
+                                                                                        }
+                                                                                    }
+                                                                                }));
+                                                                            }}
+                                                                            sx={{ ...panelInputSx, width: 110 }}
+                                                                            InputLabelProps={{ sx: panelLabelSx }}
+                                                                        />
+                                                                    ))}
+                                                                </Box>
+                                                            </Box>
+                                                        ))}
+                                                    </Box>
+                                                    <Box>
+                                                        <Typography variant="caption" style={{ color: 'rgba(148,163,184,0.9)' }}>
+                                                            Confidence multipliers
+                                                        </Typography>
+                                                        <TextField
+                                                            size="small"
+                                                            type="number"
+                                                            label="Precision bonus max"
+                                                            value={tuningParams.confidence?.precisionBonusMax ?? ''}
+                                                            onChange={(e) => {
+                                                                const next = Number(e.target.value);
+                                                                if (!Number.isFinite(next)) return;
+                                                                setTuningParams(prev => ({
+                                                                    ...prev,
+                                                                    confidence: { ...(prev.confidence || {}), precisionBonusMax: next }
+                                                                }));
+                                                            }}
+                                                            sx={{ ...panelInputSx, mt: 0.5 }}
+                                                            InputLabelProps={{ sx: panelLabelSx }}
+                                                        />
+                                                        <TextField
+                                                            size="small"
+                                                            type="number"
+                                                            label="Precision conf start"
+                                                            value={tuningParams.confidence?.precisionConfStart ?? ''}
+                                                            onChange={(e) => {
+                                                                const next = Number(e.target.value);
+                                                                if (!Number.isFinite(next)) return;
+                                                                setTuningParams(prev => ({
+                                                                    ...prev,
+                                                                    confidence: { ...(prev.confidence || {}), precisionConfStart: next }
+                                                                }));
+                                                            }}
+                                                            sx={{ ...panelInputSx, mt: 0.5 }}
+                                                            InputLabelProps={{ sx: panelLabelSx }}
+                                                        />
+                                                        <TextField
+                                                            size="small"
+                                                            type="number"
+                                                            label="Precision conf full"
+                                                            value={tuningParams.confidence?.precisionConfFull ?? ''}
+                                                            onChange={(e) => {
+                                                                const next = Number(e.target.value);
+                                                                if (!Number.isFinite(next)) return;
+                                                                setTuningParams(prev => ({
+                                                                    ...prev,
+                                                                    confidence: { ...(prev.confidence || {}), precisionConfFull: next }
+                                                                }));
+                                                            }}
+                                                            sx={{ ...panelInputSx, mt: 0.5 }}
+                                                            InputLabelProps={{ sx: panelLabelSx }}
+                                                        />
+                                                    </Box>
+                                                    <Button
+                                                        size="small"
+                                                        variant="outlined"
+                                                        sx={panelButtonSx}
+                                                        onClick={() => setTuningParams(DEFAULT_TUNING)}
+                                                    >
+                                                        Reset to defaults
+                                                    </Button>
+                                                </Box>
+                                            </Box>
+                                        )}
+	                                    </Box>
+	                                );
+	                            })()
+	                        })}
+	                </Box>
+	            )}
 
             {showSatPanel && (
                 <Paper style={{ position: 'absolute', top: gameMode === 'pvp' ? 270 : 240, left: 10, padding: 12, width: 260, zIndex: 1000, ...panelSurfaceStyle }}>
@@ -7231,7 +9870,6 @@ const App = () => {
                 </div>
             ))}
 
-            {renderSatellitesPanel()}
         </div>
     );
 

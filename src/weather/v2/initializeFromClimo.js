@@ -1,4 +1,5 @@
 import { Cp, Rd } from '../constants';
+import { LAT_DEG, U10M_ZONAL_MEAN_TARGET, SOURCE_FIXTURE_COUNT } from './windClimoTargets';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
@@ -6,6 +7,21 @@ const clamp01 = (v) => clamp(v, 0, 1);
 const smoothstep = (edge0, edge1, x) => {
   const t = clamp01((x - edge0) / (edge1 - edge0));
   return t * t * (3 - 2 * t);
+};
+
+const sampleTargetU = (latDeg) => {
+  if (SOURCE_FIXTURE_COUNT !== 8 || !LAT_DEG?.length || !U10M_ZONAL_MEAN_TARGET?.length) return 0;
+  const n = Math.min(LAT_DEG.length, U10M_ZONAL_MEAN_TARGET.length);
+  if (n === 0) return 0;
+  const step = n > 1 ? LAT_DEG[0] - LAT_DEG[1] : 1;
+  if (!Number.isFinite(step) || step === 0) return U10M_ZONAL_MEAN_TARGET[0];
+  if (latDeg >= LAT_DEG[0]) return U10M_ZONAL_MEAN_TARGET[0];
+  if (latDeg <= LAT_DEG[n - 1]) return U10M_ZONAL_MEAN_TARGET[n - 1];
+  const idx = (LAT_DEG[0] - latDeg) / step;
+  const i0 = Math.max(0, Math.min(n - 1, Math.floor(idx)));
+  const i1 = Math.min(n - 1, i0 + 1);
+  const t = clamp(idx - i0, 0, 1);
+  return U10M_ZONAL_MEAN_TARGET[i0] + (U10M_ZONAL_MEAN_TARGET[i1] - U10M_ZONAL_MEAN_TARGET[i0]) * t;
 };
 
 const KAPPA = Rd / Cp;
@@ -38,7 +54,7 @@ export function initializeV2FromClimo({ grid, state, geo, climo, params = {} }) 
   } = params;
 
   const { nx, ny, latDeg } = grid;
-  const { N, nz, ps, Ts, soilW, soilCap, landMask, sstNow, theta, qv, qc, qi, qr, sigmaHalf } = state;
+  const { N, nz, ps, Ts, soilW, soilCap, landMask, sstNow, theta, qv, qc, qi, qr, sigmaHalf, u, v } = state;
   const slpNow = climo?.hasSlp ? climo.slpNow : null;
   const t2mNow = climo?.hasT2m ? climo.t2mNow : null;
 
@@ -116,6 +132,29 @@ export function initializeV2FromClimo({ grid, state, geo, climo, params = {} }) 
           qvNew = Math.min(qvOld, rhCapLev * 0.02);
         }
         qv[idx] = clamp(qvNew, 0, 0.03);
+      }
+    }
+  }
+
+  if (SOURCE_FIXTURE_COUNT === 8 && u && v) {
+    const levU = Math.min(1, nz - 1);
+    for (let j = 0; j < ny; j++) {
+      const lat = Number.isFinite(latDeg?.[j])
+        ? latDeg[j]
+        : 90 - ((j + 0.5) / ny) * 180;
+      const absLat = Math.abs(lat);
+      const targetS = sampleTargetU(lat);
+      const jet = Math.exp(-Math.pow((absLat - 35) / 12, 2));
+      const targetU = jet * 2.2 * Math.max(0, targetS);
+      const row = j * nx;
+      for (let i = 0; i < nx; i++) {
+        const k = row + i;
+        const idxS = levS * N + k;
+        const idxU = levU * N + k;
+        u[idxS] = targetS;
+        v[idxS] = 0;
+        u[idxU] = targetU;
+        v[idxU] = 0;
       }
     }
   }

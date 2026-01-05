@@ -1,14 +1,19 @@
 import { Re } from '../constants';
 
 const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
 export function stepWinds5({ dt, grid, state, params = {}, scratch }) {
   if (!grid || !state || !scratch) return;
   const {
-    maxWind = 150,
-    tauDragSurface = 6 * 86400,
-    tauDragTop = 20 * 86400,
-    nuLaplacian = 2e5,
+    maxWind = 70,
+    tauDragSurface = 4 * 3600,
+    tauDragTop = 2 * 86400,
+    nuLaplacian = 4_000_000,
+    quadDragAlphaSurface = 0.02,
+    tropicsDragBoost = 0.5,
+    tropicsDragLat0Deg = 10,
+    tropicsDragLat1Deg = 30,
     polarFilterLatStartDeg = 60,
     polarFilterEverySteps = 1,
     extraFilterEverySteps = 15,
@@ -19,8 +24,8 @@ export function stepWinds5({ dt, grid, state, params = {}, scratch }) {
 
   const { nx, ny, invDx, invDy, f, latDeg, polarWeight, sinLat, cosLat } = grid;
   const { N, nz, u, v, phiMid } = state;
-  const { lapU, lapV, rowA, rowB } = scratch;
-  if (!lapU || !lapV || !rowA || !rowB) return;
+  const { lapU, lapV, lapLapU, lapLapV, rowA, rowB } = scratch;
+  if (!lapU || !lapV || !lapLapU || !lapLapV || !rowA || !rowB) return;
 
   const applyPolarFilter = polarFilterEverySteps > 0 && (stepIndex % polarFilterEverySteps === 0);
   const applyExtra = extraFilterEverySteps > 0 && (stepIndex % extraFilterEverySteps === 0);
@@ -78,8 +83,12 @@ export function stepWinds5({ dt, grid, state, params = {}, scratch }) {
     const base = lev * N;
     laplacianLevel(u, base, lapU);
     laplacianLevel(v, base, lapV);
+    laplacianLevel(lapU, 0, lapLapU);
+    laplacianLevel(lapV, 0, lapLapV);
     const t = nz > 1 ? lev / (nz - 1) : 0;
     const tauDragLev = lerp(tauDragTop, tauDragSurface, t);
+    const nuHyper = nuLaplacian;
+    const nuLapSmall = nuLaplacian * 0.05;
 
     for (let j = 0; j < ny; j++) {
       const row = j * nx;
@@ -87,6 +96,9 @@ export function stepWinds5({ dt, grid, state, params = {}, scratch }) {
       const invDyRow = invDy[j];
       const fRow = f[j];
       const metricCoeff = enableMetricTerms ? (sinLat[j] / cosLat[j]) / Re : 0;
+      const latAbs = Math.abs(latDeg[j]);
+      const tropicsT = clamp01((latAbs - tropicsDragLat0Deg) / (tropicsDragLat1Deg - tropicsDragLat0Deg));
+      const tropicsFactor = 1 + (1 - tropicsT) * tropicsDragBoost;
       const jN = Math.max(0, j - 1);
       const jS = Math.min(ny - 1, j + 1);
       const rowN = jN * nx;
@@ -106,10 +118,13 @@ export function stepWinds5({ dt, grid, state, params = {}, scratch }) {
 
         const u0 = u[idx0];
         const v0 = v[idx0];
-        const dragU = -u0 / tauDragLev;
-        const dragV = -v0 / tauDragLev;
-        const diffU = nuLaplacian * lapU[k];
-        const diffV = nuLaplacian * lapV[k];
+        const speed0 = Math.hypot(u0, v0);
+        const quadAlphaLev = quadDragAlphaSurface * t;
+        const dragFactor = (1 + quadAlphaLev * speed0) * tropicsFactor;
+        const dragU = -(dragFactor * u0) / tauDragLev;
+        const dragV = -(dragFactor * v0) / tauDragLev;
+        const diffU = (-nuHyper * lapLapU[k]) + (nuLapSmall * lapU[k]);
+        const diffV = (-nuHyper * lapLapV[k]) + (nuLapSmall * lapV[k]);
         const metricU = metricCoeff * u0 * v0;
         const metricV = -metricCoeff * u0 * u0;
 

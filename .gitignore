@@ -11,6 +11,7 @@
 # production
 /build
 logs/
+tools/wind-fixtures/
 
 # misc
 .DS_Store

@@ -10,6 +10,10 @@ const AP_COST = {
   RUN_FORECAST: 1,
   ISSUE_WARNING: 1,
   UPGRADE_FORECAST_TECH: 1,
+  BUILD_UPLINK_HUB: 2,
+  ADD_RADAR_MODULE: 1,
+  UPGRADE_DENSE_SURFACE: 1,
+  ADD_RADIOSONDE_MODULE: 1,
 };
 
 export class ActionRegistry {
@@ -110,6 +114,38 @@ export class ActionRegistry {
       UPGRADE_FORECAST_TECH: {
         apCost: AP_COST.UPGRADE_FORECAST_TECH,
         moneyCost: 0,
+        preconditions: (playerId, { applyFn }) => typeof applyFn === 'function',
+        perform: (playerId, { applyFn }) => {
+          applyFn();
+        }
+      },
+      BUILD_UPLINK_HUB: {
+        apCost: AP_COST.BUILD_UPLINK_HUB,
+        moneyCost: 25_000_000,
+        preconditions: (playerId, { buildFn }) => typeof buildFn === 'function',
+        perform: (playerId, { buildFn }) => {
+          buildFn();
+        }
+      },
+      ADD_RADAR_MODULE: {
+        apCost: AP_COST.ADD_RADAR_MODULE,
+        moneyCost: 22_000_000,
+        preconditions: (playerId, { applyFn }) => typeof applyFn === 'function',
+        perform: (playerId, { applyFn }) => {
+          applyFn();
+        }
+      },
+      UPGRADE_DENSE_SURFACE: {
+        apCost: AP_COST.UPGRADE_DENSE_SURFACE,
+        moneyCost: 30_000_000,
+        preconditions: (playerId, { applyFn }) => typeof applyFn === 'function',
+        perform: (playerId, { applyFn }) => {
+          applyFn();
+        }
+      },
+      ADD_RADIOSONDE_MODULE: {
+        apCost: AP_COST.ADD_RADIOSONDE_MODULE,
+        moneyCost: 18_000_000,
         preconditions: (playerId, { applyFn }) => typeof applyFn === 'function',
         perform: (playerId, { applyFn }) => {
           applyFn();

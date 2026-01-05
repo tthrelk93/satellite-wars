@@ -2,6 +2,8 @@ import { createLatLonGridV2 } from './grid';
 import { createState5 } from './state5';
 import { updateHydrostatic } from './hydrostatic';
 import { stepWinds5 } from './dynamics5';
+import { stepWindEddyNudge5 } from './windEddyNudge5';
+import { stepWindNudge5 } from './windNudge5';
 import { stepSurfacePressure5 } from './mass5';
 import { stepAdvection5 } from './advect5';
 import { stepVertical5 } from './vertical5';
@@ -62,15 +64,19 @@ export class WeatherCore5 {
     this.logger = null;
     this._loggerContext = null;
     this.dynParams = {
-      maxWind: 150,
-      tauDragSurface: 1 * 86400,
-      tauDragTop: 10 * 86400,
-      nuLaplacian: 1_000_000,
+      maxWind: 70,
+      tauDragSurface: 4 * 3600,
+      tauDragTop: 2 * 86400,
+      nuLaplacian: 4_000_000,
+      quadDragAlphaSurface: 0.02,
+      tropicsDragBoost: 0.5,
+      tropicsDragLat0Deg: 10,
+      tropicsDragLat1Deg: 30,
       polarFilterLatStartDeg: 60,
       polarFilterEverySteps: 0,
       extraFilterEverySteps: 0,
       extraFilterPasses: 2,
-      enableMetricTerms: false
+      enableMetricTerms: true
     };
     this.massParams = {
       psMin: 80000,
@@ -79,7 +85,7 @@ export class WeatherCore5 {
       maxAbsDpsDt: 0.02
     };
     this.advectParams = {
-      polarLatStartDeg: 60,
+      polarLatStartDeg: 80,
       filterMoisture: false,
       maxBacktraceCells: 2
     };
@@ -122,6 +128,31 @@ export class WeatherCore5 {
       enableThetaS: true,
       enableQvS: true,
       enableUpper: false
+    };
+    this.windNudgeParams = {
+      enable: true,
+      tauSurfaceSeconds: 7 * 86400,
+      tauUpperSeconds: 10 * 86400,
+      tauVSeconds: 20 * 86400,
+      upperJetScale: 2.2,
+      upperJetLatDeg: 35,
+      upperJetWidthDeg: 12
+    };
+    this.windEddyParams = {
+      enable: true,
+      tauSeconds: 10 * 86400,
+      scaleClampMin: 0.5,
+      scaleClampMax: 2.0,
+      eps: 1e-6
+    };
+    this._windNudgeMaxAbsCorrection = 0;
+    this._windNudgeSpinupSeconds = 0;
+    this.windNudgeSpinupParams = {
+      enable: true,
+      durationSeconds: 24 * 3600,
+      tauSurfaceStartSeconds: 6 * 3600,
+      tauUpperStartSeconds: 12 * 3600,
+      tauVStartSeconds: 24 * 3600
     };
     this.radParams = {
       enable: true,
@@ -259,6 +290,8 @@ export class WeatherCore5 {
     this._dynScratch = {
       lapU: new Float32Array(N),
       lapV: new Float32Array(N),
+      lapLapU: new Float32Array(N),
+      lapLapV: new Float32Array(N),
       fluxU: new Float32Array(N),
       fluxV: new Float32Array(N),
       dpsDt: new Float32Array(N),
@@ -397,6 +430,7 @@ export class WeatherCore5 {
     this._dynStepIndex = 0;
     this._nudgeAccumSeconds = 0;
     this._climoAccumSeconds = 0;
+    this._windNudgeSpinupSeconds = 0;
     this._updateClimoNow(0, true);
     updateHydrostatic(this.state, { pTop: P_TOP });
   }
@@ -408,6 +442,7 @@ export class WeatherCore5 {
     this._dynStepIndex = 0;
     this._nudgeAccumSeconds = 0;
     this._climoAccumSeconds = 0;
+    this._windNudgeSpinupSeconds = 0;
     this._updateClimoNow(0, true);
     if (this.ready) {
       initializeV2FromClimo({
@@ -596,6 +631,92 @@ export class WeatherCore5 {
         scratch: this._dynScratch
       });
     });
+    const spinupParams = this.windNudgeSpinupParams;
+    if (spinupParams?.enable) {
+      const durationSeconds = Number.isFinite(spinupParams.durationSeconds)
+        ? spinupParams.durationSeconds
+        : 0;
+      this._windNudgeSpinupSeconds = Math.min(
+        this._windNudgeSpinupSeconds + dt,
+        durationSeconds > 0 ? durationSeconds : this._windNudgeSpinupSeconds + dt
+      );
+    }
+    const dur = Number.isFinite(spinupParams?.durationSeconds) ? spinupParams.durationSeconds : 0;
+    const r01 = dur > 0 ? Math.min(1, this._windNudgeSpinupSeconds / dur) : 1;
+    const r = r01 * r01 * (3 - 2 * r01);
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const tauSurfaceEff = lerp(
+      spinupParams?.tauSurfaceStartSeconds ?? this.windNudgeParams.tauSurfaceSeconds,
+      this.windNudgeParams.tauSurfaceSeconds,
+      r
+    );
+    const tauUpperEff = lerp(
+      spinupParams?.tauUpperStartSeconds ?? this.windNudgeParams.tauUpperSeconds,
+      this.windNudgeParams.tauUpperSeconds,
+      r
+    );
+    const tauVEff = lerp(
+      spinupParams?.tauVStartSeconds ?? this.windNudgeParams.tauVSeconds,
+      this.windNudgeParams.tauVSeconds,
+      r
+    );
+    const windNudgeResult = stepWindNudge5({
+      dt,
+      grid: this.grid,
+      state: this.state,
+      params: {
+        ...this.windNudgeParams,
+        tauSurfaceSeconds: tauSurfaceEff,
+        tauUpperSeconds: tauUpperEff,
+        tauVSeconds: tauVEff
+      }
+    });
+    if (windNudgeResult?.didApply) {
+      const maxAbs = Number.isFinite(windNudgeResult.maxAbsCorrection)
+        ? windNudgeResult.maxAbsCorrection
+        : 0;
+      this._windNudgeMaxAbsCorrection = Math.max(this._windNudgeMaxAbsCorrection, maxAbs);
+      if (shouldLogModules) {
+        logger.recordEvent(
+          'windNudgeDiagnostics',
+          logContext,
+          this,
+          {
+            rmseSurface: windNudgeResult.rmseSurface ?? null,
+            rmseUpper: windNudgeResult.rmseUpper ?? null,
+            maxAbsCorrection: this._windNudgeMaxAbsCorrection,
+            spinupSeconds: this._windNudgeSpinupSeconds,
+            effectiveTaus: {
+              tauSurfaceSeconds: tauSurfaceEff,
+              tauUpperSeconds: tauUpperEff,
+              tauVSeconds: tauVEff
+            },
+            params: this.windNudgeParams
+          }
+        );
+        this._windNudgeMaxAbsCorrection = 0;
+      }
+    }
+    if (this.windEddyParams?.enable) {
+      const eddyResult = stepWindEddyNudge5({
+        dt,
+        grid: this.grid,
+        state: this.state,
+        params: this.windEddyParams
+      });
+      if (eddyResult?.didApply && shouldLogModules) {
+        logger.recordEvent(
+          'windEddyNudgeDiagnostics',
+          logContext,
+          this,
+          {
+            ekeMean: eddyResult.ekeMean ?? null,
+            maxScale: eddyResult.maxScale ?? null,
+            params: this.windEddyParams
+          }
+        );
+      }
+    }
     runWithLog('stepSurfacePressure5', () => {
       stepSurfacePressure5({
         dt,

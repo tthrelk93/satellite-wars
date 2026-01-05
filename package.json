@@ -23,7 +23,8 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "weather:check": "node scripts/check-weather-log.mjs",
-    "verify:no-v1-weather": "node scripts/no-v1-weather.mjs"
+    "verify:no-v1-weather": "node scripts/no-v1-weather.mjs",
+    "wind:targets": "node scripts/wind/extractZonalMeanTargets.mjs"
   },
   "eslintConfig": {
     "extends": [

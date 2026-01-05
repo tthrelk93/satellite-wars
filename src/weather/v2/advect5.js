@@ -1,4 +1,6 @@
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+const clamp01 = (v) => clamp(v, 0, 1);
+const smoothstep01 = (t) => t * t * (3 - 2 * t);
 
 export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
   if (!grid || !state || !scratch) return;
@@ -146,11 +148,17 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
   for (let lev = 0; lev < nz; lev++) {
     const base = lev * N;
     for (let j = 0; j < ny; j++) {
-      if (Math.abs(latDeg[j]) < polarLatStartDeg) continue;
+      const latAbs = Math.abs(latDeg[j]);
+      if (latAbs < polarLatStartDeg) continue;
       const passes = 2 + Math.floor(2 * (polarWeight ? polarWeight[j] : 1));
-      applyFilter(u, base, j, passes);
-      applyFilter(v, base, j, passes);
+      const t = clamp01((latAbs - 80) / 5);
+      const uvScale = smoothstep01(t);
+      const passesUv = Math.round(passes * uvScale);
       applyFilter(theta, base, j, passes);
+      if (passesUv > 0) {
+        applyFilter(u, base, j, passesUv);
+        applyFilter(v, base, j, passesUv);
+      }
       if (filterMoisture) {
         applyFilter(qv, base, j, passes);
         applyFilter(qc, base, j, passes);

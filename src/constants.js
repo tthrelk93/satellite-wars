@@ -23,3 +23,19 @@ export const BASE_INCOME_PER_TURN       = 2_000_000;
 export const INCOME_PER_IMAGING_IN_LINK = 1_500_000;
 export const INCOME_PER_COMM_IN_LINK    =   500_000;
 export const UPKEEP_PER_SAT             =   200_000;
+
+export const WIND_REALISM_TARGETS = {
+  model: {
+    meanMin: 6, meanMax: 10,
+    p90Min: 15, p90Max: 25,
+    p99Min: 35, p99Max: 45,
+    maxMax: 70
+  },
+  viz: {
+    stepMeanMinPx: 0.05,
+    stepMeanMaxPx: 1.4,
+    stepP99MaxPx: 2.5,
+    outOfBoundsMaxFrac: 0.10,
+    clippedMaxFrac: 0.01
+  }
+};

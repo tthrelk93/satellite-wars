@@ -1,8 +1,16 @@
+@font-face {
+  font-family: 'MPlus2';
+  src: url('./fonts/mplus-2p-light-sub.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'MPlus2', 'Helvetica Neue', Arial, sans-serif;
+  background: #000005;
+  color: #eeeeee;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

@@ -29,6 +29,7 @@ export const paintGridToTexture = ({
     const ctx = canvas.getContext('2d');
     const imageData = ctx.createImageData(width, height);
     const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.ClampToEdgeWrapping;
     texture.magFilter = THREE.LinearFilter;
