@@ -119,6 +119,9 @@ const WEATHER_DEBUG_SCALE = {
 
 const SIM_SPEED_DEFAULT = 3600;
 const SIM_SPEED_MAX = 14400;
+const FIXED_SIM_STEP_SECONDS = 120;
+const MAX_SIM_SUBSTEPS = 4;
+const MAX_SIM_SUBSTEPS_BURST = 20;
 const MONTH_SECONDS = (365 * 86400) / 12;
 const SELECTION_DOUBLE_CLICK_MS = 250;
 const SELECTION_DOUBLE_CLICK_PX = 8;
@@ -399,8 +402,10 @@ const App = () => {
     const directionalLightRef = useRef(null);
     const controlsRef = useRef(null);
     const simClockRef = useRef(new SimClock({ startTimeSeconds: 0, simSpeed: SIM_SPEED_DEFAULT, paused: false }));
+    const simAccumSecondsRef = useRef(0);
+    const simAdvanceQueueSecondsRef = useRef(0);
+    const simBurstActiveRef = useRef(false);
     const lastFrameMsRef = useRef(null);
-    const lastSimTimeRef = useRef(null);
     const sunDirRef = useRef(new THREE.Vector3());
     const orbitHoveringRef = useRef(false); // true while pointer over orbit gizmo
     // Live mirrors for state that global listeners read
@@ -601,8 +606,10 @@ const App = () => {
         simClock.simTimeSeconds = 0;
         simClock.setSpeed(simSpeedUI);
         simClock.setPaused(simPausedUI);
+        simAccumSecondsRef.current = 0;
+        simAdvanceQueueSecondsRef.current = 0;
+        simBurstActiveRef.current = false;
         lastFrameMsRef.current = null;
-        lastSimTimeRef.current = null;
         setSimTimeLabel('Day 0, 00:00');
 
         // Core systems setup
@@ -1643,6 +1650,12 @@ const App = () => {
         }
     }
 
+    const queueSimAdvanceSeconds = (deltaSeconds, { burst } = {}) => {
+        if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return;
+        simAdvanceQueueSecondsRef.current += deltaSeconds;
+        if (burst) simBurstActiveRef.current = true;
+    };
+
     const skipToNextDay = () => {
         const simClock = simClockRef.current;
         if (!simClock) return;
@@ -1650,16 +1663,7 @@ const App = () => {
         const nextDayStart = (Math.floor(current / 86400) + 1) * 86400;
         const delta = nextDayStart - current;
         if (!(delta > 0)) return;
-        simClock.stepSeconds(delta);
-        const earth = earthRef.current;
-        if (earth) {
-            earth.update(simClock.simTimeSeconds, 1, {
-                simSpeed: simClock.simSpeed,
-                paused: simClock.paused,
-                sensorGating: buildSensorGating()
-            });
-        }
-        updateWeatherDebugNow();
+        queueSimAdvanceSeconds(delta, { burst: true });
     };
 
     const handleEndTurnClick = () => {
@@ -1822,20 +1826,6 @@ const App = () => {
     useEffect(() => {
         if (!earthRef.current) return;
         earthRef.current.setRadarOverlayVisible?.(showRadarObs);
-        if (showRadarObs) {
-            const pass = earthRef.current.getGroundRadarPpiPass?.();
-            const uniforms = pass?.material?.uniforms;
-            if (uniforms?.dbzMin && uniforms?.qMin && uniforms?.dbzAlphaSpan) {
-                console.log('[groundRadar] pass uniforms:', {
-                    dbzMin: uniforms.dbzMin.value,
-                    qMin: uniforms.qMin.value,
-                    dbzAlphaSpan: uniforms.dbzAlphaSpan.value
-                });
-                uniforms.dbzMin.value = Math.min(uniforms.dbzMin.value, 0);
-                uniforms.qMin.value = Math.min(uniforms.qMin.value, 1e-6);
-                uniforms.dbzAlphaSpan.value = Math.max(uniforms.dbzAlphaSpan.value, 16);
-            }
-        }
     }, [showRadarObs, gameMode]);
 
     const handleLoadWindReference = async () => {
@@ -2447,7 +2437,7 @@ const App = () => {
         return (RE_M / 1000) * Math.sqrt(x * x + y * y);
     };
 
-		const buildSensorGating = () => {
+		const buildSensorGating = (simTimeSeconds = simClockRef.current?.simTimeSeconds ?? 0) => {
 	        const earth = earthRef.current;
 	        const player = currentPlayerRef.current;
 	        if (!player || !earth) return null;
@@ -2589,17 +2579,13 @@ const App = () => {
 			const imagingFootprints = [];
 			const debugEntries = cloudWatchDebugRef.current ? [] : null;
 			const tmpWorldPos = new THREE.Vector3();
-			const tmpLocalPos = new THREE.Vector3();
 			const tmpSubWorld = new THREE.Vector3();
-			const tmpSubLocal = new THREE.Vector3();
 			satellitesRef.current.forEach(sat => {
 				if (sat.ownerId !== playerId) return;
 				if (sat.type !== 'cloudWatch' || sat.inHqRange !== true) return;
 				if (!sat.mesh?.getWorldPosition) return;
 				sat.mesh.getWorldPosition(tmpWorldPos);
-				tmpLocalPos.copy(tmpWorldPos);
-				earth.parentObject?.worldToLocal?.(tmpLocalPos);
-				const latLon = vectorToLatLonRad(tmpLocalPos);
+				const latLon = earth.worldToEarthFixedLatLonRad?.(tmpWorldPos, simTimeSeconds);
 				if (!latLon) return;
 				const lonRadWorld = wrapRadToPi(latLon.lonRad);
 				const lonRadGrid = wrapRadToPi(lonRadWorld + CLOUD_WATCH_GRID_LON_OFFSET_RAD);
@@ -2612,9 +2598,7 @@ const App = () => {
             });
 				if (debugEntries) {
 					tmpSubWorld.copy(tmpWorldPos).normalize().multiplyScalar(earth.earthRadiusKm);
-					tmpSubLocal.copy(tmpSubWorld);
-					earth.parentObject?.worldToLocal?.(tmpSubLocal);
-					const subLatLon = vectorToLatLonRad(tmpSubLocal);
+					const subLatLon = earth.worldToEarthFixedLatLonRad?.(tmpSubWorld, simTimeSeconds);
 					const subLonRad = subLatLon ? wrapRadToPi(subLatLon.lonRad) : null;
 					const toUnit = (latRad, lonRad) => {
 						const cosLat = Math.cos(latRad);
@@ -5783,51 +5767,86 @@ const App = () => {
             lastFrameMsRef.current = nowMs;
 
             const simClock = simClockRef.current;
-            simClock.tick(realDtSeconds);
-            const simTimeSeconds = simClock.simTimeSeconds;
-            let deltaSimSeconds = 0;
-            if (Number.isFinite(lastSimTimeRef.current)) {
-                deltaSimSeconds = simTimeSeconds - lastSimTimeRef.current;
+            let simAccumSeconds = simAccumSecondsRef.current;
+            if (!simClock.paused) {
+                simAccumSeconds += realDtSeconds * simClock.simSpeed;
             }
-            if (!(deltaSimSeconds > 0)) deltaSimSeconds = 0;
-            lastSimTimeRef.current = simTimeSeconds;
+            const queuedAdvance = simAdvanceQueueSecondsRef.current;
+            if (queuedAdvance > 0) {
+                simAccumSeconds += queuedAdvance;
+                simAdvanceQueueSecondsRef.current = 0;
+                simBurstActiveRef.current = true;
+            }
+
+            const stepsAvailable = Math.floor(simAccumSeconds / FIXED_SIM_STEP_SECONDS);
+            const useBurst = simBurstActiveRef.current && simAccumSeconds >= FIXED_SIM_STEP_SECONDS;
+            const maxSteps = useBurst ? MAX_SIM_SUBSTEPS_BURST : MAX_SIM_SUBSTEPS;
+            const stepsToRun = Math.min(stepsAvailable, maxSteps);
+            const stepsSkipped = Math.max(0, stepsAvailable - stepsToRun);
+            simAccumSecondsRef.current = simAccumSeconds;
+            if (simAccumSeconds < FIXED_SIM_STEP_SECONDS * 0.5) {
+                simBurstActiveRef.current = false;
+            }
+            let simLagSeconds = simAccumSeconds;
+
+            const deltaSimSeconds = stepsToRun * FIXED_SIM_STEP_SECONDS;
+            let detectedSpheres = [];
+            let lastSensorGating = null;
+            let lastSimTimeSeconds = simClock.simTimeSeconds;
+
+            if (deltaSimSeconds > 0) {
+                simAccumSeconds -= deltaSimSeconds;
+                simAccumSecondsRef.current = simAccumSeconds;
+                simLagSeconds = simAccumSeconds;
+                simClock.stepSeconds(deltaSimSeconds);
+                lastSimTimeSeconds = simClock.simTimeSeconds;
+            }
+
+            const renderSimTimeSeconds = simClock.simTimeSeconds + simAccumSeconds;
+            if (earthRef.current) {
+                earthRef.current.setRotationForSimTime?.(renderSimTimeSeconds);
+            }
+            if (deltaSimSeconds > 0) {
+                satellitesRef.current.forEach(satellite => {
+                    const detections = satellite.updateOrbit(
+                        hqSpheresRef,
+                        currentPlayerRef,
+                        satellitesRef.current,
+                        deltaSimSeconds
+                    );
+                    detectedSpheres = detectedSpheres.concat(detections);
+                });
+            }
+            if (earthRef.current) {
+                const earth = earthRef.current;
+                const sensorGating = buildSensorGating(lastSimTimeSeconds);
+                lastSensorGating = sensorGating;
+                earth.update(lastSimTimeSeconds, realDtSeconds, {
+                    simSpeed: simClock.simSpeed,
+                    paused: simClock.paused,
+                    sensorGating,
+                    simStepsThisFrame: stepsToRun,
+                    simStepsSkipped: stepsSkipped,
+                    simLagSeconds,
+                    flushAssimilation: true,
+                    renderSimTimeSeconds
+                });
+            }
 
             const directionalLight = directionalLightRef.current;
             if (directionalLight) {
-                const dayOfYear = (((simTimeSeconds / 86400) % 365) + 365) % 365;
+                const dayOfYear = (((renderSimTimeSeconds / 86400) % 365) + 365) % 365;
                 const decl = solarDeclination(dayOfYear);
                 const sunDir = sunDirRef.current;
                 sunDir.set(Math.cos(decl), Math.sin(decl), 0).normalize();
                 directionalLight.position.copy(sunDir).multiplyScalar(100000);
             }
 
-            let detectedSpheres = [];
             if (earthRef.current) {
-                earthRef.current.setRotationForSimTime?.(simTimeSeconds);
-            }
-            satellitesRef.current.forEach(satellite => { // Update all satellites, regardless of player
-                const detections = satellite.updateOrbit(
-                    hqSpheresRef,
-                    currentPlayerRef,
-                    satellitesRef.current,
-                    deltaSimSeconds
-                ); // Pass the current HQ spheres
-                detectedSpheres = detectedSpheres.concat(detections);
-            });
-
-            // Update Earth (after satellites + rotation)
-            if (earthRef.current) {
+                applyCloudIntelVisibility(lastSensorGating);
                 const earth = earthRef.current;
-                const sensorGating = buildSensorGating();
-
-                earth.update(simTimeSeconds, realDtSeconds, {
-                    simSpeed: simClock.simSpeed,
-                    paused: simClock.paused,
-                    sensorGating
-                });
-                applyCloudIntelVisibility(sensorGating);
                 if (cloudWatchDebugRef.current) {
-                    const entries = sensorGating?.cloudWatchDebugEntries ?? [];
+                    const entries = lastSensorGating?.cloudWatchDebugEntries ?? [];
                     earth.setCloudWatchDebugMarkers?.(entries);
                     const nowMs = performance.now();
                     if (nowMs - cloudWatchDebugInfoRef.current.lastUpdateMs > 500) {
@@ -5860,9 +5879,9 @@ const App = () => {
                 }
             }
 
-            updateTruthEvents(simTimeSeconds);
+            updateTruthEvents(lastSimTimeSeconds);
             updateForecastSkillTelemetry();
-            evaluateWarnings(simTimeSeconds);
+            evaluateWarnings(lastSimTimeSeconds);
 
             if (anchorLockRef.current && earthRef.current && cameraRef.current && controlsRef.current) {
                 const earth = earthRef.current;
@@ -8613,17 +8632,7 @@ const App = () => {
                                 variant="outlined"
                                 color="inherit"
                                 onClick={() => {
-                                    const simClock = simClockRef.current;
-                                    simClock.stepSeconds(3600);
-                                    earthRef.current?.update(simClock.simTimeSeconds, 1, {
-                                        simSpeed: simClock.simSpeed,
-                                        paused: simClock.paused
-                                    });
-                                    earthRef.current?.weatherLogNow(simClock.simTimeSeconds, {
-                                        simSpeed: simClock.simSpeed,
-                                        paused: simClock.paused
-                                    }, 'step+1h');
-                                    updateWeatherDebugNow();
+                                    queueSimAdvanceSeconds(3600, { burst: true });
                                 }}
                             >
                                 Step +1 hour
@@ -8633,17 +8642,7 @@ const App = () => {
                                 variant="outlined"
                                 color="inherit"
                                 onClick={() => {
-                                    const simClock = simClockRef.current;
-                                    simClock.stepSeconds(86400);
-                                    earthRef.current?.update(simClock.simTimeSeconds, 1, {
-                                        simSpeed: simClock.simSpeed,
-                                        paused: simClock.paused
-                                    });
-                                    earthRef.current?.weatherLogNow(simClock.simTimeSeconds, {
-                                        simSpeed: simClock.simSpeed,
-                                        paused: simClock.paused
-                                    }, 'step+1d');
-                                    updateWeatherDebugNow();
+                                    queueSimAdvanceSeconds(86400, { burst: true });
                                 }}
                             >
                                 Step +1 day
@@ -8653,17 +8652,7 @@ const App = () => {
                                 variant="outlined"
                                 color="inherit"
                                 onClick={() => {
-                                    const simClock = simClockRef.current;
-                                    simClock.stepSeconds(MONTH_SECONDS);
-                                    earthRef.current?.update(simClock.simTimeSeconds, 1, {
-                                        simSpeed: simClock.simSpeed,
-                                        paused: simClock.paused
-                                    });
-                                    earthRef.current?.weatherLogNow(simClock.simTimeSeconds, {
-                                        simSpeed: simClock.simSpeed,
-                                        paused: simClock.paused
-                                    }, 'step+1mo');
-                                    updateWeatherDebugNow();
+                                    queueSimAdvanceSeconds(MONTH_SECONDS, { burst: true });
                                 }}
                             >
                                 Step +1 month

@@ -8,11 +8,17 @@ export class RadarPpiOverlay {
         this.ppiPass = ppiPass;
         this.earthRadiusKm = earthRadiusKm;
         this.opacity = options.opacity ?? 1.0;
-        this.backgroundAlpha = options.backgroundAlpha ?? 0.10;
+        this.backgroundAlpha = options.backgroundAlpha ?? 0.0;
         this.backgroundColor = options.backgroundColor ?? [0.0, 0.0, 0.0];
         this.edgeFadeFrac = options.edgeFadeFrac ?? 0.03;
         this.radiusOffsetKm = options.radiusOffsetKm ?? 10;
         this.segments = options.segments ?? DEFAULT_SEGMENTS;
+        this.sweepLineWidthDeg = options.sweepLineWidthDeg ?? 1.2;
+        this.sweepGlowWidthDeg = options.sweepGlowWidthDeg ?? 6.0;
+        this.sweepLineAlpha = options.sweepLineAlpha ?? 0.25;
+        this.sweepLineColor = options.sweepLineColor ?? [0.0, 1.0, 0.5];
+        this.minEchoAlpha = options.minEchoAlpha ?? 0.08;
+        this.blending = options.blending ?? THREE.AdditiveBlending;
 
         this._initMesh();
     }
@@ -33,7 +39,17 @@ export class RadarPpiOverlay {
             overlayAlpha: { value: this.opacity },
             backgroundAlpha: { value: this.backgroundAlpha },
             backgroundColor: { value: backgroundColor },
-            edgeFadeFrac: { value: this.edgeFadeFrac }
+            edgeFadeFrac: { value: this.edgeFadeFrac },
+            sweepAngleRad: { value: Math.PI * 0.5 },
+            sweepLineWidthRad: { value: THREE.MathUtils.degToRad(this.sweepLineWidthDeg) },
+            sweepGlowWidthRad: { value: THREE.MathUtils.degToRad(this.sweepGlowWidthDeg) },
+            sweepLineAlpha: { value: this.sweepLineAlpha },
+            sweepLineColor: {
+                value: Array.isArray(this.sweepLineColor)
+                    ? new THREE.Color(this.sweepLineColor[0], this.sweepLineColor[1], this.sweepLineColor[2])
+                    : this.sweepLineColor
+            },
+            minEchoAlpha: { value: this.minEchoAlpha }
         };
 
         const material = new THREE.ShaderMaterial({
@@ -60,10 +76,19 @@ export class RadarPpiOverlay {
                 uniform float backgroundAlpha;
                 uniform vec3 backgroundColor;
                 uniform float edgeFadeFrac;
+                uniform float sweepAngleRad;
+                uniform float sweepLineWidthRad;
+                uniform float sweepGlowWidthRad;
+                uniform float sweepLineAlpha;
+                uniform vec3 sweepLineColor;
+                uniform float minEchoAlpha;
 
                 out vec4 outColor;
 
                 const float PI = 3.141592653589793;
+                float wrapAngle(float a) {
+                    return atan(sin(a), cos(a));
+                }
 
                 void main() {
                     vec3 dir = normalize(vDir);
@@ -90,18 +115,44 @@ export class RadarPpiOverlay {
                     vec3 baseRGB = backgroundColor;
                     float echoA = ppi.a * overlayAlpha * edge;
                     vec3 echoRGB = ppi.rgb;
+                    float ppiLum = dot(ppi.rgb, vec3(0.333333));
+                    if (ppi.a < 1e-4 || ppiLum < 1e-4) {
+                        echoA = 0.0;
+                        echoRGB = vec3(0.0);
+                    }
+                    if (echoA < minEchoAlpha) {
+                        echoA = 0.0;
+                        echoRGB = vec3(0.0);
+                    }
 
                     float outA = baseA + echoA * (1.0 - baseA);
                     vec3 outRGB = outA > 1e-6
                         ? (baseRGB * baseA + echoRGB * echoA * (1.0 - baseA)) / outA
                         : vec3(0.0);
-                    outColor = vec4(outRGB, outA);
+
+                    float az = atan(northM, eastM);
+                    float dAz = abs(wrapAngle(az - sweepAngleRad));
+                    float glow = 1.0 - smoothstep(sweepGlowWidthRad, sweepGlowWidthRad * 1.25, dAz);
+                    float core = 1.0 - smoothstep(sweepLineWidthRad, sweepLineWidthRad * 1.10, dAz);
+                    float sweep = max(core, 0.35 * glow);
+                    float sweepA = sweepLineAlpha * sweep * edge;
+                    vec3 sweepRGB = sweepLineColor;
+
+                    float finalA = outA + sweepA * (1.0 - outA);
+                    vec3 finalRGB = finalA > 1e-6
+                        ? (outRGB * outA + sweepRGB * sweepA * (1.0 - outA)) / finalA
+                        : vec3(0.0);
+                    if (finalA < 1e-4) {
+                        discard;
+                    }
+                    outColor = vec4(finalRGB, finalA);
                 }
             `,
             glslVersion: THREE.GLSL3,
             transparent: true,
             depthWrite: false,
             depthTest: true,
+            blending: this.blending,
             side: THREE.FrontSide
         });
 
@@ -116,6 +167,11 @@ export class RadarPpiOverlay {
         uniforms.lat0Rad.value = lat;
         uniforms.lon0Rad.value = lon;
         uniforms.cosLat0.value = Math.cos(lat);
+    }
+
+    setSweepAngleRad(angleRad) {
+        if (!this.mesh?.material?.uniforms?.sweepAngleRad) return;
+        this.mesh.material.uniforms.sweepAngleRad.value = Number.isFinite(angleRad) ? angleRad : 0;
     }
 
     updateTexture() {

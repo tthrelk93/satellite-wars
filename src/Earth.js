@@ -404,10 +404,23 @@ class Earth {
     this._cloudWatchCalibrationEnabled = false;
     this._cloudWatchCalibrationGroup = null;
     this._groundRadarPpiPass = null;
+    this._radarSweepBase = null;
     this._groundRadarOriginProvider = null;
     this._lastRadarOrigin = null;
     this._sensorRenderer = null;
     this._sensorGating = null;
+    this._lastPerfStats = null;
+    this._lastPerfLogRealMs = 0;
+    this.useWeatherWorker = true;
+    this._weatherWorker = null;
+    this._weatherWorkerReady = false;
+    this._weatherWorkerBusy = false;
+    this._weatherWorkerAccumSeconds = 0;
+    this._weatherWorkerLastSimTimeSeconds = null;
+    this._weatherWorkerLatestState = null;
+    this._weatherWorkerPendingEnable = false;
+    this._weatherWorkerLastRequestRealMs = 0;
+    this._weatherWorkerMinIntervalMs = 80;
     this.latestForecastByPlayerId = new Map();
     this.forecastHistoryByPlayerId = new Map();
     this.forecastOverlayMesh = null;
@@ -427,6 +440,7 @@ class Earth {
       hqRadar: true
     };
     this._lastAssimilatedObsKeyBySensor = new Map();
+    this._pendingAssimilationObs = [];
     this._stationInfluenceCache = null;
     this._sensorLastObsById = new Map();
     this._sensorCadenceById = new Map();
@@ -593,12 +607,12 @@ class Earth {
     this.weatherVolumeGpu = null;
     this.weatherField = new WeatherField({
       renderScale: 4,
-      tickSeconds: 1.0,
+      tickSeconds: 0.2,
       seed: this.weatherSeed
     });
     this.analysisWeatherField = new WeatherField({
       renderScale: 4,
-      tickSeconds: 1.0,
+      tickSeconds: 0.2,
       seed: this.weatherSeed
     });
     this.forecastWeatherField = new WeatherField({
@@ -627,6 +641,141 @@ class Earth {
     this.analysisWeatherField?.setDebugMode(this.weatherDebugMode);
     this.forecastWeatherField?.setDebugMode(this.weatherDebugMode);
     this._applyForecastOverlayTexture(null);
+    this._initWeatherWorker();
+  }
+
+  _initWeatherWorker() {
+    if (!this.useWeatherWorker) {
+      this._disposeWeatherWorker();
+      this.weatherField?.setUseExternalCore?.(false);
+      return;
+    }
+    const core = this.weatherField?.core;
+    if (!core) return;
+    if (!this._weatherWorker) {
+      try {
+        this._weatherWorker = new Worker(new URL('./workers/weatherCore.worker.js', import.meta.url));
+      } catch (err) {
+        console.warn('[Earth] Weather worker init failed; falling back to main thread.', err);
+        this.useWeatherWorker = false;
+        return;
+      }
+      this._weatherWorker.onmessage = (event) => {
+        const data = event?.data;
+        if (!data?.type) return;
+        if (data.type === 'ready') {
+          this._weatherWorkerReady = true;
+          const payload = data.payload;
+          const currentSim = this._lastSimTimeSeconds;
+          const payloadTime = payload?.timeUTC;
+          if (Number.isFinite(currentSim) && Number.isFinite(payloadTime)) {
+            const delta = currentSim - payloadTime;
+            if (delta > 0.5) {
+              this._weatherWorkerAccumSeconds += delta;
+              this._weatherWorkerLastSimTimeSeconds = currentSim;
+              this._weatherWorkerPendingEnable = true;
+              return;
+            }
+          }
+          if (payload) {
+            this._applyWeatherWorkerState(payload);
+          }
+          this._weatherWorkerPendingEnable = false;
+          this.weatherField?.setUseExternalCore?.(true);
+        } else if (data.type === 'state') {
+          this._weatherWorkerBusy = false;
+          if (data.payload) {
+            this._applyWeatherWorkerState(data.payload);
+          }
+          if (this._weatherWorkerPendingEnable) {
+            this._weatherWorkerPendingEnable = false;
+            this.weatherField?.setUseExternalCore?.(true);
+          }
+        } else if (data.type === 'error') {
+          console.warn('[Earth] Weather worker error', data.payload);
+          this._weatherWorkerBusy = false;
+        }
+      };
+    }
+    this._weatherWorkerReady = false;
+    this._weatherWorkerBusy = false;
+    this._weatherWorkerAccumSeconds = 0;
+    this._weatherWorkerLastSimTimeSeconds = null;
+    this._weatherWorkerLatestState = null;
+    this._weatherWorkerPendingEnable = false;
+    this._weatherWorkerLastRequestRealMs = 0;
+    this.weatherField?.setUseExternalCore?.(false);
+    this._weatherWorker.postMessage({
+      type: 'init',
+      payload: {
+        nx: core.grid?.nx,
+        ny: core.grid?.ny,
+        dt: core.modelDt,
+        seed: this.weatherSeed,
+        startTimeSeconds: core.timeUTC
+      }
+    });
+  }
+
+  _disposeWeatherWorker() {
+    if (this._weatherWorker) {
+      this._weatherWorker.terminate?.();
+      this._weatherWorker = null;
+    }
+    this._weatherWorkerReady = false;
+    this._weatherWorkerBusy = false;
+    this._weatherWorkerAccumSeconds = 0;
+    this._weatherWorkerLastSimTimeSeconds = null;
+    this._weatherWorkerLatestState = null;
+    this._weatherWorkerPendingEnable = false;
+  }
+
+  _applyWeatherWorkerState(payload) {
+    const core = this.weatherField?.core;
+    if (!core || !payload) return;
+    if (Number.isFinite(payload.timeUTC)) {
+      core.timeUTC = payload.timeUTC;
+    }
+    const state = payload.state;
+    const fields = payload.fields;
+    if (state && core.state) {
+      for (const key of Object.keys(state)) {
+        const src = state[key];
+        const dst = core.state[key];
+        if (src instanceof Float32Array && dst instanceof Float32Array && src.length === dst.length) {
+          dst.set(src);
+        }
+      }
+    }
+    if (fields && core.fields) {
+      for (const key of Object.keys(fields)) {
+        const src = fields[key];
+        const dst = core.fields[key];
+        if (src instanceof Float32Array && dst instanceof Float32Array && src.length === dst.length) {
+          dst.set(src);
+        }
+      }
+    }
+    core.ready = true;
+  }
+
+  _maybeStepWeatherWorker(simSpeed) {
+    if (!this._weatherWorker || !this._weatherWorkerReady) return;
+    if (this._weatherWorkerBusy) return;
+    if (!(this._weatherWorkerAccumSeconds > 0)) return;
+    const nowMs = performance.now();
+    if (nowMs - this._weatherWorkerLastRequestRealMs < this._weatherWorkerMinIntervalMs) return;
+    const deltaSeconds = this._weatherWorkerAccumSeconds;
+    this._weatherWorkerAccumSeconds = 0;
+    this._weatherWorkerBusy = true;
+    this._weatherWorkerLastRequestRealMs = nowMs;
+    this._weatherWorker.postMessage({
+      type: 'step',
+      payload: {
+        deltaSeconds,
+        simSpeed
+      }
+    });
   }
 
   _getActiveWeatherField() {
@@ -729,7 +878,16 @@ class Earth {
       const texture = obsSet.products?.radarDbzPpi?.data;
       this.updateRadarOverlayTexture(texture);
     }
-    this._assimilateObservationSet(obsSet);
+    this._pendingAssimilationObs.push(obsSet);
+  }
+
+  _flushAssimilationQueue() {
+    const queue = this._pendingAssimilationObs;
+    if (!queue || queue.length === 0) return;
+    for (let i = 0; i < queue.length; i += 1) {
+      this._assimilateObservationSet(queue[i]);
+    }
+    queue.length = 0;
   }
 
   _assimilateObservationSet(obsSet) {
@@ -1693,10 +1851,32 @@ class Earth {
 
   _applyRotationForSimTime(simTimeSeconds) {
     if (!Number.isFinite(simTimeSeconds)) return;
+    this.parentObject.rotation.y = this._getRotationYForSimTime(simTimeSeconds);
+    this.parentObject.updateMatrixWorld(true);
+  }
+
+  _getRotationYForSimTime(simTimeSeconds) {
+    if (!Number.isFinite(simTimeSeconds)) return 0;
     const daySeconds = 86400;
     const dayFrac = (((simTimeSeconds / daySeconds) % 1) + 1) % 1;
-    this.parentObject.rotation.y = 2 * Math.PI * (dayFrac - 0.5);
-    this.parentObject.updateMatrixWorld(true);
+    return 2 * Math.PI * (dayFrac - 0.5);
+  }
+
+  _vector3ToLatLonRad(vec) {
+    if (!vec) return null;
+    const r = vec.length();
+    if (!(r > 0)) return null;
+    const latRad = Math.asin(vec.y / r);
+    const lonRad = Math.atan2(vec.x, vec.z);
+    return { latRad, lonRad };
+  }
+
+  worldToEarthFixedLatLonRad(worldPos, simTimeSeconds) {
+    if (!worldPos) return null;
+    const angle = this._getRotationYForSimTime(simTimeSeconds);
+    const local = worldPos.clone();
+    local.applyAxisAngle(new THREE.Vector3(0, 1, 0), -angle);
+    return this._vector3ToLatLonRad(local);
   }
 
   setCloudObsProduct(productName) {
@@ -2824,12 +3004,22 @@ class Earth {
       volume: this.weatherVolumeGpu,
       specs: DEFAULT_GROUND_DOPPLER_SPECS
     });
+    this._radarSweepBase = {
+      period: this._groundRadarPpiPass.sweepPeriodSeconds,
+      paintWidthDeg: this._groundRadarPpiPass.sweepPaintWidthDeg,
+      persistence: this._groundRadarPpiPass.sweepPersistenceSeconds
+    };
     this.setRadarOverlay(this._groundRadarPpiPass, {
       radiusOffsetKm: 12,
-      opacity: 1.0,
-      backgroundAlpha: 0.10,
-      backgroundColor: [0.0, 0.0, 0.0],
-      edgeFadeFrac: 0.03
+      opacity: 0.95,
+      backgroundAlpha: 0.0,
+      backgroundColor: [1.0, 1.0, 1.0],
+      edgeFadeFrac: 0.03,
+      sweepLineWidthDeg: 1.0,
+      sweepGlowWidthDeg: 5.0,
+      sweepLineAlpha: 0.7,
+      sweepLineColor: [0.2, 1.0, 0.6],
+      minEchoAlpha: 0.12
     });
     this.setRadarOverlayVisible(this.radarOverlayVisible);
   }
@@ -2857,7 +3047,7 @@ class Earth {
       || Math.abs(prev.lonRad - lon) > 1e-6;
     if (changed) {
       this._lastRadarOrigin = { latRad: lat, lonRad: lon };
-      pass.lastRenderSimTime = null;
+      pass.resetSweep?.();
       const rendered = pass.render({ simTimeSeconds });
       if (rendered) {
         this.updateRadarOverlayTexture(pass.renderTarget?.texture ?? null);
@@ -3008,16 +3198,40 @@ class Earth {
       }
 
   update(simTimeSeconds, realDtSeconds, simContext) {
+    const perfStartMs = performance.now();
     this._sensorGating = simContext?.sensorGating ?? null;
     this._lastSimTimeSeconds = simTimeSeconds;
+    const simSpeed = Number.isFinite(simContext?.simSpeed) ? simContext.simSpeed : 0;
+    const lodActive = simSpeed > 8;
+
+    if (this.useWeatherWorker && this._weatherWorkerReady) {
+      if (Number.isFinite(simTimeSeconds)) {
+        if (this._weatherWorkerLastSimTimeSeconds == null) {
+          this._weatherWorkerLastSimTimeSeconds = simTimeSeconds;
+        } else {
+          const deltaSim = simTimeSeconds - this._weatherWorkerLastSimTimeSeconds;
+          if (deltaSim > 0) {
+            this._weatherWorkerAccumSeconds += deltaSim;
+            this._weatherWorkerLastSimTimeSeconds = simTimeSeconds;
+          }
+        }
+      }
+      if (simContext?.flushAssimilation) {
+        this._maybeStepWeatherWorker(simSpeed);
+      }
+    }
+
     if (this.forecastOverlayVisible && this._sensorGating?.playerId) {
       if (this._forecastDisplayPlayerId !== this._sensorGating.playerId) {
         this._forecastDisplayPlayerId = this._sensorGating.playerId;
         this._refreshForecastOverlayTextureForPlayer(this._forecastDisplayPlayerId);
       }
     }
+    const rotationTimeSeconds = Number.isFinite(simContext?.renderSimTimeSeconds)
+      ? simContext.renderSimTimeSeconds
+      : simTimeSeconds;
     const daySeconds = 86400;
-    const dayFrac = (((simTimeSeconds / daySeconds) % 1) + 1) % 1;
+    const dayFrac = (((rotationTimeSeconds / daySeconds) % 1) + 1) % 1;
     this.parentObject.rotation.y = 2 * Math.PI * (dayFrac - 0.5);
     this.weatherField?.update(simTimeSeconds, realDtSeconds, simContext);
     this.analysisWeatherField?.update(simTimeSeconds, realDtSeconds, simContext);
@@ -3028,13 +3242,40 @@ class Earth {
       this.weatherVolumeDebugView?.render();
     }
     this._syncGroundRadarOrigin(simTimeSeconds);
-    this.weatherSensorManager?.update({
-      truthCore: this.weatherField?.core,
-      earth: this,
-      simTimeSeconds
-    });
+    const shouldUpdateSensors = !this.useWeatherWorker || simContext?.flushAssimilation;
+    if (shouldUpdateSensors) {
+      this.weatherSensorManager?.update({
+        truthCore: this.weatherField?.core,
+        earth: this,
+        simTimeSeconds
+      });
+    }
+    if (simContext?.flushAssimilation) {
+      this._flushAssimilationQueue();
+    }
+    if (this.radarOverlayVisible && this._groundRadarPpiPass && this.radarOverlay) {
+      if (this._radarSweepBase) {
+        if (lodActive) {
+          this._groundRadarPpiPass.sweepPeriodSeconds = this._radarSweepBase.period * 2;
+          this._groundRadarPpiPass.sweepPaintWidthDeg = this._radarSweepBase.paintWidthDeg * 0.8;
+          this._groundRadarPpiPass.sweepPersistenceSeconds = this._radarSweepBase.persistence * 0.7;
+        } else {
+          this._groundRadarPpiPass.sweepPeriodSeconds = this._radarSweepBase.period;
+          this._groundRadarPpiPass.sweepPaintWidthDeg = this._radarSweepBase.paintWidthDeg;
+          this._groundRadarPpiPass.sweepPersistenceSeconds = this._radarSweepBase.persistence;
+        }
+      }
+      const didSweep = this._groundRadarPpiPass.updateSweep?.({ simTimeSeconds, realDtSeconds });
+      if (didSweep) {
+        this.radarOverlay.setSweepAngleRad?.(this._groundRadarPpiPass.sweepAngleRad);
+        this.updateRadarOverlayTexture(this._groundRadarPpiPass.renderTarget?.texture ?? null);
+      }
+    }
     this._tickCloudIntel(simTimeSeconds);
     if (this.windStreamlinesVisible) {
+      if (this.windStreamlineRenderer?.setParticleDensityScale) {
+        this.windStreamlineRenderer.setParticleDensityScale(lodActive ? 0.6 : 1);
+      }
       const sourceCore = this.windStreamlineSource === 'reference' && this.windReferenceCore?.ready
         ? this.windReferenceCore
         : this.analysisWeatherField?.core;
@@ -3045,6 +3286,23 @@ class Earth {
       });
     }
     this._maybeLogWindDiagnostics(simTimeSeconds);
+    const perfEndMs = performance.now();
+    this._lastPerfStats = {
+      updateMs: perfEndMs - perfStartMs,
+      simStepsThisFrame: simContext?.simStepsThisFrame ?? null,
+      simStepsSkipped: simContext?.simStepsSkipped ?? null,
+      simLagSeconds: simContext?.simLagSeconds ?? null
+    };
+    if (perfEndMs - this._lastPerfLogRealMs > 1000) {
+      this._lastPerfLogRealMs = perfEndMs;
+      this.logWeatherEvent?.(
+        'simPerf',
+        {
+          ...this._lastPerfStats
+        },
+        { simTimeSeconds }
+      );
+    }
   }
 
   _syncAnalysisFromTruthIfReady() {
@@ -3686,6 +3944,7 @@ class Earth {
     this.forecastHistoryByPlayerId = new Map();
     this._forecastDisplayPlayerId = null;
     this._applyForecastOverlayTexture(null);
+    this._initWeatherWorker();
   }
 
   setTextureAnisotropy(anisotropy) {
@@ -3733,6 +3992,12 @@ class Earth {
     this.weatherField?.setV2ConvectionEnabled?.(enabled);
     this.analysisWeatherField?.setV2ConvectionEnabled?.(enabled);
     this.forecastWeatherField?.setV2ConvectionEnabled?.(enabled);
+    if (this._weatherWorker) {
+      this._weatherWorker.postMessage({
+        type: 'setV2ConvectionEnabled',
+        payload: { enabled: Boolean(enabled) }
+      });
+    }
   }
 
   weatherLogNow(simTimeSeconds, simContext, reason) {

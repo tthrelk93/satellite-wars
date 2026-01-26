@@ -15,6 +15,7 @@ export class WeatherVolumeGpu {
         this.useHalfFloat = options.useHalfFloat !== undefined ? options.useHalfFloat : true;
         this.uploadCadenceSimSeconds = options.uploadCadenceSimSeconds ?? 3600;
         this.maxUploadsPerRealSecond = options.maxUploadsPerRealSecond ?? 4;
+        this.minUploadIntervalMs = options.minUploadIntervalMs ?? 200;
         this.debug = options.debug ?? false;
 
         this.psUnits = 'hPa';
@@ -80,7 +81,10 @@ export class WeatherVolumeGpu {
         if (!Number.isFinite(simTimeSeconds)) return false;
 
         const nowMs = Date.now();
-        const minRealInterval = 1000 / Math.max(1, this.maxUploadsPerRealSecond);
+        const minRealInterval = Math.max(
+            1000 / Math.max(1, this.maxUploadsPerRealSecond),
+            this.minUploadIntervalMs
+        );
 
         if (this.lastUploadSimTime === null) {
             const didUpload = this.uploadFromCore();

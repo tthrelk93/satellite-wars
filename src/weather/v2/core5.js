@@ -63,6 +63,13 @@ export class WeatherCore5 {
     this._nextModuleLogSimTime = null;
     this.logger = null;
     this._loggerContext = null;
+    this.simSpeed = 1;
+    this.lodParams = {
+      enable: true,
+      simSpeedThreshold: 8,
+      microphysicsEvery: 3,
+      radiationEvery: 6
+    };
     this.dynParams = {
       maxWind: 70,
       tauDragSurface: 4 * 3600,
@@ -129,6 +136,7 @@ export class WeatherCore5 {
       enableQvS: true,
       enableUpper: false
     };
+    this._nudgeParamsRuntime = { ...this.nudgeParams };
     this.windNudgeParams = {
       enable: true,
       tauSurfaceSeconds: 7 * 86400,
@@ -422,6 +430,11 @@ export class WeatherCore5 {
     return this._loggerContext;
   }
 
+  setSimSpeed(simSpeed) {
+    if (!Number.isFinite(simSpeed)) return;
+    this.simSpeed = Math.max(0, simSpeed);
+  }
+
   setTimeUTC(seconds) {
     if (!Number.isFinite(seconds)) return;
     this.timeUTC = seconds;
@@ -600,6 +613,11 @@ export class WeatherCore5 {
       const after = logger.buildProcessSnapshot(this);
       logger.logProcessDelta(logContext, this, name, before, after);
     };
+    const lodActive = this.lodParams?.enable && this.simSpeed > this.lodParams.simSpeedThreshold;
+    const microEvery = Math.max(1, Number(this.lodParams?.microphysicsEvery) || 1);
+    const radEvery = Math.max(1, Number(this.lodParams?.radiationEvery) || 1);
+    const doRadiation = !lodActive || (this._dynStepIndex % radEvery === 0);
+    const doMicrophysics = !lodActive || (this._dynStepIndex % microEvery === 0);
 
     runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
     runWithLog('stepSurface2D5', () => {
@@ -612,22 +630,25 @@ export class WeatherCore5 {
       });
     });
     runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
-    runWithLog('stepRadiation2D5', () => {
-      stepRadiation2D5({
-        dt,
-        grid: this.grid,
-        state: this.state,
-        timeUTC: this.timeUTC,
-        params: this.radParams
+    if (doRadiation) {
+      runWithLog('stepRadiation2D5', () => {
+        stepRadiation2D5({
+          dt,
+          grid: this.grid,
+          state: this.state,
+          timeUTC: this.timeUTC,
+          params: this.radParams
+        });
       });
-    });
+    }
     runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
     runWithLog('stepWinds5', () => {
+      this.dynParams.stepIndex = this._dynStepIndex;
       stepWinds5({
         dt,
         grid: this.grid,
         state: this.state,
-        params: { ...this.dynParams, stepIndex: this._dynStepIndex },
+        params: this.dynParams,
         scratch: this._dynScratch
       });
     });
@@ -727,11 +748,12 @@ export class WeatherCore5 {
       });
     });
     runWithLog('stepAdvection5', () => {
+      this.advectParams.stepIndex = this._dynStepIndex;
       stepAdvection5({
         dt,
         grid: this.grid,
         state: this.state,
-        params: { ...this.advectParams, stepIndex: this._dynStepIndex },
+        params: this.advectParams,
         scratch: this._dynScratch
       });
     });
@@ -748,23 +770,23 @@ export class WeatherCore5 {
     if (typeof this.vertParams?.enableConvectiveOutcome === 'boolean') {
       this.microParams.enableConvectiveOutcome = this.vertParams.enableConvectiveOutcome;
     }
-    runWithLog('stepMicrophysics5', () => stepMicrophysics5({ dt, state: this.state, params: this.microParams }));
+    if (doMicrophysics) {
+      runWithLog('stepMicrophysics5', () => stepMicrophysics5({ dt, state: this.state, params: this.microParams }));
+    }
     runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
     this._nudgeAccumSeconds += dt;
     if (this.nudgeParams.enable && this._nudgeAccumSeconds >= this.nudgeParams.cadenceSeconds) {
       const dtNudge = this._nudgeAccumSeconds;
       this._nudgeAccumSeconds = 0;
       runWithLog('stepNudging5', () => {
+      this._nudgeParamsRuntime.psMin = this.massParams?.psMin;
+      this._nudgeParamsRuntime.psMax = this.massParams?.psMax;
       stepNudging5({
         dt: dtNudge,
         grid: this.grid,
         state: this.state,
         climo: this.climo,
-        params: {
-          ...this.nudgeParams,
-          psMin: this.massParams?.psMin,
-          psMax: this.massParams?.psMax
-        },
+        params: this._nudgeParamsRuntime,
         scratch: this._nudgeScratch
       });
       });

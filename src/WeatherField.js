@@ -28,6 +28,7 @@ class WeatherField {
         this._debugScratch = new Float32Array(this.core.grid.count);
         this._percentileScratch = new Float32Array(this.core.grid.count);
         this._simContext = { simSpeed: null, paused: null };
+        this.useExternalCore = false;
         this._lastStepsRan = 0;
         this._lastPaintSimTime = null;
         this._needsCoreTimeSync = true;
@@ -143,7 +144,8 @@ class WeatherField {
             this._lastSimTimeSeconds = simTimeSeconds;
             return;
         }
-        if (this._needsCoreTimeSync) {
+        const useExternalCore = this.useExternalCore === true;
+        if (this._needsCoreTimeSync && !useExternalCore) {
             this._resyncCoreTime(simTimeSeconds);
             return;
         }
@@ -155,26 +157,31 @@ class WeatherField {
             ? simContext.paused
             : this._simContext.paused;
         this._simContext = { simSpeed, paused };
+        this.core.setSimSpeed?.(simSpeed);
         this.core.setLoggerContext?.({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan });
         if (this._lastSimTimeSeconds === null || simTimeSeconds < this._lastSimTimeSeconds) {
             this._lastSimTimeSeconds = simTimeSeconds;
             return;
         }
-        const deltaSim = simTimeSeconds - this._lastSimTimeSeconds;
-        if (deltaSim > 0) {
-            const maxSteps = Math.max(1000, Math.ceil(86400 / this.core.modelDt) + 10);
-            const maxCatchupSeconds = maxSteps * this.core.modelDt;
-            if (deltaSim > maxCatchupSeconds) {
-                this._resyncCoreTime(simTimeSeconds);
-                return;
+        if (!useExternalCore) {
+            const deltaSim = simTimeSeconds - this._lastSimTimeSeconds;
+            if (deltaSim > 0) {
+                const maxSteps = Math.max(1000, Math.ceil(86400 / this.core.modelDt) + 10);
+                const maxCatchupSeconds = maxSteps * this.core.modelDt;
+                if (deltaSim > maxCatchupSeconds) {
+                    this._resyncCoreTime(simTimeSeconds);
+                    return;
+                }
+                const stepsRan = this.core.advanceModelSeconds(deltaSim) || 0;
+                this._lastStepsRan = stepsRan;
             }
-            const stepsRan = this.core.advanceModelSeconds(deltaSim) || 0;
-            this._lastStepsRan = stepsRan;
+        } else {
+            this._lastStepsRan = 0;
         }
         this._lastSimTimeSeconds = simTimeSeconds;
         const desyncSeconds = Math.abs(simTimeSeconds - this.core.timeUTC);
         const desyncThreshold = Math.max(6 * 3600, this.core.modelDt * 10);
-        if (desyncSeconds > desyncThreshold) {
+        if (desyncSeconds > desyncThreshold && !useExternalCore) {
             this._resyncCoreTime(simTimeSeconds);
             return;
         }
@@ -193,6 +200,13 @@ class WeatherField {
 
     getPaused() {
         return this.paused;
+    }
+
+    setUseExternalCore(enabled) {
+        this.useExternalCore = Boolean(enabled);
+        if (this.useExternalCore) {
+            this._needsCoreTimeSync = false;
+        }
     }
 
     stepModelSeconds(modelSeconds) {

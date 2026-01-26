@@ -2,6 +2,10 @@ import * as THREE from 'three';
 import { RE_M } from '../../constants';
 
 const DEFAULT_RADAR_CADENCE_SECONDS = 600;
+const DEFAULT_SWEEP_PERIOD_SECONDS = 6.0;
+const DEFAULT_SWEEP_BEAM_WIDTH_DEG = 1.2;
+const DEFAULT_SWEEP_PAINT_WIDTH_DEG = 3.0;
+const DEFAULT_SWEEP_PERSISTENCE_SECONDS = 12.0;
 
 export class RadarPpiPass {
     constructor({ renderer, volume, specs, options = {} }) {
@@ -9,9 +13,14 @@ export class RadarPpiPass {
         this.volume = volume;
         this.specs = specs;
         this.radarCadenceSimSeconds = options.radarCadenceSimSeconds ?? DEFAULT_RADAR_CADENCE_SECONDS;
+        this.sweepPeriodSeconds = options.sweepPeriodSeconds ?? DEFAULT_SWEEP_PERIOD_SECONDS;
+        this.sweepBeamWidthDeg = options.sweepBeamWidthDeg ?? DEFAULT_SWEEP_BEAM_WIDTH_DEG;
+        this.sweepPaintWidthDeg = options.sweepPaintWidthDeg ?? DEFAULT_SWEEP_PAINT_WIDTH_DEG;
+        this.sweepPersistenceSeconds = options.sweepPersistenceSeconds ?? DEFAULT_SWEEP_PERSISTENCE_SECONDS;
 
         this.lastRenderSimTime = null;
         this.lastVolumeUploadSimTime = null;
+        this.sweepAngleRad = Math.PI * 0.5;
 
         const ppiSizePx = specs?.ppiSizePx ?? 512;
         this.renderTarget = new THREE.WebGLRenderTarget(ppiSizePx, ppiSizePx, {
@@ -22,10 +31,30 @@ export class RadarPpiPass {
         this.renderTarget.texture.magFilter = THREE.LinearFilter;
         this.renderTarget.texture.generateMipmaps = false;
 
+        this.fullTarget = new THREE.WebGLRenderTarget(ppiSizePx, ppiSizePx, {
+            depthBuffer: false,
+            stencilBuffer: false
+        });
+        this.fullTarget.texture.minFilter = THREE.LinearFilter;
+        this.fullTarget.texture.magFilter = THREE.LinearFilter;
+        this.fullTarget.texture.generateMipmaps = false;
+
+        this._accumTargetA = this.renderTarget;
+        this._accumTargetB = new THREE.WebGLRenderTarget(ppiSizePx, ppiSizePx, {
+            depthBuffer: false,
+            stencilBuffer: false
+        });
+        this._accumTargetB.texture.minFilter = THREE.LinearFilter;
+        this._accumTargetB.texture.magFilter = THREE.LinearFilter;
+        this._accumTargetB.texture.generateMipmaps = false;
+        this._accumUseA = true;
+        this._accumDirty = true;
+
         this.scene = new THREE.Scene();
         this.orthoCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
         this._initMaterial();
+        this._initAccumComposer();
 
         const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
         this.scene.add(quad);
@@ -217,31 +246,84 @@ export class RadarPpiPass {
                     alpha = smoothstep(dbzMin, dbzMin + dbzAlphaSpan, dbz) * 0.9;
                 }
 
-                float rangeKm = rangeM / 1000.0;
-                float stepKm = max(1.0, ringStepKm);
-                float d = mod(rangeKm, stepKm);
-                d = min(d, stepKm - d);
-                float ring = 1.0 - smoothstep(ringWidthKm, 2.0 * ringWidthKm, d);
-                float rangeMaxKm = rangeMaxM / 1000.0;
-                float edge = 1.0 - smoothstep(ringWidthKm, 2.0 * ringWidthKm, abs(rangeKm - rangeMaxKm));
-                ring = max(ring, edge);
-                if (ring > 0.0) {
-                    float ringBlend = clamp(ring * 0.15, 0.0, 1.0);
-                    color = mix(color, vec3(0.9), ringBlend);
-                    alpha = max(alpha, ring * 0.25);
-                }
-
-                if (rangeKm < 2.0) {
-                    float center = 1.0 - smoothstep(0.5, 2.0, rangeKm);
-                    color = mix(color, vec3(1.0), center * 0.5);
-                    alpha = max(alpha, center * 0.6);
-                }
-
                 outColor = vec4(color, alpha);
             }
         `;
 
         return { vertex, fragment };
+    }
+
+    _initAccumComposer() {
+        const uniforms = {
+            prevTex: { value: this._accumTargetA.texture },
+            fullTex: { value: this.fullTarget.texture },
+            sweepAngleRad: { value: this.sweepAngleRad },
+            paintWidthRad: { value: THREE.MathUtils.degToRad(this.sweepPaintWidthDeg) },
+            fade: { value: 0.99 }
+        };
+        const material = new THREE.ShaderMaterial({
+            uniforms,
+            vertexShader: `
+                out vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                precision highp float;
+                precision highp sampler2D;
+
+                in vec2 vUv;
+                uniform sampler2D prevTex;
+                uniform sampler2D fullTex;
+                uniform float sweepAngleRad;
+                uniform float paintWidthRad;
+                uniform float fade;
+
+                out vec4 outColor;
+
+                float wrapAngle(float a) {
+                    return atan(sin(a), cos(a));
+                }
+
+                void main() {
+                    vec2 uv = vUv;
+                    vec2 o = (uv - 0.5) * 2.0;
+                    float r = length(o);
+                    if (r > 1.0) {
+                        outColor = vec4(0.0);
+                        return;
+                    }
+
+                    vec4 prev = texture(prevTex, uv);
+                    prev.rgb *= fade;
+                    prev.a *= fade;
+
+                    vec4 src = texture(fullTex, uv);
+                    float ang = atan(o.y, o.x);
+                    float d = abs(wrapAngle(ang - sweepAngleRad));
+                    float mask = 1.0 - smoothstep(paintWidthRad, paintWidthRad * 1.25, d);
+                    src.a *= mask;
+
+                    float outA = src.a + prev.a * (1.0 - src.a);
+                    vec3 outRGB = outA > 1e-6
+                        ? (src.rgb * src.a + prev.rgb * prev.a * (1.0 - src.a)) / outA
+                        : vec3(0.0);
+                    outColor = vec4(outRGB, outA);
+                }
+            `,
+            glslVersion: THREE.GLSL3,
+            depthWrite: false,
+            depthTest: false,
+            transparent: true
+        });
+        const scene = new THREE.Scene();
+        const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+        scene.add(quad);
+        this._accumScene = scene;
+        this._accumMaterial = material;
+        this._accumQuad = quad;
     }
 
     attachHudToCamera(camera, hudOptions = {}) {
@@ -305,6 +387,12 @@ export class RadarPpiPass {
         this.material.uniforms.cosLat0.value = Math.cos(lat);
     }
 
+    resetSweep() {
+        this.sweepAngleRad = Math.PI * 0.5;
+        this.lastRenderSimTime = null;
+        this._accumDirty = true;
+    }
+
     render({ simTimeSeconds }) {
         if (!this.volume?.weatherTex3D || !this.volume?.psTex2D) return false;
         if (!Number.isFinite(simTimeSeconds)) return false;
@@ -319,7 +407,7 @@ export class RadarPpiPass {
         this.material.uniforms.weatherTex3D.value = this.volume.weatherTex3D;
         this.material.uniforms.psTex2D.value = this.volume.psTex2D;
 
-        this.renderer.setRenderTarget(this.renderTarget);
+        this.renderer.setRenderTarget(this.fullTarget);
         this.renderer.render(this.scene, this.orthoCam);
         this.renderer.setRenderTarget(null);
 
@@ -328,10 +416,73 @@ export class RadarPpiPass {
         return true;
     }
 
+    _clearTarget(target) {
+        const renderer = this.renderer;
+        if (!renderer || !target) return;
+        const prevTarget = renderer.getRenderTarget();
+        const prevColor = new THREE.Color();
+        renderer.getClearColor(prevColor);
+        const prevAlpha = renderer.getClearAlpha();
+        const prevAutoClear = renderer.autoClear;
+        renderer.autoClear = false;
+        renderer.setRenderTarget(target);
+        renderer.setClearColor(0x000000, 0);
+        renderer.clear(true, true, true);
+        renderer.setRenderTarget(prevTarget);
+        renderer.setClearColor(prevColor, prevAlpha);
+        renderer.autoClear = prevAutoClear;
+    }
+
+    updateSweep({ simTimeSeconds, realDtSeconds }) {
+        if (!Number.isFinite(realDtSeconds) || realDtSeconds <= 0) return false;
+        if (!this._accumMaterial || !this._accumScene) return false;
+
+        if (Number.isFinite(simTimeSeconds)) {
+            this.render({ simTimeSeconds });
+        }
+        if (this._accumDirty) {
+            this._clearTarget(this._accumTargetA);
+            this._clearTarget(this._accumTargetB);
+            this._accumDirty = false;
+        }
+
+        const period = Math.max(0.5, Number(this.sweepPeriodSeconds) || DEFAULT_SWEEP_PERIOD_SECONDS);
+        const omega = (2 * Math.PI) / period;
+        this.sweepAngleRad = (this.sweepAngleRad + omega * realDtSeconds) % (2 * Math.PI);
+
+        const persistence = Math.max(0.25, Number(this.sweepPersistenceSeconds) || DEFAULT_SWEEP_PERSISTENCE_SECONDS);
+        const fade = Math.exp(-realDtSeconds / persistence);
+
+        const src = this._accumUseA ? this._accumTargetA : this._accumTargetB;
+        const dst = this._accumUseA ? this._accumTargetB : this._accumTargetA;
+
+        this._accumMaterial.uniforms.prevTex.value = src.texture;
+        this._accumMaterial.uniforms.fullTex.value = this.fullTarget.texture;
+        this._accumMaterial.uniforms.sweepAngleRad.value = this.sweepAngleRad;
+        this._accumMaterial.uniforms.paintWidthRad.value = THREE.MathUtils.degToRad(this.sweepPaintWidthDeg);
+        this._accumMaterial.uniforms.fade.value = fade;
+
+        this.renderer.setRenderTarget(dst);
+        this.renderer.render(this._accumScene, this.orthoCam);
+        this.renderer.setRenderTarget(null);
+
+        this._accumUseA = !this._accumUseA;
+        this.renderTarget = dst;
+        if (this.hudMesh?.material) {
+            this.hudMesh.material.map = this.renderTarget.texture;
+            this.hudMesh.material.needsUpdate = true;
+        }
+        return true;
+    }
+
     dispose() {
         this.renderTarget?.dispose?.();
+        this.fullTarget?.dispose?.();
+        this._accumTargetB?.dispose?.();
         this.material?.dispose?.();
+        this._accumMaterial?.dispose?.();
         this.quad?.geometry?.dispose?.();
+        this._accumQuad?.geometry?.dispose?.();
         this.hudMesh?.geometry?.dispose?.();
         this.hudMesh?.material?.dispose?.();
         this.hudBorder?.geometry?.dispose?.();

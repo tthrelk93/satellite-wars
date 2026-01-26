@@ -16,7 +16,7 @@ const DEFAULT_DIAG_SAMPLE_TARGET = 20000;
 const DESIRED_MEAN_STEP_PX = 0.9;
 const ADAPT_STEP_CLAMP_MIN = 0.3;
 const ADAPT_STEP_CLAMP_MAX = 1.2;
-const RENDER_FRAME_INTERVAL_SECONDS = 0.04;
+const RENDER_FRAME_INTERVAL_SECONDS = 0.1;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 const computePercentiles = (values, percentiles) => {
@@ -157,6 +157,8 @@ class WindStreamlineRenderer {
     this.width = width;
     this.height = height;
     this.particleMultiplier = particleMultiplier;
+    this._baseParticleMultiplier = particleMultiplier;
+    this._densityScale = 1;
     this.maxIntensity = maxIntensity;
     this.stepSeconds = stepSeconds;
     this.baseStepSeconds = stepSeconds;
@@ -207,6 +209,15 @@ class WindStreamlineRenderer {
       this._randomizeParticle(particle);
       this.particles.push(particle);
     }
+  }
+
+  setParticleDensityScale(scale) {
+    const next = Number.isFinite(scale) ? Math.max(0.2, Math.min(1, scale)) : 1;
+    if (Math.abs(next - this._densityScale) < 0.05) return;
+    this._densityScale = next;
+    this.particleMultiplier = this._baseParticleMultiplier * next;
+    this._initParticles();
+    this._clearCanvas();
   }
 
   _randomizeParticle(particle) {

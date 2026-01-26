@@ -41,8 +41,14 @@ export function stepWindEddyNudge5({ dt, grid, state, params = {} }) {
   const relax = clamp01(dt / Math.max(1e-6, tauSeconds));
   if (relax <= 0) return { didApply: false };
 
-  const rowMeanU = new Float32Array(ny);
-  const rowMeanV = new Float32Array(ny);
+  if (!state._eddyRowMeanU || state._eddyRowMeanU.length !== ny) {
+    state._eddyRowMeanU = new Float32Array(ny);
+  }
+  if (!state._eddyRowMeanV || state._eddyRowMeanV.length !== ny) {
+    state._eddyRowMeanV = new Float32Array(ny);
+  }
+  const rowMeanU = state._eddyRowMeanU;
+  const rowMeanV = state._eddyRowMeanV;
   const levS = nz - 1;
   const base = levS * N;
 

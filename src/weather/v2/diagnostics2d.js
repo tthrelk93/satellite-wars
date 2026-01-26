@@ -21,9 +21,11 @@ const smoothstep = (edge0, edge1, x) => {
 const DIAG_ALLOWED_PARAMS = new Set([
   'enableNewCoverage',
   'kTauLowLiquid',
+  'kTauLowRain',
   'kTauLowIce',
   'kTauHighIce',
   'kTauHighLiquid',
+  'tauRainCloudScale',
   'tauMaxLow',
   'tauMaxHigh',
   'tauCloudLowSeconds',
@@ -71,6 +73,7 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
   const {
     enableNewCoverage = true,
     kTauLowLiquid = 20,
+    kTauLowRain = 6,
     kTauLowIce = 20,
     kTauHighIce = 10,
     kTauHighLiquid = 30,
@@ -100,12 +103,13 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
     levVort = 2,
     levUpper = 2,
     pTop = 20000,
-    wTauHigh = 0
+    wTauHigh = 0,
+    tauRainCloudScale = 1.5
   } = params;
 
   const dtSeconds = Number.isFinite(dt) && dt > 0 ? dt : 120;
   const { nx, ny, invDx, invDy, cosLat } = grid;
-  const { N, nz, u, v, qv, qc, qi, pHalf, pMid, theta, T, omega } = state;
+  const { N, nz, u, v, qv, qc, qi, qr, pHalf, pMid, theta, T, omega } = state;
 
   const levTop = 0;
   const levTop2 = Math.min(1, nz - 1);
@@ -136,6 +140,8 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
 
   for (let k = 0; k < N; k++) {
     let lwpLow = 0;
+    let rwpLow = 0;
+    let iwpLow = 0;
     let cwpHighIce = 0;
     let cwpHighLiq = 0;
     let qcMeanLow = 0;
@@ -143,16 +149,20 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
     let weightLow = 0;
     let weightHigh = 0;
 
-    // Low levels (bottom band) — use only bottommost layer
+    // Low levels (bottom band) — use bottom two layers when available
     {
-      const lev = levBot;
-      const base = lev * N + k;
-      const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-      const mAir = dp / g;
-      const mAirEff = Math.min(dp, dpTauLowMaxPa) / g;
-      lwpLow += qc[base] * mAirEff;
-      qcMeanLow += qc[base] * mAir;
-      weightLow += mAir;
+      const lowLevels = levBot2 !== levBot ? [levBot, levBot2] : [levBot];
+      for (const lev of lowLevels) {
+        const base = lev * N + k;
+        const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+        const mAir = dp / g;
+        const mAirEff = Math.min(dp, dpTauLowMaxPa) / g;
+        lwpLow += qc[base] * mAirEff;
+        if (qr) rwpLow += qr[base] * mAirEff;
+        if (qi) iwpLow += qi[base] * mAirEff;
+        qcMeanLow += qc[base] * mAir;
+        weightLow += mAir;
+      }
     }
 
     // High levels (top band)
@@ -188,7 +198,7 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
     qcMeanLow = weightLow > 0 ? qcMeanLow / weightLow : 0;
     qcMeanHigh = weightHigh > 0 ? qcMeanHigh / weightHigh : 0;
 
-    const tauPhysLow = kTauLowLiquid * lwpLow;
+    const tauPhysLow = kTauLowLiquid * lwpLow + kTauLowRain * rwpLow + kTauLowIce * iwpLow;
     const tauPhysHigh = kTauHighIce * cwpHighIce + kTauHighLiquid * cwpHighLiq;
 
     const tauLow = Math.min(tauMaxLow, Math.max(0, tauPhysLow));
@@ -227,6 +237,9 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
     let cloudLow = 0;
     let cloudHigh = 0;
 
+    const tauRain = kTauLowRain * rwpLow + kTauLowIce * iwpLow;
+    const rainCloud = 1 - Math.exp(-tauRain / Math.max(1e-6, tauRainCloudScale));
+
     if (enableNewCoverage) {
       let anvil = convAnvil[k] * convAnvilDecay;
       if (convMask && convMask[k] === 1) anvil = 1;
@@ -237,7 +250,7 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
       const stab = smoothstep(stabLow0K, stabLow1K, dTheta);
       const subs = smoothstep(omegaLowSubs0, omegaLowSubs1, omegaL);
       const noConv = clamp01(1 - convLowSuppress * anvil);
-      const cloudLowTarget = clamp01(rhFactorLow * stab * subs * noConv);
+      const cloudLowTarget = Math.max(clamp01(rhFactorLow * stab * subs * noConv), rainCloud);
 
       const rhFactorHigh = smoothstep(rhHigh0, rhHigh1, RHup);
       const asc = smoothstep(omegaHigh0, omegaHigh1, -omegaU);
@@ -259,7 +272,7 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
       const cloudHighQc = smoothstep(qc0High, qc1High, qcMeanHigh);
       const cloudHighTau = 1 - Math.exp(-tauHigh / Math.max(1e-6, tau0));
       const cloudHighLegacy = 1 - (1 - cloudHighQc) * (1 - clamp01(wTauHigh) * cloudHighTau);
-      cloudLow = cloudLowLegacy;
+      cloudLow = Math.max(cloudLowLegacy, rainCloud);
       cloudHigh = cloudHighLegacy;
       cloudLowCov[k] = cloudLow;
       cloudHighCov[k] = cloudHigh;
