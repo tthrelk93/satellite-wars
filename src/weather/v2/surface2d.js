@@ -47,11 +47,22 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     terrainSlopeRef = 0.003,
     terrainEvapBoost = 0.2,
     lapseRateKPerM = 0.0065,
+    mixedLayerDepthM = 30,
+    rhoWater = 1025,
+    CpWater = 3990,
+    oceanRestoreTau = 120 * 86400,
+    freezeTempK = 271.35,
+    seaIceThicknessFullM = 1.5,
+    seaIceSurfaceOffsetK = 6,
+    seaIceRoughnessBoost = 0.4,
+    seaIceEvapSuppression = 0.95,
+    rhoIce = 917,
+    latentFusion = 3.34e5,
     enableThetaClosure = true
   } = params;
   if (!enable) return;
 
-  const { N, nz, theta, T, u, v, qv, Ts, soilW, soilCap, landMask, sstNow, precipRate, pHalf, pMid } = state;
+  const { N, nz, theta, T, u, v, qv, Ts, soilW, soilCap, landMask, sstNow, seaIceFrac, seaIceThicknessM, surfaceRadiativeFlux, precipRate, pHalf, pMid } = state;
   const { nx, ny, latDeg, invDx, invDy } = grid;
   const elevField = geo?.elev && geo.elev.length === N ? geo.elev : null;
   const levS = nz - 1;
@@ -64,8 +75,15 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
 
   for (let k = 0; k < N; k++) {
     const land = landMask[k] === 1;
+    if (land) {
+      if (seaIceFrac) seaIceFrac[k] = 0;
+      if (seaIceThicknessM) seaIceThicknessM[k] = 0;
+    }
     let TsVal = Ts[k];
-    const sst = sstNow[k];
+    const sstClimo = climo?.sstNow?.[k] ?? sstNow[k];
+    let sst = sstNow[k];
+    let iceFrac = seaIceFrac ? clamp01(seaIceFrac[k]) : 0;
+    let iceThickness = seaIceThicknessM ? Math.max(0, seaIceThicknessM[k]) : 0;
     const idxS = levS * N + k;
     const Tair = T[idxS];
     const qvAir = qv[idxS];
@@ -85,7 +103,8 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
       : 0;
     const slopeMag = Math.hypot(slopeX, slopeY);
     const terrainFactor = clamp(slopeMag / Math.max(1e-6, terrainSlopeRef), 0, 2.5);
-    const roughness = (land ? landRoughnessBoost : 1) * (1 + mountainRoughnessCoeff * terrainFactor);
+    const oceanIceRoughness = land ? 1 : (1 + seaIceRoughnessBoost * iceFrac);
+    const roughness = (land ? landRoughnessBoost : oceanIceRoughness) * (1 + mountainRoughnessCoeff * terrainFactor);
     const CeLocal = Ce * roughness;
     const ChLocal = Ch * roughness;
     const U = Math.max(windFloor, Math.hypot(uS, vS));
@@ -94,6 +113,9 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     const qsTs = saturationMixingRatio(TsVal, pSurf);
     const dq = Math.max(0, qsTs - qvAir);
     let E = rhoAir * CeLocal * U * dq;
+    if (!land) {
+      E *= (1 - seaIceEvapSuppression * iceFrac);
+    }
     if (E > evapMax) E = evapMax;
 
     if (land) {
@@ -106,7 +128,10 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     const H = rhoAir * CpAir * ChLocal * U * (TsVal - Tair);
 
     if (!land) {
-      TsVal += (sst - TsVal) * (dt / oceanTauTs);
+      const skinTarget = iceFrac > 0
+        ? freezeTempK - seaIceSurfaceOffsetK * iceFrac
+        : sst;
+      TsVal += (skinTarget - TsVal) * (dt / oceanTauTs);
     } else {
       let TsTargetLand = 288;
       if (enableLandClimoTs) {
@@ -130,6 +155,32 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     }
     TsVal = clamp(TsVal, TsMin, TsMax);
     Ts[k] = TsVal;
+
+    if (!land) {
+      const netSurfaceFlux = (surfaceRadiativeFlux ? surfaceRadiativeFlux[k] : 0) - H - LvAir * E;
+      const oceanHeatCapacity = Math.max(1e-6, rhoWater * CpWater * mixedLayerDepthM);
+      sst += (netSurfaceFlux * dt) / oceanHeatCapacity;
+      sst += (sstClimo - sst) * (dt / oceanRestoreTau);
+
+      const freezeEnergyScale = Math.max(1e-6, rhoIce * latentFusion);
+      if (iceThickness > 0 && netSurfaceFlux > 0) {
+        iceThickness = Math.max(0, iceThickness - (netSurfaceFlux * dt) / freezeEnergyScale);
+      }
+      if (sst < freezeTempK) {
+        const grow = (freezeTempK - sst) * 0.05 + Math.max(0, -netSurfaceFlux) * dt / freezeEnergyScale;
+        iceThickness += grow;
+        sst = freezeTempK;
+      }
+      if (iceThickness > 0 && sst > freezeTempK) {
+        const melt = (sst - freezeTempK) * 0.1;
+        iceThickness = Math.max(0, iceThickness - melt);
+        sst = Math.max(freezeTempK, sst);
+      }
+      iceFrac = clamp01(iceThickness / Math.max(1e-6, seaIceThicknessFullM));
+      sstNow[k] = clamp(sst, 260, 310);
+      if (seaIceFrac) seaIceFrac[k] = iceFrac;
+      if (seaIceThicknessM) seaIceThicknessM[k] = iceThickness;
+    }
 
     const dp0 = pHalf[(levS + 1) * N + k] - pHalf[levS * N + k];
     const m0 = Math.max(1e-6, dp0 / g);

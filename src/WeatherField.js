@@ -577,9 +577,11 @@ class WeatherField {
             case 'precip':
                 return fields.precipRate;
             case 'sst':
-                return this.core.climo?.sstNow || this._getZeroScratch();
+                return this.core.state?.sstNow || this.core.climo?.sstNow || this._getZeroScratch();
             case 'seaIce':
-                return this.core.climo?.iceNow || this._getZeroScratch();
+                return this.core.state?.seaIceFrac || this.core.climo?.iceNow || this._getZeroScratch();
+            case 'seaIceThickness':
+                return this.core.state?.seaIceThicknessM || this._getZeroScratch();
             case 'albedo':
                 return this.core.geo?.albedo || this._getZeroScratch();
             case 'elev':
@@ -674,6 +676,8 @@ class WeatherField {
                 return { fixed: [271, 307] };
             case 'seaIce':
                 return { fixed: [0, 1] };
+            case 'seaIceThickness':
+                return { fixed: [0, 3] };
             case 'albedo':
                 return { fixed: [0, 1] };
             case 'elev':

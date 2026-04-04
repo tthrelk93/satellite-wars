@@ -17,6 +17,7 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
     kSw = 0.12,
     albedoOcean = 0.06,
     albedoLand = 0.2,
+    albedoSeaIce = 0.55,
     eps0 = 0.75,
     kWv = 12.0,
     kCld = 0.1,
@@ -52,8 +53,11 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
     pMid,
     ps,
     T,
+    Ts,
     landMask,
-    albedo
+    seaIceFrac,
+    albedo,
+    surfaceRadiativeFlux
   } = state;
 
   const dayOfYear = (timeUTC / 86400) % 365;
@@ -96,11 +100,21 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
       const tauCloud = kTau * (lwpLow + lwpHigh);
       const eps = clamp01(eps0 + kWv * (wvCol / 50) + kCld * (tauCloud / 10));
 
-      const albedoVal = albedo && albedo.length === N
+      const iceFrac = seaIceFrac ? clamp01(seaIceFrac[k]) : 0;
+      const baseAlbedo = albedo && albedo.length === N
         ? albedo[k]
         : (landMask && landMask[k] === 1 ? albedoLand : albedoOcean);
+      const albedoVal = landMask && landMask[k] === 1
+        ? baseAlbedo
+        : baseAlbedo + (albedoSeaIce - baseAlbedo) * iceFrac;
 
       const SW_sfc = SW_toa * (1 - albedoVal) * Math.exp(-kSw * tauCloud);
+      const surfaceTemp = Ts && Ts.length === N ? Ts[k] : T[levLowB * N + k];
+      const sigmaSb = 5.670374419e-8;
+      const lwSurfaceNet = -eps * sigmaSb * (Math.pow(Math.max(180, surfaceTemp), 4) - Math.pow(TeqLower, 4));
+      if (surfaceRadiativeFlux && surfaceRadiativeFlux.length === N) {
+        surfaceRadiativeFlux[k] = SW_sfc + lwSurfaceNet;
+      }
       const lwFactorUpper = 0.8 + 0.2 * eps;
       const lwFactorLower = 0.6 + 0.4 * eps;
 

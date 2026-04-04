@@ -523,6 +523,9 @@ export class WeatherCore5 {
       cloudLow: this.fields.cloudLow,
       cloudHigh: this.fields.cloudHigh,
       precipRate: this.fields.precipRate,
+      sstNow: this.state.sstNow,
+      seaIceFrac: this.state.seaIceFrac,
+      seaIceThicknessM: this.state.seaIceThicknessM,
       tauLow: this.fields.tauLow,
       tauHigh: this.fields.tauHigh,
       h850: this.fields.h850,
@@ -646,6 +649,10 @@ export class WeatherCore5 {
       }
       if (climo?.iceNow && climo.iceNow.length === this.geo.iceNow.length) {
         this.geo.iceNow.set(climo.iceNow);
+        this.state.seaIceFrac.set(climo.iceNow);
+        for (let i = 0; i < this.state.seaIceThicknessM.length; i += 1) {
+          this.state.seaIceThicknessM[i] = Math.max(0, this.state.seaIceFrac[i]) * 1.5;
+        }
       }
       if (climo?.albedo && climo.albedo.length === this.geo.albedo.length) {
         this.geo.albedo.set(climo.albedo);

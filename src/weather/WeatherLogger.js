@@ -966,6 +966,20 @@ class WeatherLogger {
     }
     stats.ps = psStats;
 
+    if (fields.slp) {
+      const slpStats = this._statsScalar(fields.slp, {
+        landMask,
+        physMin: 85000,
+        physMax: 110000
+      });
+      if (slpStats) {
+        slpStats.minHpa = slpStats.min != null ? slpStats.min / 100 : null;
+        slpStats.maxHpa = slpStats.max != null ? slpStats.max / 100 : null;
+        slpStats.meanHpa = slpStats.meanAw != null ? slpStats.meanAw / 100 : null;
+      }
+      stats.slp = slpStats;
+    }
+
     const tStats = this._statsScalar(fields.T, {
       landMask,
       thresholdsBelow: [273.15],
@@ -983,16 +997,21 @@ class WeatherLogger {
     tsStats.meanLand = this._statsScalar(fields.Ts, { landMask, landMaskMode: 'land' }).meanAw;
     stats.Ts = tsStats;
 
-    const sstStats = climo.sstNow
-      ? this._statsScalar(climo.sstNow, { landMask, landMaskMode: 'ocean', physMin: 260, physMax: 320 })
+    const sstField = core.state?.sstNow || climo.sstNow;
+    const sstStats = sstField
+      ? this._statsScalar(sstField, { landMask, landMaskMode: 'ocean', physMin: 260, physMax: 320 })
       : this._missingStats();
     if (sstStats) {
       sstStats.meanOcean = sstStats.meanAw;
+      if (climo.sstNow) {
+        sstStats.rmsVsClimo = this._rmsDifference(sstField, climo.sstNow, { landMask, landMaskMode: 'ocean' });
+      }
     }
     stats.sst = sstStats;
 
-    const seaIceStats = climo.iceNow
-      ? this._statsScalar(climo.iceNow, {
+    const seaIceField = core.state?.seaIceFrac || climo.iceNow;
+    const seaIceStats = seaIceField
+      ? this._statsScalar(seaIceField, {
         landMask,
         landMaskMode: 'ocean',
         physMin: 0,
@@ -1004,8 +1023,19 @@ class WeatherLogger {
       seaIceStats.below0Count = seaIceStats.belowPhysMinCount;
       seaIceStats.areaFracGt015 = seaIceStats.areaFracAbove?.['0.15'] ?? null;
       seaIceStats.meanOcean = seaIceStats.meanAw;
+      if (climo.iceNow) {
+        seaIceStats.rmsVsClimo = this._rmsDifference(seaIceField, climo.iceNow, { landMask, landMaskMode: 'ocean' });
+      }
     }
     stats.seaIce = seaIceStats;
+    if (core.state?.seaIceThicknessM) {
+      stats.seaIceThickness = this._statsScalar(core.state.seaIceThicknessM, {
+        landMask,
+        landMaskMode: 'ocean',
+        physMin: 0,
+        physMax: 5
+      });
+    }
 
     if (includeStatic) {
       stats.albedo = geo.albedo
