@@ -1,6 +1,5 @@
-import { cosZenith } from '../solar';
-import { Cp, Rd, g } from '../constants';
-import { findClosestLevelIndex } from './verticalGrid';
+import { cosZenith } from '../solar.js';
+import { Cp, Rd, g } from '../constants.js';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
@@ -28,16 +27,11 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
     TeqUpperEqK = 255,
     TeqUpperPoleK = 235,
     TeqLatShape = 'sin2',
-    heatFracLower = 0.65,
-    heatFracUpper = 0.35,
     dThetaMaxPerStep = 1.0,
-    kTau = 80,
     radIceFactor = 0.7,
     pTop = 20000,
-    // New flags to refine vertical profiles
-    enableFullColumnLW,
-    enableSigmaLWProfile = true,
-    enableSwMassDistribution = true
+    enableFullColumnLW = true,
+    enableSigmaLWProfile = true
   } = params;
   if (!enable) return;
 
@@ -57,14 +51,15 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
     landMask,
     seaIceFrac,
     albedo,
-    surfaceRadiativeFlux
+    surfaceRadiativeFlux,
+    cloudFrac3D,
+    cloudTau3D
   } = state;
 
   const dayOfYear = (timeUTC / 86400) % 365;
-  const levLowA = Math.max(0, findClosestLevelIndex(state.sigmaHalf, 0.82));
   const levLowB = nz - 1;
-  const levHighA = Math.max(0, findClosestLevelIndex(state.sigmaHalf, 0.18));
-  const levHighB = Math.max(levHighA, findClosestLevelIndex(state.sigmaHalf, 0.28));
+  const sigmaSb = 5.670374419e-8;
+  const tauAbove = new Float32Array(nz);
 
   for (let j = 0; j < ny; j++) {
     const lat = latDeg[j];
@@ -75,30 +70,11 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
     const latShape = TeqLatShape === 'linear' ? latNorm : sinLat * sinLat;
     const TeqLower = TeqLowerEqK - (TeqLowerEqK - TeqLowerPoleK) * latShape;
     const TeqUpper = TeqUpperEqK - (TeqUpperEqK - TeqUpperPoleK) * latShape;
+
     for (let i = 0; i < nx; i++) {
       const k = j * nx + i;
       const cosZ = cosZenith(latRad, lonDeg[i], timeUTC, dayOfYear);
       const SW_toa = S0 * cosZ;
-
-      let lwpLow = 0;
-      let lwpHigh = 0;
-      let wvCol = 0;
-
-      for (let lev = 0; lev < nz; lev++) {
-        const idx = lev * N + k;
-        const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-        const mAir = dp / g;
-        wvCol += qv[idx] * mAir;
-        const qcEff = qc[idx] + (qi ? radIceFactor * qi[idx] : 0);
-        if (lev === levLowA || lev === levLowB) {
-          lwpLow += qcEff * mAir;
-        } else if (lev === levHighA || lev === levHighB) {
-          lwpHigh += qcEff * mAir;
-        }
-      }
-
-      const tauCloud = kTau * (lwpLow + lwpHigh);
-      const eps = clamp01(eps0 + kWv * (wvCol / 50) + kCld * (tauCloud / 10));
 
       const iceFrac = seaIceFrac ? clamp01(seaIceFrac[k]) : 0;
       const baseAlbedo = albedo && albedo.length === N
@@ -107,66 +83,62 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
       const albedoVal = landMask && landMask[k] === 1
         ? baseAlbedo
         : baseAlbedo + (albedoSeaIce - baseAlbedo) * iceFrac;
+      const swSource = SW_toa * (1 - albedoVal);
 
-      const SW_sfc = SW_toa * (1 - albedoVal) * Math.exp(-kSw * tauCloud);
+      let wvCol = 0;
+      let tauCloudTotal = 0;
+      let cloudCoverTotal = 0;
+      let runningTauAbove = 0;
+      for (let lev = 0; lev < nz; lev++) {
+        const idx = lev * N + k;
+        const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+        const mAir = dp / g;
+        wvCol += qv[idx] * mAir;
+      }
+      for (let lev = 0; lev < nz; lev++) {
+        tauAbove[lev] = runningTauAbove;
+        const idx = lev * N + k;
+        const cf = cloudFrac3D ? clamp01(cloudFrac3D[idx]) : 0;
+        const tauLayerBase = cloudTau3D ? Math.max(0, cloudTau3D[idx]) : 0;
+        const tauLayer = tauLayerBase * Math.max(0.2, cf);
+        runningTauAbove += tauLayer;
+        tauCloudTotal += tauLayer;
+        cloudCoverTotal = 1 - (1 - cloudCoverTotal) * (1 - cf);
+      }
+
+      const eps = clamp01(eps0 + kWv * (wvCol / 50) + kCld * Math.min(1, tauCloudTotal / 10) + 0.1 * cloudCoverTotal);
+      const SW_sfc = swSource * Math.exp(-kSw * tauCloudTotal);
       const surfaceTemp = Ts && Ts.length === N ? Ts[k] : T[levLowB * N + k];
-      const sigmaSb = 5.670374419e-8;
       const lwSurfaceNet = -eps * sigmaSb * (Math.pow(Math.max(180, surfaceTemp), 4) - Math.pow(TeqLower, 4));
       if (surfaceRadiativeFlux && surfaceRadiativeFlux.length === N) {
         surfaceRadiativeFlux[k] = SW_sfc + lwSurfaceNet;
       }
-      const lwFactorUpper = 0.8 + 0.2 * eps;
-      const lwFactorLower = 0.6 + 0.4 * eps;
-
-      // Pre-compute sum of SW weights if distributing by mass across column
-      let swWeightSum = 0;
-      let swWeights = null;
-      const swFracTotal = heatFracLower + heatFracUpper;
-      if (enableSwMassDistribution && SW_sfc > 0 && swFracTotal > 0) {
-        swWeights = new Array(nz);
-        for (let lev = 0; lev < nz; lev++) {
-          const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-          const mAir = Math.max(1e-6, dp / g);
-          const idxTmp = lev * N + k;
-          const pLevTmp = Math.max(pTop, pMid[idxTmp]);
-          const sigmaTmp = clamp01((pLevTmp - pTop) / Math.max(1e-6, ps[k] - pTop));
-          const shape = 0.4 + 0.6 * sigmaTmp; // bias slightly toward lower troposphere
-          const w = mAir * shape;
-          swWeights[lev] = w;
-          swWeightSum += w;
-        }
-      }
 
       for (let lev = 0; lev < nz; lev++) {
         const idx = lev * N + k;
+        const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+        const mAir = Math.max(1e-6, dp / g);
         const pLev = Math.max(pTop, pMid[idx]);
         const PiLev = Math.pow(pLev / P0, KAPPA);
         const TLev = Number.isFinite(T[idx]) ? T[idx] : (theta[idx] * PiLev);
-
-        let dT = 0;
-
-        if (SW_sfc > 0) {
-          if (enableSwMassDistribution && swWeights && swWeightSum > 0 && swFracTotal > 0) {
-            const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-            const mAir = Math.max(1e-6, dp / g);
-            const frac = swWeights[lev] / swWeightSum;
-            dT += (SW_sfc * swFracTotal) * frac / (Cp * mAir);
-          } else {
-            const heatFrac = lev === levLowB ? heatFracLower : lev === levHighB ? heatFracUpper : 0;
-            if (heatFrac > 0) {
-              const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-              const mAir = Math.max(1e-6, dp / g);
-              dT += (SW_sfc * heatFrac) / (Cp * mAir);
-            }
-          }
-        }
-
         const sigma = clamp01((pLev - pTop) / Math.max(1e-6, ps[k] - pTop));
         const prof = enableSigmaLWProfile ? sigma : (nz > 1 ? lev / (nz - 1) : 1);
         const TeqLev = TeqUpper + (TeqLower - TeqUpper) * prof;
         const tauLev = tauRadUpper + (tauRadLower - tauRadUpper) * prof;
-        const lwFactor = lwFactorUpper + (lwFactorLower - lwFactorUpper) * prof;
-        dT += -((TLev - TeqLev) / tauLev) * lwFactor;
+
+        const cf = cloudFrac3D ? clamp01(cloudFrac3D[idx]) : 0;
+        const tauLayerBase = cloudTau3D ? Math.max(0, cloudTau3D[idx]) : 0;
+        const tauLayer = tauLayerBase * Math.max(0.2, cf);
+        const swAbsLayer = swSource * (Math.exp(-kSw * tauAbove[lev]) - Math.exp(-kSw * (tauAbove[lev] + tauLayer)));
+        const lwCloudBoost = enableFullColumnLW
+          ? 1 + 0.35 * clamp01((tauAbove[lev] + tauLayer) / 8) + 0.15 * cf
+          : 1 + 0.15 * cloudCoverTotal;
+
+        let dT = 0;
+        if (swAbsLayer > 0) {
+          dT += swAbsLayer / (Cp * mAir);
+        }
+        dT += -((TLev - TeqLev) / tauLev) * lwCloudBoost;
 
         let dTheta = (dT * dt) / PiLev;
         dTheta = clamp(dTheta, -dThetaMaxPerStep, dThetaMaxPerStep);

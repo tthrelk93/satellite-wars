@@ -368,6 +368,7 @@ export class WeatherCore5 {
       cwpHigh: makeArray(N),
       tauLow: makeArray(N),
       tauHigh: makeArray(N),
+      tauTotal: makeArray(N),
       tauLowDelta: makeArray(N),
       tauHighDelta: makeArray(N),
       tauLowClampCount: 0,

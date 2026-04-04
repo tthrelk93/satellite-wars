@@ -15,6 +15,8 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const qc = makeArray(SZ);
   const qi = makeArray(SZ);
   const qr = makeArray(SZ);
+  const cloudFrac3D = makeArray(SZ);
+  const cloudTau3D = makeArray(SZ);
 
   const ps = makeArray(N, 101325);
   const dpsDtRaw = makeArray(N);
@@ -50,6 +52,8 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
     qc,
     qi,
     qr,
+    cloudFrac3D,
+    cloudTau3D,
     ps,
     dpsDtRaw,
     dpsDtApplied,

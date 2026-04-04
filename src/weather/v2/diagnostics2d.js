@@ -1,5 +1,5 @@
-import { g, Cp, Rd } from '../constants';
-import { findClosestLevelIndex } from './verticalGrid';
+import { g, Cp, Rd } from '../constants.js';
+import { findClosestLevelIndex } from './verticalGrid.js';
 
 const saturationMixingRatio = (T, p) => {
   const Tuse = Math.max(180, Math.min(330, T));
@@ -13,63 +13,14 @@ const saturationMixingRatio = (T, p) => {
 
 const P0 = 100000;
 const KAPPA = Rd / Cp;
-
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const smoothstep = (edge0, edge1, x) => {
   const t = clamp01((x - edge0) / Math.max(1e-8, edge1 - edge0));
   return t * t * (3 - 2 * t);
 };
-const DIAG_ALLOWED_PARAMS = new Set([
-  'enableNewCoverage',
-  'kTauLowLiquid',
-  'kTauLowRain',
-  'kTauLowIce',
-  'kTauHighIce',
-  'kTauHighLiquid',
-  'tauRainCloudScale',
-  'tauMaxLow',
-  'tauMaxHigh',
-  'tauCloudLowSeconds',
-  'tauCloudHighSeconds',
-  'rhLow0',
-  'rhLow1',
-  'rhHigh0',
-  'rhHigh1',
-  'omegaLowSubs0',
-  'omegaLowSubs1',
-  'omegaHigh0',
-  'omegaHigh1',
-  'stabLow0K',
-  'stabLow1K',
-  'convAnvilTauSeconds',
-  'convAnvilBoost',
-  'convLowSuppress',
-  'qc0Low',
-  'qc1Low',
-  'qc0High',
-  'qc1High',
-  'dpTauLowMaxPa',
-  'tau0',
-  'levVort',
-  'levUpper',
-  'pTop',
-  'wTauHigh'
-]);
-const diagWarnedParams = new Set();
-const warnUnknownDiagParams = (params) => {
-  if (!params || typeof params !== 'object') return;
-  if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') return;
-  const unknown = Object.keys(params).filter(
-    (key) => !DIAG_ALLOWED_PARAMS.has(key) && !diagWarnedParams.has(key)
-  );
-  if (!unknown.length) return;
-  unknown.forEach((key) => diagWarnedParams.add(key));
-  console.warn(`[V2 diagnostics] Unknown params: ${unknown.join(', ')}`);
-};
 
 export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }) {
   if (!grid || !state || !outFields) return;
-  warnUnknownDiagParams(params);
 
   const {
     enableNewCoverage = true,
@@ -80,50 +31,26 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
     kTauHighLiquid = 30,
     tauMaxLow = 50,
     tauMaxHigh = 50,
-    tauCloudLowSeconds = 3 * 3600,
-    tauCloudHighSeconds = 6 * 3600,
-    rhLow0 = 0.9,
-    rhLow1 = 0.99,
-    rhHigh0 = 0.55,
-    rhHigh1 = 0.85,
-    omegaLowSubs0 = 0.02,
-    omegaLowSubs1 = 0.2,
-    omegaHigh0 = 0.05,
-    omegaHigh1 = 0.3,
-    stabLow0K = 0.5,
-    stabLow1K = 3.0,
+    tauCloudLowSeconds = 2 * 3600,
+    tauCloudHighSeconds = 4 * 3600,
     convAnvilTauSeconds = 6 * 3600,
-    convAnvilBoost = 0.6,
-    convLowSuppress = 0.5,
-    qc0Low = 1e-4,
+    convAnvilBoost = 0.5,
+    qc0Low = 5e-5,
     qc1Low = 8e-4,
-    qc0High = 0.002,
-    qc1High = 0.004,
-    dpTauLowMaxPa = 11000,
-    tau0 = 6,
-    levVort = null,
-    levUpper = null,
+    qc0High = 1e-5,
+    qc1High = 4e-4,
+    rhLow0 = 0.78,
+    rhLow1 = 0.98,
+    rhHigh0 = 0.55,
+    rhHigh1 = 0.9,
     pTop = 20000,
-    wTauHigh = 0,
-    tauRainCloudScale = 1.5
+    levVort = null,
+    levUpper = null
   } = params;
 
   const dtSeconds = Number.isFinite(dt) && dt > 0 ? dt : 120;
   const { nx, ny, invDx, invDy, cosLat } = grid;
-  const { N, nz, u, v, qv, qc, qi, qr, pHalf, pMid, theta, T, omega } = state;
-
-  const levTop = 0;
-  const levTop2 = Math.max(levTop, findClosestLevelIndex(state.sigmaHalf, 0.18));
-  const levBot = nz - 1;
-  const levBot2 = Math.max(findClosestLevelIndex(state.sigmaHalf, 0.82), 0);
-  const levU = Number.isFinite(levUpper)
-    ? Math.min(Math.max(0, levUpper), nz - 1)
-    : findClosestLevelIndex(state.sigmaHalf, 0.28);
-
-  let tauLowClamp = 0;
-  let tauHighClamp = 0;
-  let tauLowAbove = 0;
-  let tauHighAbove = 0;
+  const { N, nz, u, v, qv, qc, qi, qr, pHalf, pMid, theta, T, omega, cloudFrac3D, cloudTau3D } = state;
 
   if (!state._convAnvil || state._convAnvil.length !== N) state._convAnvil = new Float32Array(N);
   if (!state._cloudLowCov || state._cloudLowCov.length !== N) state._cloudLowCov = new Float32Array(N);
@@ -133,172 +60,137 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
   const cloudLowCov = state._cloudLowCov;
   const cloudHighCov = state._cloudHighCov;
   const convMask = state.convMask;
-
   const tauCloudLow = Math.max(1e-6, tauCloudLowSeconds);
   const tauCloudHigh = Math.max(1e-6, tauCloudHighSeconds);
   const aLow = 1 - Math.exp(-dtSeconds / tauCloudLow);
   const aHigh = 1 - Math.exp(-dtSeconds / tauCloudHigh);
-  const convAnvilTau = Math.max(1e-6, convAnvilTauSeconds);
-  const convAnvilDecay = Math.exp(-dtSeconds / convAnvilTau);
+  const convAnvilDecay = Math.exp(-dtSeconds / Math.max(1e-6, convAnvilTauSeconds));
+
+  let tauLowClamp = 0;
+  let tauHighClamp = 0;
+
+  const levU = Number.isFinite(levUpper)
+    ? Math.min(Math.max(0, levUpper), nz - 1)
+    : findClosestLevelIndex(state.sigmaHalf, 0.28);
+  const lowSigmaCut = 0.72;
+  const highSigmaCut = 0.35;
 
   for (let k = 0; k < N; k++) {
-    let lwpLow = 0;
-    let rwpLow = 0;
-    let iwpLow = 0;
-    let cwpHighIce = 0;
-    let cwpHighLiq = 0;
-    let qcMeanLow = 0;
-    let qcMeanHigh = 0;
-    let weightLow = 0;
-    let weightHigh = 0;
+    let cloudLowRaw = 0;
+    let cloudHighRaw = 0;
+    let cloudTotalRaw = 0;
+    let tauLow = 0;
+    let tauHigh = 0;
+    let tauTotal = 0;
+    let cwpLow = 0;
+    let cwpHigh = 0;
 
-    // Low levels (bottom band) — use bottom two layers when available
-    {
-      const lowLevels = levBot2 !== levBot ? [levBot, levBot2] : [levBot];
-      for (const lev of lowLevels) {
-        const base = lev * N + k;
-        const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-        const mAir = dp / g;
-        const mAirEff = Math.min(dp, dpTauLowMaxPa) / g;
-        lwpLow += qc[base] * mAirEff;
-        if (qr) rwpLow += qr[base] * mAirEff;
-        if (qi) iwpLow += qi[base] * mAirEff;
-        qcMeanLow += qc[base] * mAir;
-        weightLow += mAir;
+    const prevTauLow = outFields.tauLow[k] || 0;
+    const prevTauHigh = outFields.tauHigh[k] || 0;
+
+    for (let lev = 0; lev < nz; lev++) {
+      const idx = lev * N + k;
+      const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+      const mAir = Math.max(0, dp / g);
+      const pLev = Math.max(pTop, pMid[idx]);
+      const sigma = clamp01((pLev - pTop) / Math.max(1e-6, state.ps[k] - pTop));
+      const Pi = Math.pow(pLev / P0, KAPPA);
+      const TLev = (T && T[idx]) || (theta[idx] * Pi);
+      const qs = saturationMixingRatio(TLev, pLev);
+      const rh = Math.max(0, Math.min(2, qv[idx] / Math.max(1e-8, qs)));
+      const omegaMid = 0.5 * (omega[lev * N + k] + omega[(lev + 1) * N + k]);
+
+      const condLiq = qc[idx] + 0.35 * qr[idx];
+      const condIce = qi[idx] + 0.15 * qr[idx];
+      const condTotal = condLiq + condIce;
+
+      const qc0 = sigma > lowSigmaCut ? qc0Low : qc0High;
+      const qc1 = sigma > lowSigmaCut ? qc1Low : qc1High;
+      const rh0 = sigma > lowSigmaCut ? rhLow0 : rhHigh0;
+      const rh1 = sigma > lowSigmaCut ? rhLow1 : rhHigh1;
+      const condFactor = smoothstep(qc0, qc1, condTotal);
+      const rhFactor = smoothstep(rh0, rh1, rh);
+      const ascFactor = smoothstep(0.01, 0.25, -omegaMid);
+      const convFactor = convMask && convMask[k] === 1 && sigma < 0.55 ? 0.2 : 0;
+      const frac = clamp01(Math.max(condFactor, rhFactor * (0.55 + 0.45 * ascFactor)) + convFactor);
+
+      const tauLayerRaw = (sigma > lowSigmaCut)
+        ? (kTauLowLiquid * condLiq + kTauLowRain * qr[idx] + kTauLowIce * qi[idx]) * mAir
+        : (kTauHighLiquid * condLiq + kTauHighIce * condIce) * mAir;
+      const tauLayer = Math.max(0, tauLayerRaw);
+
+      cloudFrac3D[idx] = frac;
+      cloudTau3D[idx] = tauLayer;
+      cloudTotalRaw = 1 - (1 - cloudTotalRaw) * (1 - frac);
+      tauTotal += tauLayer;
+
+      if (sigma > lowSigmaCut) {
+        cloudLowRaw = 1 - (1 - cloudLowRaw) * (1 - frac);
+        tauLow += tauLayer;
+        cwpLow += condTotal * mAir;
+      }
+      if (sigma < highSigmaCut) {
+        cloudHighRaw = 1 - (1 - cloudHighRaw) * (1 - frac);
+        tauHigh += tauLayer;
+        cwpHigh += condTotal * mAir;
       }
     }
 
-    // High levels (top band)
-    {
-      const lev = levTop;
-      const base = lev * N + k;
-      const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-      const mAir = dp / g;
-      const pLev = Math.max(pTop, pMid[base]);
-      const Pi = Math.pow(pLev / P0, KAPPA);
-      const TLev = (T && T[base]) || (theta[base] * Pi);
-      const iceFracFallback = clamp01((273 - TLev) / 20);
-      cwpHighIce += (qi[base] + qc[base] * iceFracFallback) * mAir;
-      cwpHighLiq += qc[base] * (1 - iceFracFallback) * mAir;
-      qcMeanHigh += (qc[base] + qi[base]) * mAir;
-      weightHigh += mAir;
-    }
-    if (levTop2 !== levTop) {
-      const lev = levTop2;
-      const base = lev * N + k;
-      const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-      const mAir = dp / g;
-      const pLev = Math.max(pTop, pMid[base]);
-      const Pi = Math.pow(pLev / P0, KAPPA);
-      const TLev = (T && T[base]) || (theta[base] * Pi);
-      const iceFracFallback = clamp01((273 - TLev) / 20);
-      cwpHighIce += (qi[base] + qc[base] * iceFracFallback) * mAir;
-      cwpHighLiq += qc[base] * (1 - iceFracFallback) * mAir;
-      qcMeanHigh += (qc[base] + qi[base]) * mAir;
-      weightHigh += mAir;
+    let anvil = convAnvil[k] * convAnvilDecay;
+    if (convMask && convMask[k] === 1) anvil = 1;
+    convAnvil[k] = anvil;
+
+    const cloudLowTarget = cloudLowRaw;
+    const cloudHighTarget = 1 - (1 - cloudHighRaw) * (1 - convAnvilBoost * anvil);
+
+    let cloudLow = cloudLowTarget;
+    let cloudHigh = cloudHighTarget;
+    if (enableNewCoverage) {
+      cloudLowCov[k] += aLow * (cloudLowTarget - cloudLowCov[k]);
+      cloudHighCov[k] += aHigh * (cloudHighTarget - cloudHighCov[k]);
+      cloudLow = clamp01(cloudLowCov[k]);
+      cloudHigh = clamp01(cloudHighCov[k]);
+    } else {
+      cloudLowCov[k] = cloudLowTarget;
+      cloudHighCov[k] = cloudHighTarget;
     }
 
-    qcMeanLow = weightLow > 0 ? qcMeanLow / weightLow : 0;
-    qcMeanHigh = weightHigh > 0 ? qcMeanHigh / weightHigh : 0;
+    outFields.cwpLow[k] = cwpLow;
+    outFields.cwpHigh[k] = cwpHigh;
+    outFields.tauLow[k] = Math.min(tauMaxLow, tauLow);
+    outFields.tauHigh[k] = Math.min(tauMaxHigh, tauHigh);
+    outFields.tauTotal[k] = tauTotal;
+    outFields.tauLowDelta[k] = Math.abs(outFields.tauLow[k] - prevTauLow);
+    outFields.tauHighDelta[k] = Math.abs(outFields.tauHigh[k] - prevTauHigh);
+    outFields.cloudLow[k] = cloudLow;
+    outFields.cloudHigh[k] = cloudHigh;
+    outFields.cloud[k] = Math.max(cloudTotalRaw, 1 - (1 - cloudLow) * (1 - cloudHigh));
 
-    const tauPhysLow = kTauLowLiquid * lwpLow + kTauLowRain * rwpLow + kTauLowIce * iwpLow;
-    const tauPhysHigh = kTauHighIce * cwpHighIce + kTauHighLiquid * cwpHighLiq;
+    if (tauLow > tauMaxLow) tauLowClamp += 1;
+    if (tauHigh > tauMaxHigh) tauHighClamp += 1;
 
-    const tauLow = Math.min(tauMaxLow, Math.max(0, tauPhysLow));
-    const tauHigh = Math.min(tauMaxHigh, Math.max(0, tauPhysHigh));
-    if (tauPhysLow > tauMaxLow) {
-      tauLowClamp += 1;
-      tauLowAbove += 1;
-    }
-    if (tauPhysHigh > tauMaxHigh) {
-      tauHighClamp += 1;
-      tauHighAbove += 1;
-    }
-
-    const levS = levBot;
-    const idxS = levS * N + k;
+    const levBot = nz - 1;
+    const idxS = levBot * N + k;
     const pS = Math.max(pTop, pMid[idxS]);
     const PiS = Math.pow(pS / P0, KAPPA);
     const TSurf = (T && T[idxS]) || (theta[idxS] * PiS);
     const qsSurf = saturationMixingRatio(TSurf, pS);
-    const RHlow = Math.max(0, Math.min(2, qv[idxS] / Math.max(1e-8, qsSurf)));
+    outFields.RH[k] = Math.max(0, Math.min(2, qv[idxS] / Math.max(1e-8, qsSurf)));
 
     const idxU = levU * N + k;
     const pU = Math.max(pTop, pMid[idxU]);
     const PiU = Math.pow(pU / P0, KAPPA);
     const TUpper = (T && T[idxU]) || (theta[idxU] * PiU);
     const qsUpper = saturationMixingRatio(TUpper, pU);
-    const RHup = Math.max(0, Math.min(2, qv[idxU] / Math.max(1e-8, qsUpper)));
-
-    const omegaBaseL = levS * N + k;
-    const omegaNextL = (levS + 1) * N + k;
-    const omegaBaseU = levU * N + k;
-    const omegaNextU = Math.min(nz, levU + 1) * N + k;
-    const omegaL = 0.5 * (omega[omegaBaseL] + omega[omegaNextL]);
-    const omegaU = 0.5 * (omega[omegaBaseU] + omega[omegaNextU]);
-
-    let cloudLow = 0;
-    let cloudHigh = 0;
-
-    const tauRain = kTauLowRain * rwpLow + kTauLowIce * iwpLow;
-    const rainCloud = 1 - Math.exp(-tauRain / Math.max(1e-6, tauRainCloudScale));
-
-    if (enableNewCoverage) {
-      let anvil = convAnvil[k] * convAnvilDecay;
-      if (convMask && convMask[k] === 1) anvil = 1;
-      convAnvil[k] = anvil;
-
-      const rhFactorLow = smoothstep(rhLow0, rhLow1, RHlow);
-      const dTheta = theta[levBot2 * N + k] - theta[levBot * N + k];
-      const stab = smoothstep(stabLow0K, stabLow1K, dTheta);
-      const subs = smoothstep(omegaLowSubs0, omegaLowSubs1, omegaL);
-      const noConv = clamp01(1 - convLowSuppress * anvil);
-      const cloudLowTarget = Math.max(clamp01(rhFactorLow * stab * subs * noConv), rainCloud);
-
-      const rhFactorHigh = smoothstep(rhHigh0, rhHigh1, RHup);
-      const asc = smoothstep(omegaHigh0, omegaHigh1, -omegaU);
-      const convBoost = clamp01(convAnvilBoost * anvil);
-      const cloudHighTarget = 1 - (1 - rhFactorHigh * asc) * (1 - rhFactorHigh * convBoost);
-
-      let lowCov = cloudLowCov[k];
-      let highCov = cloudHighCov[k];
-      lowCov += aLow * (cloudLowTarget - lowCov);
-      highCov += aHigh * (cloudHighTarget - highCov);
-      lowCov = clamp01(lowCov);
-      highCov = clamp01(highCov);
-      cloudLowCov[k] = lowCov;
-      cloudHighCov[k] = highCov;
-      cloudLow = lowCov;
-      cloudHigh = highCov;
-    } else {
-      const cloudLowLegacy = smoothstep(qc0Low, qc1Low, qcMeanLow);
-      const cloudHighQc = smoothstep(qc0High, qc1High, qcMeanHigh);
-      const cloudHighTau = 1 - Math.exp(-tauHigh / Math.max(1e-6, tau0));
-      const cloudHighLegacy = 1 - (1 - cloudHighQc) * (1 - clamp01(wTauHigh) * cloudHighTau);
-      cloudLow = Math.max(cloudLowLegacy, rainCloud);
-      cloudHigh = cloudHighLegacy;
-      cloudLowCov[k] = cloudLow;
-      cloudHighCov[k] = cloudHigh;
-    }
-
-    outFields.cwpLow[k] = lwpLow;
-    outFields.cwpHigh[k] = cwpHighIce + cwpHighLiq;
-    outFields.tauLow[k] = tauLow;
-    outFields.tauHigh[k] = tauHigh;
-    outFields.cloudLow[k] = cloudLow;
-    outFields.cloudHigh[k] = cloudHigh;
-    outFields.cloud[k] = 1 - (1 - cloudLow) * (1 - cloudHigh);
-
-    outFields.RH[k] = RHlow;
-    outFields.RHU[k] = RHup;
-    outFields.omegaL[k] = omegaL;
-    outFields.omegaU[k] = omegaU;
+    outFields.RHU[k] = Math.max(0, Math.min(2, qv[idxU] / Math.max(1e-8, qsUpper)));
+    outFields.omegaL[k] = 0.5 * (omega[levBot * N + k] + omega[(levBot + 1) * N + k]);
+    outFields.omegaU[k] = 0.5 * (omega[levU * N + k] + omega[Math.min(nz, levU + 1) * N + k]);
   }
 
   outFields.tauLowClampCount = tauLowClamp;
   outFields.tauHighClampCount = tauHighClamp;
-  outFields.tauLowAboveMax = tauLowAbove;
-  outFields.tauHighAboveMax = tauHighAbove;
+  outFields.tauLowAboveMax = tauLowClamp;
+  outFields.tauHighAboveMax = tauHighClamp;
 
   const lev = Number.isFinite(levVort)
     ? Math.min(Math.max(0, levVort), nz - 1)
@@ -317,15 +209,10 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
       const iE = i + 1 < nx ? i + 1 : 0;
       const iW = i - 1 >= 0 ? i - 1 : nx - 1;
       const k = row + i;
-      const kE = row + iE;
-      const kW = row + iW;
-      const kN = rowN + i;
-      const kS = rowS + i;
-      const idx0 = base + k;
-      const idxE = base + kE;
-      const idxW = base + kW;
-      const idxN = base + kN;
-      const idxS = base + kS;
+      const idxE = base + row + iE;
+      const idxW = base + row + iW;
+      const idxN = base + rowN + i;
+      const idxS = base + rowS + i;
 
       const dudx = (u[idxE] - u[idxW]) * 0.5 * invDxRow;
       const dvcos_dy = (v[idxN] * cosN - v[idxS] * cosS) * 0.5 * invDyRow;

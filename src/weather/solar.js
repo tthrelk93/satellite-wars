@@ -1,5 +1,5 @@
 // solar.js: solar geometry and surface radiation estimates
-import { S0, sigmaSB } from './constants';
+import { S0, sigmaSB } from './constants.js';
 
 export function solarDeclination(dayOfYear) {
   return (23.44 * Math.PI / 180) * Math.sin((2 * Math.PI * (dayOfYear - 81)) / 365);
