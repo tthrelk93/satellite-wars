@@ -13,6 +13,8 @@ import { initClimo2D } from './climo2d';
 import { stepRadiation2D5 } from './radiation2d';
 import { updateDiagnostics2D5 } from './diagnostics2d';
 import { initializeV2FromClimo } from './initializeFromClimo';
+import { initializeV2FromAnalysis } from './initializeFromAnalysis.js';
+import { loadAnalysisDataset } from './analysisLoader.js';
 import { stepNudging5 } from './nudging5';
 import {
   buildVerticalLayout,
@@ -76,6 +78,7 @@ export class WeatherCore5 {
     this._climoUpdate = null;
     this._climoUpdateArgs = null;
     this._climoOut = null;
+    this.analysisInit = { source: 'pending' };
     this._metricsEverySteps = 10;
     this._metricsCounter = 0;
     this._debugChecks = typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production';
@@ -637,16 +640,49 @@ export class WeatherCore5 {
       this._climoUpdateArgs = { timeUTC: this.timeUTC, out: this._climoOut };
       this._climoAccumSeconds = 0;
       this._updateClimoNow(0, true);
-      initializeV2FromClimo({
-        grid: this.grid,
-        state: this.state,
-        geo: this.geo,
-        climo: this.climo
-      });
+
+      const analysisDataset = await loadAnalysisDataset({});
+      if (analysisDataset) {
+        try {
+          this.analysisInit = initializeV2FromAnalysis({
+            grid: this.grid,
+            state: this.state,
+            geo: this.geo,
+            climo: this.climo,
+            analysis: analysisDataset,
+            params: { pTop: P_TOP, p0: 100000 }
+          });
+        } catch (analysisError) {
+          console.warn('[WeatherCore5] Analysis init failed; falling back to climatology.', analysisError);
+          initializeV2FromClimo({
+            grid: this.grid,
+            state: this.state,
+            geo: this.geo,
+            climo: this.climo
+          });
+          this.analysisInit = {
+            source: 'climatology-fallback',
+            reason: analysisError?.message || String(analysisError)
+          };
+        }
+      } else {
+        initializeV2FromClimo({
+          grid: this.grid,
+          state: this.state,
+          geo: this.geo,
+          climo: this.climo
+        });
+        this.analysisInit = { source: 'climatology' };
+      }
+
       this._updateHydrostatic();
       this.ready = true;
     } catch (err) {
       console.warn('[WeatherCore5] Climo init failed; using defaults.', err);
+      this.analysisInit = {
+        source: 'error',
+        reason: err?.message || String(err)
+      };
       this.ready = true;
     }
   }

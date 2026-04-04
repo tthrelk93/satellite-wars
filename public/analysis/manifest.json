@@ -1,0 +1,11 @@
+{
+  "schema": "satellite-wars.weather-analysis.manifest.v1",
+  "defaultCaseId": "fixture-global-2026-01-15",
+  "cases": [
+    {
+      "caseId": "fixture-global-2026-01-15",
+      "description": "Phase 2 checked-in local analysis fixture.",
+      "path": "fixture-global-2026-01-15.json"
+    }
+  ]
+}

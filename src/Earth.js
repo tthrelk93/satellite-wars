@@ -3320,9 +3320,13 @@ class Earth {
     const analysisCore = this.analysisWeatherField?.core;
     if (!truthCore?.ready || !analysisCore?.ready) return;
 
-    this._copyCoreState(truthCore, analysisCore);
-    analysisCore.setTimeUTC(truthCore.timeUTC);
-    this._perturbAnalysisCore(analysisCore, this._analysisNoiseSeed);
+    const analysisInitSource = analysisCore.analysisInit?.source;
+    const initializedFromAnalysis = analysisInitSource === 'analysis';
+    if (!initializedFromAnalysis) {
+      this._copyCoreState(truthCore, analysisCore);
+      analysisCore.setTimeUTC(truthCore.timeUTC);
+      this._perturbAnalysisCore(analysisCore, this._analysisNoiseSeed);
+    }
 
     const N = analysisCore.grid.count;
     this.analysisSigma2 = new Float32Array(N);
