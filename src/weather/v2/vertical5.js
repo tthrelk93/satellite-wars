@@ -1,4 +1,4 @@
-import { Cp, Rd, g, Lv } from '../constants';
+import { Cp, Rd, g, Lv } from '../constants.js';
 
 const P0 = 100000;
 const KAPPA = Rd / Cp;
@@ -37,6 +37,9 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'verticalAdvectionCflMax',
   'dThetaMaxVertAdvPerStep',
   'enableOmegaMassFix',
+  'orographicLiftScale',
+  'orographicDecayFrac',
+  'terrainSlopeRef',
   'eps',
   'debugConservation'
 ]);
@@ -62,7 +65,7 @@ const saturationMixingRatio = (T, p) => {
   return Math.min(qs, 0.2);
 };
 
-export function stepVertical5({ dt, grid, state, params = {} }) {
+export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!grid || !state) return;
   warnUnknownVerticalParams(params);
 
@@ -114,13 +117,16 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
 
     // Omega correction to match applied surface pressure tendency
     enableOmegaMassFix = true,
+    orographicLiftScale = 1.0,
+    orographicDecayFrac = 0.35,
+    terrainSlopeRef = 0.003,
 
     // Numerical/heating
     eps = 1e-12
   } = params;
 
   const { nx, ny, invDx, invDy, cosLat } = grid;
-  const { N, nz, u, v, omega, theta, qv, qc, qi, qr, pHalf, pMid, sigmaHalf, dpsDtApplied } = state;
+  const { N, nz, u, v, omega, theta, qv, qc, qi, qr, T, pHalf, pMid, sigmaHalf, dpsDtApplied } = state;
 
   // Convective column mask (boolean per column) for microphysics overrides
   if (!state.convMask || state.convMask.length !== N) state.convMask = new Uint8Array(N);
@@ -181,6 +187,38 @@ export function stepVertical5({ dt, grid, state, params = {} }) {
         const div = du_dx + dvcos_dy / cosC;
         const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
         omega[omegaNext + k] = omega[omegaBase + k] - div * dp;
+      }
+    }
+  }
+
+  const elevField = geo?.elev && geo.elev.length === N ? geo.elev : null;
+  if (elevField && orographicLiftScale !== 0) {
+    const levS = nz - 1;
+    for (let j = 0; j < ny; j++) {
+      const row = j * nx;
+      const jN = Math.max(0, j - 1);
+      const jS = Math.min(ny - 1, j + 1);
+      const rowN = jN * nx;
+      const rowS = jS * nx;
+      const invDxRow = invDx[j];
+      const invDyRow = invDy[j];
+      for (let i = 0; i < nx; i++) {
+        const iE = (i + 1) % nx;
+        const iW = (i - 1 + nx) % nx;
+        const k = row + i;
+        const slopeX = (elevField[row + iE] - elevField[row + iW]) * 0.5 * invDxRow;
+        const slopeY = (elevField[rowN + i] - elevField[rowS + i]) * 0.5 * invDyRow;
+        const slopeMag = Math.hypot(slopeX, slopeY);
+        const slopeFactor = clamp(slopeMag / Math.max(1e-6, terrainSlopeRef), 0, 3);
+        const idxS = levS * N + k;
+        const nearSurfaceT = Math.max(180, T[idxS]);
+        const rho = Math.max(0.2, pMid[idxS] / Math.max(1e-6, Rd * nearSurfaceT));
+        const wTerrain = (u[idxS] * slopeX + v[idxS] * slopeY) * slopeFactor;
+        const omegaTerrain = -rho * g * wTerrain * orographicLiftScale;
+        for (let lev = 1; lev <= nz; lev++) {
+          const decay = Math.exp(-Math.max(0, levS - (lev - 1)) * orographicDecayFrac);
+          omega[lev * N + k] += omegaTerrain * decay;
+        }
       }
     }
   }

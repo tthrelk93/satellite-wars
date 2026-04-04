@@ -1,10 +1,10 @@
-import { Rd, Cp } from '../constants';
+import { Rd, Cp, g } from '../constants.js';
 
 const P0 = 100000;
 const KAPPA = Rd / Cp;
 const QV_VIRTUAL = 0.61;
 
-export function updateHydrostatic(state, { p0 = P0, pTop = 20000 } = {}) {
+export function updateHydrostatic(state, { p0 = P0, pTop = 20000, terrainHeightM = null } = {}) {
   const { N, nz, sigmaHalf, theta, qv, T, Tv, ps, pHalf, pMid, phiHalf, phiMid } = state;
   if (!N || !nz) return;
 
@@ -35,15 +35,17 @@ export function updateHydrostatic(state, { p0 = P0, pTop = 20000 } = {}) {
   }
 
   for (let idx = 0; idx < N; idx++) {
-    phiHalf[idx] = 0;
-    for (let k = 0; k < nz; k++) {
-      const h1 = k * N + idx;
-      const h2 = (k + 1) * N + idx;
-      const p1 = Math.max(pTop, pHalf[h1]);
-      const p2 = Math.max(pTop, pHalf[h2]);
+    const surfacePhi = terrainHeightM && terrainHeightM.length === N ? terrainHeightM[idx] * g : 0;
+    phiHalf[nz * N + idx] = surfacePhi;
+    for (let k = nz - 1; k >= 0; k--) {
+      const hUpper = k * N + idx;
+      const hLower = (k + 1) * N + idx;
+      const pUpper = Math.max(pTop, pHalf[hUpper]);
+      const pLower = Math.max(pTop, pHalf[hLower]);
       const tvMid = Tv[k * N + idx];
-      phiHalf[h2] = phiHalf[h1] + Rd * tvMid * Math.log(p2 / p1);
-      phiMid[k * N + idx] = 0.5 * (phiHalf[h1] + phiHalf[h2]);
+      const thickness = Rd * tvMid * Math.log(pLower / pUpper);
+      phiHalf[hUpper] = phiHalf[hLower] - thickness;
+      phiMid[k * N + idx] = 0.5 * (phiHalf[hUpper] + phiHalf[hLower]);
     }
   }
 }

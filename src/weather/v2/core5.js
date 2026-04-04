@@ -353,6 +353,7 @@ export class WeatherCore5 {
       h700: makeArray(N),
       h500: makeArray(N),
       h250: makeArray(N),
+      slp: makeArray(N),
       RH: makeArray(N),
       RHU: makeArray(N),
       vort: makeArray(N),
@@ -612,6 +613,9 @@ export class WeatherCore5 {
     for (let i = 0; i < N; i += 1) {
       this.fields.hL[i] = this.state.phiMid[lowerBase + i] / 9.80665;
       this.fields.hU[i] = this.state.phiMid[upperBase + i] / 9.80665;
+      const elev = this.geo?.elev?.[i] || 0;
+      const tMean = Math.max(180, this.fields.Ts[i] + 0.5 * 0.0065 * Math.max(0, elev));
+      this.fields.slp[i] = this.state.ps[i] * Math.exp((9.80665 * Math.max(0, elev)) / Math.max(1e-6, 287.05 * tMean));
     }
     if (heights['85000']) this.fields.h850.set(heights['85000']);
     if (heights['70000']) this.fields.h700.set(heights['70000']);
@@ -620,7 +624,7 @@ export class WeatherCore5 {
   }
 
   _updateHydrostatic() {
-    updateHydrostatic(this.state, { pTop: P_TOP });
+    updateHydrostatic(this.state, { pTop: P_TOP, terrainHeightM: this.geo?.elev || null });
     this._updateStandardPressureDiagnostics();
   }
 
@@ -841,6 +845,7 @@ export class WeatherCore5 {
         grid: this.grid,
         state: this.state,
         climo: this.climo,
+        geo: this.geo,
         params: this.surfaceParams
       });
     });
@@ -863,6 +868,7 @@ export class WeatherCore5 {
         dt,
         grid: this.grid,
         state: this.state,
+        geo: this.geo,
         params: this.dynParams,
         scratch: this._dynScratch
       });
@@ -980,6 +986,7 @@ export class WeatherCore5 {
         dt,
         grid: this.grid,
         state: this.state,
+        geo: this.geo,
         params: this.vertParams,
         scratch: this._dynScratch
       });

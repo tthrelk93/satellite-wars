@@ -1,4 +1,4 @@
-import { g, Cp, Lv, Rd } from '../constants';
+import { g, Cp, Lv, Rd } from '../constants.js';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
@@ -6,6 +6,7 @@ const smoothstep = (edge0, edge1, x) => {
   const t = clamp01((x - edge0) / Math.max(1e-6, edge1 - edge0));
   return t * t * (3 - 2 * t);
 };
+const lerp = (a, b, t) => a + (b - a) * t;
 
 const P0 = 100000;
 const KAPPA = Rd / Cp;
@@ -20,7 +21,7 @@ const saturationMixingRatio = (T, p) => {
   return Math.min(qs, 0.2);
 };
 
-export function stepSurface2D5({ dt, grid, state, climo, params = {} }) {
+export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
   if (!grid || !state || !Number.isFinite(dt) || dt <= 0) return;
   const {
     enable = true,
@@ -31,7 +32,8 @@ export function stepSurface2D5({ dt, grid, state, climo, params = {} }) {
     Ch = 1.0e-3,
     windFloor = 1.0,
     oceanTauTs = 10 * 86400,
-    landTauTs = 3 * 86400,
+    landTauTsDry = 2 * 86400,
+    landTauTsWet = 6 * 86400,
     TsMin = 200,
     TsMax = 330,
     evapMax = 2e-4,
@@ -40,12 +42,18 @@ export function stepSurface2D5({ dt, grid, state, climo, params = {} }) {
     enableLandClimoTs = false,
     landTsUseT2m = true,
     landTsUseLatBaseline = true,
+    landRoughnessBoost = 1.6,
+    mountainRoughnessCoeff = 6.0,
+    terrainSlopeRef = 0.003,
+    terrainEvapBoost = 0.2,
+    lapseRateKPerM = 0.0065,
     enableThetaClosure = true
   } = params;
   if (!enable) return;
 
   const { N, nz, theta, T, u, v, qv, Ts, soilW, soilCap, landMask, sstNow, precipRate, pHalf, pMid } = state;
-  const { nx, latDeg } = grid;
+  const { nx, ny, latDeg, invDx, invDy } = grid;
+  const elevField = geo?.elev && geo.elev.length === N ? geo.elev : null;
   const levS = nz - 1;
   const t2mNow = enableLandClimoTs && landTsUseT2m && climo?.hasT2m && climo?.t2mNow?.length === N
     ? climo.t2mNow
@@ -63,22 +71,39 @@ export function stepSurface2D5({ dt, grid, state, climo, params = {} }) {
     const qvAir = qv[idxS];
     const uS = u[idxS];
     const vS = v[idxS];
+    const row = Math.floor(k / nx);
+    const col = k - row * nx;
+    const jN = Math.max(0, row - 1);
+    const jS = Math.min(ny - 1, row + 1);
+    const iE = (col + 1) % nx;
+    const iW = (col - 1 + nx) % nx;
+    const slopeX = elevField
+      ? (elevField[row * nx + iE] - elevField[row * nx + iW]) * 0.5 * invDx[row]
+      : 0;
+    const slopeY = elevField
+      ? (elevField[jN * nx + col] - elevField[jS * nx + col]) * 0.5 * invDy[row]
+      : 0;
+    const slopeMag = Math.hypot(slopeX, slopeY);
+    const terrainFactor = clamp(slopeMag / Math.max(1e-6, terrainSlopeRef), 0, 2.5);
+    const roughness = (land ? landRoughnessBoost : 1) * (1 + mountainRoughnessCoeff * terrainFactor);
+    const CeLocal = Ce * roughness;
+    const ChLocal = Ch * roughness;
     const U = Math.max(windFloor, Math.hypot(uS, vS));
     const pSurf = pMid[idxS];
     const PiS = Math.pow(Math.max(1e-6, pSurf) / P0, KAPPA);
     const qsTs = saturationMixingRatio(TsVal, pSurf);
     const dq = Math.max(0, qsTs - qvAir);
-    let E = rhoAir * Ce * U * dq;
+    let E = rhoAir * CeLocal * U * dq;
     if (E > evapMax) E = evapMax;
 
     if (land) {
       const cap = Math.max(1e-6, soilCap[k]);
       const avail = clamp01(soilW[k] / cap);
-      const limit = Math.pow(avail, soilEvapExponent);
+      const limit = Math.pow(avail, soilEvapExponent) * (1 + terrainEvapBoost * terrainFactor);
       E *= limit;
     }
 
-    const H = rhoAir * CpAir * Ch * U * (TsVal - Tair);
+    const H = rhoAir * CpAir * ChLocal * U * (TsVal - Tair);
 
     if (!land) {
       TsVal += (sst - TsVal) * (dt / oceanTauTs);
@@ -88,13 +113,18 @@ export function stepSurface2D5({ dt, grid, state, climo, params = {} }) {
         if (t2mNow && t2mNow.length === N) {
           TsTargetLand = t2mNow[k];
         } else if (landTsUseLatBaseline && latDeg) {
-          const j = Math.floor(k / nx);
-          const latAbs = Math.abs(latDeg[j]);
+          const latAbs = Math.abs(latDeg[row]);
           const humidLat = smoothstep(60, 0, latAbs);
           const thetaLat = thetaBase + thetaEquatorBoost * humidLat - thetaPoleDrop * (1 - humidLat);
           TsTargetLand = thetaLat - 2;
         }
       }
+      if (elevField) {
+        TsTargetLand -= lapseRateKPerM * elevField[k];
+      }
+      const cap = Math.max(1e-6, soilCap[k]);
+      const avail = cap > 0 ? clamp01(soilW[k] / cap) : 0;
+      const landTauTs = lerp(landTauTsDry, landTauTsWet, avail) * (1 + 0.3 * terrainFactor);
       TsTargetLand = clamp(TsTargetLand, TsMin, TsMax);
       TsVal += (TsTargetLand - TsVal) * (dt / landTauTs);
     }

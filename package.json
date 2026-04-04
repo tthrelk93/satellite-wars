@@ -25,7 +25,7 @@
     "weather:check": "node scripts/check-weather-log.mjs",
     "weather:validate": "node scripts/validate-weather-case.mjs",
     "weather:validate:export": "node scripts/export-validation-snapshots.mjs",
-    "weather:validate:test": "node --experimental-default-type=module --experimental-specifier-resolution=node --test weather-validation/tests/*.test.mjs src/weather/v2/verticalGrid.test.js src/weather/v2/initializeFromAnalysis.test.js src/weather/v2/analysisLoader.test.js src/weather/v2/nudging5.test.js src/weather/v2/windNudge5.test.js",
+    "weather:validate:test": "node --experimental-default-type=module --experimental-specifier-resolution=node --test weather-validation/tests/*.test.mjs src/weather/v2/verticalGrid.test.js src/weather/v2/initializeFromAnalysis.test.js src/weather/v2/analysisLoader.test.js src/weather/v2/nudging5.test.js src/weather/v2/windNudge5.test.js src/weather/v2/terrainCoupling.test.js",
     "weather:analysis:convert": "node scripts/convert-weather-analysis.mjs",
     "verify:no-v1-weather": "node scripts/no-v1-weather.mjs",
     "wind:targets": "node scripts/wind/extractZonalMeanTargets.mjs"

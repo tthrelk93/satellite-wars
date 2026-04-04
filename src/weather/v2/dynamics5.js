@@ -1,9 +1,9 @@
-import { Re } from '../constants';
+import { Re } from '../constants.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
-export function stepWinds5({ dt, grid, state, params = {}, scratch }) {
+export function stepWinds5({ dt, grid, state, geo, params = {}, scratch }) {
   if (!grid || !state || !scratch) return;
   const {
     maxWind = 70,
@@ -14,6 +14,9 @@ export function stepWinds5({ dt, grid, state, params = {}, scratch }) {
     tropicsDragBoost = 0.5,
     tropicsDragLat0Deg = 10,
     tropicsDragLat1Deg = 30,
+    terrainDragBoost = 2.0,
+    terrainSlopeRef = 0.003,
+    landRoughnessBoost = 0.3,
     polarFilterLatStartDeg = 60,
     polarFilterEverySteps = 1,
     extraFilterEverySteps = 15,
@@ -23,7 +26,8 @@ export function stepWinds5({ dt, grid, state, params = {}, scratch }) {
   } = params;
 
   const { nx, ny, invDx, invDy, f, latDeg, polarWeight, sinLat, cosLat } = grid;
-  const { N, nz, u, v, phiMid } = state;
+  const { N, nz, u, v, phiMid, landMask } = state;
+  const elevField = geo?.elev && geo.elev.length === N ? geo.elev : null;
   const { lapU, lapV, lapLapU, lapLapV, rowA, rowB } = scratch;
   if (!lapU || !lapV || !lapLapU || !lapLapV || !rowA || !rowB) return;
 
@@ -116,11 +120,20 @@ export function stepWinds5({ dt, grid, state, params = {}, scratch }) {
         const dphidx = (phiMid[idxE] - phiMid[idxW]) * 0.5 * invDxRow;
         const dphidy = (phiMid[idxN] - phiMid[idxS]) * 0.5 * invDyRow;
 
+        const slopeX = elevField
+          ? (elevField[row + iE] - elevField[row + iW]) * 0.5 * invDxRow
+          : 0;
+        const slopeY = elevField
+          ? (elevField[rowN + i] - elevField[rowS + i]) * 0.5 * invDyRow
+          : 0;
+        const slopeMag = Math.hypot(slopeX, slopeY);
+        const terrainFactor = clamp01(slopeMag / Math.max(1e-6, terrainSlopeRef));
+        const landFactor = landMask?.[k] === 1 ? landRoughnessBoost : 0;
         const u0 = u[idx0];
         const v0 = v[idx0];
         const speed0 = Math.hypot(u0, v0);
         const quadAlphaLev = quadDragAlphaSurface * t;
-        const dragFactor = (1 + quadAlphaLev * speed0) * tropicsFactor;
+        const dragFactor = (1 + quadAlphaLev * speed0) * tropicsFactor * (1 + terrainDragBoost * terrainFactor + landFactor * t);
         const dragU = -(dragFactor * u0) / tauDragLev;
         const dragV = -(dragFactor * v0) / tauDragLev;
         const diffU = (-nuHyper * lapLapU[k]) + (nuLapSmall * lapU[k]);

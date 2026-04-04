@@ -556,6 +556,8 @@ class WeatherField {
         switch (mode) {
             case 'ps':
                 return fields.ps;
+            case 'slp':
+                return fields.slp || fields.ps;
             case 'T':
                 return fields.T;
             case 'Ts':
@@ -648,6 +650,8 @@ class WeatherField {
         switch (mode) {
             case 'ps':
                 return { fixed: [95000, 103000] };
+            case 'slp':
+                return { fixed: [98000, 104500] };
             case 'T':
                 return { fixed: [240, 320] };
             case 'Ts':
