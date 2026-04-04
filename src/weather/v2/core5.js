@@ -14,10 +14,15 @@ import { stepRadiation2D5 } from './radiation2d';
 import { updateDiagnostics2D5 } from './diagnostics2d';
 import { initializeV2FromClimo } from './initializeFromClimo';
 import { stepNudging5 } from './nudging5';
+import {
+  buildVerticalLayout,
+  computeGeopotentialHeightByPressure,
+  createSigmaHalfLevels,
+  DEFAULT_PRESSURE_LEVELS_PA,
+  levelSubarray
+} from './verticalGrid';
 import WeatherLogger from '../WeatherLogger';
 
-// Fractions anchored between pTop and ps, thin aloft, thicker near surface
-const SIGMA_HALF = new Float32Array([0.0, 0.07, 0.18, 0.38, 0.65, 1.0]);
 const P_TOP = 20000;
 const DEBUG_INIT_TEST_BLOB = false;
 
@@ -28,7 +33,15 @@ const makeArray = (count, value = 0) => {
 };
 
 export class WeatherCore5 {
-  constructor({ nx = 180, ny = 90, dt = 120, seed } = {}) {
+  constructor({
+    nx = 180,
+    ny = 90,
+    dt = 120,
+    seed,
+    nz = 26,
+    sigmaHalf,
+    pressureLevelsPa = DEFAULT_PRESSURE_LEVELS_PA
+  } = {}) {
     this.grid = createLatLonGridV2(nx, ny, { minDxMeters: 80000 });
     if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
       const lat0 = this.grid.latDeg[0];
@@ -38,11 +51,18 @@ export class WeatherCore5 {
         console.warn('[V2 grid] Expected lat decreases with j (j increases southward); advect5 assumes this.');
       }
     }
-	    this.nz = 5;
-	    this.sigmaHalf = SIGMA_HALF;
-	    this.state = createState5({ grid: this.grid, nz: this.nz, sigmaHalf: this.sigmaHalf });
-	    const { N } = this.state;
-	    const phiMidOffset = 2 * N;
+    this.nz = Math.max(5, Math.floor(Number(nz) || 26));
+    const sigmaInput = sigmaHalf instanceof Float32Array
+      ? sigmaHalf
+      : Array.isArray(sigmaHalf)
+        ? Float32Array.from(sigmaHalf)
+        : createSigmaHalfLevels({ nz: this.nz });
+    this.sigmaHalf = sigmaInput.length === this.nz + 1
+      ? sigmaInput
+      : createSigmaHalfLevels({ nz: this.nz });
+    this.verticalLayout = buildVerticalLayout({ sigmaHalf: this.sigmaHalf, pressureLevelsPa });
+    this.state = createState5({ grid: this.grid, nz: this.nz, sigmaHalf: this.sigmaHalf });
+    const { N } = this.state;
 
     this.modelDt = dt;
     this.timeUTC = 0;
@@ -216,7 +236,7 @@ export class WeatherCore5 {
       detrainTopFrac: 0.7,
       buoyTrigK: 0.0,
       dThetaMaxConvPerStep: 2.5,
-      enableLargeScaleVerticalAdvection: false,
+      enableLargeScaleVerticalAdvection: true,
       verticalAdvectionCflMax: 0.4,
       dThetaMaxVertAdvPerStep: 2.0,
       enableOmegaMassFix: true,
@@ -314,33 +334,15 @@ export class WeatherCore5 {
       tmp2D2: new Float32Array(N)
     };
 
-	    const levLower = this.nz - 1;
-	    const levUpper = 2;
-	    const lowerOffset = levLower * N;
-	    const upperOffset = levUpper * N;
-
-	    this.fields = {
-	      u: this.state.u.subarray(lowerOffset, lowerOffset + N),
-	      v: this.state.v.subarray(lowerOffset, lowerOffset + N),
-      uU: this.state.u.subarray(upperOffset, upperOffset + N),
-      vU: this.state.v.subarray(upperOffset, upperOffset + N),
-      hL: makeArray(N, 9000),
-      hU: makeArray(N, 3000),
-      theta: this.state.theta.subarray(lowerOffset, lowerOffset + N),
-      thetaU: this.state.theta.subarray(upperOffset, upperOffset + N),
-      T: this.state.T.subarray(lowerOffset, lowerOffset + N),
-      Ts: this.state.Ts,
-      TU: this.state.T.subarray(upperOffset, upperOffset + N),
-	      qv: this.state.qv.subarray(lowerOffset, lowerOffset + N),
-	      qvU: this.state.qv.subarray(upperOffset, upperOffset + N),
-	      qc: this.state.qc.subarray(lowerOffset, lowerOffset + N),
-	      qcU: this.state.qc.subarray(upperOffset, upperOffset + N),
-	      qi: this.state.qi.subarray(lowerOffset, lowerOffset + N),
-	      qiU: this.state.qi.subarray(upperOffset, upperOffset + N),
-	      qr: this.state.qr.subarray(lowerOffset, lowerOffset + N),
-	      ps: this.state.ps,
-	      RH: makeArray(N),
-	      RHU: makeArray(N),
+    this.fields = {
+      hL: makeArray(N),
+      hU: makeArray(N),
+      h850: makeArray(N),
+      h700: makeArray(N),
+      h500: makeArray(N),
+      h250: makeArray(N),
+      RH: makeArray(N),
+      RHU: makeArray(N),
       vort: makeArray(N),
       div: makeArray(N),
       omegaL: makeArray(N),
@@ -348,7 +350,6 @@ export class WeatherCore5 {
       cloud: makeArray(N),
       cloudLow: makeArray(N),
       cloudHigh: makeArray(N),
-      phiMid: this.state.phiMid.subarray(phiMidOffset, phiMidOffset + N),
       cwp: makeArray(N),
       cwpLow: makeArray(N),
       cwpHigh: makeArray(N),
@@ -362,6 +363,7 @@ export class WeatherCore5 {
       tcGenesis: makeArray(N),
       tcMask: makeArray(N)
     };
+    this._bindFieldViews();
 
     this.geo = {
       landMask: this.state.landMask,
@@ -390,11 +392,9 @@ export class WeatherCore5 {
       this._applyDebugInitTestBlob();
     }
 
-	    updateHydrostatic(this.state, { pTop: P_TOP });
+    this._updateHydrostatic();
 
-	    this._v2Levels = { levLower, levUpper, lowerOffset, upperOffset };
-
-    console.log(`[V2] seed=${this.seed} version=v2`);
+    console.log(`[V2] seed=${this.seed} version=v2 nz=${this.nz}`);
     this._initPromise = this._init();
   }
 
@@ -445,7 +445,7 @@ export class WeatherCore5 {
     this._climoAccumSeconds = 0;
     this._windNudgeSpinupSeconds = 0;
     this._updateClimoNow(0, true);
-    updateHydrostatic(this.state, { pTop: P_TOP });
+    this._updateHydrostatic();
   }
 
   setSeed(seed) {
@@ -465,11 +465,132 @@ export class WeatherCore5 {
         climo: this.climo
       });
     }
-    updateHydrostatic(this.state, { pTop: P_TOP });
+    this._updateHydrostatic();
   }
 
   getSeed() {
     return this.seed;
+  }
+
+  _copySnapshotField(field) {
+    if (field instanceof Float32Array) return new Float32Array(field);
+    if (field instanceof Uint8Array) return new Uint8Array(field);
+    if (field instanceof Uint16Array) return new Uint16Array(field);
+    return field;
+  }
+
+  getStateSnapshot({ mode = 'compact' } = {}) {
+    const compactFields = {
+      ps: this.fields.ps,
+      Ts: this.fields.Ts,
+      u: this.fields.u,
+      v: this.fields.v,
+      uU: this.fields.uU,
+      vU: this.fields.vU,
+      cloud: this.fields.cloud,
+      cloudLow: this.fields.cloudLow,
+      cloudHigh: this.fields.cloudHigh,
+      precipRate: this.fields.precipRate,
+      tauLow: this.fields.tauLow,
+      tauHigh: this.fields.tauHigh,
+      h850: this.fields.h850,
+      h700: this.fields.h700,
+      h500: this.fields.h500,
+      h250: this.fields.h250
+    };
+    const snapshot = {
+      mode,
+      timeUTC: this.timeUTC,
+      grid: {
+        nx: this.grid.nx,
+        ny: this.grid.ny,
+        latDeg: new Float32Array(this.grid.latDeg),
+        lonDeg: new Float32Array(this.grid.lonDeg)
+      },
+      vertical: {
+        nz: this.nz,
+        sigmaHalf: new Float32Array(this.sigmaHalf),
+        layout: { ...this.verticalLayout }
+      },
+      fields: Object.fromEntries(
+        Object.entries(compactFields).map(([key, field]) => [key, this._copySnapshotField(field)])
+      )
+    };
+
+    if (mode === 'full') {
+      snapshot.state = Object.fromEntries(
+        Object.entries(this.state)
+          .filter(([, value]) => value instanceof Float32Array || value instanceof Uint8Array || value instanceof Uint16Array)
+          .map(([key, value]) => [key, this._copySnapshotField(value)])
+      );
+    }
+
+    return snapshot;
+  }
+
+  _bindFieldViews() {
+    const { N } = this.state;
+    const layout = this.verticalLayout;
+    const levSurface = layout.surface;
+    const levLower = layout.lowerTroposphere;
+    const levMid = layout.midTroposphere;
+    const levUpper = layout.upperTroposphere;
+    this._v2Levels = {
+      levSurface,
+      levLower,
+      levMid,
+      levUpper,
+      surfaceOffset: levSurface * N,
+      lowerOffset: levLower * N,
+      midOffset: levMid * N,
+      upperOffset: levUpper * N
+    };
+
+    Object.assign(this.fields, {
+      u: levelSubarray(this.state.u, N, levSurface),
+      v: levelSubarray(this.state.v, N, levSurface),
+      uU: levelSubarray(this.state.u, N, levUpper),
+      vU: levelSubarray(this.state.v, N, levUpper),
+      theta: levelSubarray(this.state.theta, N, levSurface),
+      thetaU: levelSubarray(this.state.theta, N, levUpper),
+      T: levelSubarray(this.state.T, N, levSurface),
+      TU: levelSubarray(this.state.T, N, levUpper),
+      Ts: this.state.Ts,
+      qv: levelSubarray(this.state.qv, N, levSurface),
+      qvU: levelSubarray(this.state.qv, N, levUpper),
+      qc: levelSubarray(this.state.qc, N, levSurface),
+      qcU: levelSubarray(this.state.qc, N, levUpper),
+      qi: levelSubarray(this.state.qi, N, levSurface),
+      qiU: levelSubarray(this.state.qi, N, levUpper),
+      qr: levelSubarray(this.state.qr, N, levSurface),
+      ps: this.state.ps,
+      phiMid: levelSubarray(this.state.phiMid, N, levMid),
+      precipRate: this.state.precipRate
+    });
+
+    this.diagParams.levUpper = levUpper;
+    this.diagParams.levVort = levMid;
+  }
+
+  _updateStandardPressureDiagnostics() {
+    const heights = computeGeopotentialHeightByPressure(this.state, this.verticalLayout.pressureLevelsPa);
+    const { N } = this.state;
+    const { levLower, levUpper } = this._v2Levels;
+    const lowerBase = levLower * N;
+    const upperBase = levUpper * N;
+    for (let i = 0; i < N; i += 1) {
+      this.fields.hL[i] = this.state.phiMid[lowerBase + i] / 9.80665;
+      this.fields.hU[i] = this.state.phiMid[upperBase + i] / 9.80665;
+    }
+    if (heights['85000']) this.fields.h850.set(heights['85000']);
+    if (heights['70000']) this.fields.h700.set(heights['70000']);
+    if (heights['50000']) this.fields.h500.set(heights['50000']);
+    if (heights['25000']) this.fields.h250.set(heights['25000']);
+  }
+
+  _updateHydrostatic() {
+    updateHydrostatic(this.state, { pTop: P_TOP });
+    this._updateStandardPressureDiagnostics();
   }
 
   setV2ConvectionEnabled(enabled) {
@@ -522,7 +643,7 @@ export class WeatherCore5 {
         geo: this.geo,
         climo: this.climo
       });
-      updateHydrostatic(this.state, { pTop: P_TOP });
+      this._updateHydrostatic();
       this.ready = true;
     } catch (err) {
       console.warn('[WeatherCore5] Climo init failed; using defaults.', err);
@@ -619,7 +740,7 @@ export class WeatherCore5 {
     const doRadiation = !lodActive || (this._dynStepIndex % radEvery === 0);
     const doMicrophysics = !lodActive || (this._dynStepIndex % microEvery === 0);
 
-    runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
+    runWithLog('updateHydrostatic', () => this._updateHydrostatic());
     runWithLog('stepSurface2D5', () => {
       stepSurface2D5({
         dt,
@@ -629,7 +750,7 @@ export class WeatherCore5 {
         params: this.surfaceParams
       });
     });
-    runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
+    runWithLog('updateHydrostatic', () => this._updateHydrostatic());
     if (doRadiation) {
       runWithLog('stepRadiation2D5', () => {
         stepRadiation2D5({
@@ -641,7 +762,7 @@ export class WeatherCore5 {
         });
       });
     }
-    runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
+    runWithLog('updateHydrostatic', () => this._updateHydrostatic());
     runWithLog('stepWinds5', () => {
       this.dynParams.stepIndex = this._dynStepIndex;
       stepWinds5({
@@ -766,14 +887,14 @@ export class WeatherCore5 {
         scratch: this._dynScratch
       });
     });
-    runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
+    runWithLog('updateHydrostatic', () => this._updateHydrostatic());
     if (typeof this.vertParams?.enableConvectiveOutcome === 'boolean') {
       this.microParams.enableConvectiveOutcome = this.vertParams.enableConvectiveOutcome;
     }
     if (doMicrophysics) {
       runWithLog('stepMicrophysics5', () => stepMicrophysics5({ dt, state: this.state, params: this.microParams }));
     }
-    runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
+    runWithLog('updateHydrostatic', () => this._updateHydrostatic());
     this._nudgeAccumSeconds += dt;
     if (this.nudgeParams.enable && this._nudgeAccumSeconds >= this.nudgeParams.cadenceSeconds) {
       const dtNudge = this._nudgeAccumSeconds;
@@ -790,7 +911,7 @@ export class WeatherCore5 {
         scratch: this._nudgeScratch
       });
       });
-      runWithLog('updateHydrostatic', () => updateHydrostatic(this.state, { pTop: P_TOP }));
+      runWithLog('updateHydrostatic', () => this._updateHydrostatic());
     }
     runWithLog('updateDiagnostics2D5', () => {
       updateDiagnostics2D5({

@@ -4,7 +4,7 @@ const makeArray = (size, value = 0) => {
   return arr;
 };
 
-export function createState5({ grid, nz = 5, sigmaHalf } = {}) {
+export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const N = grid.count;
   const SZ = N * nz;
 

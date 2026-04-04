@@ -1,4 +1,5 @@
 import { LAT_DEG, U10M_ZONAL_MEAN_TARGET, SOURCE_FIXTURE_COUNT } from './windClimoTargets';
+import { findClosestLevelIndex } from './verticalGrid';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -30,7 +31,7 @@ export function stepWindNudge5({ dt, grid, state, params = {} }) {
   if (!nx || !ny || !N || !nz || !u || !v) return { didApply: false };
 
   const levS = nz - 1;
-  const levU = Math.min(1, nz - 1);
+  const levU = findClosestLevelIndex(state.sigmaHalf, 0.28);
   const tauSurfaceSeconds = Number.isFinite(params.tauSurfaceSeconds) ? params.tauSurfaceSeconds : 7 * 86400;
   const tauUpperSeconds = Number.isFinite(params.tauUpperSeconds) ? params.tauUpperSeconds : 10 * 86400;
   const tauVSeconds = Number.isFinite(params.tauVSeconds) ? params.tauVSeconds : 20 * 86400;

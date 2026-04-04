@@ -306,6 +306,10 @@ class WeatherField {
         };
     }
 
+    getCoreSnapshot(options = {}) {
+        return this.core?.getStateSnapshot?.(options) || null;
+    }
+
     setV2ConvectionEnabled(enabled) {
         this.core.setV2ConvectionEnabled?.(enabled);
     }
@@ -588,6 +592,14 @@ class WeatherField {
                 return this._computeWindSpeed();
             case 'windUpper':
                 return this._computeWindSpeed(this.core.fields.uU, this.core.fields.vU);
+            case 'h850':
+                return fields.h850 || this._getZeroScratch();
+            case 'h700':
+                return fields.h700 || this._getZeroScratch();
+            case 'h500':
+                return fields.h500 || this._getZeroScratch();
+            case 'h250':
+                return fields.h250 || this._getZeroScratch();
             case 'hUpper':
                 return fields.hU;
             case 'omegaL':
@@ -672,8 +684,16 @@ class WeatherField {
                 return { fixed: [0, 30] };
             case 'windUpper':
                 return { fixed: [0, 100] };
+            case 'h850':
+                return { fixed: [500, 1800] };
+            case 'h700':
+                return { fixed: [2000, 4000] };
+            case 'h500':
+                return { fixed: [4800, 6200] };
+            case 'h250':
+                return { fixed: [9000, 12000] };
             case 'hUpper':
-                return { fixed: [1000, 5000] };
+                return { fixed: [1000, 12000] };
             case 'omegaL':
                 return { fixed: [-0.2, 0.2], diverging: true };
             case 'omegaU':

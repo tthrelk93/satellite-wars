@@ -1,5 +1,6 @@
 import { Cp, Rd } from '../constants';
 import { LAT_DEG, U10M_ZONAL_MEAN_TARGET, SOURCE_FIXTURE_COUNT } from './windClimoTargets';
+import { findClosestLevelIndex } from './verticalGrid';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
@@ -137,7 +138,7 @@ export function initializeV2FromClimo({ grid, state, geo, climo, params = {} }) 
   }
 
   if (SOURCE_FIXTURE_COUNT === 8 && u && v) {
-    const levU = Math.min(1, nz - 1);
+    const levU = findClosestLevelIndex(sigmaHalf, 0.28);
     for (let j = 0; j < ny; j++) {
       const lat = Number.isFinite(latDeg?.[j])
         ? latDeg[j]

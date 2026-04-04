@@ -16,6 +16,7 @@ import { AmvSensor } from './sensors/weather/AmvSensor';
 import { paintGridToTexture } from './sensors/weather/paintGridToTexture';
 import WindStreamlineRenderer from './WindStreamlineRenderer';
 import { CLOUD_WATCH_GRID_LON_OFFSET_RAD, WIND_REALISM_TARGETS } from './constants';
+import { findClosestLevelIndex } from './weather/v2/verticalGrid';
 import earthmap from './8081_earthmap10k.jpg';
 import earthbump from './8081_earthbump10k.jpg';
 import fogTexture from './fog.png'; // Add your fog texture map here
@@ -421,6 +422,7 @@ class Earth {
     this._weatherWorkerPendingEnable = false;
     this._weatherWorkerLastRequestRealMs = 0;
     this._weatherWorkerMinIntervalMs = 80;
+    this._weatherWorkerSnapshotMode = 'compact';
     this.latestForecastByPlayerId = new Map();
     this.forecastHistoryByPlayerId = new Map();
     this.forecastOverlayMesh = null;
@@ -712,7 +714,8 @@ class Earth {
         ny: core.grid?.ny,
         dt: core.modelDt,
         seed: this.weatherSeed,
-        startTimeSeconds: core.timeUTC
+        startTimeSeconds: core.timeUTC,
+        snapshotMode: this._weatherWorkerSnapshotMode
       }
     });
   }
@@ -738,11 +741,16 @@ class Earth {
     }
     const state = payload.state;
     const fields = payload.fields;
+    const canCopy = (src, dst) => (
+      (src instanceof Float32Array && dst instanceof Float32Array) ||
+      (src instanceof Uint8Array && dst instanceof Uint8Array) ||
+      (src instanceof Uint16Array && dst instanceof Uint16Array)
+    );
     if (state && core.state) {
       for (const key of Object.keys(state)) {
         const src = state[key];
         const dst = core.state[key];
-        if (src instanceof Float32Array && dst instanceof Float32Array && src.length === dst.length) {
+        if (canCopy(src, dst) && src.length === dst.length) {
           dst.set(src);
         }
       }
@@ -751,7 +759,7 @@ class Earth {
       for (const key of Object.keys(fields)) {
         const src = fields[key];
         const dst = core.fields[key];
-        if (src instanceof Float32Array && dst instanceof Float32Array && src.length === dst.length) {
+        if (canCopy(src, dst) && src.length === dst.length) {
           dst.set(src);
         }
       }
@@ -773,7 +781,8 @@ class Earth {
       type: 'step',
       payload: {
         deltaSeconds,
-        simSpeed
+        simSpeed,
+        snapshotMode: this._weatherWorkerSnapshotMode
       }
     });
   }
@@ -1072,7 +1081,7 @@ class Earth {
         const mask = tauHighProduct.mask;
         const data = tauHighProduct.data;
         const lev0 = 0;
-        const lev1 = Math.min(1, nz - 1);
+        const lev1 = Math.max(lev0, findClosestLevelIndex(state.sigmaHalf, 0.18));
         for (let k = 0; k < N; k++) {
           const w = mask ? mask[k] : 1;
           if (w <= 0) continue;
@@ -3335,10 +3344,15 @@ class Earth {
 
   _copyFloat32Props(srcObj, dstObj) {
     if (!srcObj || !dstObj) return;
+    const canCopy = (a, b) => (
+      (a instanceof Float32Array && b instanceof Float32Array) ||
+      (a instanceof Uint8Array && b instanceof Uint8Array) ||
+      (a instanceof Uint16Array && b instanceof Uint16Array)
+    );
     for (const key of Object.keys(srcObj)) {
       const a = srcObj[key];
       const b = dstObj[key];
-      if (a instanceof Float32Array && b instanceof Float32Array && a.length === b.length) {
+      if (canCopy(a, b) && a.length === b.length) {
         b.set(a);
       }
     }
@@ -3996,6 +4010,16 @@ class Earth {
       this._weatherWorker.postMessage({
         type: 'setV2ConvectionEnabled',
         payload: { enabled: Boolean(enabled) }
+      });
+    }
+  }
+
+  setWeatherWorkerSnapshotMode(mode) {
+    this._weatherWorkerSnapshotMode = mode === 'full' ? 'full' : 'compact';
+    if (this._weatherWorker) {
+      this._weatherWorker.postMessage({
+        type: 'setSnapshotMode',
+        payload: { mode: this._weatherWorkerSnapshotMode }
       });
     }
   }

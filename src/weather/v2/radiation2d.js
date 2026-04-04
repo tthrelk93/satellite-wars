@@ -1,5 +1,6 @@
 import { cosZenith } from '../solar';
 import { Cp, Rd, g } from '../constants';
+import { findClosestLevelIndex } from './verticalGrid';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
@@ -56,10 +57,10 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
   } = state;
 
   const dayOfYear = (timeUTC / 86400) % 365;
-  const levLowA = Math.max(0, nz - 2);
+  const levLowA = Math.max(0, findClosestLevelIndex(state.sigmaHalf, 0.82));
   const levLowB = nz - 1;
-  const levHighA = Math.min(1, nz - 1);
-  const levHighB = Math.min(2, nz - 1);
+  const levHighA = Math.max(0, findClosestLevelIndex(state.sigmaHalf, 0.18));
+  const levHighB = Math.max(levHighA, findClosestLevelIndex(state.sigmaHalf, 0.28));
 
   for (let j = 0; j < ny; j++) {
     const lat = latDeg[j];

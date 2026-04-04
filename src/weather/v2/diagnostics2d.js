@@ -1,4 +1,5 @@
 import { g, Cp, Rd } from '../constants';
+import { findClosestLevelIndex } from './verticalGrid';
 
 const saturationMixingRatio = (T, p) => {
   const Tuse = Math.max(180, Math.min(330, T));
@@ -100,8 +101,8 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
     qc1High = 0.004,
     dpTauLowMaxPa = 11000,
     tau0 = 6,
-    levVort = 2,
-    levUpper = 2,
+    levVort = null,
+    levUpper = null,
     pTop = 20000,
     wTauHigh = 0,
     tauRainCloudScale = 1.5
@@ -112,10 +113,12 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
   const { N, nz, u, v, qv, qc, qi, qr, pHalf, pMid, theta, T, omega } = state;
 
   const levTop = 0;
-  const levTop2 = Math.min(1, nz - 1);
+  const levTop2 = Math.max(levTop, findClosestLevelIndex(state.sigmaHalf, 0.18));
   const levBot = nz - 1;
-  const levBot2 = Math.max(nz - 2, 0);
-  const levU = Math.min(Math.max(0, levUpper), nz - 1);
+  const levBot2 = Math.max(findClosestLevelIndex(state.sigmaHalf, 0.82), 0);
+  const levU = Number.isFinite(levUpper)
+    ? Math.min(Math.max(0, levUpper), nz - 1)
+    : findClosestLevelIndex(state.sigmaHalf, 0.28);
 
   let tauLowClamp = 0;
   let tauHighClamp = 0;
@@ -297,7 +300,9 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
   outFields.tauLowAboveMax = tauLowAbove;
   outFields.tauHighAboveMax = tauHighAbove;
 
-  const lev = Math.min(Math.max(0, levVort), nz - 1);
+  const lev = Number.isFinite(levVort)
+    ? Math.min(Math.max(0, levVort), nz - 1)
+    : findClosestLevelIndex(state.sigmaHalf, 0.52);
   const base = lev * N;
   for (let j = 0; j < ny; j++) {
     const invDxRow = invDx[j];

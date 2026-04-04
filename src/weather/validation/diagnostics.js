@@ -1,35 +1,7 @@
 import { g, Rd } from '../constants';
+import { computeGeopotentialHeightByPressure, DEFAULT_PRESSURE_LEVELS_PA } from '../v2/verticalGrid';
 
-const DEFAULT_PRESSURE_LEVELS_PA = [85000, 70000, 50000, 25000];
 const EPS = 1e-6;
-
-const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
-
-const interpolateColumnAtPressure = (field3d, pressure3d, nz, N, cellIndex, targetPressurePa) => {
-  let nearest = null;
-  for (let lev = 0; lev < nz; lev += 1) {
-    const idx = lev * N + cellIndex;
-    const p = pressure3d[idx];
-    const value = field3d[idx];
-    if (!Number.isFinite(p) || !Number.isFinite(value)) continue;
-    nearest = value;
-    if (Math.abs(p - targetPressurePa) < 1) return value;
-    if (lev < nz - 1) {
-      const nextIdx = (lev + 1) * N + cellIndex;
-      const pNext = pressure3d[nextIdx];
-      const valueNext = field3d[nextIdx];
-      const inBracket = (p >= targetPressurePa && pNext <= targetPressurePa) || (p <= targetPressurePa && pNext >= targetPressurePa);
-      if (inBracket && Number.isFinite(pNext) && Number.isFinite(valueNext)) {
-        const lnP = Math.log(Math.max(EPS, p));
-        const lnPNext = Math.log(Math.max(EPS, pNext));
-        const lnTarget = Math.log(Math.max(EPS, targetPressurePa));
-        const t = clamp((lnTarget - lnP) / Math.max(EPS, lnPNext - lnP), 0, 1);
-        return value + (valueNext - value) * t;
-      }
-    }
-  }
-  return nearest;
-};
 
 const computeSeaLevelPressurePa = (core) => {
   const ps = core?.state?.ps;
@@ -59,20 +31,6 @@ const computeTotalColumnWaterKgM2 = (state) => {
   return out;
 };
 
-const computePressureLevelHeights = (state, pressureLevelsPa) => {
-  const { N, nz, pMid, phiMid } = state;
-  const byPressure = {};
-  pressureLevelsPa.forEach((pressurePa) => {
-    const field = new Array(N);
-    for (let cell = 0; cell < N; cell += 1) {
-      const geopotential = interpolateColumnAtPressure(phiMid, pMid, nz, N, cell, pressurePa);
-      field[cell] = Number.isFinite(geopotential) ? geopotential / g : null;
-    }
-    byPressure[String(pressurePa)] = field;
-  });
-  return byPressure;
-};
-
 export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PRESSURE_LEVELS_PA } = {}) {
   const grid = core?.grid;
   const state = core?.state;
@@ -84,6 +42,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
   const wind10mU = Array.from(fields.u || []);
   const wind10mV = Array.from(fields.v || []);
   const wind10mSpeedMs = wind10mU.map((u, index) => Math.hypot(u, wind10mV[index] || 0));
+  const seaLevelPressurePa = computeSeaLevelPressurePa(core);
 
   return {
     schema: 'satellite-wars.weather-validation.snapshot.v1',
@@ -95,12 +54,14 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
       longitudesDeg: Array.from(grid.lonDeg || [])
     },
     pressureLevelsPa: pressureLevelsPa.slice(),
-    seaLevelPressurePa: computeSeaLevelPressurePa(core),
+    seaLevelPressurePa,
     surfacePressurePa: Array.from(state.ps || []),
     wind10mU,
     wind10mV,
     wind10mSpeedMs,
-    geopotentialHeightMByPressurePa: computePressureLevelHeights(state, pressureLevelsPa),
+    geopotentialHeightMByPressurePa: Object.fromEntries(
+      Object.entries(computeGeopotentialHeightByPressure(state, pressureLevelsPa)).map(([pressurePa, values]) => [pressurePa, Array.from(values)])
+    ),
     totalColumnWaterKgM2: computeTotalColumnWaterKgM2(state),
     precipRateMmHr: Array.from(fields.precipRate || state.precipRate || []),
     precipAccumMm: Array.from(state.precipAccum || []),
@@ -110,7 +71,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     cycloneSupportFields: {
       relativeVorticityS_1: Array.from(fields.vort || []),
       wind10mSpeedMs,
-      seaLevelPressurePa: computeSeaLevelPressurePa(core)
+      seaLevelPressurePa
     }
   };
 }
