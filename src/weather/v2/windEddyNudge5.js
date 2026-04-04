@@ -1,4 +1,4 @@
-import { LAT_DEG, EKE10M_BY_LAT_TARGET, SOURCE_FIXTURE_COUNT } from './windClimoTargets';
+import { LAT_DEG, EKE10M_BY_LAT_TARGET, SOURCE_FIXTURE_COUNT } from './windClimoTargets.js';
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -22,8 +22,11 @@ const sampleTargetEke = (latDeg) => {
   return 0;
 };
 
-export function stepWindEddyNudge5({ dt, grid, state, params = {} }) {
+export function stepWindEddyNudge5({ dt, grid, state, climo, params = {} }) {
   if (!grid || !state || !Number.isFinite(dt) || dt <= 0) return { didApply: false };
+  if (climo?.hasWind && (climo?.hasWind500 || climo?.hasWind250) && params.allowFallbackOnly !== true) {
+    return { didApply: false, source: 'spatial-climatology-disabled-fallback' };
+  }
   if (SOURCE_FIXTURE_COUNT !== 8 || !EKE10M_BY_LAT_TARGET?.length) {
     return { didApply: false };
   }

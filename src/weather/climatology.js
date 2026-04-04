@@ -121,6 +121,11 @@ const createFallbackClimo = ({ nx, ny, latDeg }) => {
     wind250MonthsU: null,
     wind250MonthsV: null,
     t2mMonths: null,
+    q2mMonths: null,
+    q700Months: null,
+    q250Months: null,
+    t700Months: null,
+    t250Months: null,
     usedFallback: true
   };
 };
@@ -241,6 +246,11 @@ export async function loadClimatology({ nx, ny, latDeg }) {
     let wind250MonthsU = null;
     let wind250MonthsV = null;
     let t2mMonths = null;
+    let q2mMonths = null;
+    let q700Months = null;
+    let q250Months = null;
+    let t700Months = null;
+    let t250Months = null;
     const optional = manifest.optionalNudging;
     if (optional?.slp?.files && optional.slp.files.length === 12) {
       try {
@@ -383,6 +393,35 @@ export async function loadClimatology({ nx, ny, latDeg }) {
       }
     }
 
+    const loadMonthlyScalarStack = async (spec) => {
+      if (!spec?.files || spec.files.length !== 12) return null;
+      try {
+        const out = [];
+        for (const file of spec.files) {
+          const { data, width, height } = await loadImageData(`${baseUrl}/${file}`);
+          out.push(
+            sampleImageToGrid({
+              imageData: data,
+              imgW: width,
+              imgH: height,
+              nx,
+              ny,
+              decodeFn: (r) => decodeGray(r, spec.decode)
+            })
+          );
+        }
+        return out;
+      } catch (err) {
+        return null;
+      }
+    };
+
+    q2mMonths = await loadMonthlyScalarStack(optional?.q2m);
+    q700Months = await loadMonthlyScalarStack(optional?.q700);
+    q250Months = await loadMonthlyScalarStack(optional?.q250);
+    t700Months = await loadMonthlyScalarStack(optional?.t700);
+    t250Months = await loadMonthlyScalarStack(optional?.t250);
+
     return {
       sstMonths,
       iceMonths,
@@ -397,6 +436,11 @@ export async function loadClimatology({ nx, ny, latDeg }) {
       wind250MonthsU,
       wind250MonthsV,
       t2mMonths,
+      q2mMonths,
+      q700Months,
+      q250Months,
+      t700Months,
+      t250Months,
       usedFallback: false
     };
   } catch (err) {

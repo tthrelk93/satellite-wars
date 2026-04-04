@@ -34,6 +34,17 @@ export async function initClimo2D({ grid, seed } = {}) {
   const iceNow = new Float32Array(N);
   const slpNow = new Float32Array(N);
   const t2mNow = new Float32Array(N);
+  const windNowU = new Float32Array(N);
+  const windNowV = new Float32Array(N);
+  const wind500NowU = new Float32Array(N);
+  const wind500NowV = new Float32Array(N);
+  const wind250NowU = new Float32Array(N);
+  const wind250NowV = new Float32Array(N);
+  const q2mNow = new Float32Array(N);
+  const q700Now = new Float32Array(N);
+  const q250Now = new Float32Array(N);
+  const t700Now = new Float32Array(N);
+  const t250Now = new Float32Array(N);
   const soilCap = new Float32Array(N);
   const albedo = new Float32Array(N);
   const elev = new Float32Array(N);
@@ -43,12 +54,44 @@ export async function initClimo2D({ grid, seed } = {}) {
   const iceMonths = climo?.iceMonths && climo.iceMonths.length === 12 ? climo.iceMonths : null;
   const slpMonths = climo?.slpMonths && climo.slpMonths.length === 12 ? climo.slpMonths : null;
   const t2mMonths = climo?.t2mMonths && climo.t2mMonths.length === 12 ? climo.t2mMonths : null;
+  const windMonthsU = climo?.windMonthsU && climo.windMonthsU.length === 12 ? climo.windMonthsU : null;
+  const windMonthsV = climo?.windMonthsV && climo.windMonthsV.length === 12 ? climo.windMonthsV : null;
+  const wind500MonthsU = climo?.wind500MonthsU && climo.wind500MonthsU.length === 12 ? climo.wind500MonthsU : null;
+  const wind500MonthsV = climo?.wind500MonthsV && climo.wind500MonthsV.length === 12 ? climo.wind500MonthsV : null;
+  const wind250MonthsU = climo?.wind250MonthsU && climo.wind250MonthsU.length === 12 ? climo.wind250MonthsU : null;
+  const wind250MonthsV = climo?.wind250MonthsV && climo.wind250MonthsV.length === 12 ? climo.wind250MonthsV : null;
+  const q2mMonths = climo?.q2mMonths && climo.q2mMonths.length === 12 ? climo.q2mMonths : null;
+  const q700Months = climo?.q700Months && climo.q700Months.length === 12 ? climo.q700Months : null;
+  const q250Months = climo?.q250Months && climo.q250Months.length === 12 ? climo.q250Months : null;
+  const t700Months = climo?.t700Months && climo.t700Months.length === 12 ? climo.t700Months : null;
+  const t250Months = climo?.t250Months && climo.t250Months.length === 12 ? climo.t250Months : null;
   const hasSlp = Boolean(slpMonths);
   const hasT2m = Boolean(t2mMonths);
+  const hasWind = Boolean(windMonthsU && windMonthsV);
+  const hasWind500 = Boolean(wind500MonthsU && wind500MonthsV);
+  const hasWind250 = Boolean(wind250MonthsU && wind250MonthsV);
+  const hasQ2m = Boolean(q2mMonths);
+  const hasQ700 = Boolean(q700Months);
+  const hasQ250 = Boolean(q250Months);
+  const hasT700 = Boolean(t700Months);
+  const hasT250 = Boolean(t250Months);
 
   if (climo?.soilCap && climo.soilCap.length === N) soilCap.set(climo.soilCap);
   if (climo?.albedo && climo.albedo.length === N) albedo.set(climo.albedo);
   if (climo?.elev && climo.elev.length === N) elev.set(climo.elev);
+
+  const updateMonthlyField = (months, outField, m0, m1, f, fallbackValue = 0) => {
+    if (!outField) return;
+    if (months) {
+      const field0 = months[m0];
+      const field1 = months[m1];
+      for (let k = 0; k < outField.length; k++) {
+        outField[k] = lerp(field0[k], field1[k], f);
+      }
+    } else {
+      outField.fill(fallbackValue);
+    }
+  };
 
   const updateClimoNow = ({ timeUTC, out }) => {
     if (!out?.sstNow || !sstMonths) return;
@@ -78,34 +121,41 @@ export async function initClimo2D({ grid, seed } = {}) {
       }
     }
 
-    if (out.slpNow) {
-      if (slpMonths) {
-        const slp0 = slpMonths[m0];
-        const slp1 = slpMonths[m1];
-        const slpOut = out.slpNow;
-        for (let k = 0; k < slpOut.length; k++) {
-          slpOut[k] = lerp(slp0[k], slp1[k], f);
-        }
-      } else {
-        out.slpNow.fill(0);
-      }
-    }
-
-    if (out.t2mNow) {
-      if (t2mMonths) {
-        const t20 = t2mMonths[m0];
-        const t21 = t2mMonths[m1];
-        const t2Out = out.t2mNow;
-        for (let k = 0; k < t2Out.length; k++) {
-          t2Out[k] = lerp(t20[k], t21[k], f);
-        }
-      } else {
-        out.t2mNow.fill(0);
-      }
-    }
+    updateMonthlyField(slpMonths, out.slpNow, m0, m1, f, 0);
+    updateMonthlyField(t2mMonths, out.t2mNow, m0, m1, f, 0);
+    updateMonthlyField(windMonthsU, out.windNowU, m0, m1, f, 0);
+    updateMonthlyField(windMonthsV, out.windNowV, m0, m1, f, 0);
+    updateMonthlyField(wind500MonthsU, out.wind500NowU, m0, m1, f, 0);
+    updateMonthlyField(wind500MonthsV, out.wind500NowV, m0, m1, f, 0);
+    updateMonthlyField(wind250MonthsU, out.wind250NowU, m0, m1, f, 0);
+    updateMonthlyField(wind250MonthsV, out.wind250NowV, m0, m1, f, 0);
+    updateMonthlyField(q2mMonths, out.q2mNow, m0, m1, f, 0);
+    updateMonthlyField(q700Months, out.q700Now, m0, m1, f, 0);
+    updateMonthlyField(q250Months, out.q250Now, m0, m1, f, 0);
+    updateMonthlyField(t700Months, out.t700Now, m0, m1, f, 0);
+    updateMonthlyField(t250Months, out.t250Now, m0, m1, f, 0);
   };
 
-  updateClimoNow({ timeUTC: 0, out: { sstNow, iceNow, slpNow, t2mNow } });
+  updateClimoNow({
+    timeUTC: 0,
+    out: {
+      sstNow,
+      iceNow,
+      slpNow,
+      t2mNow,
+      windNowU,
+      windNowV,
+      wind500NowU,
+      wind500NowV,
+      wind250NowU,
+      wind250NowV,
+      q2mNow,
+      q700Now,
+      q250Now,
+      t700Now,
+      t250Now
+    }
+  });
 
   const landCandidates = [
     climo?.soilCap ? { name: 'soilCap', source: soilCap, threshold: 0.01 } : null,
@@ -140,8 +190,27 @@ export async function initClimo2D({ grid, seed } = {}) {
     iceNow,
     slpNow,
     t2mNow,
+    windNowU,
+    windNowV,
+    wind500NowU,
+    wind500NowV,
+    wind250NowU,
+    wind250NowV,
+    q2mNow,
+    q700Now,
+    q250Now,
+    t700Now,
+    t250Now,
     hasSlp,
     hasT2m,
+    hasWind,
+    hasWind500,
+    hasWind250,
+    hasQ2m,
+    hasQ700,
+    hasQ250,
+    hasT700,
+    hasT250,
     soilCap,
     albedo,
     elev,

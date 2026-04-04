@@ -157,6 +157,15 @@ export class WeatherCore5 {
       enablePs: true,
       enableThetaS: true,
       enableQvS: true,
+      enableThetaColumn: true,
+      enableQvColumn: true,
+      enableWindColumn: true,
+      thetaSource: 'auto',
+      qvSource: 'auto',
+      windSource: 'auto',
+      tauThetaColumn: 15 * 86400,
+      tauQvColumn: 12 * 86400,
+      tauWindColumn: 10 * 86400,
       enableUpper: false
     };
     this._nudgeParamsRuntime = { ...this.nudgeParams };
@@ -385,8 +394,27 @@ export class WeatherCore5 {
       iceNow: this.geo.iceNow,
       slpNow: makeArray(N),
       t2mNow: makeArray(N),
+      windNowU: makeArray(N),
+      windNowV: makeArray(N),
+      wind500NowU: makeArray(N),
+      wind500NowV: makeArray(N),
+      wind250NowU: makeArray(N),
+      wind250NowV: makeArray(N),
+      q2mNow: makeArray(N),
+      q700Now: makeArray(N),
+      q250Now: makeArray(N),
+      t700Now: makeArray(N),
+      t250Now: makeArray(N),
       hasSlp: false,
-      hasT2m: false
+      hasT2m: false,
+      hasWind: false,
+      hasWind500: false,
+      hasWind250: false,
+      hasQ2m: false,
+      hasQ700: false,
+      hasQ250: false,
+      hasT700: false,
+      hasT250: false
     };
 
     this.state.albedo = this.geo.albedo;
@@ -627,15 +655,45 @@ export class WeatherCore5 {
       if (climo?.t2mNow && climo.t2mNow.length === this.climo.t2mNow.length) {
         this.climo.t2mNow.set(climo.t2mNow);
       }
+      if (climo?.windNowU && climo.windNowU.length === this.climo.windNowU.length) this.climo.windNowU.set(climo.windNowU);
+      if (climo?.windNowV && climo.windNowV.length === this.climo.windNowV.length) this.climo.windNowV.set(climo.windNowV);
+      if (climo?.wind500NowU && climo.wind500NowU.length === this.climo.wind500NowU.length) this.climo.wind500NowU.set(climo.wind500NowU);
+      if (climo?.wind500NowV && climo.wind500NowV.length === this.climo.wind500NowV.length) this.climo.wind500NowV.set(climo.wind500NowV);
+      if (climo?.wind250NowU && climo.wind250NowU.length === this.climo.wind250NowU.length) this.climo.wind250NowU.set(climo.wind250NowU);
+      if (climo?.wind250NowV && climo.wind250NowV.length === this.climo.wind250NowV.length) this.climo.wind250NowV.set(climo.wind250NowV);
+      if (climo?.q2mNow && climo.q2mNow.length === this.climo.q2mNow.length) this.climo.q2mNow.set(climo.q2mNow);
+      if (climo?.q700Now && climo.q700Now.length === this.climo.q700Now.length) this.climo.q700Now.set(climo.q700Now);
+      if (climo?.q250Now && climo.q250Now.length === this.climo.q250Now.length) this.climo.q250Now.set(climo.q250Now);
+      if (climo?.t700Now && climo.t700Now.length === this.climo.t700Now.length) this.climo.t700Now.set(climo.t700Now);
+      if (climo?.t250Now && climo.t250Now.length === this.climo.t250Now.length) this.climo.t250Now.set(climo.t250Now);
       this.climo.hasSlp = Boolean(climo?.hasSlp);
       this.climo.hasT2m = Boolean(climo?.hasT2m);
+      this.climo.hasWind = Boolean(climo?.hasWind);
+      this.climo.hasWind500 = Boolean(climo?.hasWind500);
+      this.climo.hasWind250 = Boolean(climo?.hasWind250);
+      this.climo.hasQ2m = Boolean(climo?.hasQ2m);
+      this.climo.hasQ700 = Boolean(climo?.hasQ700);
+      this.climo.hasQ250 = Boolean(climo?.hasQ250);
+      this.climo.hasT700 = Boolean(climo?.hasT700);
+      this.climo.hasT250 = Boolean(climo?.hasT250);
 
       this._climoUpdate = climo?.updateClimoNow || null;
       this._climoOut = {
         sstNow: this.state.sstNow,
         iceNow: this.geo.iceNow,
         slpNow: this.climo.slpNow,
-        t2mNow: this.climo.t2mNow
+        t2mNow: this.climo.t2mNow,
+        windNowU: this.climo.windNowU,
+        windNowV: this.climo.windNowV,
+        wind500NowU: this.climo.wind500NowU,
+        wind500NowV: this.climo.wind500NowV,
+        wind250NowU: this.climo.wind250NowU,
+        wind250NowV: this.climo.wind250NowV,
+        q2mNow: this.climo.q2mNow,
+        q700Now: this.climo.q700Now,
+        q250Now: this.climo.q250Now,
+        t700Now: this.climo.t700Now,
+        t250Now: this.climo.t250Now
       };
       this._climoUpdateArgs = { timeUTC: this.timeUTC, out: this._climoOut };
       this._climoAccumSeconds = 0;
@@ -842,6 +900,7 @@ export class WeatherCore5 {
       dt,
       grid: this.grid,
       state: this.state,
+      climo: this.climo,
       params: {
         ...this.windNudgeParams,
         tauSurfaceSeconds: tauSurfaceEff,
@@ -860,6 +919,7 @@ export class WeatherCore5 {
           logContext,
           this,
           {
+            source: windNudgeResult.source ?? null,
             rmseSurface: windNudgeResult.rmseSurface ?? null,
             rmseUpper: windNudgeResult.rmseUpper ?? null,
             maxAbsCorrection: this._windNudgeMaxAbsCorrection,
@@ -880,6 +940,7 @@ export class WeatherCore5 {
         dt,
         grid: this.grid,
         state: this.state,
+        climo: this.climo,
         params: this.windEddyParams
       });
       if (eddyResult?.didApply && shouldLogModules) {

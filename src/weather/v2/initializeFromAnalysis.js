@@ -62,6 +62,19 @@ export function initializeV2FromAnalysis({
     ? remapPressureFieldMap(fields.relativeHumidityByPressurePa, sourceGrid, targetGrid)
     : null;
 
+  const qvTargetMap = specificHumidityMap || new Map();
+  if (!specificHumidityMap && relativeHumidityMap && temperatureMap) {
+    relativeHumidityMap.forEach((rhField, pressurePa) => {
+      const temperatureField = temperatureMap.get(pressurePa);
+      if (!temperatureField) return;
+      const qField = new Float32Array(rhField.length);
+      for (let cell = 0; cell < rhField.length; cell += 1) {
+        qField[cell] = specificHumidityFromRelativeHumidity(rhField[cell], temperatureField[cell], pressurePa);
+      }
+      qvTargetMap.set(pressurePa, qField);
+    });
+  }
+
   const { N, nz, sigmaHalf, ps, Ts, theta, qv, qc, qi, qr, u, v, soilW, soilCap } = state;
   if (!sigmaHalf || sigmaHalf.length !== nz + 1) {
     throw new Error('State sigmaHalf must match nz + 1.');
@@ -86,8 +99,8 @@ export function initializeV2FromAnalysis({
         : thetaVal != null
           ? thetaVal * Math.pow(pTarget / p0, 287.05 / 1004)
           : null;
-      const qSpecific = specificHumidityMap
-        ? interpolatePressureFieldAtCell(specificHumidityMap, pTarget, cell)
+      const qSpecific = qvTargetMap.size > 0
+        ? interpolatePressureFieldAtCell(qvTargetMap, pTarget, cell)
         : null;
       const rhVal = relativeHumidityMap
         ? interpolatePressureFieldAtCell(relativeHumidityMap, pTarget, cell)
@@ -132,6 +145,17 @@ export function initializeV2FromAnalysis({
       geo.elev[cell] = surfaceGeopotentialRemapped[cell] / 9.80665;
     }
   }
+
+  state.analysisTargets = {
+    source: 'analysis',
+    surfacePressurePa: new Float32Array(psRemapped),
+    uByPressurePa: uMap,
+    vByPressurePa: vMap,
+    temperatureKByPressurePa: temperatureMap,
+    thetaKByPressurePa: thetaMap,
+    specificHumidityKgKgByPressurePa: qvTargetMap,
+    surfaceTemperatureK: surfaceTempRemapped ? new Float32Array(surfaceTempRemapped) : null
+  };
 
   void climo;
 
