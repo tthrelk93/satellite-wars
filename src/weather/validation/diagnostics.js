@@ -16,19 +16,24 @@ const computeSeaLevelPressurePa = (core) => {
   return out;
 };
 
-const computeTotalColumnWaterKgM2 = (state) => {
-  const { N, nz, qv, qc, qi, qr, pHalf } = state;
+const computeColumnIntegralKgM2 = (state, selector) => {
+  const { N, nz, pHalf } = state;
   const out = new Array(N).fill(0);
   for (let cell = 0; cell < N; cell += 1) {
     let total = 0;
     for (let lev = 0; lev < nz; lev += 1) {
       const idx = lev * N + cell;
       const dp = pHalf[(lev + 1) * N + cell] - pHalf[lev * N + cell];
-      total += (qv[idx] + qc[idx] + (qi?.[idx] || 0) + (qr?.[idx] || 0)) * (dp / g);
+      total += selector(idx) * (dp / g);
     }
     out[cell] = total;
   }
   return out;
+};
+
+const computeTotalColumnWaterKgM2 = (state) => {
+  const { qv, qc, qi, qr, qs } = state;
+  return computeColumnIntegralKgM2(state, (idx) => qv[idx] + qc[idx] + (qi?.[idx] || 0) + (qr?.[idx] || 0) + (qs?.[idx] || 0));
 };
 
 export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PRESSURE_LEVELS_PA } = {}) {
@@ -64,7 +69,11 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     ),
     totalColumnWaterKgM2: computeTotalColumnWaterKgM2(state),
     precipRateMmHr: Array.from(fields.precipRate || state.precipRate || []),
+    precipRainRateMmHr: Array.from(state.precipRainRate || []),
+    precipSnowRateMmHr: Array.from(state.precipSnowRate || []),
     precipAccumMm: Array.from(state.precipAccum || []),
+    cloudWaterPathKgM2: computeColumnIntegralKgM2(state, (idx) => (state.qc?.[idx] || 0) + (state.qr?.[idx] || 0)),
+    snowWaterPathKgM2: computeColumnIntegralKgM2(state, (idx) => (state.qi?.[idx] || 0) + (state.qs?.[idx] || 0)),
     sstK: Array.from(state.sstNow || []),
     seaIceFraction: Array.from(state.seaIceFrac || []),
     seaIceThicknessM: Array.from(state.seaIceThicknessM || []),

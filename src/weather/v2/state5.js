@@ -15,6 +15,7 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const qc = makeArray(SZ);
   const qi = makeArray(SZ);
   const qr = makeArray(SZ);
+  const qs = makeArray(SZ);
   const cloudFrac3D = makeArray(SZ);
   const cloudTau3D = makeArray(SZ);
 
@@ -25,6 +26,8 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const soilW = makeArray(N);
   const precipAccum = makeArray(N);
   const precipRate = makeArray(N);
+  const precipRainRate = makeArray(N);
+  const precipSnowRate = makeArray(N);
   const sstNow = makeArray(N, 300);
   const seaIceFrac = makeArray(N);
   const seaIceThicknessM = makeArray(N);
@@ -52,6 +55,7 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
     qc,
     qi,
     qr,
+    qs,
     cloudFrac3D,
     cloudTau3D,
     ps,
@@ -61,6 +65,8 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
     soilW,
     precipAccum,
     precipRate,
+    precipRainRate,
+    precipSnowRate,
     landMask,
     soilCap,
     sstNow,

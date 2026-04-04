@@ -50,7 +50,7 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
 
   const dtSeconds = Number.isFinite(dt) && dt > 0 ? dt : 120;
   const { nx, ny, invDx, invDy, cosLat } = grid;
-  const { N, nz, u, v, qv, qc, qi, qr, pHalf, pMid, theta, T, omega, cloudFrac3D, cloudTau3D } = state;
+  const { N, nz, u, v, qv, qc, qi, qr, qs, pHalf, pMid, theta, T, omega, cloudFrac3D, cloudTau3D } = state;
 
   if (!state._convAnvil || state._convAnvil.length !== N) state._convAnvil = new Float32Array(N);
   if (!state._cloudLowCov || state._cloudLowCov.length !== N) state._cloudLowCov = new Float32Array(N);
@@ -101,7 +101,7 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
       const omegaMid = 0.5 * (omega[lev * N + k] + omega[(lev + 1) * N + k]);
 
       const condLiq = qc[idx] + 0.35 * qr[idx];
-      const condIce = qi[idx] + 0.15 * qr[idx];
+      const condIce = qi[idx] + (qs?.[idx] || 0) + 0.15 * qr[idx];
       const condTotal = condLiq + condIce;
 
       const qc0 = sigma > lowSigmaCut ? qc0Low : qc0High;

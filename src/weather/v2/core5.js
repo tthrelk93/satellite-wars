@@ -599,6 +599,8 @@ export class WeatherCore5 {
       qi: levelSubarray(this.state.qi, N, levSurface),
       qiU: levelSubarray(this.state.qi, N, levUpper),
       qr: levelSubarray(this.state.qr, N, levSurface),
+      qs: levelSubarray(this.state.qs, N, levSurface),
+      qsU: levelSubarray(this.state.qs, N, levUpper),
       ps: this.state.ps,
       phiMid: levelSubarray(this.state.phiMid, N, levMid),
       precipRate: this.state.precipRate

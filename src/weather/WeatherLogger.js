@@ -1096,6 +1096,11 @@ class WeatherLogger {
       qiUStats.below0Count = qiUStats.belowPhysMinCount;
       stats.qiU = qiUStats;
     }
+    if (fields.qsU) {
+      const qsUStats = this._statsScalar(fields.qsU, { landMask, physMin: 0 });
+      qsUStats.below0Count = qsUStats.belowPhysMinCount;
+      stats.qsU = qsUStats;
+    }
 
     const tauLowStats = this._statsScalar(fields.tauLow, { landMask, physMin: 0, physMax: 80 });
     stats.tauLow = tauLowStats;
@@ -1179,6 +1184,12 @@ class WeatherLogger {
     precipStats.precipMax = precipStats.max;
     precipStats.globalMmPerDay = precipStats.meanAw != null ? precipStats.meanAw * 24 : null;
     stats.precip = precipStats;
+    if (core.state?.precipRainRate) {
+      stats.precipRain = this._statsScalar(core.state.precipRainRate, { landMask, physMin: 0, thresholdsAbove: [0.1] });
+    }
+    if (core.state?.precipSnowRate) {
+      stats.precipSnow = this._statsScalar(core.state.precipSnowRate, { landMask, physMin: 0, thresholdsAbove: [0.1] });
+    }
 
     return stats;
   }
@@ -1218,7 +1229,10 @@ class WeatherLogger {
         hU: fields.hU[k],
         qvU: fields.qvU[k],
         qcU: fields.qcU ? fields.qcU[k] : 0,
-        qiU: fields.qiU ? fields.qiU[k] : 0
+        qiU: fields.qiU ? fields.qiU[k] : 0,
+        qsU: fields.qsU ? fields.qsU[k] : 0,
+        precipRain: core.state?.precipRainRate ? core.state.precipRainRate[k] : 0,
+        precipSnow: core.state?.precipSnowRate ? core.state.precipSnowRate[k] : 0
       });
     }
     return probes;
