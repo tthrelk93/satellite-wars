@@ -321,6 +321,21 @@ class WeatherField {
         return this.logger.recordNow({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan }, this.core, { reason });
     }
 
+    logValidationSnapshot(simTimeSeconds, simContext = {}, options = {}) {
+        const simSpeed = Number.isFinite(simContext.simSpeed)
+            ? simContext.simSpeed
+            : this._simContext.simSpeed;
+        const paused = typeof simContext.paused === 'boolean'
+            ? simContext.paused
+            : this._simContext.paused;
+        this.core.setLoggerContext?.({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan });
+        return this.logger.recordValidationSnapshot(
+            { simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan },
+            this.core,
+            options
+        );
+    }
+
     getZonalMean(mode) {
         if (!this.core.ready) return new Float32Array(this.core.grid.ny);
         const { grid } = this.core;

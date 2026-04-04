@@ -1,4 +1,5 @@
 import { Re, g } from './constants';
+import { buildValidationDiagnostics } from './validation/diagnostics';
 
 const EARTH_AREA = 4 * Math.PI * Re * Re;
 const DEFAULT_MAX_ENTRIES = 20000;
@@ -149,6 +150,25 @@ class WeatherLogger {
       event,
       sim: this._buildSimMeta(context, core),
       payload: payload ?? null
+    };
+    this._pushEntry(entry);
+    return true;
+  }
+
+  recordValidationSnapshot(context, core, {
+    force = false,
+    leadHours = null,
+    label = null,
+    pressureLevelsPa
+  } = {}) {
+    if (!this.enabled && !force) return false;
+    const diagnostics = buildValidationDiagnostics(core, { pressureLevelsPa });
+    const entry = {
+      event: 'validationSnapshot',
+      sim: this._buildSimMeta(context, core),
+      leadHours: Number.isFinite(leadHours) ? leadHours : null,
+      label: typeof label === 'string' && label.length ? label : null,
+      payload: diagnostics
     };
     this._pushEntry(entry);
     return true;

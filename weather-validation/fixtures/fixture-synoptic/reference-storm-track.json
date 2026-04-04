@@ -1,0 +1,25 @@
+{
+  "schema": "satellite-wars.weather-validation.cyclone-track.v1",
+  "tracks": [
+    {
+      "stormId": "AL01",
+      "points": [
+        {
+          "leadHours": 0,
+          "latDeg": 12.0,
+          "lonDeg": -58.0
+        },
+        {
+          "leadHours": 6,
+          "latDeg": 13.5,
+          "lonDeg": -55.0
+        },
+        {
+          "leadHours": 12,
+          "latDeg": 15.0,
+          "lonDeg": -52.0
+        }
+      ]
+    }
+  ]
+}

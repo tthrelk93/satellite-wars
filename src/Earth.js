@@ -4004,6 +4004,10 @@ class Earth {
     return this.weatherField?.logNow(simTimeSeconds, simContext, reason);
   }
 
+  weatherLogValidationSnapshot(simTimeSeconds, simContext, options) {
+    return this.weatherField?.logValidationSnapshot(simTimeSeconds, simContext, options);
+  }
+
   render(scene) {
     scene.add(this.parentObject);
   }

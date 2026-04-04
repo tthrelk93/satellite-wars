@@ -1,0 +1,37 @@
+{
+  "schema": "satellite-wars.weather-validation.case.v1",
+  "caseId": "fixture-synoptic",
+  "title": "Checked-in synthetic synoptic validation fixture",
+  "description": "Small deterministic benchmark fixture used to exercise remapping, metrics, reporting, and cyclone-track scoring without changing model physics.",
+  "initTime": "2026-01-15T00:00:00Z",
+  "leadHours": [
+    0,
+    6,
+    12
+  ],
+  "validationPressureLevelsPa": [
+    50000
+  ],
+  "simulatorGrid": {
+    "latitudesDeg": [
+      45,
+      0,
+      -45
+    ],
+    "longitudesDeg": [
+      -135,
+      -45,
+      45,
+      135
+    ]
+  },
+  "outputDir": "weather-validation/output/fixture-synoptic",
+  "model": {
+    "fieldsPath": "../../fixtures/fixture-synoptic/model-fields.json",
+    "stormTrackPath": "../../fixtures/fixture-synoptic/model-storm-track.json"
+  },
+  "reference": {
+    "fieldsPath": "../../fixtures/fixture-synoptic/reference-fields.json",
+    "stormTrackPath": "../../fixtures/fixture-synoptic/reference-storm-track.json"
+  }
+}

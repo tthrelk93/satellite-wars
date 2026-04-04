@@ -1,0 +1,216 @@
+{
+  "schema": "satellite-wars.weather-validation.summary.v1",
+  "caseId": "fixture-synoptic",
+  "initTime": "2026-01-15T00:00:00Z",
+  "leadHours": [
+    0,
+    6,
+    12
+  ],
+  "pressureLevelsPa": [
+    50000
+  ],
+  "outputJsonPath": "weather-validation/output/fixture-synoptic/summary.json",
+  "outputMarkdownPath": "weather-validation/output/fixture-synoptic/summary.md",
+  "aggregate": {
+    "slpRmsePaMean": 91.50906854549494,
+    "slpRmseHpaMean": 0.9150906854549495,
+    "z500RmseMMean": 29.4090019449782,
+    "wind10RmseMsMean": 1.9423185880376768,
+    "totalColumnWaterRmseKgM2Mean": 1.2872629679686916,
+    "precipBiasMmHrMean": 0.5038319947916667,
+    "cloudTotalBiasMean": -0.006002736057351572
+  },
+  "cycloneTrack": {
+    "storms": [
+      {
+        "stormId": "AL01",
+        "meanErrorKm": 69.8371200806352,
+        "maxErrorKm": 92.6948015683894,
+        "pointErrorsKm": [
+          {
+            "leadHours": 0,
+            "errorKm": 54.80362823082036
+          },
+          {
+            "leadHours": 6,
+            "errorKm": 62.012930442695875
+          },
+          {
+            "leadHours": 12,
+            "errorKm": 92.6948015683894
+          }
+        ]
+      }
+    ],
+    "meanErrorKm": 69.8371200806352,
+    "maxErrorKm": 92.6948015683894
+  },
+  "leads": [
+    {
+      "leadHours": 0,
+      "metrics": {
+        "slpRmsePa": 92.49400550724933,
+        "slpRmseHpa": 0.9249400550724932,
+        "z500RmseM": 29.4090019449782,
+        "wind10RmseMs": 1.9423185880376765,
+        "totalColumnWaterRmseKgM2": 1.2872629679686904,
+        "precip": {
+          "biasMmHr": 0.5038319947916666,
+          "categorical": [
+            {
+              "thresholdMmHr": 0.1,
+              "hits": 12,
+              "misses": 0,
+              "falseAlarms": 0,
+              "correctNegatives": 0,
+              "frequencyBias": 1,
+              "pod": 1,
+              "far": 0,
+              "csi": 1
+            },
+            {
+              "thresholdMmHr": 1,
+              "hits": 10,
+              "misses": 0,
+              "falseAlarms": 0,
+              "correctNegatives": 2,
+              "frequencyBias": 1,
+              "pod": 1,
+              "far": 0,
+              "csi": 1
+            },
+            {
+              "thresholdMmHr": 5,
+              "hits": 0,
+              "misses": 0,
+              "falseAlarms": 0,
+              "correctNegatives": 12,
+              "frequencyBias": null,
+              "pod": null,
+              "far": null,
+              "csi": null
+            }
+          ]
+        },
+        "cloudFractionBias": {
+          "low": 0.006169302323893705,
+          "high": -0.01618378463656047,
+          "total": -0.006788535983409884
+        }
+      }
+    },
+    {
+      "leadHours": 6,
+      "metrics": {
+        "slpRmsePa": 91.4797117293378,
+        "slpRmseHpa": 0.914797117293378,
+        "z500RmseM": 29.4090019449782,
+        "wind10RmseMs": 1.9423185880376765,
+        "totalColumnWaterRmseKgM2": 1.2872629679686927,
+        "precip": {
+          "biasMmHr": 0.5038319947916666,
+          "categorical": [
+            {
+              "thresholdMmHr": 0.1,
+              "hits": 12,
+              "misses": 0,
+              "falseAlarms": 0,
+              "correctNegatives": 0,
+              "frequencyBias": 1,
+              "pod": 1,
+              "far": 0,
+              "csi": 1
+            },
+            {
+              "thresholdMmHr": 1,
+              "hits": 10,
+              "misses": 2,
+              "falseAlarms": 0,
+              "correctNegatives": 0,
+              "frequencyBias": 0.8333333333333334,
+              "pod": 0.8333333333333334,
+              "far": 0,
+              "csi": 0.8333333333333334
+            },
+            {
+              "thresholdMmHr": 5,
+              "hits": 0,
+              "misses": 0,
+              "falseAlarms": 0,
+              "correctNegatives": 12,
+              "frequencyBias": null,
+              "pod": null,
+              "far": null,
+              "csi": null
+            }
+          ]
+        },
+        "cloudFractionBias": {
+          "low": 0.006169302323893685,
+          "high": -0.01618378463656046,
+          "total": -0.0060027666793271055
+        }
+      }
+    },
+    {
+      "leadHours": 12,
+      "metrics": {
+        "slpRmsePa": 90.55348839989773,
+        "slpRmseHpa": 0.9055348839989773,
+        "z500RmseM": 29.4090019449782,
+        "wind10RmseMs": 1.942318588037677,
+        "totalColumnWaterRmseKgM2": 1.2872629679686916,
+        "precip": {
+          "biasMmHr": 0.5038319947916668,
+          "categorical": [
+            {
+              "thresholdMmHr": 0.1,
+              "hits": 12,
+              "misses": 0,
+              "falseAlarms": 0,
+              "correctNegatives": 0,
+              "frequencyBias": 1,
+              "pod": 1,
+              "far": 0,
+              "csi": 1
+            },
+            {
+              "thresholdMmHr": 1,
+              "hits": 12,
+              "misses": 0,
+              "falseAlarms": 0,
+              "correctNegatives": 0,
+              "frequencyBias": 1,
+              "pod": 1,
+              "far": 0,
+              "csi": 1
+            },
+            {
+              "thresholdMmHr": 5,
+              "hits": 0,
+              "misses": 0,
+              "falseAlarms": 0,
+              "correctNegatives": 12,
+              "frequencyBias": null,
+              "pod": null,
+              "far": null,
+              "csi": null
+            }
+          ]
+        },
+        "cloudFractionBias": {
+          "low": 0.006169302323893659,
+          "high": -0.01618378463656046,
+          "total": -0.005216905509317726
+        }
+      }
+    }
+  ],
+  "inputs": {
+    "modelFieldsPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars/weather-validation/fixtures/fixture-synoptic/model-fields.json",
+    "referenceFieldsPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars/weather-validation/fixtures/fixture-synoptic/reference-fields.json",
+    "modelStormTrackPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars/weather-validation/fixtures/fixture-synoptic/model-storm-track.json",
+    "referenceStormTrackPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars/weather-validation/fixtures/fixture-synoptic/reference-storm-track.json"
+  }
+}
