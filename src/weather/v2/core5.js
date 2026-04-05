@@ -15,6 +15,7 @@ import { updateDiagnostics2D5 } from './diagnostics2d';
 import { initializeV2FromClimo } from './initializeFromClimo';
 import { initializeV2FromAnalysis } from './initializeFromAnalysis.js';
 import { loadAnalysisDataset } from './analysisLoader.js';
+import { stepAnalysisIncrement5 } from './analysisIncrement5.js';
 import { stepNudging5 } from './nudging5';
 import {
   buildVerticalLayout,
@@ -326,6 +327,16 @@ export class WeatherCore5 {
       levUpper: 2,
       pTop: P_TOP,
       wTauHigh: 0
+    };
+    this.analysisIncrementParams = {
+      enable: true,
+      thetaMin: 180,
+      thetaMax: 380,
+      TsMin: 180,
+      TsMax: 330,
+      qvMax: 0.04,
+      windMin: -150,
+      windMax: 150
     };
     this._dynScratch = {
       lapU: new Float32Array(N),
@@ -1026,6 +1037,31 @@ export class WeatherCore5 {
       });
       });
       runWithLog('updateHydrostatic', () => this._updateHydrostatic());
+    }
+    const analysisIncrementResult = stepAnalysisIncrement5({
+      dt,
+      state: this.state,
+      params: {
+        ...this.analysisIncrementParams,
+        psMin: this.massParams?.psMin,
+        psMax: this.massParams?.psMax
+      }
+    });
+    if (analysisIncrementResult?.didApply) {
+      runWithLog('updateHydrostatic', () => this._updateHydrostatic());
+      if (shouldLogModules) {
+        logger.recordEvent(
+          'analysisIncrementDiagnostics',
+          logContext,
+          this,
+          {
+            updatedCount: analysisIncrementResult.updatedCount ?? null,
+            meanAbsDelta: analysisIncrementResult.meanAbsDelta ?? null,
+            maxAbsDelta: analysisIncrementResult.maxAbsDelta ?? null,
+            remainingSeconds: analysisIncrementResult.remainingSeconds ?? null
+          }
+        );
+      }
     }
     runWithLog('updateDiagnostics2D5', () => {
       updateDiagnostics2D5({

@@ -21,6 +21,7 @@
     "precipBiasMmHrMean": 0.5038319947916667,
     "cloudTotalBiasMean": -0.006002736057351572
   },
+  "analysisAggregate": null,
   "cycloneTrack": {
     "storms": [
       {
@@ -46,6 +47,7 @@
     "meanErrorKm": 69.8371200806352,
     "maxErrorKm": 92.6948015683894
   },
+  "analysisCycloneTrack": null,
   "leads": [
     {
       "leadHours": 0,
@@ -98,7 +100,8 @@
           "high": -0.01618378463656047,
           "total": -0.006788535983409884
         }
-      }
+      },
+      "analysisMetrics": null
     },
     {
       "leadHours": 6,
@@ -151,7 +154,8 @@
           "high": -0.01618378463656046,
           "total": -0.0060027666793271055
         }
-      }
+      },
+      "analysisMetrics": null
     },
     {
       "leadHours": 12,
@@ -204,13 +208,16 @@
           "high": -0.01618378463656046,
           "total": -0.005216905509317726
         }
-      }
+      },
+      "analysisMetrics": null
     }
   ],
   "inputs": {
     "modelFieldsPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars/weather-validation/fixtures/fixture-synoptic/model-fields.json",
     "referenceFieldsPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars/weather-validation/fixtures/fixture-synoptic/reference-fields.json",
     "modelStormTrackPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars/weather-validation/fixtures/fixture-synoptic/model-storm-track.json",
+    "analysisFieldsPath": null,
+    "analysisStormTrackPath": null,
     "referenceStormTrackPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars/weather-validation/fixtures/fixture-synoptic/reference-storm-track.json"
   }
 }

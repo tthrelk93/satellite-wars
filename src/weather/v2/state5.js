@@ -34,6 +34,12 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const surfaceRadiativeFlux = makeArray(N);
   const soilCap = makeArray(N);
   const landMask = new Uint8Array(N);
+  const analysisIauPs = makeArray(N);
+  const analysisIauTs = makeArray(N);
+  const analysisIauU = makeArray(SZ);
+  const analysisIauV = makeArray(SZ);
+  const analysisIauTheta = makeArray(SZ);
+  const analysisIauQv = makeArray(SZ);
 
   const pHalf = makeArray((nz + 1) * N);
   const pMid = makeArray(nz * N);
@@ -69,6 +75,12 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
     precipSnowRate,
     landMask,
     soilCap,
+    analysisIauPs,
+    analysisIauTs,
+    analysisIauU,
+    analysisIauV,
+    analysisIauTheta,
+    analysisIauQv,
     sstNow,
     seaIceFrac,
     seaIceThicknessM,

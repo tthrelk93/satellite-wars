@@ -18,6 +18,7 @@ import WindStreamlineRenderer from './WindStreamlineRenderer';
 import { CLOUD_WATCH_GRID_LON_OFFSET_RAD, WIND_REALISM_TARGETS } from './constants';
 import { findClosestLevelIndex } from './weather/v2/verticalGrid';
 import { interpolatePressureFieldAtCell } from './weather/v2/analysisData.js';
+import { armAnalysisIncrement5, clearAnalysisIncrement5 } from './weather/v2/analysisIncrement5.js';
 import earthmap from './8081_earthmap10k.jpg';
 import earthbump from './8081_earthbump10k.jpg';
 import fogTexture from './fog.png'; // Add your fog texture map here
@@ -451,10 +452,10 @@ class Earth {
     this.analysisReanchorEverySeconds = 6 * 3600;
     this.analysisLastReanchorSimTimeSeconds = null;
     this.analysisVarConfig = {
-      ps: { gain: 0.35, min: 50000, max: 110000 },
-      wind: { gain: 0.3, min: -150, max: 150 },
-      theta: { gain: 0.25, min: 180, max: 380 },
-      qv: { gain: 0.25, min: 0, max: 0.04 },
+      ps: { gain: 0.35, iauGain: 1.0, min: 50000, max: 110000 },
+      wind: { gain: 0.3, iauGain: 1.0, min: -150, max: 150 },
+      theta: { gain: 0.25, iauGain: 1.0, min: 180, max: 380 },
+      qv: { gain: 0.25, iauGain: 1.0, min: 0, max: 0.04 },
       cloud: { gain: 0.25, min: 0, max: 1 },
       precip: { gain: 0.2, min: 0, max: 200 }
     };
@@ -3495,14 +3496,29 @@ class Earth {
 
     let updatedCount = 0;
     let sumAbsDelta = 0;
+    let iauCount = 0;
+    let iauResidualSum = 0;
     const N = state.N;
     const nz = state.nz;
+    const intervalSeconds = Number.isFinite(this.analysisReanchorEverySeconds)
+      ? Math.max(1, this.analysisReanchorEverySeconds)
+      : 6 * 3600;
+
+    clearAnalysisIncrement5(state);
 
     if (targets.surfacePressurePa && targets.surfacePressurePa.length === N) {
       for (let k = 0; k < N; k++) {
         const before = state.ps[k];
         const after = this._blendAnalysisValue('ps', before, targets.surfacePressurePa[k]);
         state.ps[k] = after;
+        if (state.analysisIauPs?.length === N) {
+          const residual = targets.surfacePressurePa[k] - after;
+          const cfg = this.analysisVarConfig?.ps || {};
+          const iauGain = Number.isFinite(cfg.iauGain) ? cfg.iauGain : 1.0;
+          state.analysisIauPs[k] = (residual * iauGain) / intervalSeconds;
+          iauResidualSum += Math.abs(residual);
+          iauCount += 1;
+        }
         sumAbsDelta += Math.abs(after - before);
         updatedCount += 1;
         this._markAnalysisObsSeen(k, simTimeSeconds);
@@ -3523,6 +3539,16 @@ class Earth {
             const vBefore = state.v[idx];
             state.u[idx] = this._blendAnalysisValue('wind', uBefore, uTarget);
             state.v[idx] = this._blendAnalysisValue('wind', vBefore, vTarget);
+            if (state.analysisIauU?.length === state.SZ && state.analysisIauV?.length === state.SZ) {
+              const cfg = this.analysisVarConfig?.wind || {};
+              const iauGain = Number.isFinite(cfg.iauGain) ? cfg.iauGain : 1.0;
+              const uResidual = uTarget - state.u[idx];
+              const vResidual = vTarget - state.v[idx];
+              state.analysisIauU[idx] = (uResidual * iauGain) / intervalSeconds;
+              state.analysisIauV[idx] = (vResidual * iauGain) / intervalSeconds;
+              iauResidualSum += Math.abs(uResidual) + Math.abs(vResidual);
+              iauCount += 2;
+            }
             sumAbsDelta += Math.abs(state.u[idx] - uBefore) + Math.abs(state.v[idx] - vBefore);
             updatedCount += 2;
           }
@@ -3535,6 +3561,14 @@ class Earth {
               : targetVal;
             const before = state.theta[idx];
             state.theta[idx] = this._blendAnalysisValue('theta', before, thetaTarget);
+            if (state.analysisIauTheta?.length === state.SZ) {
+              const cfg = this.analysisVarConfig?.theta || {};
+              const iauGain = Number.isFinite(cfg.iauGain) ? cfg.iauGain : 1.0;
+              const residual = thetaTarget - state.theta[idx];
+              state.analysisIauTheta[idx] = (residual * iauGain) / intervalSeconds;
+              iauResidualSum += Math.abs(residual);
+              iauCount += 1;
+            }
             sumAbsDelta += Math.abs(state.theta[idx] - before);
             updatedCount += 1;
           }
@@ -3544,6 +3578,14 @@ class Earth {
           if (Number.isFinite(qTarget)) {
             const before = state.qv[idx];
             state.qv[idx] = this._blendAnalysisValue('qv', before, qTarget);
+            if (state.analysisIauQv?.length === state.SZ) {
+              const cfg = this.analysisVarConfig?.qv || {};
+              const iauGain = Number.isFinite(cfg.iauGain) ? cfg.iauGain : 1.0;
+              const residual = qTarget - state.qv[idx];
+              state.analysisIauQv[idx] = (residual * iauGain) / intervalSeconds;
+              iauResidualSum += Math.abs(residual);
+              iauCount += 1;
+            }
             sumAbsDelta += Math.abs(state.qv[idx] - before);
             updatedCount += 1;
           }
@@ -3552,15 +3594,25 @@ class Earth {
       if (targets.surfaceTemperatureK && targets.surfaceTemperatureK.length === N) {
         const before = state.Ts[cell];
         state.Ts[cell] = this._blendAnalysisValue('theta', before, targets.surfaceTemperatureK[cell]);
+        if (state.analysisIauTs?.length === N) {
+          const cfg = this.analysisVarConfig?.theta || {};
+          const iauGain = Number.isFinite(cfg.iauGain) ? cfg.iauGain : 1.0;
+          const residual = targets.surfaceTemperatureK[cell] - state.Ts[cell];
+          state.analysisIauTs[cell] = (residual * iauGain) / intervalSeconds;
+          iauResidualSum += Math.abs(residual);
+          iauCount += 1;
+        }
         sumAbsDelta += Math.abs(state.Ts[cell] - before);
         updatedCount += 1;
       }
     }
 
+    armAnalysisIncrement5(state, iauCount > 0 ? intervalSeconds : 0);
     analysisCore._updateHydrostatic?.();
     return {
       updatedCount,
       meanAbsDelta: updatedCount > 0 ? sumAbsDelta / updatedCount : 0,
+      iauMeanAbsResidual: iauCount > 0 ? iauResidualSum / iauCount : 0,
       source: 'analysis-targets'
     };
   }
@@ -3584,6 +3636,7 @@ class Earth {
           source: stats.source,
           updatedCount: stats.updatedCount,
           meanAbsDelta: stats.meanAbsDelta,
+          iauMeanAbsResidual: stats.iauMeanAbsResidual,
           intervalSeconds: this.analysisReanchorEverySeconds
         },
         { simTimeSeconds, core: analysisCore }
