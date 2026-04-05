@@ -1,0 +1,44 @@
+{
+  "schema": "satellite-wars.weather-validation.case.v1",
+  "caseId": "tropical-system",
+  "title": "Tropical system case",
+  "initTime": "2026-01-15T00:00:00Z",
+  "leadHours": [
+    0,
+    12,
+    24
+  ],
+  "validationPressureLevelsPa": [
+    50000
+  ],
+  "simulatorGrid": {
+    "latitudesDeg": [
+      60,
+      30,
+      0,
+      -30,
+      -60
+    ],
+    "longitudesDeg": [
+      -150,
+      -90,
+      -30,
+      30,
+      90,
+      150
+    ]
+  },
+  "outputDir": "weather-validation/output/tropical-system",
+  "model": {
+    "fieldsPath": "../../../fixtures/earth-suite/tropical-system/model-fields.json",
+    "stormTrackPath": "../../../fixtures/earth-suite/tropical-system/model-track.json"
+  },
+  "analysis": {
+    "fieldsPath": "../../../fixtures/earth-suite/tropical-system/analysis-fields.json",
+    "stormTrackPath": "../../../fixtures/earth-suite/tropical-system/analysis-track.json"
+  },
+  "reference": {
+    "fieldsPath": "../../../fixtures/earth-suite/tropical-system/reference-fields.json",
+    "stormTrackPath": "../../../fixtures/earth-suite/tropical-system/reference-track.json"
+  }
+}

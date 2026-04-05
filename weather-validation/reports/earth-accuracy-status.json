@@ -1,0 +1,417 @@
+{
+  "suiteId": "earth-accuracy-suite-v1",
+  "generatedAt": "2026-04-05T00:13:26.144Z",
+  "overallPass": true,
+  "caseResults": [
+    {
+      "caseId": "quiescent-synoptic",
+      "label": "Quiescent synoptic case",
+      "category": "quiescent",
+      "aggregate": {
+        "slpRmsePaMean": 37.62553688745858,
+        "slpRmseHpaMean": 0.37625536887458577,
+        "z500RmseMMean": 14.572905220936525,
+        "wind10RmseMsMean": 0.6084710383986615,
+        "totalColumnWaterRmseKgM2Mean": 0.5462494396321774,
+        "precipBiasMmHrMean": 0.10928194222222219,
+        "cloudTotalBiasMean": 0.005465802431566136,
+        "precipCsi1Mean": 0.9707936507936509,
+        "cycloneTrackMeanErrorKm": null
+      },
+      "analysisAggregate": {
+        "slpRmsePaMean": 33.85958007070413,
+        "slpRmseHpaMean": 0.3385958007070413,
+        "z500RmseMMean": 14.286526391764005,
+        "wind10RmseMsMean": 0.5026717099233332,
+        "totalColumnWaterRmseKgM2Mean": 0.47234874904221086,
+        "precipBiasMmHrMean": 0.10898970888888888,
+        "cloudTotalBiasMean": 0.005451909151737569,
+        "precipCsi1Mean": 0.9841269841269842,
+        "cycloneTrackMeanErrorKm": null
+      },
+      "baselines": {
+        "climatology": {
+          "slpRmsePaMean": 48.861312445461714,
+          "slpRmseHpaMean": 0.4886131244546171,
+          "z500RmseMMean": 15.578567250483195,
+          "wind10RmseMsMean": 0.8862397574193768,
+          "totalColumnWaterRmseKgM2Mean": 0.7679939967689894,
+          "precipBiasMmHrMean": 0.11043419777777774,
+          "cloudTotalBiasMean": 0.005458271758222011,
+          "precipCsi1Mean": 0.9327689594356262,
+          "cycloneTrackMeanErrorKm": null
+        },
+        "persistence": {
+          "slpRmsePaMean": 55.661852085983156,
+          "slpRmseHpaMean": 0.5566185208598315,
+          "z500RmseMMean": 42.35228595344277,
+          "wind10RmseMsMean": 1.0391800660693065,
+          "totalColumnWaterRmseKgM2Mean": 1.0465042202924235,
+          "precipBiasMmHrMean": -0.12895159111111112,
+          "cloudTotalBiasMean": 0.005462884173566115,
+          "precipCsi1Mean": 0.8516483516483516,
+          "cycloneTrackMeanErrorKm": null
+        },
+        "remapFloor": {
+          "slpRmsePaMean": 33.43205920874075,
+          "slpRmseHpaMean": 0.33432059208740755,
+          "z500RmseMMean": 14.257062255030299,
+          "wind10RmseMsMean": 0.4892110938713512,
+          "totalColumnWaterRmseKgM2Mean": 0.4655829067575203,
+          "precipBiasMmHrMean": 0.10890794222222222,
+          "cloudTotalBiasMean": 0.0054455234786524335,
+          "precipCsi1Mean": 0.9702380952380952,
+          "cycloneTrackMeanErrorKm": null
+        }
+      },
+      "gates": {
+        "slp": true,
+        "z500": true,
+        "wind10": true,
+        "tcw": true,
+        "precipBias": true,
+        "cloudBias": true,
+        "cycloneTrack": true
+      },
+      "beatBaselines": {
+        "climatology": true,
+        "persistence": true
+      },
+      "overallPass": true
+    },
+    {
+      "caseId": "midlatitude-cyclone",
+      "label": "Strong midlatitude cyclone",
+      "category": "cyclone",
+      "aggregate": {
+        "slpRmsePaMean": 90.74763503884355,
+        "slpRmseHpaMean": 0.9074763503884355,
+        "z500RmseMMean": 18.3694323368544,
+        "wind10RmseMsMean": 1.468126942929317,
+        "totalColumnWaterRmseKgM2Mean": 1.1922826185015074,
+        "precipBiasMmHrMean": 0.11150425999999998,
+        "cloudTotalBiasMean": 0.004435628581180833,
+        "precipCsi1Mean": 0.8936372269705603,
+        "cycloneTrackMeanErrorKm": 78.32430469951122
+      },
+      "analysisAggregate": {
+        "slpRmsePaMean": 71.19789077478242,
+        "slpRmseHpaMean": 0.7119789077478242,
+        "z500RmseMMean": 15.276371677067154,
+        "wind10RmseMsMean": 0.8396099131398701,
+        "totalColumnWaterRmseKgM2Mean": 0.6188795525252588,
+        "precipBiasMmHrMean": 0.10809889333333335,
+        "cloudTotalBiasMean": 0.004645756449304887,
+        "precipCsi1Mean": 0.9461402794736128,
+        "cycloneTrackMeanErrorKm": 29.10493699236335
+      },
+      "baselines": {
+        "climatology": {
+          "slpRmsePaMean": 97.0414520020574,
+          "slpRmseHpaMean": 0.9704145200205742,
+          "z500RmseMMean": 19.38383799975877,
+          "wind10RmseMsMean": 1.6371009230181788,
+          "totalColumnWaterRmseKgM2Mean": 1.3431310441408781,
+          "precipBiasMmHrMean": 0.11287833777777777,
+          "cloudTotalBiasMean": 0.004362201931683245,
+          "precipCsi1Mean": 0.8812915479582147,
+          "cycloneTrackMeanErrorKm": null
+        },
+        "persistence": {
+          "slpRmsePaMean": 97.1793051739295,
+          "slpRmseHpaMean": 0.9717930517392951,
+          "z500RmseMMean": 44.08307594841106,
+          "wind10RmseMsMean": 1.6346102712341652,
+          "totalColumnWaterRmseKgM2Mean": 1.453108668408323,
+          "precipBiasMmHrMean": -0.12307614,
+          "cloudTotalBiasMean": 0.004421697161751244,
+          "precipCsi1Mean": 0.8309591642924975,
+          "cycloneTrackMeanErrorKm": null
+        },
+        "remapFloor": {
+          "slpRmsePaMean": 67.89305573788023,
+          "slpRmseHpaMean": 0.6789305573788024,
+          "z500RmseMMean": 14.718142042549582,
+          "wind10RmseMsMean": 0.6669365276822298,
+          "totalColumnWaterRmseKgM2Mean": 0.4655829067575203,
+          "precipBiasMmHrMean": 0.10754966000000003,
+          "cloudTotalBiasMean": 0.00469085913309392,
+          "precipCsi1Mean": 1,
+          "cycloneTrackMeanErrorKm": null
+        }
+      },
+      "gates": {
+        "slp": true,
+        "z500": true,
+        "wind10": true,
+        "tcw": true,
+        "precipBias": true,
+        "cloudBias": true,
+        "cycloneTrack": true
+      },
+      "beatBaselines": {
+        "climatology": true,
+        "persistence": true
+      },
+      "overallPass": true
+    },
+    {
+      "caseId": "tropical-system",
+      "label": "Tropical system case",
+      "category": "tropical",
+      "aggregate": {
+        "slpRmsePaMean": 91.58185657170775,
+        "slpRmseHpaMean": 0.9158185657170773,
+        "z500RmseMMean": 17.356807983541643,
+        "wind10RmseMsMean": 1.1803640155291801,
+        "totalColumnWaterRmseKgM2Mean": 1.0448376024043735,
+        "precipBiasMmHrMean": 0.1128472166666666,
+        "cloudTotalBiasMean": 0.004703311443372457,
+        "precipCsi1Mean": 1,
+        "cycloneTrackMeanErrorKm": 83.87638243297506
+      },
+      "analysisAggregate": {
+        "slpRmsePaMean": 69.09270021028124,
+        "slpRmseHpaMean": 0.6909270021028123,
+        "z500RmseMMean": 14.959323416468886,
+        "wind10RmseMsMean": 0.6600721556327112,
+        "totalColumnWaterRmseKgM2Mean": 0.5686018024695926,
+        "precipBiasMmHrMean": 0.11197078333333325,
+        "cloudTotalBiasMean": 0.004839000371956888,
+        "precipCsi1Mean": 1,
+        "cycloneTrackMeanErrorKm": 31.46322338012899
+      },
+      "baselines": {
+        "climatology": {
+          "slpRmsePaMean": 102.41126040509069,
+          "slpRmseHpaMean": 1.0241126040509068,
+          "z500RmseMMean": 18.787373076880446,
+          "wind10RmseMsMean": 1.4322758693220576,
+          "totalColumnWaterRmseKgM2Mean": 1.2673566519572843,
+          "precipBiasMmHrMean": 0.11319788333333325,
+          "cloudTotalBiasMean": 0.004612683325391971,
+          "precipCsi1Mean": 1,
+          "cycloneTrackMeanErrorKm": null
+        },
+        "persistence": {
+          "slpRmsePaMean": 101.20009030254607,
+          "slpRmseHpaMean": 1.0120009030254609,
+          "z500RmseMMean": 43.78891393970111,
+          "wind10RmseMsMean": 1.4477628034895649,
+          "totalColumnWaterRmseKgM2Mean": 1.396197692648083,
+          "precipBiasMmHrMean": -0.12697758333333345,
+          "cloudTotalBiasMean": 0.00466048819500365,
+          "precipCsi1Mean": 1,
+          "cycloneTrackMeanErrorKm": null
+        },
+        "remapFloor": {
+          "slpRmsePaMean": 62.0762559519894,
+          "slpRmseHpaMean": 0.6207625595198941,
+          "z500RmseMMean": 14.588068293764552,
+          "wind10RmseMsMean": 0.5703030376141842,
+          "totalColumnWaterRmseKgM2Mean": 0.4655829067575206,
+          "precipBiasMmHrMean": 0.11153848333333329,
+          "cloudTotalBiasMean": 0.004858494781841828,
+          "precipCsi1Mean": 1,
+          "cycloneTrackMeanErrorKm": null
+        }
+      },
+      "gates": {
+        "slp": true,
+        "z500": true,
+        "wind10": true,
+        "tcw": true,
+        "precipBias": true,
+        "cloudBias": true,
+        "cycloneTrack": true
+      },
+      "beatBaselines": {
+        "climatology": true,
+        "persistence": true
+      },
+      "overallPass": true
+    },
+    {
+      "caseId": "mountain-precip",
+      "label": "Mountain precipitation case",
+      "category": "mountain",
+      "aggregate": {
+        "slpRmsePaMean": 67.51609780816187,
+        "slpRmseHpaMean": 0.6751609780816188,
+        "z500RmseMMean": 16.449464017038668,
+        "wind10RmseMsMean": 1.092473133836999,
+        "totalColumnWaterRmseKgM2Mean": 0.902465879754384,
+        "precipBiasMmHrMean": -0.014534725555555591,
+        "cloudTotalBiasMean": 0.0020647124917792478,
+        "precipCsi1Mean": 0.9065440732107399,
+        "cycloneTrackMeanErrorKm": null
+      },
+      "analysisAggregate": {
+        "slpRmsePaMean": 54.217447835916936,
+        "slpRmseHpaMean": 0.5421744783591693,
+        "z500RmseMMean": 14.768486697385121,
+        "wind10RmseMsMean": 0.6793003903568442,
+        "totalColumnWaterRmseKgM2Mean": 0.5462494396321774,
+        "precipBiasMmHrMean": -0.016472658888888925,
+        "cloudTotalBiasMean": 0.00204511218138643,
+        "precipCsi1Mean": 0.9584479717813051,
+        "cycloneTrackMeanErrorKm": null
+      },
+      "baselines": {
+        "climatology": {
+          "slpRmsePaMean": 80.43636849579018,
+          "slpRmseHpaMean": 0.8043636849579018,
+          "z500RmseMMean": 18.21743349517317,
+          "wind10RmseMsMean": 1.425096669956966,
+          "totalColumnWaterRmseKgM2Mean": 1.1922826185015074,
+          "precipBiasMmHrMean": -0.012892047777777825,
+          "cloudTotalBiasMean": 0.0020319190955864572,
+          "precipCsi1Mean": 0.8805483298236921,
+          "cycloneTrackMeanErrorKm": null
+        },
+        "persistence": {
+          "slpRmsePaMean": 81.9848677626669,
+          "slpRmseHpaMean": 0.8198486776266688,
+          "z500RmseMMean": 43.512085907992116,
+          "wind10RmseMsMean": 1.4558078075049738,
+          "totalColumnWaterRmseKgM2Mean": 1.3406163212575073,
+          "precipBiasMmHrMean": -0.24960482555555563,
+          "cloudTotalBiasMean": 0.0020475259651016892,
+          "precipCsi1Mean": 0.8519063545150501,
+          "cycloneTrackMeanErrorKm": null
+        },
+        "remapFloor": {
+          "slpRmsePaMean": 51.85280756371285,
+          "slpRmseHpaMean": 0.5185280756371285,
+          "z500RmseMMean": 14.47347735415003,
+          "wind10RmseMsMean": 0.5728526056280948,
+          "totalColumnWaterRmseKgM2Mean": 0.4655829067575203,
+          "precipBiasMmHrMean": -0.016846658888888897,
+          "cloudTotalBiasMean": 0.0020006397955456595,
+          "precipCsi1Mean": 0.9876543209876543,
+          "cycloneTrackMeanErrorKm": null
+        }
+      },
+      "gates": {
+        "slp": true,
+        "z500": true,
+        "wind10": true,
+        "tcw": true,
+        "precipBias": true,
+        "cloudBias": true,
+        "cycloneTrack": true
+      },
+      "beatBaselines": {
+        "climatology": true,
+        "persistence": true
+      },
+      "overallPass": true
+    },
+    {
+      "caseId": "polar-ice",
+      "label": "Polar / sea-ice case",
+      "category": "polar",
+      "aggregate": {
+        "slpRmsePaMean": 50.62869233446461,
+        "slpRmseHpaMean": 0.5062869233446462,
+        "z500RmseMMean": 15.326211575632621,
+        "wind10RmseMsMean": 0.8277697157398075,
+        "totalColumnWaterRmseKgM2Mean": 0.7051446401760914,
+        "precipBiasMmHrMean": 0.10973956888888887,
+        "cloudTotalBiasMean": 0.005276300456396171,
+        "precipCsi1Mean": 0.9327689594356262,
+        "cycloneTrackMeanErrorKm": null
+      },
+      "analysisAggregate": {
+        "slpRmsePaMean": 41.60130235915566,
+        "slpRmseHpaMean": 0.4160130235915566,
+        "z500RmseMMean": 14.437735993831078,
+        "wind10RmseMsMean": 0.5612868016245015,
+        "totalColumnWaterRmseKgM2Mean": 0.4933141832731565,
+        "precipBiasMmHrMean": 0.1088047133333333,
+        "cloudTotalBiasMean": 0.005286075639544537,
+        "precipCsi1Mean": 0.9841269841269842,
+        "cycloneTrackMeanErrorKm": null
+      },
+      "baselines": {
+        "climatology": {
+          "slpRmsePaMean": 59.88748782151229,
+          "slpRmseHpaMean": 0.598874878215123,
+          "z500RmseMMean": 16.34990325314441,
+          "wind10RmseMsMean": 1.0623074201589535,
+          "totalColumnWaterRmseKgM2Mean": 0.902465879754384,
+          "precipBiasMmHrMean": 0.11091799111111111,
+          "cloudTotalBiasMean": 0.005243862526516377,
+          "precipCsi1Mean": 0.9183389450056118,
+          "cycloneTrackMeanErrorKm": null
+        },
+        "persistence": {
+          "slpRmsePaMean": 64.63853757227504,
+          "slpRmseHpaMean": 0.6463853757227503,
+          "z500RmseMMean": 42.683601423869646,
+          "wind10RmseMsMean": 1.1705022148055986,
+          "totalColumnWaterRmseKgM2Mean": 1.1352857065959274,
+          "precipBiasMmHrMean": -0.1275529866666667,
+          "cloudTotalBiasMean": 0.005257016728571121,
+          "precipCsi1Mean": 0.8639277389277389,
+          "cycloneTrackMeanErrorKm": null
+        },
+        "remapFloor": {
+          "slpRmsePaMean": 40.44069244941061,
+          "slpRmseHpaMean": 0.40440692449410615,
+          "z500RmseMMean": 14.33141947344263,
+          "wind10RmseMsMean": 0.5169759026541288,
+          "totalColumnWaterRmseKgM2Mean": 0.4655829067575202,
+          "precipBiasMmHrMean": 0.10860604666666666,
+          "cloudTotalBiasMean": 0.005277749475401432,
+          "precipCsi1Mean": 0.9841269841269842,
+          "cycloneTrackMeanErrorKm": null
+        }
+      },
+      "gates": {
+        "slp": true,
+        "z500": true,
+        "wind10": true,
+        "tcw": true,
+        "precipBias": true,
+        "cloudBias": true,
+        "cycloneTrack": true
+      },
+      "beatBaselines": {
+        "climatology": true,
+        "persistence": true
+      },
+      "overallPass": true
+    }
+  ],
+  "thresholds": {
+    "slpRmseHpa": {
+      "absolute": 2.5,
+      "floorMultiplier": 8
+    },
+    "z500RmseM": {
+      "absolute": 65,
+      "floorMultiplier": 10
+    },
+    "wind10RmseMs": {
+      "absolute": 3.5,
+      "floorMultiplier": 8
+    },
+    "totalColumnWaterRmseKgM2": {
+      "absolute": 3,
+      "floorMultiplier": 8
+    },
+    "precipBiasMmHrAbs": {
+      "absolute": 1,
+      "floorMultiplier": 10
+    },
+    "cloudTotalBiasAbs": {
+      "absolute": 0.12,
+      "floorMultiplier": 10
+    },
+    "cycloneTrackMeanErrorKm": {
+      "absolute": 220,
+      "floorMultiplier": 10
+    }
+  }
+}

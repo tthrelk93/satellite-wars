@@ -1,0 +1,41 @@
+{
+  "schema": "satellite-wars.weather-validation.case.v1",
+  "caseId": "polar-ice",
+  "title": "Polar / sea-ice case",
+  "initTime": "2026-01-15T00:00:00Z",
+  "leadHours": [
+    0,
+    12,
+    24
+  ],
+  "validationPressureLevelsPa": [
+    50000
+  ],
+  "simulatorGrid": {
+    "latitudesDeg": [
+      60,
+      30,
+      0,
+      -30,
+      -60
+    ],
+    "longitudesDeg": [
+      -150,
+      -90,
+      -30,
+      30,
+      90,
+      150
+    ]
+  },
+  "outputDir": "weather-validation/output/polar-ice",
+  "model": {
+    "fieldsPath": "../../../fixtures/earth-suite/polar-ice/model-fields.json"
+  },
+  "analysis": {
+    "fieldsPath": "../../../fixtures/earth-suite/polar-ice/analysis-fields.json"
+  },
+  "reference": {
+    "fieldsPath": "../../../fixtures/earth-suite/polar-ice/reference-fields.json"
+  }
+}

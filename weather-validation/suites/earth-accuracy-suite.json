@@ -1,0 +1,121 @@
+{
+  "suiteId": "earth-accuracy-suite-v1",
+  "reportBasePath": "weather-validation/reports/earth-accuracy-status",
+  "thresholds": {
+    "slpRmseHpa": {
+      "absolute": 2.5,
+      "floorMultiplier": 8
+    },
+    "z500RmseM": {
+      "absolute": 65,
+      "floorMultiplier": 10
+    },
+    "wind10RmseMs": {
+      "absolute": 3.5,
+      "floorMultiplier": 8
+    },
+    "totalColumnWaterRmseKgM2": {
+      "absolute": 3.0,
+      "floorMultiplier": 8
+    },
+    "precipBiasMmHrAbs": {
+      "absolute": 1.0,
+      "floorMultiplier": 10
+    },
+    "cloudTotalBiasAbs": {
+      "absolute": 0.12,
+      "floorMultiplier": 10
+    },
+    "cycloneTrackMeanErrorKm": {
+      "absolute": 220,
+      "floorMultiplier": 10
+    }
+  },
+  "cases": [
+    {
+      "caseId": "quiescent-synoptic",
+      "label": "Quiescent synoptic case",
+      "category": "quiescent",
+      "manifestPath": "../cases/earth-suite/quiescent-synoptic/manifest.json",
+      "baselines": {
+        "climatology": {
+          "fieldsPath": "../fixtures/earth-suite/quiescent-synoptic/climatology-fields.json"
+        },
+        "persistence": {
+          "fieldsPath": "../fixtures/earth-suite/quiescent-synoptic/persistence-fields.json"
+        },
+        "remapFloor": {
+          "fieldsPath": "../fixtures/earth-suite/quiescent-synoptic/remap-floor-fields.json"
+        }
+      }
+    },
+    {
+      "caseId": "midlatitude-cyclone",
+      "label": "Strong midlatitude cyclone",
+      "category": "cyclone",
+      "manifestPath": "../cases/earth-suite/midlatitude-cyclone/manifest.json",
+      "baselines": {
+        "climatology": {
+          "fieldsPath": "../fixtures/earth-suite/midlatitude-cyclone/climatology-fields.json"
+        },
+        "persistence": {
+          "fieldsPath": "../fixtures/earth-suite/midlatitude-cyclone/persistence-fields.json"
+        },
+        "remapFloor": {
+          "fieldsPath": "../fixtures/earth-suite/midlatitude-cyclone/remap-floor-fields.json"
+        }
+      }
+    },
+    {
+      "caseId": "tropical-system",
+      "label": "Tropical system case",
+      "category": "tropical",
+      "manifestPath": "../cases/earth-suite/tropical-system/manifest.json",
+      "baselines": {
+        "climatology": {
+          "fieldsPath": "../fixtures/earth-suite/tropical-system/climatology-fields.json"
+        },
+        "persistence": {
+          "fieldsPath": "../fixtures/earth-suite/tropical-system/persistence-fields.json"
+        },
+        "remapFloor": {
+          "fieldsPath": "../fixtures/earth-suite/tropical-system/remap-floor-fields.json"
+        }
+      }
+    },
+    {
+      "caseId": "mountain-precip",
+      "label": "Mountain precipitation case",
+      "category": "mountain",
+      "manifestPath": "../cases/earth-suite/mountain-precip/manifest.json",
+      "baselines": {
+        "climatology": {
+          "fieldsPath": "../fixtures/earth-suite/mountain-precip/climatology-fields.json"
+        },
+        "persistence": {
+          "fieldsPath": "../fixtures/earth-suite/mountain-precip/persistence-fields.json"
+        },
+        "remapFloor": {
+          "fieldsPath": "../fixtures/earth-suite/mountain-precip/remap-floor-fields.json"
+        }
+      }
+    },
+    {
+      "caseId": "polar-ice",
+      "label": "Polar / sea-ice case",
+      "category": "polar",
+      "manifestPath": "../cases/earth-suite/polar-ice/manifest.json",
+      "baselines": {
+        "climatology": {
+          "fieldsPath": "../fixtures/earth-suite/polar-ice/climatology-fields.json"
+        },
+        "persistence": {
+          "fieldsPath": "../fixtures/earth-suite/polar-ice/persistence-fields.json"
+        },
+        "remapFloor": {
+          "fieldsPath": "../fixtures/earth-suite/polar-ice/remap-floor-fields.json"
+        }
+      }
+    }
+  ]
+}

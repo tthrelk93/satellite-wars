@@ -1,0 +1,44 @@
+{
+  "schema": "satellite-wars.weather-validation.case.v1",
+  "caseId": "midlatitude-cyclone",
+  "title": "Strong midlatitude cyclone",
+  "initTime": "2026-01-15T00:00:00Z",
+  "leadHours": [
+    0,
+    12,
+    24
+  ],
+  "validationPressureLevelsPa": [
+    50000
+  ],
+  "simulatorGrid": {
+    "latitudesDeg": [
+      60,
+      30,
+      0,
+      -30,
+      -60
+    ],
+    "longitudesDeg": [
+      -150,
+      -90,
+      -30,
+      30,
+      90,
+      150
+    ]
+  },
+  "outputDir": "weather-validation/output/midlatitude-cyclone",
+  "model": {
+    "fieldsPath": "../../../fixtures/earth-suite/midlatitude-cyclone/model-fields.json",
+    "stormTrackPath": "../../../fixtures/earth-suite/midlatitude-cyclone/model-track.json"
+  },
+  "analysis": {
+    "fieldsPath": "../../../fixtures/earth-suite/midlatitude-cyclone/analysis-fields.json",
+    "stormTrackPath": "../../../fixtures/earth-suite/midlatitude-cyclone/analysis-track.json"
+  },
+  "reference": {
+    "fieldsPath": "../../../fixtures/earth-suite/midlatitude-cyclone/reference-fields.json",
+    "stormTrackPath": "../../../fixtures/earth-suite/midlatitude-cyclone/reference-track.json"
+  }
+}
