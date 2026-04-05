@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { bilinear } from './weather/shared/bilinear';
 
-const DEFAULT_WIDTH = 2048;
-const DEFAULT_HEIGHT = 1024;
-const PARTICLE_MULTIPLIER = 12;
+const DEFAULT_WIDTH = 1024;
+const DEFAULT_HEIGHT = 512;
+const PARTICLE_MULTIPLIER = 6;
 const MAX_PARTICLE_AGE = 320;
 const MIN_PARTICLE_AGE = Math.round(MAX_PARTICLE_AGE * 0.5);
 const INTENSITY_SCALE_STEP = 10;

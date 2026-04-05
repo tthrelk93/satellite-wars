@@ -322,6 +322,10 @@ const CLOUD_OBS_LON_OFFSET_RAD = 0;
 const CLOUD_OBS_FLIP_X = false;
 const WIND_STREAMLINE_LON_OFFSET_RAD = CLOUD_OBS_LON_OFFSET_RAD;
 const WIND_STREAMLINE_RADIUS_OFFSET_KM = 210;
+const EARTH_GEOMETRY_SEGMENTS = 96;
+const CLOUD_GEOMETRY_SEGMENTS = 128;
+const OVERLAY_GEOMETRY_SEGMENTS = 96;
+const AUX_GEOMETRY_SEGMENTS = 64;
 
 class Earth {
   constructor(camera, players, { weatherSeed } = {}) {
@@ -339,7 +343,7 @@ class Earth {
     this._textureAnisotropy = 1;
     this._baseMapTexture = baseMapTexture;
     this._bumpTexture = bumpTexture;
-    this.geometry = new THREE.SphereGeometry(this.earthRadiusKm, 128, 128);
+    this.geometry = new THREE.SphereGeometry(this.earthRadiusKm, EARTH_GEOMETRY_SEGMENTS, EARTH_GEOMETRY_SEGMENTS);
     this.material = new THREE.MeshPhongMaterial({
       map: baseMapTexture,
       bumpMap: bumpTexture,
@@ -351,7 +355,7 @@ class Earth {
     this.mesh.scale.set(1, 1, 1); // Ensure it is a perfect sphere
 
     // Create cloud layer using fog.png
-    this.cloudGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 200, 512, 512); // Slightly larger than Earth
+    this.cloudGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 200, CLOUD_GEOMETRY_SEGMENTS, CLOUD_GEOMETRY_SEGMENTS); // Slightly larger than Earth
     const fogBaseTexture = new THREE.TextureLoader().load(fogTexture);
     fogBaseTexture.colorSpace = THREE.SRGBColorSpace;
     fogBaseTexture.minFilter = THREE.LinearMipmapLinearFilter;
@@ -387,7 +391,7 @@ class Earth {
     this.stationObsVisible = true;
     this.cloudObsMesh = null;
     this.cloudObsMaterial = null;
-    this.cloudObsVisible = true;
+    this.cloudObsVisible = false;
     this.cloudObsProduct = 'tauTotal';
     this._cloudObsTextureCache = null;
     this._cloudIntelTextureCache = null;
@@ -465,8 +469,8 @@ class Earth {
     this.weatherVolumeGpu = null;
     this.weatherVolumeDebugView = null;
     this.radarOverlay = null;
-    this.weatherLowGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 120, 256, 256);
-    this.weatherHighGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 160, 256, 256);
+    this.weatherLowGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 120, OVERLAY_GEOMETRY_SEGMENTS, OVERLAY_GEOMETRY_SEGMENTS);
+    this.weatherHighGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 160, OVERLAY_GEOMETRY_SEGMENTS, OVERLAY_GEOMETRY_SEGMENTS);
     this.weatherLowMaterial = new THREE.MeshPhongMaterial({
       map: null,
       transparent: true,
@@ -482,7 +486,7 @@ class Earth {
     this.weatherLowMesh = new THREE.Mesh(this.weatherLowGeometry, this.weatherLowMaterial);
     this.weatherHighMesh = new THREE.Mesh(this.weatherHighGeometry, this.weatherHighMaterial);
 
-    this.weatherDebugGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 220, 256, 256);
+    this.weatherDebugGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 220, AUX_GEOMETRY_SEGMENTS, AUX_GEOMETRY_SEGMENTS);
     this.weatherDebugMaterial = new THREE.MeshBasicMaterial({
       map: null,
       transparent: true,
@@ -502,7 +506,7 @@ class Earth {
     this.parentObject.add(this.cloudMesh);
     this.parentObject.add(this.weatherDebugMesh);
 
-    this.cloudObsGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 180, 256, 256);
+    this.cloudObsGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 180, AUX_GEOMETRY_SEGMENTS, AUX_GEOMETRY_SEGMENTS);
     this.cloudObsMaterial = new THREE.MeshBasicMaterial({
       map: null,
       transparent: true,
@@ -528,7 +532,7 @@ class Earth {
     this._lastWindTargetsStatus = null;
     this._lastWindReferenceDiagPayload = null;
     this._lastWindReferenceComparison = null;
-    this.windStreamlineGeometry = new THREE.SphereGeometry(this.earthRadiusKm + WIND_STREAMLINE_RADIUS_OFFSET_KM, 256, 256);
+    this.windStreamlineGeometry = new THREE.SphereGeometry(this.earthRadiusKm + WIND_STREAMLINE_RADIUS_OFFSET_KM, AUX_GEOMETRY_SEGMENTS, AUX_GEOMETRY_SEGMENTS);
     this.windStreamlineMaterial = new THREE.MeshBasicMaterial({
       map: this.windStreamlineRenderer.texture,
       transparent: true,
@@ -543,7 +547,7 @@ class Earth {
     this._lastWindVizDiagSimTimeSeconds = null;
     this._lastWindReferenceDiagSimTimeSeconds = null;
 
-    this.forecastOverlayGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 240, 256, 256);
+    this.forecastOverlayGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 240, AUX_GEOMETRY_SEGMENTS, AUX_GEOMETRY_SEGMENTS);
     this.forecastOverlayMaterial = new THREE.MeshBasicMaterial({
       map: null,
       transparent: true,
@@ -2134,8 +2138,8 @@ class Earth {
 
   _ensureCloudWatchDebugMaskMeshes() {
     if (this._cloudWatchDebugLiveMesh && this._cloudWatchDebugSeenMesh) return;
-    const liveGeo = new THREE.SphereGeometry(this.earthRadiusKm + 188, 128, 128);
-    const seenGeo = new THREE.SphereGeometry(this.earthRadiusKm + 192, 128, 128);
+    const liveGeo = new THREE.SphereGeometry(this.earthRadiusKm + 188, AUX_GEOMETRY_SEGMENTS, AUX_GEOMETRY_SEGMENTS);
+    const seenGeo = new THREE.SphereGeometry(this.earthRadiusKm + 192, AUX_GEOMETRY_SEGMENTS, AUX_GEOMETRY_SEGMENTS);
     const liveMat = new THREE.MeshBasicMaterial({
       map: null,
       transparent: true,
