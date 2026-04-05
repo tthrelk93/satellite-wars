@@ -226,14 +226,25 @@ class WeatherField {
     }
 
     stepModelSeconds(modelSeconds) {
-        if (!this.core.ready) return;
-        const stepsRan = this.core.advanceModelSeconds(modelSeconds) || 0;
+        this.catchUpModelSeconds(modelSeconds);
+    }
+
+    catchUpModelSeconds(modelSeconds, simTimeSeconds = null) {
+        if (!this.core.ready) return 0;
+        let stepsRan = 0;
+        if (Number.isFinite(modelSeconds) && modelSeconds > 0) {
+            stepsRan = this.core.advanceModelSeconds(modelSeconds) || 0;
+        }
         this._lastStepsRan = stepsRan;
+        if (Number.isFinite(simTimeSeconds)) {
+            this._lastSimTimeSeconds = simTimeSeconds;
+        }
         this._paintAccumSeconds = 0;
         if (this.renderEnabled) {
             this._paintClouds(this.core.timeUTC);
             this._paintDebug();
         }
+        return stepsRan;
     }
 
     setDebugMode(mode) {

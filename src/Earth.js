@@ -662,6 +662,8 @@ class Earth {
     this.analysisWeatherField?.setDebugMode(this.weatherDebugMode);
     this.forecastWeatherField?.setDebugMode(this.weatherDebugMode);
     this._applyForecastOverlayTexture(null);
+    this._analysisDeferredSimSeconds = 0;
+    this._analysisDeferredLastSimTimeSeconds = null;
     this._initWeatherWorker();
   }
 
@@ -1569,6 +1571,38 @@ class Earth {
 
   setWindStreamlineSource(source) {
     this.windStreamlineSource = source === 'reference' ? 'reference' : 'analysis';
+  }
+
+  _analysisCoreHotPathRequested() {
+    return this.weatherViewSource === 'analysis' || this.forecastOverlayVisible;
+  }
+
+  _trackAnalysisDeferredSimSeconds(simTimeSeconds) {
+    if (!Number.isFinite(simTimeSeconds)) return;
+    if (this._analysisDeferredLastSimTimeSeconds == null || simTimeSeconds < this._analysisDeferredLastSimTimeSeconds) {
+      this._analysisDeferredLastSimTimeSeconds = simTimeSeconds;
+      this._analysisDeferredSimSeconds = 0;
+      return;
+    }
+    const deltaSim = simTimeSeconds - this._analysisDeferredLastSimTimeSeconds;
+    if (deltaSim > 0) {
+      this._analysisDeferredSimSeconds += deltaSim;
+      this._analysisDeferredLastSimTimeSeconds = simTimeSeconds;
+    }
+  }
+
+  _flushDeferredAnalysisCore(simTimeSeconds) {
+    const analysisField = this.analysisWeatherField;
+    if (!analysisField?.core?.ready) return 0;
+    const deferred = this._analysisDeferredSimSeconds;
+    if (!(deferred > 0)) {
+      if (Number.isFinite(simTimeSeconds)) {
+        analysisField._lastSimTimeSeconds = simTimeSeconds;
+      }
+      return 0;
+    }
+    this._analysisDeferredSimSeconds = 0;
+    return analysisField.catchUpModelSeconds(deferred, simTimeSeconds);
   }
 
   setWindReferenceWindCore(coreLike) {
@@ -3259,8 +3293,14 @@ class Earth {
     const perfStartMs = performance.now();
     this._sensorGating = simContext?.sensorGating ?? null;
     this._lastSimTimeSeconds = simTimeSeconds;
+    this._trackAnalysisDeferredSimSeconds(simTimeSeconds);
     const simSpeed = Number.isFinite(simContext?.simSpeed) ? simContext.simSpeed : 0;
     const lodActive = simSpeed > 8;
+    const analysisHotPath = this._analysisCoreHotPathRequested();
+    this.analysisWeatherField?.setUseExternalCore?.(!analysisHotPath);
+    if (analysisHotPath) {
+      this._flushDeferredAnalysisCore(simTimeSeconds);
+    }
 
     if (this.useWeatherWorker && this._weatherWorkerReady) {
       if (Number.isFinite(simTimeSeconds)) {
@@ -3337,7 +3377,7 @@ class Earth {
       }
       const sourceCore = this.windStreamlineSource === 'reference' && this.windReferenceCore?.ready
         ? this.windReferenceCore
-        : this.analysisWeatherField?.core;
+        : this.weatherField?.core;
       this.windStreamlineRenderer?.update({
         core: sourceCore,
         simTimeSeconds,
@@ -3673,6 +3713,10 @@ class Earth {
     onProgress
   } = {}) {
     const forecastRunId = `fc-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+    this.analysisWeatherField?.setUseExternalCore?.(false);
+    this._flushDeferredAnalysisCore(simTimeSeconds);
+    this._updateAnalysisSigma2(simTimeSeconds);
+    this._maybeReanchorAnalysisFromTargets(simTimeSeconds);
     const analysisCore = this.analysisWeatherField?.core;
     const forecastCore = this.forecastWeatherField?.core;
     if (!analysisCore?.ready || !forecastCore?.ready) {
