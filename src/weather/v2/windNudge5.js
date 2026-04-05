@@ -92,12 +92,18 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       const weight = Number.isFinite(grid.cosLat?.[j])
         ? Math.max(0, grid.cosLat[j])
         : Math.max(0, Math.cos(latDeg * Math.PI / 180));
-      const jetCapFloor = (Number.isFinite(params.upperWindCapMin) ? params.upperWindCapMin : 0)
-        + (Number.isFinite(params.upperWindCapJetBoost) ? params.upperWindCapJetBoost : 0)
-          * Math.exp(-Math.pow((absLat - upperJetLatDeg) / upperJetWidthDeg, 2));
-      const capParams = Number.isFinite(jetCapFloor)
-        ? { ...params, dynamicUpperWindCapMin: jetCapFloor }
-        : params;
+      const rowUpperTargetSpeedMax = (() => {
+        const srcU = climo.hasWind250 && climo.wind250NowU ? climo.wind250NowU : targetUpperU;
+        const srcV = climo.hasWind250 && climo.wind250NowV ? climo.wind250NowV : targetUpperV;
+        let rowMax = 0;
+        for (let ii = 0; ii < nx; ii += 1) {
+          const kk = row + ii;
+          rowMax = Math.max(rowMax, Math.hypot(srcU[kk], srcV[kk]));
+        }
+        return rowMax;
+      })();
+      const jetFloorBoost = (Number.isFinite(params.upperWindCapJetBoost) ? params.upperWindCapJetBoost : 0)
+        * Math.exp(-Math.pow((absLat - upperJetLatDeg) / upperJetWidthDeg, 2));
       for (let i = 0; i < nx; i += 1) {
         const k = row + i;
         const idxS = levS * N + k;
@@ -122,6 +128,15 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
               targetUpperUk = lerp(climo.wind500NowU[k], climo.wind250NowU[k], w250);
               targetUpperVk = lerp(climo.wind500NowV[k], climo.wind250NowV[k], w250);
             }
+            const localTargetSpeed = Math.hypot(targetUpperUk, targetUpperVk);
+            const localTargetShare = rowUpperTargetSpeedMax > 0
+              ? clamp(localTargetSpeed / rowUpperTargetSpeedMax, 0, 1)
+              : 1;
+            const capParams = {
+              ...params,
+              dynamicUpperWindCapMin: (Number.isFinite(params.upperWindCapMin) ? params.upperWindCapMin : 0)
+                + jetFloorBoost * Math.sqrt(localTargetShare)
+            };
             const duU = (targetUpperUk - u[idxU]) * relaxU;
             const dvU = (targetUpperVk - v[idxU]) * relaxV;
             u[idxU] += duU;
@@ -143,6 +158,15 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
             targetUpperUk = lerp(climo.wind500NowU[k], climo.wind250NowU[k], w250);
             targetUpperVk = lerp(climo.wind500NowV[k], climo.wind250NowV[k], w250);
           }
+          const localTargetSpeed = Math.hypot(targetUpperUk, targetUpperVk);
+          const localTargetShare = rowUpperTargetSpeedMax > 0
+            ? clamp(localTargetSpeed / rowUpperTargetSpeedMax, 0, 1)
+            : 1;
+          const capParams = {
+            ...params,
+            dynamicUpperWindCapMin: (Number.isFinite(params.upperWindCapMin) ? params.upperWindCapMin : 0)
+              + jetFloorBoost * Math.sqrt(localTargetShare)
+          };
           const duU = (targetUpperUk - u[idxU]) * relaxU;
           const dvU = (targetUpperVk - v[idxU]) * relaxV;
           u[idxU] += duU;
