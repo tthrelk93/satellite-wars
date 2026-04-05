@@ -10,7 +10,7 @@ function renderPrecipTable(precip) {
   ].join('\n');
 }
 
-export function renderValidationMarkdown({ manifest, summary, leadResults, cycloneTrack }) {
+export function renderValidationMarkdown({ manifest, summary, leadResults, cycloneTrack, analysisCycloneTrack }) {
   const lines = [
     `# Weather validation summary: ${manifest.caseId}`,
     '',
@@ -29,11 +29,29 @@ export function renderValidationMarkdown({ manifest, summary, leadResults, cyclo
     ''
   ];
 
+  if (summary.analysisAggregate) {
+    lines.push('## Analysis vs reference aggregate metrics');
+    lines.push('');
+    lines.push(`- Analysis SLP RMSE mean: ${fmt(summary.analysisAggregate.slpRmseHpaMean, 3)} hPa`);
+    lines.push(`- Analysis 500 hPa height RMSE mean: ${fmt(summary.analysisAggregate.z500RmseMMean, 3)} m`);
+    lines.push(`- Analysis 10 m wind RMSE mean: ${fmt(summary.analysisAggregate.wind10RmseMsMean, 3)} m/s`);
+    lines.push(`- Analysis total column water RMSE mean: ${fmt(summary.analysisAggregate.totalColumnWaterRmseKgM2Mean, 3)} kg/m²`);
+    lines.push('');
+  }
+
   if (cycloneTrack) {
     lines.push('## Cyclone track error');
     lines.push('');
     lines.push(`- Mean error: ${fmt(cycloneTrack.meanErrorKm, 2)} km`);
     lines.push(`- Max error: ${fmt(cycloneTrack.maxErrorKm, 2)} km`);
+    lines.push('');
+  }
+
+  if (analysisCycloneTrack) {
+    lines.push('## Analysis cyclone track error');
+    lines.push('');
+    lines.push(`- Mean error: ${fmt(analysisCycloneTrack.meanErrorKm, 2)} km`);
+    lines.push(`- Max error: ${fmt(analysisCycloneTrack.maxErrorKm, 2)} km`);
     lines.push('');
   }
 
@@ -47,6 +65,11 @@ export function renderValidationMarkdown({ manifest, summary, leadResults, cyclo
     lines.push(`- Total column water RMSE: ${fmt(metrics.totalColumnWaterRmseKgM2, 3)} kg/m²`);
     lines.push(`- Precip bias: ${fmt(metrics.precip.biasMmHr, 3)} mm/hr`);
     lines.push(`- Cloud bias (low/high/total): ${fmt(metrics.cloudFractionBias.low, 4)} / ${fmt(metrics.cloudFractionBias.high, 4)} / ${fmt(metrics.cloudFractionBias.total, 4)}`);
+    if (lead.analysisMetrics) {
+      lines.push(`- Analysis SLP RMSE: ${fmt(lead.analysisMetrics.slpRmseHpa, 3)} hPa`);
+      lines.push(`- Analysis 500 hPa height RMSE: ${fmt(lead.analysisMetrics.z500RmseM, 3)} m`);
+      lines.push(`- Analysis 10 m wind RMSE: ${fmt(lead.analysisMetrics.wind10RmseMs, 3)} m/s`);
+    }
     lines.push('');
     lines.push(renderPrecipTable(metrics.precip));
     lines.push('');

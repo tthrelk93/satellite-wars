@@ -30,11 +30,14 @@ const fmt = (value, digits = 3) => (Number.isFinite(value) ? value.toFixed(digit
 
 const { manifest } = await loadCaseManifest(caseManifestPath);
 const modelDataset = await loadFieldDataset(manifest.model.fieldsPath);
+const analysisDataset = await loadFieldDataset(manifest.analysis?.fieldsPath);
 const referenceDataset = await loadFieldDataset(manifest.reference.fieldsPath);
 const modelTrackDataset = await loadStormTrackDataset(manifest.model.stormTrackPath);
+const analysisTrackDataset = await loadStormTrackDataset(manifest.analysis?.stormTrackPath);
 const referenceTrackDataset = await loadStormTrackDataset(manifest.reference.stormTrackPath);
 
 const modelLeads = mapLeadsByHour(modelDataset);
+const analysisLeads = mapLeadsByHour(analysisDataset);
 const referenceLeads = mapLeadsByHour(referenceDataset);
 const targetGrid = manifest.simulatorGrid;
 const pressureLevelsPa = Array.isArray(manifest.validationPressureLevelsPa) && manifest.validationPressureLevelsPa.length
@@ -60,17 +63,38 @@ const leadResults = manifest.leadHours.map((leadHours) => {
     pressure500Pa: pressureLevelsPa[0]
   });
 
+  const analysisLead = analysisLeads.get(leadHours);
+  const analysisLeadOnTarget = analysisLead
+    ? remapLeadToTargetGrid(analysisLead, analysisDataset.grid, targetGrid, pressureLevelsPa)
+    : null;
+  const analysisMetrics = analysisLeadOnTarget
+    ? computeLeadMetrics({
+      modelLead: analysisLeadOnTarget,
+      truthLead: referenceLeadOnTarget,
+      targetGrid,
+      pressure500Pa: pressureLevelsPa[0]
+    })
+    : null;
+
   return {
     leadHours,
     modelLead: modelLeadOnTarget,
+    analysisLead: analysisLeadOnTarget,
     referenceLead: referenceLeadOnTarget,
-    metrics
+    metrics,
+    analysisMetrics
   };
 });
 
 const aggregate = computeAggregateMetrics(leadResults);
+const analysisAggregate = analysisDataset
+  ? computeAggregateMetrics(leadResults.filter((lead) => lead.analysisMetrics).map((lead) => ({ leadHours: lead.leadHours, metrics: lead.analysisMetrics })))
+  : null;
 const cycloneTrack = modelTrackDataset && referenceTrackDataset
   ? computeCycloneTrackError(modelTrackDataset, referenceTrackDataset)
+  : null;
+const analysisCycloneTrack = analysisTrackDataset && referenceTrackDataset
+  ? computeCycloneTrackError(analysisTrackDataset, referenceTrackDataset)
   : null;
 
 const outputDir = path.resolve(process.cwd(), manifest.outputDir || `weather-validation/output/${manifest.caseId}`);
@@ -88,21 +112,26 @@ const summary = {
   outputJsonPath: outputJsonPathRel,
   outputMarkdownPath: outputMarkdownPathRel,
   aggregate,
+  analysisAggregate,
   cycloneTrack,
+  analysisCycloneTrack,
   leads: leadResults.map((lead) => ({
     leadHours: lead.leadHours,
-    metrics: lead.metrics
+    metrics: lead.metrics,
+    analysisMetrics: lead.analysisMetrics
   })),
   inputs: {
     modelFieldsPath: manifest.model.fieldsPath,
     referenceFieldsPath: manifest.reference.fieldsPath,
     modelStormTrackPath: manifest.model.stormTrackPath || null,
+    analysisFieldsPath: manifest.analysis?.fieldsPath || null,
+    analysisStormTrackPath: manifest.analysis?.stormTrackPath || null,
     referenceStormTrackPath: manifest.reference.stormTrackPath || null
   }
 };
 
 await writeJson(outputJsonPath, summary);
-const markdown = renderValidationMarkdown({ manifest, summary, leadResults, cycloneTrack });
+const markdown = renderValidationMarkdown({ manifest, summary, leadResults, cycloneTrack, analysisCycloneTrack });
 await writeText(outputMarkdownPath, markdown);
 
 console.log(`Validated case: ${manifest.caseId}`);

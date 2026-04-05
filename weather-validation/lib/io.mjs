@@ -50,6 +50,11 @@ export async function loadCaseManifest(manifestPath = DEFAULT_CASE_MANIFEST) {
         fieldsPath: resolveRelativePath(absolutePath, manifest.model?.fieldsPath),
         stormTrackPath: resolveRelativePath(absolutePath, manifest.model?.stormTrackPath)
       },
+      analysis: {
+        ...manifest.analysis,
+        fieldsPath: resolveRelativePath(absolutePath, manifest.analysis?.fieldsPath),
+        stormTrackPath: resolveRelativePath(absolutePath, manifest.analysis?.stormTrackPath)
+      },
       reference: {
         ...manifest.reference,
         fieldsPath: resolveRelativePath(absolutePath, manifest.reference?.fieldsPath),

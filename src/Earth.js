@@ -17,6 +17,7 @@ import { paintGridToTexture } from './sensors/weather/paintGridToTexture';
 import WindStreamlineRenderer from './WindStreamlineRenderer';
 import { CLOUD_WATCH_GRID_LON_OFFSET_RAD, WIND_REALISM_TARGETS } from './constants';
 import { findClosestLevelIndex } from './weather/v2/verticalGrid';
+import { interpolatePressureFieldAtCell } from './weather/v2/analysisData.js';
 import earthmap from './8081_earthmap10k.jpg';
 import earthbump from './8081_earthbump10k.jpg';
 import fogTexture from './fog.png'; // Add your fog texture map here
@@ -67,6 +68,7 @@ const SIGMA_A0_CLOUD = 0.4;
 const SIGMA_A0_TAU = 10;
 const SIGMA_A0_WIND = 6;
 const SIGMA_A0_QV = 0.004;
+const SIGMA_A0_THETA = 3;
 const QCQI_MAX = 0.05;
 const DEFAULT_FORECAST_LEAD_HOURS = [1, 3, 6, 12, 24];
 const FORECAST_HORIZON_HOURS = 24;
@@ -444,6 +446,18 @@ class Earth {
     this._lastAssimilatedObsKeyBySensor = new Map();
     this._pendingAssimilationObs = [];
     this._stationInfluenceCache = null;
+    this.analysisMode = 'auto';
+    this.analysisReanchorEnabled = true;
+    this.analysisReanchorEverySeconds = 6 * 3600;
+    this.analysisLastReanchorSimTimeSeconds = null;
+    this.analysisVarConfig = {
+      ps: { gain: 0.35, min: 50000, max: 110000 },
+      wind: { gain: 0.3, min: -150, max: 150 },
+      theta: { gain: 0.25, min: 180, max: 380 },
+      qv: { gain: 0.25, min: 0, max: 0.04 },
+      cloud: { gain: 0.25, min: 0, max: 1 },
+      precip: { gain: 0.2, min: 0, max: 200 }
+    };
     this._sensorLastObsById = new Map();
     this._sensorCadenceById = new Map();
     this.radarOverlayVisible = true;
@@ -1201,13 +1215,17 @@ class Earth {
     const productU = obsSet?.products?.u;
     const productV = obsSet?.products?.v;
     const productQv = obsSet?.products?.qv;
-    if (!productU || !productV || !productQv) return { updatedCount: 0 };
-    if (productU.kind !== 'points' || productV.kind !== 'points' || productQv.kind !== 'points') {
+    const productTheta = obsSet?.products?.theta;
+    const productT = obsSet?.products?.temperature;
+    if (!productU || !productV || (!productQv && !productTheta && !productT)) return { updatedCount: 0 };
+    if (productU.kind !== 'points' || productV.kind !== 'points' || ((productQv && productQv.kind !== 'points') || (productTheta && productTheta.kind !== 'points') || (productT && productT.kind !== 'points'))) {
       return { updatedCount: 0 };
     }
     const dataU = productU.data;
     const dataV = productV.data;
-    const dataQv = productQv.data;
+    const dataQv = productQv?.data;
+    const dataTheta = productTheta?.data;
+    const dataT = productT?.data;
     if (!dataU?.latDeg || !dataU?.lonDeg || !dataU?.value || !dataU?.levelIndex) return { updatedCount: 0 };
     const latDeg = dataU.latDeg;
     const lonDeg = dataU.lonDeg;
@@ -1215,9 +1233,12 @@ class Earth {
     const uObs = dataU.value;
     const vObs = dataV?.value;
     const qvObs = dataQv?.value;
+    const thetaObs = dataTheta?.value;
+    const tempObs = dataT?.value;
     const mask = productU.mask;
     const sigmaU = productU.sigmaObs;
-    const sigmaQv = productQv.sigmaObs;
+    const sigmaQv = productQv?.sigmaObs;
+    const sigmaTheta = productTheta?.sigmaObs || productT?.sigmaObs;
 
     const grid = analysisCore.grid;
     const state = analysisCore.state;
@@ -1263,17 +1284,36 @@ class Earth {
       state.u[idx] = uUpdated;
       state.v[idx] = vUpdated;
 
-      const sigmaQ = sigmaQv ? sigmaQv[i] : 0.001;
-      const sigmaQ2 = sigmaQ * sigmaQ;
-      const qUpdated = this._kalmanUpdate({
-        value: state.qv[idx],
-        k: k2d,
-        yObs: qvObs ? qvObs[i] : 0,
-        sigmaO2: sigmaQ2,
-        sigmaA0: SIGMA_A0_QV,
-        weight: 1
-      });
-      state.qv[idx] = Math.max(0, Math.min(0.04, qUpdated));
+      if (qvObs) {
+        const sigmaQ = sigmaQv ? sigmaQv[i] : 0.001;
+        const sigmaQ2 = sigmaQ * sigmaQ;
+        const qUpdated = this._kalmanUpdate({
+          value: state.qv[idx],
+          k: k2d,
+          yObs: qvObs[i],
+          sigmaO2: sigmaQ2,
+          sigmaA0: SIGMA_A0_QV,
+          weight: 1
+        });
+        state.qv[idx] = Math.max(0, Math.min(0.04, qUpdated));
+      }
+
+      if (thetaObs || tempObs) {
+        const thetaTarget = thetaObs
+          ? thetaObs[i]
+          : tempObs[i] / Math.pow(Math.max(1e-6, state.pMid[idx]) / 100000, 287.05 / 1004);
+        const sigmaTh = sigmaTheta ? sigmaTheta[i] : 1.0;
+        const sigmaTh2 = sigmaTh * sigmaTh;
+        const updatedTheta = this._kalmanUpdate({
+          value: state.theta[idx],
+          k: k2d,
+          yObs: thetaTarget,
+          sigmaO2: sigmaTh2,
+          sigmaA0: SIGMA_A0_THETA,
+          weight: 1
+        });
+        state.theta[idx] = Math.max(180, Math.min(380, updatedTheta));
+      }
 
       this._markAnalysisObsSeen(k2d, obsSet.t);
       updatedCount += 1;
@@ -3246,6 +3286,7 @@ class Earth {
     this.analysisWeatherField?.update(simTimeSeconds, realDtSeconds, simContext);
     this._syncAnalysisFromTruthIfReady();
     this._updateAnalysisSigma2(simTimeSeconds);
+    this._maybeReanchorAnalysisFromTargets(simTimeSeconds);
     const didUpload = this.weatherVolumeGpu?.update({ simTimeSeconds });
     if (didUpload) {
       this.weatherVolumeDebugView?.render();
@@ -3322,6 +3363,7 @@ class Earth {
 
     const analysisInitSource = analysisCore.analysisInit?.source;
     const initializedFromAnalysis = analysisInitSource === 'analysis';
+    this.analysisMode = initializedFromAnalysis ? 'real-earth' : 'sandbox';
     if (!initializedFromAnalysis) {
       this._copyCoreState(truthCore, analysisCore);
       analysisCore.setTimeUTC(truthCore.timeUTC);
@@ -3338,6 +3380,7 @@ class Earth {
     this.analysisObsLastSeenCloudSimTimeSeconds = new Float32Array(N);
     this.analysisObsLastSeenCloudSimTimeSeconds.fill(-1e9);
     this._lastSigmaSimTimeSeconds = null;
+    this.analysisLastReanchorSimTimeSeconds = null;
 
     this._analysisSyncedFromTruth = true;
   }
@@ -3434,6 +3477,118 @@ class Earth {
     updateSigma(this.analysisSigma2Cloud, this.analysisObsLastSeenCloudSimTimeSeconds);
 
     this._lastSigmaSimTimeSeconds = simTimeSeconds;
+  }
+
+  _blendAnalysisValue(kind, value, target) {
+    const cfg = this.analysisVarConfig?.[kind] || {};
+    const gain = Number.isFinite(cfg.gain) ? cfg.gain : 0.2;
+    const blended = value + gain * (target - value);
+    const min = Number.isFinite(cfg.min) ? cfg.min : -Infinity;
+    const max = Number.isFinite(cfg.max) ? cfg.max : Infinity;
+    return Math.min(max, Math.max(min, blended));
+  }
+
+  _applyAnalysisTargetsToCore(analysisCore, simTimeSeconds) {
+    const state = analysisCore?.state;
+    const targets = state?.analysisTargets;
+    if (!analysisCore?.ready || !state || !targets) return { updatedCount: 0 };
+
+    let updatedCount = 0;
+    let sumAbsDelta = 0;
+    const N = state.N;
+    const nz = state.nz;
+
+    if (targets.surfacePressurePa && targets.surfacePressurePa.length === N) {
+      for (let k = 0; k < N; k++) {
+        const before = state.ps[k];
+        const after = this._blendAnalysisValue('ps', before, targets.surfacePressurePa[k]);
+        state.ps[k] = after;
+        sumAbsDelta += Math.abs(after - before);
+        updatedCount += 1;
+        this._markAnalysisObsSeen(k, simTimeSeconds);
+      }
+    }
+
+    const thetaMap = targets.thetaKByPressurePa || targets.temperatureKByPressurePa || null;
+    const useTempMap = thetaMap === targets.temperatureKByPressurePa;
+    for (let cell = 0; cell < N; cell += 1) {
+      for (let lev = 0; lev < nz; lev += 1) {
+        const idx = lev * N + cell;
+        const p = state.pMid[idx];
+        if (targets.uByPressurePa && targets.vByPressurePa) {
+          const uTarget = interpolatePressureFieldAtCell(targets.uByPressurePa, p, cell);
+          const vTarget = interpolatePressureFieldAtCell(targets.vByPressurePa, p, cell);
+          if (Number.isFinite(uTarget) && Number.isFinite(vTarget)) {
+            const uBefore = state.u[idx];
+            const vBefore = state.v[idx];
+            state.u[idx] = this._blendAnalysisValue('wind', uBefore, uTarget);
+            state.v[idx] = this._blendAnalysisValue('wind', vBefore, vTarget);
+            sumAbsDelta += Math.abs(state.u[idx] - uBefore) + Math.abs(state.v[idx] - vBefore);
+            updatedCount += 2;
+          }
+        }
+        if (thetaMap) {
+          const targetVal = interpolatePressureFieldAtCell(thetaMap, p, cell);
+          if (Number.isFinite(targetVal)) {
+            const thetaTarget = useTempMap
+              ? targetVal / Math.pow(Math.max(1e-6, p) / 100000, 287.05 / 1004)
+              : targetVal;
+            const before = state.theta[idx];
+            state.theta[idx] = this._blendAnalysisValue('theta', before, thetaTarget);
+            sumAbsDelta += Math.abs(state.theta[idx] - before);
+            updatedCount += 1;
+          }
+        }
+        if (targets.specificHumidityKgKgByPressurePa) {
+          const qTarget = interpolatePressureFieldAtCell(targets.specificHumidityKgKgByPressurePa, p, cell);
+          if (Number.isFinite(qTarget)) {
+            const before = state.qv[idx];
+            state.qv[idx] = this._blendAnalysisValue('qv', before, qTarget);
+            sumAbsDelta += Math.abs(state.qv[idx] - before);
+            updatedCount += 1;
+          }
+        }
+      }
+      if (targets.surfaceTemperatureK && targets.surfaceTemperatureK.length === N) {
+        const before = state.Ts[cell];
+        state.Ts[cell] = this._blendAnalysisValue('theta', before, targets.surfaceTemperatureK[cell]);
+        sumAbsDelta += Math.abs(state.Ts[cell] - before);
+        updatedCount += 1;
+      }
+    }
+
+    analysisCore._updateHydrostatic?.();
+    return {
+      updatedCount,
+      meanAbsDelta: updatedCount > 0 ? sumAbsDelta / updatedCount : 0,
+      source: 'analysis-targets'
+    };
+  }
+
+  _maybeReanchorAnalysisFromTargets(simTimeSeconds) {
+    if (!this.analysisReanchorEnabled) return;
+    if (!this._analysisSyncedFromTruth) return;
+    if (this.analysisMode !== 'real-earth') return;
+    if (!Number.isFinite(simTimeSeconds)) return;
+    if (this.analysisLastReanchorSimTimeSeconds != null && simTimeSeconds - this.analysisLastReanchorSimTimeSeconds < this.analysisReanchorEverySeconds) {
+      return;
+    }
+    const analysisCore = this.analysisWeatherField?.core;
+    const stats = this._applyAnalysisTargetsToCore(analysisCore, simTimeSeconds);
+    this.analysisLastReanchorSimTimeSeconds = simTimeSeconds;
+    if (stats.updatedCount > 0) {
+      this.logWeatherEvent(
+        'analysisReanchorApplied',
+        {
+          mode: this.analysisMode,
+          source: stats.source,
+          updatedCount: stats.updatedCount,
+          meanAbsDelta: stats.meanAbsDelta,
+          intervalSeconds: this.analysisReanchorEverySeconds
+        },
+        { simTimeSeconds, core: analysisCore }
+      );
+    }
   }
 
   _snapshotForecastCoreFromAnalysis({ analysisCore, forecastCore }) {
