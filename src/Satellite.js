@@ -53,6 +53,7 @@ class Satellite {
     this.inHqRange = false;
     this.storedFogPath = [];
     this.commLines = [];
+    this.commLineMap = new Map();
     this.neighbors = new Set(); // Initialize neighbors for graph representation
     this.DEBUG = true;
     this._lastHQDetect = new Map(); // hqId -> timestamp

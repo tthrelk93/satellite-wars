@@ -418,6 +418,7 @@ const App = () => {
     const cloudWatchDebugRef = useRef(false);
     const cloudWatchDebugInfoRef = useRef({ lastUpdateMs: 0 });
     const windTargetsStatusRef = useRef({ lastUpdateMs: 0 });
+    const lastSensorGatingRef = useRef(null);
     const showForecastOverlayRef = useRef(false);
     const forecastProductRef = useRef('cloudTau');
     const forecastLeadHoursRef = useRef(1);
@@ -5652,17 +5653,51 @@ const App = () => {
         });
     };
 
-    const drawCommLines = (sat /*, targets (unused) */) => {
-        // Clear existing lines
-        sat.commLines.forEach(line => {
-            if (sceneRef.current) sceneRef.current.remove(line);
-            if (line.geometry) line.geometry.dispose();
-            if (line.material) line.material.dispose();
+    const syncSatCommLines = (sat, segments) => {
+        const scene = sceneRef.current;
+        if (!scene || !sat) return;
+        if (!(sat.commLineMap instanceof Map)) {
+            sat.commLineMap = new Map();
+        }
+        const keep = new Set();
+        segments.forEach(({ key, startPos, endPos, color = 0xff00ff }) => {
+            keep.add(key);
+            let line = sat.commLineMap.get(key);
+            if (!line) {
+                const positions = new Float32Array(6);
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                const material = new THREE.LineBasicMaterial({ color });
+                line = new THREE.Line(geometry, material);
+                line.frustumCulled = false;
+                sat.commLineMap.set(key, line);
+                scene.add(line);
+            }
+            const attr = line.geometry.getAttribute('position');
+            const arr = attr.array;
+            arr[0] = startPos.x; arr[1] = startPos.y; arr[2] = startPos.z;
+            arr[3] = endPos.x; arr[4] = endPos.y; arr[5] = endPos.z;
+            attr.needsUpdate = true;
+            if (line.parent !== scene) scene.add(line);
         });
-        sat.commLines = [];
 
+        for (const [key, line] of sat.commLineMap.entries()) {
+            if (keep.has(key)) continue;
+            if (line.parent === scene) scene.remove(line);
+            line.geometry?.dispose?.();
+            line.material?.dispose?.();
+            sat.commLineMap.delete(key);
+        }
+        sat.commLines = Array.from(sat.commLineMap.values());
+    };
+
+    const drawCommLines = (sat /*, targets (unused) */) => {
         const scene = sceneRef.current;
         if (!scene) return;
+
+        const segments = [];
+        const tmpA = new THREE.Vector3();
+        const tmpB = new THREE.Vector3();
 
         // Helper: resolve an ID to a node (Satellite or HQ)
         const byId = (id) =>
@@ -5713,16 +5748,16 @@ const App = () => {
                 const b = byId(pathIds[i + 1]);
                 if (!a || !b) continue;
 
-                const aPos = a.sphere ? a.sphere.getWorldPosition(new THREE.Vector3()) : a.mesh.position.clone();
-                const bPos = b.sphere ? b.sphere.getWorldPosition(new THREE.Vector3()) : b.mesh.position.clone();
-
-
-                const geometry = new THREE.BufferGeometry().setFromPoints([aPos, bPos]);
-                const material = new THREE.LineBasicMaterial({ color: 0xff00ff });
-                const line = new THREE.Line(geometry, material);
-                scene.add(line);
-                sat.commLines.push(line);
+                const aPos = a.sphere ? a.sphere.getWorldPosition(tmpA.clone()) : a.mesh.getWorldPosition(tmpA.clone());
+                const bPos = b.sphere ? b.sphere.getWorldPosition(tmpB.clone()) : b.mesh.getWorldPosition(tmpB.clone());
+                segments.push({
+                    key: `path:${pathIds[i]}->${pathIds[i + 1]}`,
+                    startPos: aPos,
+                    endPos: bPos
+                });
             }
+
+            syncSatCommLines(sat, segments);
 
             return; // imaging handled fully
         }
@@ -5733,17 +5768,18 @@ const App = () => {
             .filter(Boolean);
 
         targets.forEach(target => {
-            const startPos = sat.mesh.position.clone();
+            const startPos = sat.mesh.getWorldPosition(tmpA.clone());
             const endPos = target.type === 'HQ'
-                ? target.sphere.getWorldPosition(new THREE.Vector3())
-                : target.mesh.position.clone();
-
-            const geometry = new THREE.BufferGeometry().setFromPoints([startPos, endPos]);
-            const material = new THREE.LineBasicMaterial({ color: 0xff00ff });
-            const line = new THREE.Line(geometry, material);
-            scene.add(line);
-            sat.commLines.push(line);
+                ? target.sphere.getWorldPosition(tmpB.clone())
+                : target.mesh.getWorldPosition(tmpB.clone());
+            segments.push({
+                key: `edge:${target.id}`,
+                startPos,
+                endPos
+            });
         });
+
+        syncSatCommLines(sat, segments);
     };
 
     const wrapRadToPi = (rad) => {
@@ -5805,10 +5841,11 @@ const App = () => {
             }
 
             const renderSimTimeSeconds = simClock.simTimeSeconds + simAccumSeconds;
+            const didAdvanceSim = deltaSimSeconds > 0;
             if (earthRef.current) {
                 earthRef.current.setRotationForSimTime?.(renderSimTimeSeconds);
             }
-            if (deltaSimSeconds > 0) {
+            if (didAdvanceSim) {
                 satellitesRef.current.forEach(satellite => {
                     const detections = satellite.updateOrbit(
                         hqSpheresRef,
@@ -5821,7 +5858,12 @@ const App = () => {
             }
             if (earthRef.current) {
                 const earth = earthRef.current;
-                const sensorGating = buildSensorGating(lastSimTimeSeconds);
+                const sensorGating = didAdvanceSim || !lastSensorGatingRef.current
+                    ? buildSensorGating(lastSimTimeSeconds)
+                    : lastSensorGatingRef.current;
+                if (sensorGating) {
+                    lastSensorGatingRef.current = sensorGating;
+                }
                 lastSensorGating = sensorGating;
                 earth.update(lastSimTimeSeconds, realDtSeconds, {
                     simSpeed: simClock.simSpeed,
@@ -5830,7 +5872,7 @@ const App = () => {
                     simStepsThisFrame: stepsToRun,
                     simStepsSkipped: stepsSkipped,
                     simLagSeconds,
-                    flushAssimilation: true,
+                    flushAssimilation: didAdvanceSim,
                     renderSimTimeSeconds
                 });
             }
@@ -5881,9 +5923,11 @@ const App = () => {
                 }
             }
 
-            updateTruthEvents(lastSimTimeSeconds);
-            updateForecastSkillTelemetry();
-            evaluateWarnings(lastSimTimeSeconds);
+            if (didAdvanceSim) {
+                updateTruthEvents(lastSimTimeSeconds);
+                updateForecastSkillTelemetry();
+                evaluateWarnings(lastSimTimeSeconds);
+            }
 
             if (anchorLockRef.current && earthRef.current && cameraRef.current && controlsRef.current) {
                 const earth = earthRef.current;
@@ -5909,7 +5953,9 @@ const App = () => {
 
             // Handle sphere detections
 //      handleSphereDetections(detectedSpheres);
-            handleCommSatDetections();
+            if (didAdvanceSim) {
+                handleCommSatDetections();
+            }
 
             if (sceneRef.current && cameraRef.current) {
                 rendererRef.current.render(sceneRef.current, cameraRef.current);
