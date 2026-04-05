@@ -29,6 +29,7 @@ class WeatherField {
         this._percentileScratch = new Float32Array(this.core.grid.count);
         this._simContext = { simSpeed: null, paused: null };
         this.useExternalCore = false;
+        this.renderEnabled = true;
         this._lastStepsRan = 0;
         this._lastPaintSimTime = null;
         this._needsCoreTimeSync = true;
@@ -186,6 +187,10 @@ class WeatherField {
             return;
         }
         this.logger?.recordIfDue({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan }, this.core);
+        if (!this.renderEnabled) {
+            this._paintAccumSeconds = 0;
+            return;
+        }
         const realDt = Number.isFinite(realDtSeconds) ? Math.max(0, realDtSeconds) : 0;
         this._paintAccumSeconds += realDt;
         if (this._paintAccumSeconds < this.tickSeconds) return;
@@ -209,13 +214,26 @@ class WeatherField {
         }
     }
 
+    setRenderEnabled(enabled) {
+        const next = Boolean(enabled);
+        if (this.renderEnabled === next) return;
+        this.renderEnabled = next;
+        this._paintAccumSeconds = 0;
+        if (next && this.core.ready) {
+            this._paintClouds(this.core.timeUTC);
+            this._paintDebug();
+        }
+    }
+
     stepModelSeconds(modelSeconds) {
         if (!this.core.ready) return;
         const stepsRan = this.core.advanceModelSeconds(modelSeconds) || 0;
         this._lastStepsRan = stepsRan;
         this._paintAccumSeconds = 0;
-        this._paintClouds(this.core.timeUTC);
-        this._paintDebug();
+        if (this.renderEnabled) {
+            this._paintClouds(this.core.timeUTC);
+            this._paintDebug();
+        }
     }
 
     setDebugMode(mode) {
@@ -243,8 +261,10 @@ class WeatherField {
         this._lastStepsRan = 0;
         this._lastPaintSimTime = null;
         this._needsCoreTimeSync = true;
-        this._paintClouds(this.core.timeUTC);
-        this._paintDebug();
+        if (this.renderEnabled) {
+            this._paintClouds(this.core.timeUTC);
+            this._paintDebug();
+        }
     }
 
     _resyncCoreTime(simTimeSeconds) {
@@ -254,6 +274,10 @@ class WeatherField {
         this._lastStepsRan = 0;
         this._lastPaintSimTime = null;
         this._needsCoreTimeSync = false;
+        if (this.renderEnabled) {
+            this._paintClouds(this.core.timeUTC);
+            this._paintDebug();
+        }
     }
 
     getSeed() {

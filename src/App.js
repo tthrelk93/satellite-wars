@@ -117,7 +117,7 @@ const WEATHER_DEBUG_SCALE = {
     precip: { min: 0, max: 50, log: true }
 };
 
-const SIM_SPEED_DEFAULT = 3600;
+const SIM_SPEED_DEFAULT = 600;
 const SIM_SPEED_MAX = 14400;
 const FIXED_SIM_STEP_SECONDS = 120;
 const MAX_SIM_SUBSTEPS = 4;

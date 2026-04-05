@@ -461,7 +461,7 @@ class Earth {
     };
     this._sensorLastObsById = new Map();
     this._sensorCadenceById = new Map();
-    this.radarOverlayVisible = true;
+    this.radarOverlayVisible = false;
     this.weatherVolumeGpu = null;
     this.weatherVolumeDebugView = null;
     this.radarOverlay = null;
@@ -514,7 +514,7 @@ class Earth {
     this.cloudObsMesh.rotation.y = CLOUD_OBS_LON_OFFSET_RAD;
     this.parentObject.add(this.cloudObsMesh);
 
-    this.windStreamlinesVisible = true;
+    this.windStreamlinesVisible = false;
     this.windStreamlineRenderer = new WindStreamlineRenderer();
     if (this.windStreamlineRenderer?.texture) {
       this.windStreamlineRenderer.texture.colorSpace = THREE.SRGBColorSpace;
@@ -623,13 +623,13 @@ class Earth {
     }
     this.weatherVolumeGpu = null;
     this.weatherField = new WeatherField({
-      renderScale: 4,
-      tickSeconds: 0.2,
+      renderScale: 2,
+      tickSeconds: 0.35,
       seed: this.weatherSeed
     });
     this.analysisWeatherField = new WeatherField({
-      renderScale: 4,
-      tickSeconds: 0.2,
+      renderScale: 2,
+      tickSeconds: 0.35,
       seed: this.weatherSeed
     });
     this.forecastWeatherField = new WeatherField({
@@ -811,6 +811,10 @@ class Earth {
   _applyWeatherViewSourceMaps() {
     const wf = this._getActiveWeatherField();
     if (!wf) return;
+
+    this.weatherField?.setRenderEnabled?.(this.weatherViewSource !== 'analysis');
+    this.analysisWeatherField?.setRenderEnabled?.(this.weatherViewSource === 'analysis');
+    this.forecastWeatherField?.setRenderEnabled?.(false);
 
     this.weatherLowMaterial.map = wf.textureLow;
     this.weatherLowMaterial.needsUpdate = true;
