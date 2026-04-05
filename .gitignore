@@ -12,6 +12,9 @@
 /build
 logs/
 tools/wind-fixtures/
+*.grib2.*.idx
+*.grb2.*.idx
+*.pgrb2.*.idx
 
 # misc
 .DS_Store
