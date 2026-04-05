@@ -9,11 +9,14 @@ function applyUpperWindCap(u, v, idx, targetU, targetV, params = {}) {
   if (factor <= 0) return;
   const offset = Number.isFinite(params.upperWindCapOffset) ? params.upperWindCapOffset : 0;
   const minCap = Number.isFinite(params.upperWindCapMin) ? params.upperWindCapMin : 0;
+  const dynamicMinCap = Number.isFinite(params.dynamicUpperWindCapMin)
+    ? params.dynamicUpperWindCapMin
+    : minCap;
   const maxCap = Number.isFinite(params.maxUpperSpeed) && params.maxUpperSpeed > 0
     ? params.maxUpperSpeed
     : Infinity;
   let capSpeed = Math.hypot(targetU, targetV) * factor + offset;
-  capSpeed = Math.max(capSpeed, minCap);
+  capSpeed = Math.max(capSpeed, minCap, dynamicMinCap);
   capSpeed = Math.min(capSpeed, maxCap);
   if (!(capSpeed > 0)) return;
   const speed = Math.hypot(u[idx], v[idx]);
@@ -60,6 +63,9 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
   const relaxS = clamp(dt / tauSurfaceSeconds, 0, 1);
   const relaxU = clamp(dt / tauUpperSeconds, 0, 1);
   const relaxV = clamp(dt / tauVSeconds, 0, 1);
+  const upperJetScale = Number.isFinite(params.upperJetScale) ? params.upperJetScale : 2.2;
+  const upperJetLatDeg = Number.isFinite(params.upperJetLatDeg) ? params.upperJetLatDeg : 35;
+  const upperJetWidthDeg = Number.isFinite(params.upperJetWidthDeg) ? params.upperJetWidthDeg : 12;
 
   let sumErrS = 0;
   let sumErrU = 0;
@@ -82,9 +88,16 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
     for (let j = 0; j < ny; j += 1) {
       const row = j * nx;
       const latDeg = Number.isFinite(grid.latDeg?.[j]) ? grid.latDeg[j] : 90 - ((j + 0.5) / ny) * 180;
+      const absLat = Math.abs(latDeg);
       const weight = Number.isFinite(grid.cosLat?.[j])
         ? Math.max(0, grid.cosLat[j])
         : Math.max(0, Math.cos(latDeg * Math.PI / 180));
+      const jetCapFloor = (Number.isFinite(params.upperWindCapMin) ? params.upperWindCapMin : 0)
+        + (Number.isFinite(params.upperWindCapJetBoost) ? params.upperWindCapJetBoost : 0)
+          * Math.exp(-Math.pow((absLat - upperJetLatDeg) / upperJetWidthDeg, 2));
+      const capParams = Number.isFinite(jetCapFloor)
+        ? { ...params, dynamicUpperWindCapMin: jetCapFloor }
+        : params;
       for (let i = 0; i < nx; i += 1) {
         const k = row + i;
         const idxS = levS * N + k;
@@ -113,7 +126,7 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
             const dvU = (targetUpperVk - v[idxU]) * relaxV;
             u[idxU] += duU;
             v[idxU] += dvU;
-            applyUpperWindCap(u, v, idxU, targetUpperUk, targetUpperVk, params);
+            applyUpperWindCap(u, v, idxU, targetUpperUk, targetUpperVk, capParams);
             sumErrU += ((u[idxU] - targetUpperUk) ** 2 + (v[idxU] - targetUpperVk) ** 2) * weight;
             sumWUpper += weight;
             maxAbsCorrection = Math.max(maxAbsCorrection, Math.abs(duU), Math.abs(dvU));
@@ -134,7 +147,7 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
           const dvU = (targetUpperVk - v[idxU]) * relaxV;
           u[idxU] += duU;
           v[idxU] += dvU;
-          applyUpperWindCap(u, v, idxU, targetUpperUk, targetUpperVk, params);
+          applyUpperWindCap(u, v, idxU, targetUpperUk, targetUpperVk, capParams);
           sumErrU += ((u[idxU] - targetUpperUk) ** 2 + (v[idxU] - targetUpperVk) ** 2) * weight;
           sumWUpper += weight;
           maxAbsCorrection = Math.max(maxAbsCorrection, Math.abs(duU), Math.abs(dvU));
@@ -154,10 +167,6 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
   if (SOURCE_FIXTURE_COUNT !== 8 || !LAT_DEG?.length || !U10M_ZONAL_MEAN_TARGET?.length) {
     return { didApply: false };
   }
-
-  const upperJetScale = Number.isFinite(params.upperJetScale) ? params.upperJetScale : 2.2;
-  const upperJetLatDeg = Number.isFinite(params.upperJetLatDeg) ? params.upperJetLatDeg : 35;
-  const upperJetWidthDeg = Number.isFinite(params.upperJetWidthDeg) ? params.upperJetWidthDeg : 12;
 
   for (let j = 0; j < ny; j++) {
     let sumUS = 0;
@@ -193,6 +202,11 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
     const targetS = sampleTargetU(latDeg);
     const jet = Math.exp(-Math.pow((absLat - upperJetLatDeg) / upperJetWidthDeg, 2));
     const targetU = jet * upperJetScale * Math.max(0, targetS);
+    const jetCapFloor = (Number.isFinite(params.upperWindCapMin) ? params.upperWindCapMin : 0)
+      + (Number.isFinite(params.upperWindCapJetBoost) ? params.upperWindCapJetBoost : 0) * jet;
+    const capParams = Number.isFinite(jetCapFloor)
+      ? { ...params, dynamicUpperWindCapMin: jetCapFloor }
+      : params;
 
     const duS = (targetS - uMeanS) * relaxS;
     const duU = (targetU - uMeanU) * relaxU;
@@ -215,7 +229,7 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       v[idxS] += dvS;
       u[idxU] += duU;
       v[idxU] += dvU;
-      applyUpperWindCap(u, v, idxU, targetU, 0, params);
+      applyUpperWindCap(u, v, idxU, targetU, 0, capParams);
     }
   }
 

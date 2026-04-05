@@ -177,7 +177,8 @@ export class WeatherCore5 {
       tauVSeconds: 2 * 3600,
       upperWindCapFactor: 2.5,
       upperWindCapOffset: 20,
-      upperWindCapMin: 35,
+      upperWindCapMin: 25,
+      upperWindCapJetBoost: 20,
       upperJetScale: 2.2,
       upperJetLatDeg: 35,
       upperJetWidthDeg: 12
