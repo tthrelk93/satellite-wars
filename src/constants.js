@@ -26,10 +26,10 @@ export const UPKEEP_PER_SAT             =   200_000;
 
 export const WIND_REALISM_TARGETS = {
   model: {
-    meanMin: 6, meanMax: 10,
-    p90Min: 15, p90Max: 25,
-    p99Min: 35, p99Max: 45,
-    maxMax: 70
+    meanMin: 4.5, meanMax: 9.5,
+    p90Min: 9, p90Max: 15,
+    p99Min: 14, p99Max: 24,
+    maxMax: 40
   },
   viz: {
     stepMeanMinPx: 0.05,

@@ -2,6 +2,26 @@ import { LAT_DEG, U10M_ZONAL_MEAN_TARGET, SOURCE_FIXTURE_COUNT } from './windCli
 import { findClosestLevelIndex } from './verticalGrid.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+function applyUpperWindCap(u, v, idx, targetU, targetV, params = {}) {
+  const factor = Number.isFinite(params.upperWindCapFactor) ? params.upperWindCapFactor : 0;
+  if (factor <= 0) return;
+  const offset = Number.isFinite(params.upperWindCapOffset) ? params.upperWindCapOffset : 0;
+  const minCap = Number.isFinite(params.upperWindCapMin) ? params.upperWindCapMin : 0;
+  const maxCap = Number.isFinite(params.maxUpperSpeed) && params.maxUpperSpeed > 0
+    ? params.maxUpperSpeed
+    : Infinity;
+  let capSpeed = Math.hypot(targetU, targetV) * factor + offset;
+  capSpeed = Math.max(capSpeed, minCap);
+  capSpeed = Math.min(capSpeed, maxCap);
+  if (!(capSpeed > 0)) return;
+  const speed = Math.hypot(u[idx], v[idx]);
+  if (!(speed > capSpeed)) return;
+  const s = capSpeed / speed;
+  u[idx] *= s;
+  v[idx] *= s;
+}
 
 const sampleTargetU = (latDeg) => {
   const latArr = LAT_DEG;
@@ -43,12 +63,19 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
 
   let sumErrS = 0;
   let sumErrU = 0;
-  let sumW = 0;
+  let sumWSurface = 0;
+  let sumWUpper = 0;
   let maxAbsCorrection = 0;
 
   if (hasSpatialWindTargets(climo) && params.useSpatialTargets !== false) {
     const targetSurfaceU = climo.windNowU;
     const targetSurfaceV = climo.windNowV;
+    const hasBlendableUpperTargets = Boolean(
+      climo.hasWind500 && climo.hasWind250
+      && climo.wind500NowU && climo.wind500NowV
+      && climo.wind250NowU && climo.wind250NowV
+      && state.pMid?.length === nz * N
+    );
     const targetUpperU = climo.hasWind500 ? climo.wind500NowU : climo.wind250NowU;
     const targetUpperV = climo.hasWind500 ? climo.wind500NowV : climo.wind250NowV;
 
@@ -61,27 +88,65 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       for (let i = 0; i < nx; i += 1) {
         const k = row + i;
         const idxS = levS * N + k;
-        const idxU = levU * N + k;
         const duS = (targetSurfaceU[k] - u[idxS]) * relaxS;
         const dvS = (targetSurfaceV[k] - v[idxS]) * relaxV;
-        const duU = (targetUpperU[k] - u[idxU]) * relaxU;
-        const dvU = (targetUpperV[k] - v[idxU]) * relaxV;
         u[idxS] += duS;
         v[idxS] += dvS;
-        u[idxU] += duU;
-        v[idxU] += dvU;
         sumErrS += ((u[idxS] - targetSurfaceU[k]) ** 2 + (v[idxS] - targetSurfaceV[k]) ** 2) * weight;
-        sumErrU += ((u[idxU] - targetUpperU[k]) ** 2 + (v[idxU] - targetUpperV[k]) ** 2) * weight;
-        sumW += weight;
-        maxAbsCorrection = Math.max(maxAbsCorrection, Math.abs(duS), Math.abs(dvS), Math.abs(duU), Math.abs(dvU));
+        sumWSurface += weight;
+        maxAbsCorrection = Math.max(maxAbsCorrection, Math.abs(duS), Math.abs(dvS));
+
+        const pMid = state.pMid;
+        if (pMid?.length === nz * N) {
+          for (let lev = 0; lev < nz; lev += 1) {
+            const idxU = lev * N + k;
+            const pLev = pMid[idxU];
+            if (!Number.isFinite(pLev) || pLev < 15000 || pLev > 50000) continue;
+            let targetUpperUk = targetUpperU[k];
+            let targetUpperVk = targetUpperV[k];
+            if (hasBlendableUpperTargets) {
+              const w250 = clamp((50000 - pLev) / (50000 - 25000), 0, 1);
+              targetUpperUk = lerp(climo.wind500NowU[k], climo.wind250NowU[k], w250);
+              targetUpperVk = lerp(climo.wind500NowV[k], climo.wind250NowV[k], w250);
+            }
+            const duU = (targetUpperUk - u[idxU]) * relaxU;
+            const dvU = (targetUpperVk - v[idxU]) * relaxV;
+            u[idxU] += duU;
+            v[idxU] += dvU;
+            applyUpperWindCap(u, v, idxU, targetUpperUk, targetUpperVk, params);
+            sumErrU += ((u[idxU] - targetUpperUk) ** 2 + (v[idxU] - targetUpperVk) ** 2) * weight;
+            sumWUpper += weight;
+            maxAbsCorrection = Math.max(maxAbsCorrection, Math.abs(duU), Math.abs(dvU));
+          }
+        } else {
+          const idxU = levU * N + k;
+          let targetUpperUk = targetUpperU[k];
+          let targetUpperVk = targetUpperV[k];
+          if (hasBlendableUpperTargets) {
+            const pLev = state.pMid[idxU];
+            const w250 = Number.isFinite(pLev)
+              ? clamp((50000 - pLev) / (50000 - 25000), 0, 1)
+              : 0;
+            targetUpperUk = lerp(climo.wind500NowU[k], climo.wind250NowU[k], w250);
+            targetUpperVk = lerp(climo.wind500NowV[k], climo.wind250NowV[k], w250);
+          }
+          const duU = (targetUpperUk - u[idxU]) * relaxU;
+          const dvU = (targetUpperVk - v[idxU]) * relaxV;
+          u[idxU] += duU;
+          v[idxU] += dvU;
+          applyUpperWindCap(u, v, idxU, targetUpperUk, targetUpperVk, params);
+          sumErrU += ((u[idxU] - targetUpperUk) ** 2 + (v[idxU] - targetUpperVk) ** 2) * weight;
+          sumWUpper += weight;
+          maxAbsCorrection = Math.max(maxAbsCorrection, Math.abs(duU), Math.abs(dvU));
+        }
       }
     }
 
     return {
       didApply: true,
       source: 'spatial-climatology',
-      rmseSurface: sumW > 0 ? Math.sqrt(sumErrS / sumW) : null,
-      rmseUpper: sumW > 0 ? Math.sqrt(sumErrU / sumW) : null,
+      rmseSurface: sumWSurface > 0 ? Math.sqrt(sumErrS / sumWSurface) : null,
+      rmseUpper: sumWUpper > 0 ? Math.sqrt(sumErrU / sumWUpper) : null,
       maxAbsCorrection
     };
   }
@@ -138,7 +203,8 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       : Math.max(0, Math.cos(latDeg * Math.PI / 180));
     sumErrS += (uMeanS - targetS) * (uMeanS - targetS) * weight;
     sumErrU += (uMeanU - targetU) * (uMeanU - targetU) * weight;
-    sumW += weight;
+    sumWSurface += weight;
+    sumWUpper += weight;
     maxAbsCorrection = Math.max(maxAbsCorrection, Math.abs(duS), Math.abs(duU), Math.abs(dvS), Math.abs(dvU));
 
     for (let i = 0; i < nx; i++) {
@@ -149,14 +215,15 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       v[idxS] += dvS;
       u[idxU] += duU;
       v[idxU] += dvU;
+      applyUpperWindCap(u, v, idxU, targetU, 0, params);
     }
   }
 
   return {
     didApply: true,
     source: 'zonal-fallback',
-    rmseSurface: sumW > 0 ? Math.sqrt(sumErrS / sumW) : null,
-    rmseUpper: sumW > 0 ? Math.sqrt(sumErrU / sumW) : null,
+    rmseSurface: sumWSurface > 0 ? Math.sqrt(sumErrS / sumWSurface) : null,
+    rmseUpper: sumWUpper > 0 ? Math.sqrt(sumErrU / sumWUpper) : null,
     maxAbsCorrection
   };
 }

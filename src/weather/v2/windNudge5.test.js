@@ -17,6 +17,9 @@ test('stepWindNudge5 uses spatial climatology targets when available', () => {
   state.v.fill(0);
   const levS = state.nz - 1;
   const levU = findClosestLevelIndex(state.sigmaHalf, 0.28);
+  for (let i = 0; i < state.N; i += 1) {
+    state.pMid[levU * state.N + i] = 30000;
+  }
   const climo = {
     hasWind: true,
     hasWind500: true,
@@ -44,4 +47,94 @@ test('stepWindNudge5 uses spatial climatology targets when available', () => {
   assert.equal(state.v[levS * state.N + 0], 1);
   assert.equal(state.u[levU * state.N + 0], 15);
   assert.equal(state.v[levU * state.N + 0], 2);
+});
+
+test('stepWindNudge5 blends 500 hPa and 250 hPa targets for upper-level nudging', () => {
+  const sigmaHalf = createSigmaHalfLevels({ nz: 6 });
+  const state = createState5({ grid: { count: 4 }, nz: 6, sigmaHalf });
+  const grid = {
+    nx: 2,
+    ny: 2,
+    latDeg: new Float32Array([30, -30]),
+    cosLat: new Float32Array([Math.cos(Math.PI / 6), Math.cos(Math.PI / 6)])
+  };
+  state.u.fill(0);
+  state.v.fill(0);
+  const levU = findClosestLevelIndex(state.sigmaHalf, 0.28);
+  for (let i = 0; i < state.N; i += 1) {
+    state.pMid[levU * state.N + i] = 30000;
+  }
+  const climo = {
+    hasWind: true,
+    hasWind500: true,
+    hasWind250: true,
+    windNowU: new Float32Array([5, 6, 7, 8]),
+    windNowV: new Float32Array([1, 1, 1, 1]),
+    wind500NowU: new Float32Array([15, 16, 17, 18]),
+    wind500NowV: new Float32Array([2, 2, 2, 2]),
+    wind250NowU: new Float32Array([35, 36, 37, 38]),
+    wind250NowV: new Float32Array([6, 6, 6, 6])
+  };
+
+  stepWindNudge5({
+    dt: 86400,
+    grid,
+    state,
+    climo,
+    params: {
+      tauSurfaceSeconds: 86400,
+      tauUpperSeconds: 86400,
+      tauVSeconds: 86400
+    }
+  });
+
+  assert.equal(state.u[levU * state.N + 0], 31);
+  assert.ok(Math.abs(state.v[levU * state.N + 0] - 5.2) < 1e-6);
+});
+
+test('stepWindNudge5 caps runaway upper winds relative to climatology targets', () => {
+  const sigmaHalf = createSigmaHalfLevels({ nz: 6 });
+  const state = createState5({ grid: { count: 1 }, nz: 6, sigmaHalf });
+  const grid = {
+    nx: 1,
+    ny: 1,
+    latDeg: new Float32Array([35]),
+    cosLat: new Float32Array([Math.cos(35 * Math.PI / 180)])
+  };
+  state.u.fill(0);
+  state.v.fill(0);
+  const levU = findClosestLevelIndex(state.sigmaHalf, 0.28);
+  state.pMid[levU * state.N + 0] = 30000;
+  state.u[levU * state.N + 0] = 100;
+  const climo = {
+    hasWind: true,
+    hasWind500: true,
+    hasWind250: true,
+    windNowU: new Float32Array([5]),
+    windNowV: new Float32Array([0]),
+    wind500NowU: new Float32Array([15]),
+    wind500NowV: new Float32Array([2]),
+    wind250NowU: new Float32Array([35]),
+    wind250NowV: new Float32Array([6])
+  };
+
+  stepWindNudge5({
+    dt: 1,
+    grid,
+    state,
+    climo,
+    params: {
+      tauSurfaceSeconds: 1e9,
+      tauUpperSeconds: 1e9,
+      tauVSeconds: 1e9,
+      upperWindCapFactor: 2.5,
+      upperWindCapOffset: 20,
+      upperWindCapMin: 35,
+      maxUpperSpeed: 70
+    }
+  });
+
+  const cappedSpeed = Math.hypot(state.u[levU * state.N + 0], state.v[levU * state.N + 0]);
+  assert.ok(cappedSpeed <= 70);
+  assert.ok(cappedSpeed < 100);
 });

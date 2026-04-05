@@ -22,6 +22,8 @@ export function stepWinds5({ dt, grid, state, geo, params = {}, scratch }) {
     extraFilterEverySteps = 15,
     extraFilterPasses = 2,
     enableMetricTerms = true,
+    diagnosticsLevel = -1,
+    collectDiagnostics = false,
     stepIndex = 0
   } = params;
 
@@ -34,6 +36,18 @@ export function stepWinds5({ dt, grid, state, geo, params = {}, scratch }) {
   const applyPolarFilter = polarFilterEverySteps > 0 && (stepIndex % polarFilterEverySteps === 0);
   const applyExtra = extraFilterEverySteps > 0 && (stepIndex % extraFilterEverySteps === 0);
   const extraPasses = applyExtra ? extraFilterPasses : 0;
+  const shouldCollectDiagnostics = collectDiagnostics && Number.isInteger(diagnosticsLevel) && diagnosticsLevel >= 0 && diagnosticsLevel < nz;
+  let diagCount = 0;
+  let diagClamped = 0;
+  let sumPGradDelta2 = 0;
+  let sumCoriolisDelta2 = 0;
+  let sumDragDelta2 = 0;
+  let sumDiffDelta2 = 0;
+  let sumMetricDelta2 = 0;
+  let sumPreClampSpeed = 0;
+  let sumPostClampSpeed = 0;
+  let maxPreClampSpeed = 0;
+  let maxPostClampSpeed = 0;
 
   const laplacianLevel = (src, base, out) => {
     for (let j = 0; j < ny; j++) {
@@ -140,17 +154,44 @@ export function stepWinds5({ dt, grid, state, geo, params = {}, scratch }) {
         const diffV = (-nuHyper * lapLapV[k]) + (nuLapSmall * lapV[k]);
         const metricU = metricCoeff * u0 * v0;
         const metricV = -metricCoeff * u0 * u0;
+        const pGradU = -dphidx;
+        const pGradV = -dphidy;
+        const coriolisU = fRow * v0;
+        const coriolisV = -fRow * u0;
 
-        let u1 = u0 + (-dphidx + fRow * v0 + dragU + diffU + metricU) * dt;
-        let v1 = v0 + (-dphidy - fRow * u0 + dragV + diffV + metricV) * dt;
+        let u1 = u0 + (pGradU + coriolisU + dragU + diffU + metricU) * dt;
+        let v1 = v0 + (pGradV + coriolisV + dragV + diffV + metricV) * dt;
+        const preClampSpeed = Math.hypot(u1, v1);
+        let clamped = false;
         const speed = Math.hypot(u1, v1);
         if (speed > maxWind) {
           const s = maxWind / speed;
           u1 *= s;
           v1 *= s;
+          clamped = true;
         }
         u[idx0] = u1;
         v[idx0] = v1;
+
+        if (shouldCollectDiagnostics && lev === diagnosticsLevel) {
+          diagCount += 1;
+          if (clamped) diagClamped += 1;
+          const pGradDelta = Math.hypot(pGradU, pGradV) * dt;
+          const coriolisDelta = Math.hypot(coriolisU, coriolisV) * dt;
+          const dragDelta = Math.hypot(dragU, dragV) * dt;
+          const diffDelta = Math.hypot(diffU, diffV) * dt;
+          const metricDelta = Math.hypot(metricU, metricV) * dt;
+          sumPGradDelta2 += pGradDelta * pGradDelta;
+          sumCoriolisDelta2 += coriolisDelta * coriolisDelta;
+          sumDragDelta2 += dragDelta * dragDelta;
+          sumDiffDelta2 += diffDelta * diffDelta;
+          sumMetricDelta2 += metricDelta * metricDelta;
+          sumPreClampSpeed += preClampSpeed;
+          const postClampSpeed = Math.hypot(u1, v1);
+          sumPostClampSpeed += postClampSpeed;
+          maxPreClampSpeed = Math.max(maxPreClampSpeed, preClampSpeed);
+          maxPostClampSpeed = Math.max(maxPostClampSpeed, postClampSpeed);
+        }
       }
     }
 
@@ -164,4 +205,21 @@ export function stepWinds5({ dt, grid, state, geo, params = {}, scratch }) {
       }
     }
   }
+
+  if (!shouldCollectDiagnostics || diagCount <= 0) return null;
+  const rms = (sum) => Math.sqrt(sum / diagCount);
+  return {
+    level: diagnosticsLevel,
+    count: diagCount,
+    rmsDeltaPGrad: rms(sumPGradDelta2),
+    rmsDeltaCoriolis: rms(sumCoriolisDelta2),
+    rmsDeltaDrag: rms(sumDragDelta2),
+    rmsDeltaDiffusion: rms(sumDiffDelta2),
+    rmsDeltaMetric: rms(sumMetricDelta2),
+    meanPreClampSpeed: sumPreClampSpeed / diagCount,
+    meanPostClampSpeed: sumPostClampSpeed / diagCount,
+    maxPreClampSpeed,
+    maxPostClampSpeed,
+    fracClamped: diagClamped / diagCount
+  };
 }

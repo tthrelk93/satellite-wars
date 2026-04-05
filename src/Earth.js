@@ -1644,7 +1644,7 @@ class Earth {
   }
 
   _logWindModelDiagnostics(simTimeSeconds) {
-    const core = this.analysisWeatherField?.core;
+    const core = this.weatherField?.core;
     if (!core?.ready) return false;
     const { grid, fields } = core;
     if (!grid || !fields?.u || !fields?.v) return false;
@@ -1662,6 +1662,30 @@ class Earth {
     const maxSpeed = diag.maxSpeed;
     const dynMaxWind = core?.dynParams?.maxWind ?? null;
     const speedRatio = Number.isFinite(dynMaxWind) && dynMaxWind > 0 ? speedPct.p99 / dynMaxWind : null;
+    const upperDiag = (fields.uU && fields.vU)
+      ? computeWindDiagnostics({
+        grid,
+        u: fields.uU,
+        v: fields.vU,
+        sampleTarget: 20000
+      })
+      : null;
+    const upperPct = upperDiag?.speedPercentiles || {};
+    const upperSpeedRatio = Number.isFinite(dynMaxWind) && dynMaxWind > 0 && Number.isFinite(upperPct.p99)
+      ? upperPct.p99 / dynMaxWind
+      : null;
+    let upperFracNearDynMax = null;
+    if (fields.uU && fields.vU && Number.isFinite(dynMaxWind) && dynMaxWind > 0) {
+      let nearMax = 0;
+      let count = 0;
+      for (let i = 0; i < fields.uU.length; i += 1) {
+        const speed = Math.hypot(fields.uU[i], fields.vU[i]);
+        if (!Number.isFinite(speed)) continue;
+        count += 1;
+        if (speed >= dynMaxWind * 0.98) nearMax += 1;
+      }
+      upperFracNearDynMax = count > 0 ? nearMax / count : null;
+    }
     const flags = [];
     if (meanSpeed < WIND_REALISM_TARGETS.model.meanMin) flags.push('mean_too_low');
     if (meanSpeed > WIND_REALISM_TARGETS.model.meanMax) flags.push('mean_too_high');
@@ -1672,10 +1696,22 @@ class Earth {
     if (maxSpeed > WIND_REALISM_TARGETS.model.maxMax) flags.push('max_too_high');
 
     const payload = {
-      source: 'analysis',
+      source: 'truth',
       ...diag,
       dynMaxWind,
       speedToMaxWindRatio: speedRatio,
+      upper: upperDiag
+        ? {
+          meanSpeed: upperDiag.meanSpeed,
+          maxSpeed: upperDiag.maxSpeed,
+          speedPercentiles: upperPct,
+          latBands: upperDiag.latBands,
+          roughness: upperDiag.roughness,
+          ekeMean: upperDiag.ekeMean,
+          speedToMaxWindRatio: upperSpeedRatio,
+          fracNearDynMax: upperFracNearDynMax
+        }
+        : null,
       modelDtSeconds: core.modelDt ?? null,
       flags
     };
@@ -1917,7 +1953,7 @@ class Earth {
       failingReasons
     };
     this._lastWindTargetsStatus = payload;
-    const core = this.analysisWeatherField?.core;
+    const core = this.weatherField?.core;
     return this.logWeatherEvent?.(
       'windTargetsStatus',
       payload,

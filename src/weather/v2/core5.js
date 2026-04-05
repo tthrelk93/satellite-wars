@@ -97,7 +97,7 @@ export class WeatherCore5 {
     this.dynParams = {
       maxWind: 70,
       tauDragSurface: 4 * 3600,
-      tauDragTop: 2 * 86400,
+      tauDragTop: 6 * 3600,
       nuLaplacian: 4_000_000,
       quadDragAlphaSurface: 0.02,
       tropicsDragBoost: 0.5,
@@ -141,7 +141,7 @@ export class WeatherCore5 {
     };
     this.nudgeParams = {
       enable: true,
-      cadenceSeconds: 6 * 3600,
+      cadenceSeconds: 3 * 3600,
       tauPs: 15 * 86400,
       tauThetaS: 45 * 86400,
       tauQvS: 30 * 86400,
@@ -166,15 +166,18 @@ export class WeatherCore5 {
       windSource: 'auto',
       tauThetaColumn: 15 * 86400,
       tauQvColumn: 12 * 86400,
-      tauWindColumn: 10 * 86400,
+      tauWindColumn: 1 * 86400,
       enableUpper: false
     };
     this._nudgeParamsRuntime = { ...this.nudgeParams };
     this.windNudgeParams = {
       enable: true,
       tauSurfaceSeconds: 7 * 86400,
-      tauUpperSeconds: 10 * 86400,
-      tauVSeconds: 20 * 86400,
+      tauUpperSeconds: 1 * 3600,
+      tauVSeconds: 2 * 3600,
+      upperWindCapFactor: 2.5,
+      upperWindCapOffset: 20,
+      upperWindCapMin: 35,
       upperJetScale: 2.2,
       upperJetLatDeg: 35,
       upperJetWidthDeg: 12
@@ -192,8 +195,8 @@ export class WeatherCore5 {
       enable: true,
       durationSeconds: 24 * 3600,
       tauSurfaceStartSeconds: 6 * 3600,
-      tauUpperStartSeconds: 12 * 3600,
-      tauVStartSeconds: 24 * 3600
+      tauUpperStartSeconds: 1 * 3600,
+      tauVStartSeconds: 2 * 3600
     };
     this.radParams = {
       enable: true,
@@ -883,17 +886,25 @@ export class WeatherCore5 {
       });
     }
     runWithLog('updateHydrostatic', () => this._updateHydrostatic());
+    let windDynamicsDiagnostics = null;
     runWithLog('stepWinds5', () => {
       this.dynParams.stepIndex = this._dynStepIndex;
-      stepWinds5({
+      windDynamicsDiagnostics = stepWinds5({
         dt,
         grid: this.grid,
         state: this.state,
         geo: this.geo,
-        params: this.dynParams,
+        params: {
+          ...this.dynParams,
+          diagnosticsLevel: this.verticalLayout?.upperTroposphere ?? null,
+          collectDiagnostics: shouldLogModules
+        },
         scratch: this._dynScratch
       });
     });
+    if (shouldLogModules && windDynamicsDiagnostics) {
+      logger.recordEvent('windDynamicsDiagnostics', logContext, this, windDynamicsDiagnostics);
+    }
     const spinupParams = this.windNudgeSpinupParams;
     if (spinupParams?.enable) {
       const durationSeconds = Number.isFinite(spinupParams.durationSeconds)
@@ -932,7 +943,8 @@ export class WeatherCore5 {
         ...this.windNudgeParams,
         tauSurfaceSeconds: tauSurfaceEff,
         tauUpperSeconds: tauUpperEff,
-        tauVSeconds: tauVEff
+        tauVSeconds: tauVEff,
+        maxUpperSpeed: this.dynParams?.maxWind ?? null
       }
     });
     if (windNudgeResult?.didApply) {
