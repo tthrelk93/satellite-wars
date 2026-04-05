@@ -5754,9 +5754,11 @@ const App = () => {
 
     // Animation loop
     useEffect(() => {
+        let rafId = null;
+        let stopped = false;
         const animate = () => {
-            if (!rendererRef.current) return;
-            requestAnimationFrame(animate);
+            if (stopped || !rendererRef.current) return;
+            rafId = requestAnimationFrame(animate);
 
             const nowMs = performance.now();
             if (lastFrameMsRef.current === null) {
@@ -5915,6 +5917,13 @@ const App = () => {
         };
 
         animate();
+        return () => {
+            stopped = true;
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+        };
     }, [satellites, gameMode]);
 
     function handleMouseMove(event) {
