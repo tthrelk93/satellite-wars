@@ -220,7 +220,7 @@ test('stepWindNudge5 keeps moderate upper-air targets below runaway 2.5x inflati
       tauSurfaceSeconds: 1e9,
       tauUpperSeconds: 1e9,
       tauVSeconds: 1e9,
-      upperWindCapFactor: 1.6,
+      upperWindCapFactor: 1.4,
       upperWindCapOffset: 0,
       upperWindCapMin: 0,
       upperWindCapJetBoost: 20,
@@ -230,6 +230,55 @@ test('stepWindNudge5 keeps moderate upper-air targets below runaway 2.5x inflati
   });
 
   const cappedSpeed = Math.hypot(state.u[levU * state.N + 0], state.v[levU * state.N + 0]);
-  assert.ok(cappedSpeed <= 16 + 1e-6);
-  assert.ok(cappedSpeed < 20);
+  assert.ok(cappedSpeed <= 14 + 1e-6);
+  assert.ok(cappedSpeed < 16);
+});
+
+test('stepWindNudge5 still leaves headroom for strong jet targets after tightening the cap factor', () => {
+  const sigmaHalf = createSigmaHalfLevels({ nz: 6 });
+  const state = createState5({ grid: { count: 1 }, nz: 6, sigmaHalf });
+  const grid = {
+    nx: 1,
+    ny: 1,
+    latDeg: new Float32Array([35]),
+    cosLat: new Float32Array([Math.cos(35 * Math.PI / 180)])
+  };
+  state.u.fill(0);
+  state.v.fill(0);
+  const levU = findClosestLevelIndex(state.sigmaHalf, 0.28);
+  state.pMid[levU * state.N + 0] = 25000;
+  state.u[levU * state.N + 0] = 100;
+  const climo = {
+    hasWind: true,
+    hasWind500: true,
+    hasWind250: true,
+    windNowU: new Float32Array([6]),
+    windNowV: new Float32Array([0]),
+    wind500NowU: new Float32Array([18]),
+    wind500NowV: new Float32Array([0]),
+    wind250NowU: new Float32Array([30]),
+    wind250NowV: new Float32Array([0])
+  };
+
+  stepWindNudge5({
+    dt: 1,
+    grid,
+    state,
+    climo,
+    params: {
+      tauSurfaceSeconds: 1e9,
+      tauUpperSeconds: 1e9,
+      tauVSeconds: 1e9,
+      upperWindCapFactor: 1.4,
+      upperWindCapOffset: 0,
+      upperWindCapMin: 0,
+      upperWindCapJetBoost: 20,
+      upperJetLatDeg: 35,
+      upperJetWidthDeg: 12
+    }
+  });
+
+  const cappedSpeed = Math.hypot(state.u[levU * state.N + 0], state.v[levU * state.N + 0]);
+  assert.ok(cappedSpeed <= 42 + 1e-6);
+  assert.ok(cappedSpeed > 40);
 });
