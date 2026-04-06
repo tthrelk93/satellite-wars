@@ -35,8 +35,10 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'dThetaMaxConvPerStep',
   'enableLargeScaleVerticalAdvection',
   'verticalAdvectionCflMax',
+  'verticalAdvectionSigmaTaperExp',
   'dThetaMaxVertAdvPerStep',
   'enableOmegaMassFix',
+  'omegaMassFixSigmaTaperExp',
   'orographicLiftScale',
   'orographicDecayFrac',
   'terrainSlopeRef',
@@ -113,10 +115,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     // Large-scale vertical advection (omega-based)
     enableLargeScaleVerticalAdvection = true,
     verticalAdvectionCflMax = 0.4,
+    verticalAdvectionSigmaTaperExp = 2.0,
     dThetaMaxVertAdvPerStep = 2.0,
 
     // Omega correction to match applied surface pressure tendency
     enableOmegaMassFix = true,
+    omegaMassFixSigmaTaperExp = 2.0,
     orographicLiftScale = 1.0,
     orographicDecayFrac = 0.35,
     terrainSlopeRef = 0.003,
@@ -236,8 +240,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       if (!Number.isFinite(omegaSurf) || !Number.isFinite(target)) continue;
       const delta = target - omegaSurf;
       if (delta === 0) continue;
+      const taperExp = Math.max(0, omegaMassFixSigmaTaperExp);
       for (let lev = 0; lev <= nz; lev++) {
-        omega[lev * N + k] += delta * sigmaHalf[lev];
+        const sigma = clamp01(sigmaHalf[lev]);
+        const weight = taperExp > 0 ? Math.pow(sigma, taperExp) : sigma;
+        omega[lev * N + k] += delta * weight;
       }
     }
   }
@@ -253,39 +260,39 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       }
       const qvNext = state._vertAdvQv;
       const thetaNext = state._vertAdvTheta;
+      const taperExp = Math.max(0, verticalAdvectionSigmaTaperExp);
       for (let k = 0; k < N; k++) {
-        let fluxQvTop = 0;
-        let fluxThetaTop = 0;
         for (let lev = 0; lev < nz; lev++) {
           const idx = lev * N + k;
-          const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-          if (dpLev <= 0) {
-            qvNext[idx] = qv[idx];
-            thetaNext[idx] = theta[idx];
-            fluxQvTop = 0;
-            fluxThetaTop = 0;
-            continue;
-          }
-          const mLev = dpLev / g;
-          let fluxQvBot = 0;
-          let fluxThetaBot = 0;
-          if (lev < nz - 1) {
-            let mDot = -omega[(lev + 1) * N + k] / g;
-            if (mDot !== 0) {
-              let mUp = mLev;
-              if (mDot > 0) {
-                const dpBelow = pHalf[(lev + 2) * N + k] - pHalf[(lev + 1) * N + k];
-                mUp = dpBelow / g;
-              }
-              const maxAbs = cflMax * Math.max(1e-6, mUp) / dt;
-              if (Math.abs(mDot) > maxAbs) mDot = Math.sign(mDot) * maxAbs;
-              const idxUp = mDot > 0 ? (lev + 1) * N + k : idx;
-              fluxQvBot = mDot * qv[idxUp];
-              fluxThetaBot = mDot * theta[idxUp];
+          let qvUpdated = qv[idx];
+          let thetaUpdated = theta[idx];
+          const omegaTop = omega[lev * N + k];
+          const omegaBot = omega[(lev + 1) * N + k];
+          const omegaMid = 0.5 * (omegaTop + omegaBot);
+          const sigmaMid = sigmaHalf && sigmaHalf.length > lev + 1
+            ? clamp01(0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1]))
+            : 1;
+          const transportScale = taperExp > 0 ? Math.pow(sigmaMid, taperExp) : 1;
+
+          if (omegaMid < 0 && lev < nz - 1) {
+            const idxBelow = (lev + 1) * N + k;
+            const dpNeighbor = pMid[idxBelow] - pMid[idx];
+            if (dpNeighbor > 0) {
+              const frac = clamp(((-omegaMid) * dt * transportScale) / dpNeighbor, 0, cflMax);
+              qvUpdated += frac * (qv[idxBelow] - qv[idx]);
+              thetaUpdated += frac * (theta[idxBelow] - theta[idx]);
+            }
+          } else if (omegaMid > 0 && lev > 0) {
+            const idxAbove = (lev - 1) * N + k;
+            const dpNeighbor = pMid[idx] - pMid[idxAbove];
+            if (dpNeighbor > 0) {
+              const frac = clamp((omegaMid * dt * transportScale) / dpNeighbor, 0, cflMax);
+              qvUpdated += frac * (qv[idxAbove] - qv[idx]);
+              thetaUpdated += frac * (theta[idxAbove] - theta[idx]);
             }
           }
-          qvNext[idx] = qv[idx] + (dt / mLev) * (fluxQvBot - fluxQvTop);
-          const thetaUpdated = theta[idx] + (dt / mLev) * (fluxThetaBot - fluxThetaTop);
+
+          qvNext[idx] = Math.max(0, qvUpdated);
           if (dThetaMaxVertAdvPerStep > 0) {
             const dTheta = thetaUpdated - theta[idx];
             thetaNext[idx] =
@@ -293,8 +300,6 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           } else {
             thetaNext[idx] = thetaUpdated;
           }
-          fluxQvTop = fluxQvBot;
-          fluxThetaTop = fluxThetaBot;
         }
       }
       qv.set(qvNext);
