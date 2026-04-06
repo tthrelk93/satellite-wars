@@ -138,3 +138,98 @@ test('stepWindNudge5 caps runaway upper winds relative to climatology targets', 
   assert.ok(cappedSpeed <= 70);
   assert.ok(cappedSpeed < 100);
 });
+
+test('stepWindNudge5 does not preserve a fixed base upper-air floor in weak-target bands', () => {
+  const sigmaHalf = createSigmaHalfLevels({ nz: 6 });
+  const state = createState5({ grid: { count: 1 }, nz: 6, sigmaHalf });
+  const grid = {
+    nx: 1,
+    ny: 1,
+    latDeg: new Float32Array([80]),
+    cosLat: new Float32Array([Math.cos(80 * Math.PI / 180)])
+  };
+  state.u.fill(0);
+  state.v.fill(0);
+  const levU = findClosestLevelIndex(state.sigmaHalf, 0.28);
+  state.pMid[levU * state.N + 0] = 30000;
+  state.u[levU * state.N + 0] = 100;
+  const climo = {
+    hasWind: true,
+    hasWind500: true,
+    hasWind250: true,
+    windNowU: new Float32Array([2]),
+    windNowV: new Float32Array([0]),
+    wind500NowU: new Float32Array([5]),
+    wind500NowV: new Float32Array([0]),
+    wind250NowU: new Float32Array([5]),
+    wind250NowV: new Float32Array([0])
+  };
+
+  stepWindNudge5({
+    dt: 1,
+    grid,
+    state,
+    climo,
+    params: {
+      tauSurfaceSeconds: 1e9,
+      tauUpperSeconds: 1e9,
+      tauVSeconds: 1e9,
+      upperWindCapFactor: 1.6,
+      upperWindCapOffset: 0,
+      upperWindCapMin: 0
+    }
+  });
+
+  const cappedSpeed = Math.hypot(state.u[levU * state.N + 0], state.v[levU * state.N + 0]);
+  assert.ok(cappedSpeed <= 8 + 1e-6);
+  assert.ok(cappedSpeed < 10);
+});
+
+test('stepWindNudge5 keeps moderate upper-air targets below runaway 2.5x inflation', () => {
+  const sigmaHalf = createSigmaHalfLevels({ nz: 6 });
+  const state = createState5({ grid: { count: 1 }, nz: 6, sigmaHalf });
+  const grid = {
+    nx: 1,
+    ny: 1,
+    latDeg: new Float32Array([55]),
+    cosLat: new Float32Array([Math.cos(55 * Math.PI / 180)])
+  };
+  state.u.fill(0);
+  state.v.fill(0);
+  const levU = findClosestLevelIndex(state.sigmaHalf, 0.28);
+  state.pMid[levU * state.N + 0] = 30000;
+  state.u[levU * state.N + 0] = 100;
+  const climo = {
+    hasWind: true,
+    hasWind500: true,
+    hasWind250: true,
+    windNowU: new Float32Array([4]),
+    windNowV: new Float32Array([0]),
+    wind500NowU: new Float32Array([10]),
+    wind500NowV: new Float32Array([0]),
+    wind250NowU: new Float32Array([10]),
+    wind250NowV: new Float32Array([0])
+  };
+
+  stepWindNudge5({
+    dt: 1,
+    grid,
+    state,
+    climo,
+    params: {
+      tauSurfaceSeconds: 1e9,
+      tauUpperSeconds: 1e9,
+      tauVSeconds: 1e9,
+      upperWindCapFactor: 1.6,
+      upperWindCapOffset: 0,
+      upperWindCapMin: 0,
+      upperWindCapJetBoost: 20,
+      upperJetLatDeg: 35,
+      upperJetWidthDeg: 12
+    }
+  });
+
+  const cappedSpeed = Math.hypot(state.u[levU * state.N + 0], state.v[levU * state.N + 0]);
+  assert.ok(cappedSpeed <= 16 + 1e-6);
+  assert.ok(cappedSpeed < 20);
+});

@@ -1,9 +1,10 @@
-import { Cp, Rd } from '../constants';
-import { LAT_DEG, U10M_ZONAL_MEAN_TARGET, SOURCE_FIXTURE_COUNT } from './windClimoTargets';
-import { findClosestLevelIndex } from './verticalGrid';
+import { Cp, Rd } from '../constants.js';
+import { LAT_DEG, U10M_ZONAL_MEAN_TARGET, SOURCE_FIXTURE_COUNT } from './windClimoTargets.js';
+import { findClosestLevelIndex } from './verticalGrid.js';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
+const lerp = (a, b, t) => a + (b - a) * t;
 
 const smoothstep = (edge0, edge1, x) => {
   const t = clamp01((x - edge0) / (edge1 - edge0));
@@ -25,6 +26,56 @@ const sampleTargetU = (latDeg) => {
   return U10M_ZONAL_MEAN_TARGET[i0] + (U10M_ZONAL_MEAN_TARGET[i1] - U10M_ZONAL_MEAN_TARGET[i0]) * t;
 };
 
+const hasSpatialWindTargets = (climo) => Boolean(
+  climo?.hasWind && climo?.windNowU && climo?.windNowV &&
+  (climo?.hasWind500 || climo?.hasWind250)
+);
+
+const sampleVerticalWindTarget = ({ state, climo, cell, pLev, levS, idxS }) => {
+  if (!Number.isFinite(pLev) || !climo?.windNowU || !climo?.windNowV) return null;
+
+  const surfaceU = climo.windNowU[cell];
+  const surfaceV = climo.windNowV[cell];
+  if (!Number.isFinite(surfaceU) || !Number.isFinite(surfaceV)) return null;
+
+  const wind500NowU = climo?.wind500NowU;
+  const wind500NowV = climo?.wind500NowV;
+  const wind250NowU = climo?.wind250NowU;
+  const wind250NowV = climo?.wind250NowV;
+  const has500 = Boolean(climo?.hasWind500 && wind500NowU && wind500NowV);
+  const has250 = Boolean(climo?.hasWind250 && wind250NowU && wind250NowV);
+
+  if (!has500 && !has250) return { u: surfaceU, v: surfaceV };
+
+  if (pLev <= 50000) {
+    if (has500 && has250) {
+      const w250 = clamp((50000 - pLev) / (50000 - 25000), 0, 1);
+      return {
+        u: lerp(wind500NowU[cell], wind250NowU[cell], w250),
+        v: lerp(wind500NowV[cell], wind250NowV[cell], w250)
+      };
+    }
+    if (has250) return { u: wind250NowU[cell], v: wind250NowV[cell] };
+    return { u: wind500NowU[cell], v: wind500NowV[cell] };
+  }
+
+  if (has500) {
+    const pSurf = Number.isFinite(state?.ps?.[cell])
+      ? state.ps[cell]
+      : Number.isFinite(state?.pMid?.[idxS])
+        ? state.pMid[idxS]
+        : 100000;
+    const denom = Math.max(1e-6, pSurf - 50000);
+    const w500 = clamp((pSurf - pLev) / denom, 0, 1);
+    return {
+      u: lerp(surfaceU, wind500NowU[cell], w500),
+      v: lerp(surfaceV, wind500NowV[cell], w500)
+    };
+  }
+
+  return { u: surfaceU, v: surfaceV };
+};
+
 const KAPPA = Rd / Cp;
 
 const saturationMixingRatio = (T, p) => {
@@ -35,6 +86,16 @@ const saturationMixingRatio = (T, p) => {
   const eps = 0.622;
   const qs = (eps * esClamped) / Math.max(1, p - esClamped);
   return Math.min(qs, 0.2);
+};
+
+const getLayerMidPressure = ({ state, sigma, pTop, cell, lev, idx }) => {
+  const existing = state?.pMid?.[idx];
+  if (Number.isFinite(existing) && existing > 0) return existing;
+  const pSurf = Number.isFinite(state?.ps?.[cell]) ? state.ps[cell] : 100000;
+  if (!sigma || sigma.length < lev + 2) return pSurf;
+  const p1 = pTop + (pSurf - pTop) * sigma[lev];
+  const p2 = pTop + (pSurf - pTop) * sigma[lev + 1];
+  return Math.sqrt(Math.max(pTop, p1) * Math.max(pTop, p2));
 };
 
 export function initializeV2FromClimo({ grid, state, geo, climo, params = {} }) {
@@ -137,7 +198,33 @@ export function initializeV2FromClimo({ grid, state, geo, climo, params = {} }) 
     }
   }
 
-  if (SOURCE_FIXTURE_COUNT === 8 && u && v) {
+  if (u && v && hasSpatialWindTargets(climo)) {
+    for (let j = 0; j < ny; j++) {
+      const row = j * nx;
+      for (let i = 0; i < nx; i++) {
+        const k = row + i;
+        const idxS = levS * N + k;
+        const surfaceU = climo.windNowU[k];
+        const surfaceV = climo.windNowV[k];
+        if (Number.isFinite(surfaceU) && Number.isFinite(surfaceV)) {
+          u[idxS] = surfaceU;
+          v[idxS] = surfaceV;
+        }
+
+        if (state.pMid?.length === nz * N) {
+          for (let lev = 0; lev < nz; lev += 1) {
+            if (lev === levS) continue;
+            const idx = lev * N + k;
+            const pLev = getLayerMidPressure({ state, sigma, pTop, cell: k, lev, idx });
+            const target = sampleVerticalWindTarget({ state, climo, cell: k, pLev, levS, idxS });
+            if (!target) continue;
+            u[idx] = target.u;
+            v[idx] = target.v;
+          }
+        }
+      }
+    }
+  } else if (SOURCE_FIXTURE_COUNT === 8 && u && v) {
     const levU = findClosestLevelIndex(sigmaHalf, 0.28);
     for (let j = 0; j < ny; j++) {
       const lat = Number.isFinite(latDeg?.[j])
