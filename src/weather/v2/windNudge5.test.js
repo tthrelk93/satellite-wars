@@ -220,7 +220,7 @@ test('stepWindNudge5 keeps moderate upper-air targets below runaway 2.5x inflati
       tauSurfaceSeconds: 1e9,
       tauUpperSeconds: 1e9,
       tauVSeconds: 1e9,
-      upperWindCapFactor: 1.4,
+      upperWindCapFactor: 1.35,
       upperWindCapOffset: 0,
       upperWindCapMin: 0,
       upperWindCapJetBoost: 20,
@@ -230,8 +230,8 @@ test('stepWindNudge5 keeps moderate upper-air targets below runaway 2.5x inflati
   });
 
   const cappedSpeed = Math.hypot(state.u[levU * state.N + 0], state.v[levU * state.N + 0]);
-  assert.ok(cappedSpeed <= 14 + 1e-6);
-  assert.ok(cappedSpeed < 16);
+  assert.ok(cappedSpeed <= 13.5 + 1e-6);
+  assert.ok(cappedSpeed < 15);
 });
 
 test('stepWindNudge5 still leaves headroom for strong jet targets after tightening the cap factor', () => {
@@ -269,7 +269,7 @@ test('stepWindNudge5 still leaves headroom for strong jet targets after tighteni
       tauSurfaceSeconds: 1e9,
       tauUpperSeconds: 1e9,
       tauVSeconds: 1e9,
-      upperWindCapFactor: 1.4,
+      upperWindCapFactor: 1.35,
       upperWindCapOffset: 0,
       upperWindCapMin: 0,
       upperWindCapJetBoost: 20,
@@ -279,6 +279,6 @@ test('stepWindNudge5 still leaves headroom for strong jet targets after tighteni
   });
 
   const cappedSpeed = Math.hypot(state.u[levU * state.N + 0], state.v[levU * state.N + 0]);
-  assert.ok(cappedSpeed <= 42 + 1e-6);
+  assert.ok(cappedSpeed <= 40.5 + 1e-6);
   assert.ok(cappedSpeed > 40);
 });
