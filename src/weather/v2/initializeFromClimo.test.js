@@ -3,6 +3,20 @@ import assert from 'node:assert/strict';
 import { createState5 } from './state5.js';
 import { createSigmaHalfLevels } from './verticalGrid.js';
 import { initializeV2FromClimo } from './initializeFromClimo.js';
+import { updateHydrostatic } from './hydrostatic.js';
+
+const nearestLevelForPressure = (state, pressurePa) => {
+  let bestLev = 0;
+  let bestError = Infinity;
+  for (let lev = 0; lev < state.nz; lev += 1) {
+    const error = Math.abs(state.pMid[lev * state.N] - pressurePa);
+    if (error < bestError) {
+      bestError = error;
+      bestLev = lev;
+    }
+  }
+  return bestLev;
+};
 
 test('initializeV2FromClimo seeds spatial wind climatology through the full column when available', () => {
   const sigmaHalf = createSigmaHalfLevels({ nz: 6 });
@@ -130,4 +144,70 @@ test('initializeV2FromClimo derives layer pressures when hydrostatic pMid is not
   assert.ok(Math.abs(state.u[1] - expectedU) < 1e-6);
   assert.ok(Math.abs(state.v[1] - expectedV) < 1e-6);
   assert.ok(state.u[1] < 35);
+});
+
+test('initializeV2FromClimo uses upper-air temperature climatology to avoid a hot mid-column bulge', () => {
+  const sigmaHalf = createSigmaHalfLevels({ nz: 8 });
+  const grid = {
+    count: 1,
+    nx: 1,
+    ny: 1,
+    latDeg: new Float32Array([20])
+  };
+  const state = createState5({ grid, nz: 8, sigmaHalf });
+  state.ps[0] = 100000;
+  state.landMask[0] = 0;
+  state.soilCap[0] = 1;
+  state.sstNow[0] = 300;
+
+  const climo = {
+    hasT700: true,
+    hasT250: true,
+    t700Now: new Float32Array([268]),
+    t250Now: new Float32Array([222])
+  };
+
+  initializeV2FromClimo({ grid, state, geo: {}, climo });
+  updateHydrostatic(state, { pTop: 20000 });
+
+  const lev700 = nearestLevelForPressure(state, 70000);
+  const lev250 = nearestLevelForPressure(state, 25000);
+  const surfaceLev = state.nz - 1;
+
+  assert.ok(Math.abs(state.T[lev700 * state.N] - 268) < 6);
+  assert.ok(Math.abs(state.T[lev250 * state.N] - 222) < 8);
+  assert.ok(state.T[lev700 * state.N] < state.T[surfaceLev * state.N]);
+
+  for (let lev = 0; lev < state.nz - 1; lev += 1) {
+    assert.ok(
+      state.T[lev * state.N] <= state.T[(lev + 1) * state.N] + 1e-6,
+      `expected temperature to increase downward at lev=${lev}`
+    );
+  }
+});
+
+test('initializeV2FromClimo fallback profile stays within a realistic startup temperature range', () => {
+  const sigmaHalf = createSigmaHalfLevels({ nz: 8 });
+  const grid = {
+    count: 1,
+    nx: 1,
+    ny: 1,
+    latDeg: new Float32Array([0])
+  };
+  const state = createState5({ grid, nz: 8, sigmaHalf });
+  state.ps[0] = 100000;
+  state.landMask[0] = 0;
+  state.soilCap[0] = 1;
+  state.sstNow[0] = 301;
+
+  initializeV2FromClimo({ grid, state, geo: {}, climo: {} });
+  updateHydrostatic(state, { pTop: 20000 });
+
+  let maxT = -Infinity;
+  for (let lev = 0; lev < state.nz; lev += 1) {
+    maxT = Math.max(maxT, state.T[lev * state.N]);
+  }
+
+  assert.ok(maxT < 310, `expected fallback column maxT < 310 K, got ${maxT}`);
+  assert.ok(state.T[(state.nz - 1) * state.N] <= 302);
 });

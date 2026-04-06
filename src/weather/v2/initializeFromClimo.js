@@ -1,4 +1,4 @@
-import { Cp, Rd } from '../constants.js';
+import { potentialTemperatureFromTemperature } from './analysisData.js';
 import { LAT_DEG, U10M_ZONAL_MEAN_TARGET, SOURCE_FIXTURE_COUNT } from './windClimoTargets.js';
 import { findClosestLevelIndex } from './verticalGrid.js';
 
@@ -76,7 +76,58 @@ const sampleVerticalWindTarget = ({ state, climo, cell, pLev, levS, idxS }) => {
   return { u: surfaceU, v: surfaceV };
 };
 
-const KAPPA = Rd / Cp;
+const interpolateLogPressure = (pTarget, p0, v0, p1, v1) => {
+  const ln0 = Math.log(Math.max(1, p0));
+  const ln1 = Math.log(Math.max(1, p1));
+  const denom = ln1 - ln0;
+  if (!Number.isFinite(denom) || Math.abs(denom) < 1e-9) return v0;
+  const t = clamp((Math.log(Math.max(1, pTarget)) - ln0) / denom, 0, 1);
+  return lerp(v0, v1, t);
+};
+
+const buildTemperatureAnchors = ({
+  pSurf,
+  pTop,
+  TsVal,
+  t700,
+  t250,
+  humidLat
+}) => {
+  const equatorWeight = clamp01(humidLat);
+  const fallback700 = clamp(TsVal - lerp(34, 24, equatorWeight), 215, TsVal - 4);
+  const t700Use = clamp(
+    Number.isFinite(t700) ? t700 : fallback700,
+    215,
+    TsVal - 4
+  );
+  const fallback250 = clamp(t700Use - lerp(46, 38, equatorWeight), 185, t700Use - 4);
+  const t250Use = clamp(
+    Number.isFinite(t250) ? t250 : fallback250,
+    185,
+    t700Use - 4
+  );
+  const tTop = clamp(t250Use - 6, 180, t250Use);
+
+  const anchors = [{ p: pSurf, T: TsVal }];
+  if (pSurf > 70000 + 500) anchors.push({ p: 70000, T: t700Use });
+  if (pSurf > 25000 + 500) anchors.push({ p: 25000, T: t250Use });
+  anchors.push({ p: pTop, T: tTop });
+  anchors.sort((a, b) => b.p - a.p);
+  return anchors;
+};
+
+const sampleTemperatureFromAnchors = (pTarget, anchors) => {
+  if (!anchors?.length) return null;
+  if (pTarget >= anchors[0].p) return anchors[0].T;
+  for (let i = 0; i < anchors.length - 1; i += 1) {
+    const a = anchors[i];
+    const b = anchors[i + 1];
+    if (pTarget <= a.p && pTarget >= b.p) {
+      return interpolateLogPressure(pTarget, a.p, a.T, b.p, b.T);
+    }
+  }
+  return anchors[anchors.length - 1].T;
+};
 
 const saturationMixingRatio = (T, p) => {
   const Tuse = clamp(T, 180, 330);
@@ -121,7 +172,6 @@ export function initializeV2FromClimo({ grid, state, geo, climo, params = {} }) 
   const t2mNow = climo?.hasT2m ? climo.t2mNow : null;
 
   const levS = nz - 1;
-  const dTheta = 6;
   const sigma = sigmaHalf && sigmaHalf.length >= nz + 1 ? sigmaHalf : null;
 
   for (let j = 0; j < ny; j++) {
@@ -159,23 +209,32 @@ export function initializeV2FromClimo({ grid, state, geo, climo, params = {} }) 
         soilW[k] = 0;
       }
 
+      const pSurf = ps[k];
       const qvBase = land ? qvLandBase : qvOceanBase;
       const qv0 = qvBase * (humidLat + qvPoleFactor * (1 - humidLat));
-      const thetaSurface = TsVal + 2;
-      const pSurf = ps[k];
+      const t700Target = climo?.hasT700 && climo?.t700Now?.length === N ? climo.t700Now[k] : null;
+      const t250Target = climo?.hasT250 && climo?.t250Now?.length === N ? climo.t250Now[k] : null;
+      const tempAnchors = buildTemperatureAnchors({
+        pSurf,
+        pTop,
+        TsVal,
+        t700: t700Target,
+        t250: t250Target,
+        humidLat
+      });
+
       let rhSurf = 0.7;
       if (sigma) {
         const p1 = pTop + (pSurf - pTop) * sigma[levS];
         const p2 = pTop + (pSurf - pTop) * sigma[levS + 1];
         const pMidSurf = Math.sqrt(Math.max(pTop, p1) * Math.max(pTop, p2));
-        const PiSurf = Math.pow(pMidSurf / p0, KAPPA);
-        const TSurf = thetaSurface * PiSurf;
+        const TSurf = sampleTemperatureFromAnchors(pMidSurf, tempAnchors) ?? TsVal;
         const qsSurf = saturationMixingRatio(TSurf, pMidSurf);
         rhSurf = qsSurf > 0 ? clamp(qv0 / qsSurf, 0.2, 0.9) : 0.7;
       }
+
       for (let lev = 0; lev < nz; lev++) {
         const idx = lev * N + k;
-        theta[idx] = thetaSurface + (levS - lev) * dTheta;
         const qvOld = qv0 * Math.exp(-(levS - lev) / 2);
         const sigmaMid = sigma
           ? 0.5 * (sigma[lev] + sigma[lev + 1])
@@ -186,11 +245,14 @@ export function initializeV2FromClimo({ grid, state, geo, climo, params = {} }) 
           const p1 = pTop + (pSurf - pTop) * sigma[lev];
           const p2 = pTop + (pSurf - pTop) * sigma[lev + 1];
           const pMid = Math.sqrt(Math.max(pTop, p1) * Math.max(pTop, p2));
-          const Pi = Math.pow(pMid / p0, KAPPA);
-          const T = theta[idx] * Pi;
+          const T = sampleTemperatureFromAnchors(pMid, tempAnchors) ?? TsVal;
+          theta[idx] = potentialTemperatureFromTemperature(T, pMid, p0);
           const qs = saturationMixingRatio(T, pMid);
           qvNew = Math.min(qvOld, rhCapLev * qs);
         } else {
+          const frac = lev / Math.max(1, nz - 1);
+          const T = lerp(tempAnchors[tempAnchors.length - 1].T, TsVal, frac);
+          theta[idx] = potentialTemperatureFromTemperature(T, pSurf, p0);
           qvNew = Math.min(qvOld, rhCapLev * 0.02);
         }
         qv[idx] = clamp(qvNew, 0, 0.03);
