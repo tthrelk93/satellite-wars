@@ -1,24 +1,25 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-07T11:14:00Z",
+  "updatedAt": "2026-04-07T13:21:00Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
-  "baselineCommit": "1db18a7", 
+  "baselineCommit": "255c084",
   "latestCycle": {
-    "id": "cycle-2026-04-07T10-29-38Z-bounded-truth-worker-desync",
-    "goal": "bound visible sim advancement against truth-worker lead so the mature Day 6-8 window becomes usable again",
-    "verifiedImprovement": "month-burst backlog no longer lets the visible sim outrun the truth worker by multi-day amounts; mature live checkpoints stayed within roughly 9.97-11.97 hours of truth while still reaching Day 7",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-07T10-29-38Z-bounded-truth-worker-desync/runtime-summary.json",
-    "runtimeLogPath": "logs/weather-2026-04-07T10-43-20Z-89473.jsonl"
+    "id": "cycle-2026-04-07T13-07-12Z-topography-climo-restoration",
+    "goal": "restore missing terrain climatology in the live browser worker so the weather model stops running with a flat land field",
+    "verifiedImprovement": "canonical localhost browser runs now ingest nonzero land-only terrain from climatology; the verified run held elev.max 3825.27 m, elevLand.mean 894.67 m, and elevOcean.max 0 through Day 1, 09:06",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-07T13-07-12Z-topography-climo-restoration/runtime-summary.json",
+    "runtimeLogPath": "logs/weather-2026-04-07T13-14-48Z-45673.jsonl"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
     "overallPass": true
   },
   "blockingGaps": [
-    "broader Earth-like realism still needs explicit mature-window re-audits across circulation, vertical coupling, storm behavior, cloud structure, and precipitation organization now that the live Day 6-8 window is usable again",
-    "runtime smoothness is still not shippable enough: the fresh hotspot profile points to repeated wind-field rebuild cost in src/WindStreamlineRenderer.js:_buildField / _shouldRebuildField",
+    "broader Earth-like realism still needs explicit mature-window re-audits now that terrain coupling is active in the browser worker",
+    "orographic realism still needs direct validation: mountain precipitation structure, upslope lift organization, lee-side drying, and storm interaction with terrain all need fresh evidence",
+    "runtime smoothness is still not signed off; any further smoothness-only work must start from fresh hotspot attribution again",
     "world-class status still requires realism and smoothness to pass in the same fresh live run"
   ],
   "cycleInputs": [
@@ -31,53 +32,32 @@
   ],
   "latestTelemetry": {
     "singleTabLocalhostVerified": true,
-    "runtimeHealthWarnings": [
-      "earth_update_p95_high",
-      "earth_update_max_high",
-      "sim_lag_max_high",
-      "sim_steps_skipped"
-    ],
-    "updateMs": {
-      "p95": 23.345000009238724,
-      "max": 184.29999999701977
-    },
-    "simLagSeconds": {
-      "p95": 119.99999999999727,
-      "max": 20640
-    },
-    "workerCatchup": {
-      "preFixMaxLeadSeconds": 1855080,
-      "postFixLeadCapSeconds": 43200,
-      "matureWindowLeadSeconds": {
-        "day3": 35880,
-        "day5": 35880,
-        "day6": 35880,
-        "day7": 35880,
-        "latestBeforeWindowEnd": 43080
+    "terrainRestored": {
+      "preFix": {
+        "simLabel": "Day 0, 02:52",
+        "elevMaxM": 0,
+        "elevMeanM": 0
       },
-      "postFixWorkerChunkSeconds": 21600
+      "postFix": {
+        "earlySimLabel": "Day 0, 01:28",
+        "matureSimLabel": "Day 1, 09:06",
+        "elevMaxM": 3825.272216796875,
+        "elevMeanAwM": 321.8599749604572,
+        "elevLandMeanM": 894.6691136512364,
+        "elevOceanMaxM": 0,
+        "landFrac": 0.35975308641975307
+      }
     },
-    "windTargets": {
-      "meanSpeed": 5.1623694751394025,
-      "p90": 12.147291911233921,
-      "p99": 14.72797589468613,
-      "maxSpeed": 15.549147122418782,
-      "stepMeanPx": 0.06030382286817156,
-      "failingReasons": [],
-      "overallPass": true
-    },
-    "hotspotFocus": {
-      "area": "WindStreamlineRenderer._buildField",
-      "functionHints": [
-        "src/WindStreamlineRenderer.js:_buildField",
-        "src/WindStreamlineRenderer.js:_shouldRebuildField"
-      ]
+    "runtimeSummary": {
+      "lineCount": 0,
+      "validationSnapshotCount": 0,
+      "warnings": []
     }
   },
   "defaultNextPriority": [
-    "use the restored mature Day 6-8 live window to re-audit the highest-leverage remaining realism weakness with the realism investigation playbook",
-    "keep wind-streamline rebuild hotspots evidence-based: use the fresh hotspot-profile.json before any renderer smoothness tweak",
-    "re-check realism and smoothness in the same fresh live run rather than treating them as separate finish lines",
+    "re-audit the highest-leverage remaining realism weakness now that browser terrain coupling is restored, prioritizing mountain/orographic precipitation and terrain-shaped storm structure",
+    "keep realism-first discipline: use the mature live window to verify circulation, clouds, precipitation, and vertical coupling instead of drifting into smoothness-only tweaks",
+    "when smoothness becomes the blocker again, collect fresh hotspot attribution before changing renderer or worker performance behavior",
     "keep validation on the clean world-class checkout only"
   ],
   "rules": {

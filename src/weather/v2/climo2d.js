@@ -1,4 +1,4 @@
-import { loadClimatology } from '../climatology';
+import { loadClimatology } from '../climatology.js';
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
@@ -16,6 +16,16 @@ const deriveLandMask = (source, threshold) => {
   }
   return { mask, landFrac: landCount / count };
 };
+
+const maskFieldToLand = (field, landMask, fillValue = 0) => {
+  if (!field || !landMask || field.length !== landMask.length) return field;
+  for (let k = 0; k < field.length; k += 1) {
+    if (landMask[k] !== 1) field[k] = fillValue;
+  }
+  return field;
+};
+
+export const maskElevToLand = (elev, landMask) => maskFieldToLand(elev, landMask, 0);
 
 export async function initClimo2D({ grid, seed } = {}) {
   const nx = grid?.nx ?? 180;
@@ -179,6 +189,7 @@ export async function initClimo2D({ grid, seed } = {}) {
   }
   if (chosen?.mask && chosen.mask.length === landMask.length) {
     landMask.set(chosen.mask);
+    maskElevToLand(elev, landMask);
   }
 
   void seed;
