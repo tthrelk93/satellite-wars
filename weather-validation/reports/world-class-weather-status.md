@@ -11,7 +11,9 @@ Verdict: NOT WORLD CLASS YET
 - Canonical localhost reuse remains working: `npm run agent:reuse-localhost-tab` successfully reused `http://127.0.0.1:3000/` on the OpenClaw `openclaw` profile and cleaned duplicate localhost tabs during the cycle.
 - Single-tab enforcement was verified again with one live localhost tab only.
 - Fresh runtime summary (`weather-validation/output/cycle-2026-04-07T05-06-50Z-surface-drag-relaxation/runtime-summary.json`) still says `likelySmoothEnough: false`.
-- Fresh live wind telemetry no longer fails the documented wind-energy gate; the next concrete blocker is runtime smoothness.
+- Fresh live wind telemetry no longer fails the documented wind-energy gate.
+- The main mission is still broader Earth-like realism, not just wind targets. The model still needs repeated documented realism audits across circulation, vertical structure, storms, clouds, precipitation, and multi-day evolution.
+- Runtime smoothness is still a blocker for shippability, but it should act as a guardrail rather than consuming every cycle while realism weaknesses remain under-documented.
 
 ## Fresh evidence from the latest cycle
 
@@ -32,22 +34,25 @@ Verdict: NOT WORLD CLASS YET
 
 ## What still blocks "world class"
 
-- Runtime smoothness still shows `Earth.update` spikes (`earth_update_p95_high`, `earth_update_max_high`).
 - Long-horizon live realism still needs repeated documented checkpoints on the newly-energized field, not just a single successful mature-window run.
+- Broader Earth-like realism still needs explicit re-audits across circulation, vertical coupling, storm behavior, cloud structure, and precipitation organization.
+- Runtime smoothness still shows `Earth.update` spikes (`earth_update_p95_high`, `earth_update_max_high`), but should only take the primary slot when it blocks reliable realism observation or regresses after a realism fix.
 - The weather worker still needs a clean pass where realism and smoothness are both inside the world-class bar at the same time.
 
 ## Canonical cycle inputs
 
 - `weather-validation/reports/earth-accuracy-status.md`
+- `weather-validation/reports/realism-investigation-playbook.md`
+- `weather-validation/reports/smoothness-investigation-playbook.md`
 - the newest `weather-validation/output/cycle-*/checkpoint.md`
 - `weather-validation/output/agent-dev-server.json` when a dev server is running
 - the latest runtime summary from `npm run agent:summarize-runtime-log`
 
 ## Default next priority
 
-1. Investigate and reduce `Earth.update` runtime spikes that still push `updateMs p95` and `max` above the smoothness gate.
-2. Re-run the canonical single-tab observation path on the energized wind field and document a longer live checkpoint without step-induced validation artifacts.
-3. Confirm the mean/p99 wind pass remains stable over repeated mature live windows.
+1. Re-audit the mature live weather for the highest-leverage realism weakness, not just wind speed gates, using the realism investigation playbook.
+2. Document repeated mature-window checkpoints on the energized field so realism claims cover multi-day behavior rather than a single successful run.
+3. Reserve smoothness-focused cycles for the periodic health check or when runtime noise prevents reliable realism observation.
 4. Keep the localhost validation path clean: one tab, canonical port `3000`, no drift into the sibling dirty checkout.
 
 ## Commit discipline

@@ -56,6 +56,7 @@ const simPerfLagSeconds = [];
 const simPerfStepsSkipped = [];
 let latestWindTargets = null;
 let latestWindModel = null;
+let latestWindVizDiagnostics = null;
 let latestWindComparison = null;
 let validationSnapshotCount = 0;
 let lineCount = 0;
@@ -87,6 +88,11 @@ for await (const line of reader) {
     };
   } else if (event === 'windModelDiagnostics' && payload) {
     latestWindModel = {
+      simTimeSeconds: entry?.sim?.simTimeSeconds ?? null,
+      ...payload
+    };
+  } else if (event === 'windVizDiagnostics' && payload) {
+    latestWindVizDiagnostics = {
       simTimeSeconds: entry?.sim?.simTimeSeconds ?? null,
       ...payload
     };
@@ -141,6 +147,7 @@ const summary = {
   },
   latestWindTargets,
   latestWindModel,
+  latestWindVizDiagnostics,
   latestWindComparison
 };
 

@@ -12,6 +12,8 @@ Working directory rule:
 Read these first at the start of every cycle:
 - `weather-validation/reports/world-class-weather-status.md`
 - `weather-validation/reports/earth-accuracy-status.md`
+- `weather-validation/reports/realism-investigation-playbook.md`
+- `weather-validation/reports/smoothness-investigation-playbook.md`
 - the newest `weather-validation/output/cycle-*/checkpoint.md`
 - `git log --oneline -n 10`
 
@@ -24,20 +26,35 @@ Non-negotiable rules:
 - No dirty worktree at cycle end.
 - Every verified improvement must end in a git commit.
 - Failed experiments must be reverted before the cycle ends.
+- Do not create status-only commits for failed experiments.
+
+Cycle selection rule:
+- Realism is the main mission. By default, choose the highest-leverage Earth-like realism weakness before a smoothness-only task.
+- Choose a smoothness-only cycle only when:
+  - runtime problems prevent reliable realism observation,
+  - the latest realism fix introduced a performance regression, or
+  - it is the periodic smoothness health-check cycle.
+- Do not spend more than one out of every four cycles on smoothness-only work while realism still has obvious unresolved weaknesses.
 
 Mandatory cycle protocol:
-1. Reassess the highest-leverage remaining realism or smoothness blocker.
+1. Reassess the highest-leverage remaining realism weakness first, and only choose smoothness instead when the cycle selection rule allows it.
 2. Write a testable hypothesis and explicit pass/fail criteria in `plan.md`.
 3. Create `weather-validation/output/cycle-<UTC>-<slug>/`.
-4. Make the smallest code change that can test the hypothesis.
-5. Run targeted tests and objective validation before live observation.
-6. Start or restart the canonical dev server with `npm run agent:dev-server -- --restart --port 3000`.
-7. Reuse the existing browser tab with `npm run agent:reuse-localhost-tab`.
-8. Observe the live app on localhost for long enough to evaluate the target behavior.
-9. Summarize runtime telemetry with `npm run agent:summarize-runtime-log`.
-10. Write `checkpoint.md` and `evidence-summary.json`.
-11. Update `weather-validation/reports/world-class-weather-status.md` and `.json`.
-12. If the improvement is verified, commit immediately. If it is not verified, revert your changes and end with `NO NEW VERIFIED PROGRESS`.
+4. If realism is the blocker, capture the fresh evidence needed to prove the weakness is real in a mature live window before changing behavior.
+5. If smoothness is the blocker, capture fresh profiler evidence first:
+   - run `npm run agent:summarize-runtime-log`
+   - run `npm run agent:profile-runtime-hotspots`
+   - identify the dominant stage before changing renderer/smoothness code
+6. Make the smallest code change that can test the hypothesis.
+7. Run targeted tests and objective validation before live observation.
+8. Start or restart the canonical dev server with `npm run agent:dev-server -- --restart --port 3000`.
+9. Reuse the existing browser tab with `npm run agent:reuse-localhost-tab`.
+10. Observe the live app on localhost for long enough to evaluate the target behavior.
+11. Summarize runtime telemetry with `npm run agent:summarize-runtime-log`.
+12. If smoothness is still the blocker, write `hotspot-profile.json` from the same fresh run.
+13. Write `checkpoint.md` and `evidence-summary.json`.
+14. Update `weather-validation/reports/world-class-weather-status.md` and `.json` only when the verified baseline materially improves. Failed cycles should keep conclusions in the cycle-local artifacts and then revert tracked status-file edits.
+15. If the improvement is verified, commit immediately. If it is not verified, revert your changes and end with `NO NEW VERIFIED PROGRESS`.
 
 Browser and dev-server policy:
 - Use one canonical app URL: `http://127.0.0.1:3000/` unless a different port is unavoidable.
@@ -54,14 +71,20 @@ Observation policy:
 
 Performance policy:
 - Smoothness is a first-class requirement.
+- Smoothness is a guardrail, not the main mission while realism weaknesses remain obvious.
 - Re-check performance any time you touch `src/App.js`, `src/Earth.js`, `src/workers/`, render paths, or sim stepping.
 - Run a performance checkpoint at least every 3 cycles even if the main focus is realism.
 - Never claim "silky smooth" or "polished" without fresh browser observation plus runtime telemetry.
+- When smoothness is failing, do not spend two consecutive cycles on speculative renderer tweaks. The next cycle must produce fresh hotspot attribution that identifies the dominant stage or add instrumentation to make that possible.
+- If `hotspot-profile.json` says the dominant cause is ambiguous, do not make a performance behavior change in that cycle.
+- Treat the current verified baseline as the reference point. A failed smoothness experiment is useful only if it narrows the hotspot target.
 
 Required artifacts per cycle:
 - `plan.md`
 - `checkpoint.md`
 - `evidence-summary.json`
+- `hotspot-profile.json` whenever smoothness is blocked
+- realism comparison evidence whenever realism is blocked
 - changed file paths
 - functions/modules touched
 - targeted test output
@@ -73,6 +96,7 @@ World-class bar:
 - The benchmark suite passes.
 - Live browser runs still look Earth-like over time.
 - No obvious runaway drift, dead circulation, fake-looking cloud texture, or broken wind structure.
+- The model has been re-audited across circulation, vertical coupling, clouds/precipitation, storm structure, and multi-day realism, not just wind targets.
 - Performance remains smooth and shippable.
 - Every claim is backed by fresh metrics and observation artifacts.
 

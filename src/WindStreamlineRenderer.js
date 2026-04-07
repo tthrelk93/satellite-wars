@@ -18,6 +18,9 @@ const ADAPT_STEP_CLAMP_MIN = 0.3;
 const ADAPT_STEP_CLAMP_MAX = 1.2;
 const RENDER_FRAME_INTERVAL_SECONDS = 0.1;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const nowMs = () => (typeof performance !== 'undefined' && typeof performance.now === 'function'
+  ? performance.now()
+  : Date.now());
 
 const computePercentiles = (values, percentiles) => {
   if (!values || values.length === 0) return {};
@@ -198,6 +201,8 @@ class WindStreamlineRenderer {
     this._fieldReady = false;
     this._lastFieldDiagnostics = null;
     this._lastFrameDiagnostics = null;
+    this._lastBuildPerfDiagnostics = null;
+    this._lastPerfDiagnostics = null;
     this._clearCanvas();
   }
 
@@ -221,7 +226,6 @@ class WindStreamlineRenderer {
   }
 
   _randomizeParticle(particle) {
-    const total = this.width * this.height;
     const maxSin = Math.sin(85 * Math.PI / 180);
     for (let attempt = 0; attempt < 30; attempt++) {
       const x = Math.random() * (this.width - 1);
@@ -262,6 +266,9 @@ class WindStreamlineRenderer {
 
   _buildField(core) {
     if (!core?.ready) return false;
+    const buildStartMs = nowMs();
+    let phaseStartMs = buildStartMs;
+    const buildPhases = {};
     const { grid, fields } = core;
     if (!grid?.nx || !grid?.ny || !fields?.u || !fields?.v) return false;
 
@@ -313,6 +320,8 @@ class WindStreamlineRenderer {
         }
       }
     }
+    buildPhases.smoothFieldMs = nowMs() - phaseStartMs;
+    phaseStartMs = nowMs();
 
     this.stepSeconds = this.baseStepSeconds;
     if (!this._fieldDxNext || this._fieldDxNext.length !== width * height) {
@@ -386,6 +395,8 @@ class WindStreamlineRenderer {
         nextStepRaw[idx] = magRaw;
       }
     }
+    buildPhases.rasterizeFieldMs = nowMs() - phaseStartMs;
+    phaseStartMs = nowMs();
 
     const blend = this._fieldReady && !gridChanged ? 0.25 : 1.0;
     let validCount = 0;
@@ -437,6 +448,8 @@ class WindStreamlineRenderer {
         stepSamplesRaw.push(magRaw);
       }
     }
+    buildPhases.blendFieldMs = nowMs() - phaseStartMs;
+    phaseStartMs = nowMs();
 
     const speedPct = computePercentiles(speedSamples, [0.5, 0.9, 0.99]);
     const stepPct = computePercentiles(stepSamples, [0.5, 0.9, 0.99]);
@@ -514,12 +527,25 @@ class WindStreamlineRenderer {
         stepSeconds: this.stepSeconds
       };
     }
+    buildPhases.adaptiveStepRetuneMs = nowMs() - phaseStartMs;
+    phaseStartMs = nowMs();
 
     const shouldClear = !this._fieldReady || gridChanged;
     this._fieldReady = true;
     if (shouldClear) {
       this._clearCanvas();
     }
+    buildPhases.clearCanvasMs = nowMs() - phaseStartMs;
+    this._lastBuildPerfDiagnostics = {
+      totalMs: nowMs() - buildStartMs,
+      phases: buildPhases,
+      gridChanged,
+      blendFactor: blend,
+      sampleStride,
+      validCount,
+      clippedFrac: this._lastFieldDiagnostics?.clippedFrac ?? null,
+      stepSeconds: this._lastFieldDiagnostics?.stepSeconds ?? null
+    };
     return true;
   }
 
@@ -535,27 +561,68 @@ class WindStreamlineRenderer {
 
   update({ core, simTimeSeconds, realDtSeconds } = {}) {
     if (!core?.ready) return;
-    if (this._shouldRebuildField(core, simTimeSeconds)) {
+    const updateStartMs = nowMs();
+    const shouldRebuild = this._shouldRebuildField(core, simTimeSeconds);
+    let rebuiltField = false;
+    let buildPerf = null;
+    const finalizePerf = (renderSteps, evolveParticlesMs, drawMs, frameDiag) => {
+      const fieldAgeSimSeconds = Number.isFinite(simTimeSeconds) && Number.isFinite(this._lastFieldSimTimeSeconds)
+        ? simTimeSeconds - this._lastFieldSimTimeSeconds
+        : null;
+      this._lastPerfDiagnostics = {
+        totalMs: nowMs() - updateStartMs,
+        fieldRebuildRequested: shouldRebuild,
+        fieldRebuilt: rebuiltField,
+        buildFieldMs: buildPerf?.totalMs ?? 0,
+        buildFieldPhases: buildPerf?.phases ?? null,
+        renderSteps,
+        evolveParticlesMs,
+        drawMs,
+        particleCount: frameDiag?.particleCount ?? this.particles.length,
+        fieldCadenceSeconds: this.fieldUpdateCadenceSeconds,
+        frameIntervalSeconds: this._frameIntervalSeconds,
+        fieldAgeSimSeconds
+      };
+    };
+    if (shouldRebuild) {
       if (this._buildField(core)) {
         this._lastFieldSimTimeSeconds = simTimeSeconds ?? null;
+        buildPerf = this._lastBuildPerfDiagnostics;
+        rebuiltField = true;
       }
     }
-    if (!this._fieldReady) return;
-    if (!(realDtSeconds > 0)) return;
+    if (!this._fieldReady) {
+      finalizePerf(0, 0, 0, null);
+      return;
+    }
+    if (!(realDtSeconds > 0)) {
+      finalizePerf(0, 0, 0, null);
+      return;
+    }
     this._frameAccumSeconds += realDtSeconds;
     const maxSubsteps = 3;
     const steps = Math.min(maxSubsteps, Math.floor(this._frameAccumSeconds / this._frameIntervalSeconds));
-    if (steps <= 0) return;
+    if (steps <= 0) {
+      finalizePerf(0, 0, 0, null);
+      return;
+    }
     this._frameAccumSeconds -= steps * this._frameIntervalSeconds;
     let frameDiag = null;
+    let evolveParticlesMs = 0;
+    let drawMs = 0;
     for (let i = 0; i < steps; i++) {
+      const evolveStartMs = nowMs();
       frameDiag = this._evolveParticles();
+      evolveParticlesMs += nowMs() - evolveStartMs;
+      const drawStartMs = nowMs();
       this._draw();
+      drawMs += nowMs() - drawStartMs;
     }
     this._lastFrameDiagnostics = {
       ...frameDiag,
       simTimeSeconds: Number.isFinite(simTimeSeconds) ? simTimeSeconds : null
     };
+    finalizePerf(steps, evolveParticlesMs, drawMs, frameDiag);
   }
 
   _evolveParticles() {
@@ -564,7 +631,6 @@ class WindStreamlineRenderer {
     });
     const width = this.width;
     const height = this.height;
-    const total = width * height;
     let movedCount = 0;
     let respawnedCount = 0;
     let invalidCount = 0;
@@ -681,7 +747,8 @@ class WindStreamlineRenderer {
   getDiagnostics() {
     return {
       field: this._lastFieldDiagnostics,
-      frame: this._lastFrameDiagnostics
+      frame: this._lastFrameDiagnostics,
+      perf: this._lastPerfDiagnostics
     };
   }
 }

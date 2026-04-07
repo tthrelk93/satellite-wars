@@ -1822,7 +1822,8 @@ class Earth {
     if (!diag) return false;
     const field = diag.field;
     const frame = diag.frame;
-    if (!field && !frame) return false;
+    const perf = diag.perf;
+    if (!field && !frame && !perf) return false;
     const flags = [];
     const stepMeanPx = field?.meanStepPx ?? null;
     const stepP99Px = field?.stepPercentiles?.p99 ?? null;
@@ -1847,6 +1848,7 @@ class Earth {
     const payload = {
       field,
       frame,
+      perf,
       flags
     };
     this._lastWindVizDiagPayload = payload;
