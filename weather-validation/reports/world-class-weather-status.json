@@ -1,0 +1,36 @@
+{
+  "schema": "satellite-wars.world-class-status.v1",
+  "updatedAt": "2026-04-06T00:00:00Z",
+  "verdict": "not_world_class_yet",
+  "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
+  "branch": "codex/world-class-weather-loop",
+  "baselineCommit": "e4eb1a4",
+  "benchmarkSuite": {
+    "path": "weather-validation/reports/earth-accuracy-status.md",
+    "overallPass": true
+  },
+  "blockingGaps": [
+    "single-tab localhost observation was not previously enforced",
+    "cycle cleanliness and commit hygiene were not previously enforced",
+    "long-horizon live realism is not yet consistently documented",
+    "runtime smoothness is not yet a recurring gate"
+  ],
+  "cycleInputs": [
+    "weather-validation/reports/earth-accuracy-status.md",
+    "newest weather-validation/output/cycle-*/checkpoint.md",
+    "weather-validation/output/agent-dev-server.json",
+    "latest runtime summary from npm run agent:summarize-runtime-log"
+  ],
+  "defaultNextPriority": [
+    "establish a fresh baseline cycle in this clean worktree",
+    "confirm single-server single-tab browser observation",
+    "measure current live weather and runtime smoothness with fresh artifacts",
+    "choose the highest-leverage realism or performance blocker from that baseline"
+  ],
+  "rules": {
+    "commitEveryVerifiedImprovement": true,
+    "leaveCleanWorktreeAtCycleEnd": true,
+    "doNotTouchSiblingDirtyCheckout": true,
+    "doNotOpenDuplicateLocalhostTabs": true
+  }
+}

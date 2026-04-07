@@ -11,6 +11,7 @@
 # production
 /build
 logs/
+weather-validation/output/
 tools/wind-fixtures/
 *.grib2.*.idx
 *.grb2.*.idx
