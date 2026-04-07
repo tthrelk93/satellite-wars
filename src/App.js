@@ -11,6 +11,7 @@ import Player from './Player';
 import { UPKEEP_PER_SAT, INCOME_PER_COMM_IN_LINK, INCOME_PER_IMAGING_IN_LINK, BASE_INCOME_PER_TURN, MU_EARTH, RE_M, OMEGA_EARTH, LOSSES_MPS, DV_REF_MPS, DV_EXPONENT, COMM_RANGE_KM, SPACE_LOS_EPS, GROUND_LOS_EPS, CLOUD_WATCH_GRID_LON_OFFSET_RAD } from './constants';
 import SimClock from './SimClock';
 import { solarDeclination } from './weather/solar';
+import { clampSimAdvanceByTruthBudget } from './weather/simAdvanceBudget';
 import { loadNullschoolWind } from './weather/reference/loadNullschoolWind';
 
 import { EventBus } from './EventBus';
@@ -122,6 +123,7 @@ const SIM_SPEED_MAX = 14400;
 const FIXED_SIM_STEP_SECONDS = 120;
 const MAX_SIM_SUBSTEPS = 4;
 const MAX_SIM_SUBSTEPS_BURST = 20;
+const TRUTH_WORKER_DESYNC_BUDGET_SECONDS = 12 * 3600;
 const MONTH_SECONDS = (365 * 86400) / 12;
 const SELECTION_DOUBLE_CLICK_MS = 250;
 const SELECTION_DOUBLE_CLICK_PX = 8;
@@ -5806,13 +5808,30 @@ const App = () => {
 
             const simClock = simClockRef.current;
             let simAccumSeconds = simAccumSecondsRef.current;
+            const visibleSimTimeSeconds = simClock.simTimeSeconds + simAccumSeconds;
+            const workerSyncStatus = earthRef.current?.getWeatherWorkerSyncStatus?.(visibleSimTimeSeconds);
+            let workerLeadSeconds = Number.isFinite(workerSyncStatus?.leadSeconds)
+                ? workerSyncStatus.leadSeconds
+                : null;
+            const takeBudgetedAdvance = (requestedSeconds) => {
+                if (!Number.isFinite(requestedSeconds) || requestedSeconds <= 0) return 0;
+                if (!Number.isFinite(workerLeadSeconds)) return requestedSeconds;
+                const allowedSeconds = clampSimAdvanceByTruthBudget(
+                    requestedSeconds,
+                    workerLeadSeconds,
+                    TRUTH_WORKER_DESYNC_BUDGET_SECONDS
+                );
+                workerLeadSeconds += allowedSeconds;
+                return allowedSeconds;
+            };
             if (!simClock.paused) {
-                simAccumSeconds += realDtSeconds * simClock.simSpeed;
+                simAccumSeconds += takeBudgetedAdvance(realDtSeconds * simClock.simSpeed);
             }
             const queuedAdvance = simAdvanceQueueSecondsRef.current;
             if (queuedAdvance > 0) {
-                simAccumSeconds += queuedAdvance;
-                simAdvanceQueueSecondsRef.current = 0;
+                const allowedQueuedAdvance = takeBudgetedAdvance(queuedAdvance);
+                simAccumSeconds += allowedQueuedAdvance;
+                simAdvanceQueueSecondsRef.current = Math.max(0, queuedAdvance - allowedQueuedAdvance);
                 simBurstActiveRef.current = true;
             }
 

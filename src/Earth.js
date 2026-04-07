@@ -814,6 +814,38 @@ class Earth {
     });
   }
 
+  getWeatherWorkerSyncStatus(simTimeSeconds) {
+    if (!this.useWeatherWorker) return null;
+    const truthCoreTimeSeconds = this.weatherField?.core?.timeUTC;
+    const workerAccumSeconds = Number.isFinite(this._weatherWorkerAccumSeconds)
+      ? Math.max(0, this._weatherWorkerAccumSeconds)
+      : null;
+    const workerLastSimTimeSeconds = Number.isFinite(this._weatherWorkerLastSimTimeSeconds)
+      ? this._weatherWorkerLastSimTimeSeconds
+      : null;
+    const visibleSimLeadSeconds = Number.isFinite(simTimeSeconds) && Number.isFinite(truthCoreTimeSeconds)
+      ? Math.max(0, simTimeSeconds - truthCoreTimeSeconds)
+      : null;
+    const trackedSimLeadSeconds = Number.isFinite(workerLastSimTimeSeconds) && Number.isFinite(truthCoreTimeSeconds)
+      ? Math.max(0, workerLastSimTimeSeconds - truthCoreTimeSeconds)
+      : null;
+    const leadSeconds = [visibleSimLeadSeconds, trackedSimLeadSeconds, workerAccumSeconds]
+      .filter(Number.isFinite)
+      .reduce((maxLead, value) => Math.max(maxLead, value), 0);
+
+    return {
+      ready: this._weatherWorkerReady,
+      busy: this._weatherWorkerBusy,
+      truthCoreTimeSeconds: Number.isFinite(truthCoreTimeSeconds) ? truthCoreTimeSeconds : null,
+      workerAccumSeconds,
+      workerLastSimTimeSeconds,
+      visibleSimLeadSeconds,
+      trackedSimLeadSeconds,
+      leadSeconds,
+      maxStepSeconds: this._weatherWorkerMaxStepSeconds
+    };
+  }
+
   _getActiveWeatherField() {
     return this.weatherViewSource === 'analysis'
       ? this.analysisWeatherField
@@ -3358,7 +3390,8 @@ class Earth {
           }
         }
       }
-      if (simContext?.flushAssimilation) {
+      const shouldDrainWeatherWorker = simContext?.flushAssimilation || this._weatherWorkerAccumSeconds > 0;
+      if (shouldDrainWeatherWorker) {
         this._maybeStepWeatherWorker(simSpeed);
       }
     }

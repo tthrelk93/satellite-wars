@@ -1,25 +1,24 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-07T09:24:30Z",
+  "updatedAt": "2026-04-07T11:14:00Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
-  "baselineCommit": "1db18a7",
+  "baselineCommit": "1db18a7", 
   "latestCycle": {
-    "id": "cycle-2026-04-07T09-08-03Z-mature-precipitation-organization",
-    "goal": "restore a trustworthy mature live window by preventing the truth weather worker from hard-freezing under reproduced multi-day backlog",
-    "verifiedImprovement": "truth-worker catch-up now advances again in bounded 6-hour chunks instead of remaining fully frozen during the reproduced burst case",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-07T09-08-03Z-mature-precipitation-organization/runtime-summary.json",
-    "runtimeLogPath": "logs/weather-2026-04-07T09-16-35Z-57192.jsonl"
+    "id": "cycle-2026-04-07T10-29-38Z-bounded-truth-worker-desync",
+    "goal": "bound visible sim advancement against truth-worker lead so the mature Day 6-8 window becomes usable again",
+    "verifiedImprovement": "month-burst backlog no longer lets the visible sim outrun the truth worker by multi-day amounts; mature live checkpoints stayed within roughly 9.97-11.97 hours of truth while still reaching Day 7",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-07T10-29-38Z-bounded-truth-worker-desync/runtime-summary.json",
+    "runtimeLogPath": "logs/weather-2026-04-07T10-43-20Z-89473.jsonl"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
     "overallPass": true
   },
   "blockingGaps": [
-    "truth-worker lag still becomes too large during aggressive burst stepping, so the Day 6-8 live window is not yet trustworthy enough for a mature realism audit",
-    "canonical runtime-log helpers still received zero server-side log lines in this run, so fresh hotspot attribution is still missing",
-    "broader Earth-like realism still needs explicit re-audits across circulation, vertical coupling, storm behavior, cloud structure, and precipitation organization once the worker lag blocker is under control",
+    "broader Earth-like realism still needs explicit mature-window re-audits across circulation, vertical coupling, storm behavior, cloud structure, and precipitation organization now that the live Day 6-8 window is usable again",
+    "runtime smoothness is still not shippable enough: the fresh hotspot profile points to repeated wind-field rebuild cost in src/WindStreamlineRenderer.js:_buildField / _shouldRebuildField",
     "world-class status still requires realism and smoothness to pass in the same fresh live run"
   ],
   "cycleInputs": [
@@ -33,37 +32,52 @@
   "latestTelemetry": {
     "singleTabLocalhostVerified": true,
     "runtimeHealthWarnings": [
-      "runtime_log_empty",
-      "weather_worker_backlog_high"
+      "earth_update_p95_high",
+      "earth_update_max_high",
+      "sim_lag_max_high",
+      "sim_steps_skipped"
     ],
     "updateMs": {
-      "p95": null,
-      "max": null
+      "p95": 23.345000009238724,
+      "max": 184.29999999701977
     },
     "simLagSeconds": {
-      "p95": null,
-      "max": null
+      "p95": 119.99999999999727,
+      "max": 20640
     },
     "workerCatchup": {
-      "preFixTruthCoreAdvanceSeconds": 0,
-      "preFixUiSimAdvanceSeconds": 12000,
-      "postFixTruthCoreAdvanceSeconds": 64800,
+      "preFixMaxLeadSeconds": 1855080,
+      "postFixLeadCapSeconds": 43200,
+      "matureWindowLeadSeconds": {
+        "day3": 35880,
+        "day5": 35880,
+        "day6": 35880,
+        "day7": 35880,
+        "latestBeforeWindowEnd": 43080
+      },
       "postFixWorkerChunkSeconds": 21600
     },
     "windTargets": {
-      "meanSpeed": 4.816509966583703,
-      "p90": 11.638237075587353,
-      "p99": 14.153074121069743,
-      "maxSpeed": 15.09103428117464,
-      "stepMeanPx": 0.057398536647168326,
+      "meanSpeed": 5.1623694751394025,
+      "p90": 12.147291911233921,
+      "p99": 14.72797589468613,
+      "maxSpeed": 15.549147122418782,
+      "stepMeanPx": 0.06030382286817156,
       "failingReasons": [],
       "overallPass": true
+    },
+    "hotspotFocus": {
+      "area": "WindStreamlineRenderer._buildField",
+      "functionHints": [
+        "src/WindStreamlineRenderer.js:_buildField",
+        "src/WindStreamlineRenderer.js:_shouldRebuildField"
+      ]
     }
   },
   "defaultNextPriority": [
-    "reduce truth-worker lag / sim-time desynchronization so the Day 6-8 live window is trustworthy again",
-    "re-audit the mature live weather for the highest-leverage realism weakness using the realism investigation playbook once the worker lag blocker is under control",
-    "restore canonical runtime-log instrumentation so hotspot attribution is evidence-based instead of speculative",
+    "use the restored mature Day 6-8 live window to re-audit the highest-leverage remaining realism weakness with the realism investigation playbook",
+    "keep wind-streamline rebuild hotspots evidence-based: use the fresh hotspot-profile.json before any renderer smoothness tweak",
+    "re-check realism and smoothness in the same fresh live run rather than treating them as separate finish lines",
     "keep validation on the clean world-class checkout only"
   ],
   "rules": {
