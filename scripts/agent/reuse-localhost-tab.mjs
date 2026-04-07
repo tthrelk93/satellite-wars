@@ -46,8 +46,9 @@ const normalizedTargetUrl = new URL(targetUrl).href;
 const normalizedTarget = new URL(normalizedTargetUrl);
 
 const runBrowser = (args, { expectJson = false, allowFailure = false } = {}) => {
-  const fullArgs = ['browser', ...args, '--browser-profile', profile];
+  const fullArgs = ['browser', '--browser-profile', profile];
   if (expectJson) fullArgs.push('--json');
+  fullArgs.push(...args);
   const result = spawnSync('openclaw', fullArgs, {
     cwd: repoRoot,
     encoding: 'utf8'

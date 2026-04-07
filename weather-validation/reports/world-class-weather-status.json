@@ -1,19 +1,26 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-06T00:00:00Z",
+  "updatedAt": "2026-04-07T04:49:23Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
   "baselineCommit": "e4eb1a4",
+  "latestCycle": {
+    "id": "cycle-2026-04-07T04-44-00Z-baseline-live-smoothness",
+    "goal": "restore canonical single-tab localhost observation and capture a fresh live baseline",
+    "verifiedImprovement": "canonical localhost tab reuse works again against the current OpenClaw CLI",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-07T04-44-00Z-baseline-live-smoothness/runtime-summary.json",
+    "runtimeLogPath": "logs/weather-2026-04-07T04-47-29Z-59200.jsonl"
+  },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
     "overallPass": true
   },
   "blockingGaps": [
-    "single-tab localhost observation was not previously enforced",
-    "cycle cleanliness and commit hygiene were not previously enforced",
-    "long-horizon live realism is not yet consistently documented",
-    "runtime smoothness is not yet a recurring gate"
+    "live wind energy remains below target in fresh telemetry",
+    "wind streamline step mean remains below the smoothness target in fresh telemetry",
+    "runtime smoothness still has high p95/max update spikes",
+    "long-horizon live realism is not yet consistently documented"
   ],
   "cycleInputs": [
     "weather-validation/reports/earth-accuracy-status.md",
@@ -21,11 +28,40 @@
     "weather-validation/output/agent-dev-server.json",
     "latest runtime summary from npm run agent:summarize-runtime-log"
   ],
+  "latestTelemetry": {
+    "singleTabLocalhostVerified": true,
+    "runtimeHealthWarnings": [
+      "earth_update_p95_high",
+      "earth_update_max_high",
+      "wind_targets_failing"
+    ],
+    "updateMs": {
+      "p95": 22.520000001043076,
+      "max": 90.40000000596046
+    },
+    "simLagSeconds": {
+      "p95": 110.83799999915085,
+      "max": 110.93999999910628
+    },
+    "windTargets": {
+      "meanSpeed": 3.797077738613221,
+      "p90": 8.769845732560198,
+      "p99": 11.136644665109296,
+      "maxSpeed": 11.988906214464576,
+      "stepMeanPx": 0.04750258833488802,
+      "failingReasons": [
+        "model_mean_low",
+        "model_p90_low",
+        "model_p99_low",
+        "viz_step_mean_low"
+      ]
+    }
+  },
   "defaultNextPriority": [
-    "establish a fresh baseline cycle in this clean worktree",
-    "confirm single-server single-tab browser observation",
-    "measure current live weather and runtime smoothness with fresh artifacts",
-    "choose the highest-leverage realism or performance blocker from that baseline"
+    "raise the live wind field toward the documented target band without introducing overspeed or churn",
+    "increase streamline step mean above the minimum target while preserving particle stability",
+    "reduce Earth.update p95/max runtime spikes",
+    "re-run the canonical single-tab live observation path after the next wind/smoothness fix"
   ],
   "rules": {
     "commitEveryVerifiedImprovement": true,
