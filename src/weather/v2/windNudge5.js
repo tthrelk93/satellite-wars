@@ -4,6 +4,33 @@ import { findClosestLevelIndex } from './verticalGrid.js';
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 
+function computeAdaptiveRelax({
+  baseRelax,
+  currentSpeed,
+  targetSpeed,
+  rowTargetSpeedMax,
+  boostMax = 1
+}) {
+  const relaxBase = clamp(baseRelax, 0, 1);
+  const relaxBoostMax = Math.max(1, boostMax);
+  if (!(relaxBase > 0) || !(relaxBoostMax > 1) || !(targetSpeed > 1e-6)) {
+    return { relax: relaxBase, boostFactor: 1 };
+  }
+  const deficitFrac = clamp(1 - currentSpeed / targetSpeed, 0, 1);
+  if (!(deficitFrac > 0)) {
+    return { relax: relaxBase, boostFactor: 1 };
+  }
+  const targetShare = rowTargetSpeedMax > 1e-6
+    ? clamp(targetSpeed / rowTargetSpeedMax, 0, 1)
+    : 1;
+  const boostWeight = deficitFrac * Math.sqrt(targetShare);
+  const boostFactor = lerp(1, relaxBoostMax, boostWeight);
+  return {
+    relax: clamp(relaxBase * boostFactor, 0, 1),
+    boostFactor
+  };
+}
+
 function applyUpperWindCap(u, v, idx, targetU, targetV, params = {}) {
   const factor = Number.isFinite(params.upperWindCapFactor) ? params.upperWindCapFactor : 0;
   if (factor <= 0) return;
@@ -67,10 +94,17 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
   const upperJetLatDeg = Number.isFinite(params.upperJetLatDeg) ? params.upperJetLatDeg : 35;
   const upperJetWidthDeg = Number.isFinite(params.upperJetWidthDeg) ? params.upperJetWidthDeg : 12;
 
+  const surfaceDeficitRelaxBoostMax = Number.isFinite(params.surfaceDeficitRelaxBoostMax)
+    ? params.surfaceDeficitRelaxBoostMax
+    : 1;
+
   let sumErrS = 0;
   let sumErrU = 0;
   let sumWSurface = 0;
   let sumWUpper = 0;
+  let sumSurfaceBoost = 0;
+  let countSurfaceBoost = 0;
+  let maxSurfaceBoost = 1;
   let maxAbsCorrection = 0;
 
   if (hasSpatialWindTargets(climo) && params.useSpatialTargets !== false) {
@@ -92,6 +126,14 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       const weight = Number.isFinite(grid.cosLat?.[j])
         ? Math.max(0, grid.cosLat[j])
         : Math.max(0, Math.cos(latDeg * Math.PI / 180));
+      const rowSurfaceTargetSpeedMax = (() => {
+        let rowMax = 0;
+        for (let ii = 0; ii < nx; ii += 1) {
+          const kk = row + ii;
+          rowMax = Math.max(rowMax, Math.hypot(targetSurfaceU[kk], targetSurfaceV[kk]));
+        }
+        return rowMax;
+      })();
       const rowUpperTargetSpeedMax = (() => {
         const srcU = climo.hasWind250 && climo.wind250NowU ? climo.wind250NowU : targetUpperU;
         const srcV = climo.hasWind250 && climo.wind250NowV ? climo.wind250NowV : targetUpperV;
@@ -107,12 +149,24 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       for (let i = 0; i < nx; i += 1) {
         const k = row + i;
         const idxS = levS * N + k;
-        const duS = (targetSurfaceU[k] - u[idxS]) * relaxS;
-        const dvS = (targetSurfaceV[k] - v[idxS]) * relaxV;
+        const targetSurfaceSpeed = Math.hypot(targetSurfaceU[k], targetSurfaceV[k]);
+        const currentSurfaceSpeed = Math.hypot(u[idxS], v[idxS]);
+        const surfaceRelax = computeAdaptiveRelax({
+          baseRelax: relaxS,
+          currentSpeed: currentSurfaceSpeed,
+          targetSpeed: targetSurfaceSpeed,
+          rowTargetSpeedMax: rowSurfaceTargetSpeedMax,
+          boostMax: surfaceDeficitRelaxBoostMax
+        });
+        const duS = (targetSurfaceU[k] - u[idxS]) * surfaceRelax.relax;
+        const dvS = (targetSurfaceV[k] - v[idxS]) * surfaceRelax.relax;
         u[idxS] += duS;
         v[idxS] += dvS;
         sumErrS += ((u[idxS] - targetSurfaceU[k]) ** 2 + (v[idxS] - targetSurfaceV[k]) ** 2) * weight;
         sumWSurface += weight;
+        sumSurfaceBoost += surfaceRelax.boostFactor;
+        countSurfaceBoost += 1;
+        if (surfaceRelax.boostFactor > maxSurfaceBoost) maxSurfaceBoost = surfaceRelax.boostFactor;
         maxAbsCorrection = Math.max(maxAbsCorrection, Math.abs(duS), Math.abs(dvS));
 
         const pMid = state.pMid;
@@ -184,6 +238,8 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       source: 'spatial-climatology',
       rmseSurface: sumWSurface > 0 ? Math.sqrt(sumErrS / sumWSurface) : null,
       rmseUpper: sumWUpper > 0 ? Math.sqrt(sumErrU / sumWUpper) : null,
+      surfaceRelaxBoostMean: countSurfaceBoost > 0 ? sumSurfaceBoost / countSurfaceBoost : 1,
+      surfaceRelaxBoostMax: maxSurfaceBoost,
       maxAbsCorrection
     };
   }
@@ -232,9 +288,18 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       ? { ...params, dynamicUpperWindCapMin: jetCapFloor }
       : params;
 
-    const duS = (targetS - uMeanS) * relaxS;
+    const targetSurfaceSpeed = Math.abs(targetS);
+    const currentSurfaceSpeed = Math.hypot(uMeanS, vMeanS);
+    const surfaceRelax = computeAdaptiveRelax({
+      baseRelax: relaxS,
+      currentSpeed: currentSurfaceSpeed,
+      targetSpeed: targetSurfaceSpeed,
+      rowTargetSpeedMax: targetSurfaceSpeed,
+      boostMax: surfaceDeficitRelaxBoostMax
+    });
+    const duS = (targetS - uMeanS) * surfaceRelax.relax;
     const duU = (targetU - uMeanU) * relaxU;
-    const dvS = (0 - vMeanS) * relaxV;
+    const dvS = (0 - vMeanS) * surfaceRelax.relax;
     const dvU = (0 - vMeanU) * relaxV;
     const weight = Number.isFinite(grid.cosLat?.[j])
       ? Math.max(0, grid.cosLat[j])
@@ -243,6 +308,9 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
     sumErrU += (uMeanU - targetU) * (uMeanU - targetU) * weight;
     sumWSurface += weight;
     sumWUpper += weight;
+    sumSurfaceBoost += surfaceRelax.boostFactor;
+    countSurfaceBoost += 1;
+    if (surfaceRelax.boostFactor > maxSurfaceBoost) maxSurfaceBoost = surfaceRelax.boostFactor;
     maxAbsCorrection = Math.max(maxAbsCorrection, Math.abs(duS), Math.abs(duU), Math.abs(dvS), Math.abs(dvU));
 
     for (let i = 0; i < nx; i++) {
@@ -262,6 +330,8 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
     source: 'zonal-fallback',
     rmseSurface: sumWSurface > 0 ? Math.sqrt(sumErrS / sumWSurface) : null,
     rmseUpper: sumWUpper > 0 ? Math.sqrt(sumErrU / sumWUpper) : null,
+    surfaceRelaxBoostMean: countSurfaceBoost > 0 ? sumSurfaceBoost / countSurfaceBoost : 1,
+    surfaceRelaxBoostMax: maxSurfaceBoost,
     maxAbsCorrection
   };
 }

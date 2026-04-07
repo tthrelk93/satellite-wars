@@ -24,8 +24,9 @@ const sampleTargetEke = (latDeg) => {
 
 export function stepWindEddyNudge5({ dt, grid, state, climo, params = {} }) {
   if (!grid || !state || !Number.isFinite(dt) || dt <= 0) return { didApply: false };
-  if (climo?.hasWind && (climo?.hasWind500 || climo?.hasWind250) && params.allowFallbackOnly !== true) {
-    return { didApply: false, source: 'spatial-climatology-disabled-fallback' };
+  const spatialTargetsAvailable = Boolean(climo?.hasWind && (climo?.hasWind500 || climo?.hasWind250));
+  if (spatialTargetsAvailable && params.enableWithSpatialTargets === false) {
+    return { didApply: false, source: 'spatial-climatology-disabled' };
   }
   if (SOURCE_FIXTURE_COUNT !== 8 || !EKE10M_BY_LAT_TARGET?.length) {
     return { didApply: false };
@@ -38,11 +39,13 @@ export function stepWindEddyNudge5({ dt, grid, state, climo, params = {} }) {
     tauSeconds = 10 * 86400,
     scaleClampMin = 0.5,
     scaleClampMax = 2.0,
+    deficitRelaxBoostMax = 1.0,
     eps = 1e-6
   } = params;
 
   const relax = clamp01(dt / Math.max(1e-6, tauSeconds));
   if (relax <= 0) return { didApply: false };
+  const relaxBoostMax = Math.max(1, deficitRelaxBoostMax);
 
   if (!state._eddyRowMeanU || state._eddyRowMeanU.length !== ny) {
     state._eddyRowMeanU = new Float32Array(ny);
@@ -98,7 +101,11 @@ export function stepWindEddyNudge5({ dt, grid, state, climo, params = {} }) {
     const ekeRow = ekeRowSum / countRow;
     const scaleRaw = Math.sqrt((target + eps) / (ekeRow + eps));
     const scale = Math.max(scaleClampMin, Math.min(scaleClampMax, scaleRaw));
-    const blend = lerp(1, scale, relax);
+    const deficitFrac = target > eps
+      ? clamp01(1 - Math.sqrt((ekeRow + eps) / (target + eps)))
+      : 0;
+    const relaxEff = clamp01(relax * lerp(1, relaxBoostMax, deficitFrac));
+    const blend = lerp(1, scale, relaxEff);
     if (scale > maxScale) maxScale = scale;
     for (let i = 0; i < nx; i++) {
       const idx = base + row + i;
@@ -113,6 +120,7 @@ export function stepWindEddyNudge5({ dt, grid, state, climo, params = {} }) {
 
   return {
     didApply: true,
+    source: spatialTargetsAvailable ? 'spatial-climatology+eke-target' : 'zonal-fallback-eke-target',
     ekeMean: countEke > 0 ? sumEke / countEke : null,
     maxScale
   };

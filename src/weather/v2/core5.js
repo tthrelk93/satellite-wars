@@ -96,8 +96,14 @@ export class WeatherCore5 {
     };
     this.dynParams = {
       maxWind: 70,
-      tauDragSurface: 4 * 3600,
-      tauDragTop: 6 * 3600,
+      tauDragSurface: 6 * 3600,
+      tauDragTop: 24 * 3600,
+      dragSigmaStart: 0.72,
+      dragSigmaEnd: 0.98,
+      dragSigmaExponent: 2.0,
+      roughnessSigmaStart: 0.82,
+      roughnessSigmaEnd: 1.0,
+      roughnessSigmaExponent: 1.5,
       nuLaplacian: 4_000_000,
       quadDragAlphaSurface: 0.02,
       tropicsDragBoost: 0.5,
@@ -175,6 +181,7 @@ export class WeatherCore5 {
       tauSurfaceSeconds: 7 * 86400,
       tauUpperSeconds: 1 * 3600,
       tauVSeconds: 2 * 3600,
+      surfaceDeficitRelaxBoostMax: 8,
       upperWindCapFactor: 1.35,
       upperWindCapOffset: 0,
       upperWindCapMin: 0,
@@ -185,9 +192,11 @@ export class WeatherCore5 {
     };
     this.windEddyParams = {
       enable: true,
-      tauSeconds: 10 * 86400,
+      enableWithSpatialTargets: true,
+      tauSeconds: 5 * 86400,
       scaleClampMin: 0.5,
-      scaleClampMax: 2.0,
+      scaleClampMax: 3.0,
+      deficitRelaxBoostMax: 24.0,
       eps: 1e-6
     };
     this._windNudgeMaxAbsCorrection = 0;
@@ -233,33 +242,37 @@ export class WeatherCore5 {
        tauConv: 2 * 3600,
        tauPblUnstable: 6 * 3600,
        tauPblStable: 2 * 86400,
-      pblDepthFrac: 0.35,
-      maxMixFracPbl: 0.2,
-      pblTaper: 0.85,
-      pblMixCondensate: true,
-      pblCondMixScale: 0.35,
-      rhTrig: 0.75,
-      rhMidMin: 0.25,
-      omegaTrig: 0.3,
-      instabTrig: 3,
-      qvTrig: 0.002,
-      thetaeCoeff: 10,
-      thetaeQvCap: 0.03,
-      pblWarmRain: true,
+       pblDepthFrac: 0.22,
+       pblDepthFracStable: 0.14,
+       pblDepthFracUnstable: 0.22,
+       pblDepthFracLandBonus: 0.02,
+       pblDepthFracOceanPenalty: 0.02,
+       maxMixFracPbl: 0.2,
+       pblTaper: 0.85,
+       pblMixCondensate: true,
+       pblCondMixScale: 0.35,
+       rhTrig: 0.75,
+       rhMidMin: 0.25,
+       omegaTrig: 0.3,
+       instabTrig: 3,
+       qvTrig: 0.002,
+       thetaeCoeff: 10,
+       thetaeQvCap: 0.03,
+       pblWarmRain: true,
        qcAuto0: 7e-4,
        tauAuto: 4 * 3600,
        autoMaxFrac: 0.2,
        entrainFrac: 0.2,
-      detrainTopFrac: 0.7,
-      buoyTrigK: 0.0,
-      dThetaMaxConvPerStep: 2.5,
-      enableLargeScaleVerticalAdvection: true,
-      verticalAdvectionCflMax: 0.4,
-      dThetaMaxVertAdvPerStep: 2.0,
-      enableOmegaMassFix: true,
-      eps: 1e-12,
-      debugConservation: false
-    };
+       detrainTopFrac: 0.7,
+       buoyTrigK: 0.0,
+       dThetaMaxConvPerStep: 2.5,
+       enableLargeScaleVerticalAdvection: true,
+       verticalAdvectionCflMax: 0.4,
+       dThetaMaxVertAdvPerStep: 2.0,
+       enableOmegaMassFix: true,
+       eps: 1e-12,
+       debugConservation: false
+     };
     this.microParams = {
       p0: 100000,
       pTop: P_TOP,
@@ -527,6 +540,22 @@ export class WeatherCore5 {
     return field;
   }
 
+  _copySnapshotIntoField(src, dst) {
+    if (src instanceof Float32Array && dst instanceof Float32Array && src.length === dst.length) {
+      dst.set(src);
+      return true;
+    }
+    if (src instanceof Uint8Array && dst instanceof Uint8Array && src.length === dst.length) {
+      dst.set(src);
+      return true;
+    }
+    if (src instanceof Uint16Array && dst instanceof Uint16Array && src.length === dst.length) {
+      dst.set(src);
+      return true;
+    }
+    return false;
+  }
+
   getStateSnapshot({ mode = 'compact' } = {}) {
     const compactFields = {
       ps: this.fields.ps,
@@ -565,7 +594,16 @@ export class WeatherCore5 {
       },
       fields: Object.fromEntries(
         Object.entries(compactFields).map(([key, field]) => [key, this._copySnapshotField(field)])
-      )
+      ),
+      runtime: {
+        accumSeconds: this._accum,
+        lastAdvanceSteps: this._lastAdvanceSteps,
+        dynStepIndex: this._dynStepIndex,
+        nudgeAccumSeconds: this._nudgeAccumSeconds,
+        climoAccumSeconds: this._climoAccumSeconds,
+        windNudgeSpinupSeconds: this._windNudgeSpinupSeconds,
+        simSpeed: this.simSpeed
+      }
     };
 
     if (mode === 'full') {
@@ -577,6 +615,51 @@ export class WeatherCore5 {
     }
 
     return snapshot;
+  }
+
+  applyStateSnapshot(snapshot, { restoreRuntime = true } = {}) {
+    if (!snapshot || typeof snapshot !== 'object') return false;
+
+    if (snapshot.state && this.state) {
+      for (const [key, value] of Object.entries(snapshot.state)) {
+        this._copySnapshotIntoField(value, this.state[key]);
+      }
+    }
+    if (snapshot.fields && this.fields) {
+      for (const [key, value] of Object.entries(snapshot.fields)) {
+        this._copySnapshotIntoField(value, this.fields[key]);
+      }
+    }
+
+    if (Number.isFinite(snapshot.timeUTC)) {
+      this.timeUTC = snapshot.timeUTC;
+    }
+
+    const runtime = snapshot.runtime || null;
+    if (restoreRuntime && runtime) {
+      this._accum = Number.isFinite(runtime.accumSeconds) ? runtime.accumSeconds : 0;
+      this._lastAdvanceSteps = Number.isFinite(runtime.lastAdvanceSteps) ? runtime.lastAdvanceSteps : 0;
+      this._dynStepIndex = Number.isFinite(runtime.dynStepIndex) ? runtime.dynStepIndex : 0;
+      this._nudgeAccumSeconds = Number.isFinite(runtime.nudgeAccumSeconds) ? runtime.nudgeAccumSeconds : 0;
+      this._climoAccumSeconds = Number.isFinite(runtime.climoAccumSeconds) ? runtime.climoAccumSeconds : 0;
+      this._windNudgeSpinupSeconds = Number.isFinite(runtime.windNudgeSpinupSeconds)
+        ? runtime.windNudgeSpinupSeconds
+        : 0;
+      if (Number.isFinite(runtime.simSpeed)) {
+        this.simSpeed = Math.max(0, runtime.simSpeed);
+      }
+    } else {
+      this._accum = 0;
+      this._lastAdvanceSteps = 0;
+      this._dynStepIndex = 0;
+      this._nudgeAccumSeconds = 0;
+      this._climoAccumSeconds = 0;
+      this._windNudgeSpinupSeconds = 0;
+    }
+
+    this._updateClimoNow(0, true);
+    this._updateHydrostatic();
+    return true;
   }
 
   _bindFieldViews() {
@@ -962,6 +1045,8 @@ export class WeatherCore5 {
             source: windNudgeResult.source ?? null,
             rmseSurface: windNudgeResult.rmseSurface ?? null,
             rmseUpper: windNudgeResult.rmseUpper ?? null,
+            surfaceRelaxBoostMean: windNudgeResult.surfaceRelaxBoostMean ?? null,
+            surfaceRelaxBoostMax: windNudgeResult.surfaceRelaxBoostMax ?? null,
             maxAbsCorrection: this._windNudgeMaxAbsCorrection,
             spinupSeconds: this._windNudgeSpinupSeconds,
             effectiveTaus: {

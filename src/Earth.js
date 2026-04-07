@@ -675,6 +675,7 @@ class Earth {
     }
     const core = this.weatherField?.core;
     if (!core) return;
+    const startSnapshot = core.getStateSnapshot?.({ mode: 'full' }) || null;
     if (!this._weatherWorker) {
       try {
         this._weatherWorker = new Worker(new URL('./workers/weatherCore.worker.js', import.meta.url));
@@ -736,6 +737,7 @@ class Earth {
         dt: core.modelDt,
         seed: this.weatherSeed,
         startTimeSeconds: core.timeUTC,
+        startSnapshot,
         snapshotMode: this._weatherWorkerSnapshotMode
       }
     });
@@ -757,6 +759,11 @@ class Earth {
   _applyWeatherWorkerState(payload) {
     const core = this.weatherField?.core;
     if (!core || !payload) return;
+    if (typeof core.applyStateSnapshot === 'function') {
+      core.applyStateSnapshot(payload, { restoreRuntime: true });
+      core.ready = true;
+      return;
+    }
     if (Number.isFinite(payload.timeUTC)) {
       core.timeUTC = payload.timeUTC;
     }
@@ -4220,6 +4227,33 @@ class Earth {
   weatherStepDays(days = 1) {
     this.weatherField?.stepModelSeconds(days * 86400);
     this.analysisWeatherField?.stepModelSeconds(days * 86400);
+  }
+
+  stepPausedWeatherSimulation(deltaSeconds, { targetSimTimeSeconds = null } = {}) {
+    if (!(Number.isFinite(deltaSeconds) && deltaSeconds > 0)) return 0;
+    const truthCoreTime = this.weatherField?.core?.timeUTC ?? 0;
+    const nextSimTimeSeconds = Number.isFinite(targetSimTimeSeconds)
+      ? targetSimTimeSeconds
+      : truthCoreTime + deltaSeconds;
+
+    this.weatherField?.setUseExternalCore?.(false);
+    this.analysisWeatherField?.setUseExternalCore?.(false);
+
+    const truthSteps = this.weatherField?.catchUpModelSeconds(deltaSeconds, nextSimTimeSeconds) ?? 0;
+    const analysisSteps = this.analysisWeatherField?.catchUpModelSeconds(deltaSeconds, nextSimTimeSeconds) ?? 0;
+
+    this._lastSimTimeSeconds = nextSimTimeSeconds;
+    this._weatherWorkerAccumSeconds = 0;
+    this._weatherWorkerBusy = false;
+    this._weatherWorkerLastSimTimeSeconds = nextSimTimeSeconds;
+    this._weatherWorkerPendingEnable = false;
+
+    if (this.useWeatherWorker) {
+      this._initWeatherWorker();
+    }
+
+    this._maybeLogWindDiagnostics(nextSimTimeSeconds);
+    return Math.max(truthSteps, analysisSteps);
   }
 
   getWeatherZonalMean(mode) {

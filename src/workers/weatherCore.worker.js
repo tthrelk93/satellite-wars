@@ -23,12 +23,7 @@ const collectTransferBuffers = (value, buffers = []) => {
 
 const postSnapshot = (type) => {
   if (!core) return;
-  const snapshot = core.getStateSnapshot({ mode: snapshotMode });
-  const payload = {
-    timeUTC: snapshot.timeUTC,
-    fields: snapshot.fields,
-    state: snapshot.state || null
-  };
+  const payload = core.getStateSnapshot({ mode: snapshotMode });
   const message = { type, payload };
   self.postMessage(message, collectTransferBuffers(payload));
 };
@@ -48,7 +43,9 @@ self.onmessage = async (event) => {
         seed: payload.seed
       });
       await core._initPromise;
-      if (Number.isFinite(payload.startTimeSeconds)) {
+      if (payload.startSnapshot && typeof core.applyStateSnapshot === 'function') {
+        core.applyStateSnapshot(payload.startSnapshot, { restoreRuntime: true });
+      } else if (Number.isFinite(payload.startTimeSeconds)) {
         core.setTimeUTC(payload.startTimeSeconds);
       }
       postSnapshot('ready');

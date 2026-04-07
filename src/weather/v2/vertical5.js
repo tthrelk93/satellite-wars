@@ -14,8 +14,14 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'tauPblUnstable',
   'tauPblStable',
   'pblDepthFrac',
+  'pblDepthFracStable',
+  'pblDepthFracUnstable',
+  'pblDepthFracLandBonus',
+  'pblDepthFracOceanPenalty',
   'maxMixFracPbl',
   'pblTaper',
+  'enablePblMomentumMix',
+  'pblMomentumMixScale',
   'pblMixCondensate',
   'pblCondMixScale',
   'rhTrig',
@@ -85,9 +91,15 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     // PBL mixing (timescale-based)
     tauPblUnstable = 6 * 3600,
     tauPblStable = 2 * 86400,
-    pblDepthFrac = 0.35,
+    pblDepthFrac = 0.22,
+    pblDepthFracStable = null,
+    pblDepthFracUnstable = null,
+    pblDepthFracLandBonus = 0.02,
+    pblDepthFracOceanPenalty = 0.02,
     maxMixFracPbl = 0.2,
     pblTaper = 0.85,
+    enablePblMomentumMix = true,
+    pblMomentumMixScale = 1.0,
     pblMixCondensate = true,
     pblCondMixScale = 0.35,
 
@@ -130,7 +142,24 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   } = params;
 
   const { nx, ny, invDx, invDy, cosLat } = grid;
-  const { N, nz, u, v, omega, theta, qv, qc, qi, qr, T, pHalf, pMid, sigmaHalf, dpsDtApplied } = state;
+  const {
+    N,
+    nz,
+    u,
+    v,
+    omega,
+    theta,
+    qv,
+    qc,
+    qi,
+    qr,
+    T,
+    pHalf,
+    pMid,
+    sigmaHalf,
+    dpsDtApplied,
+    landMask
+  } = state;
 
   // Convective column mask (boolean per column) for microphysics overrides
   if (!state.convMask || state.convMask.length !== N) state.convMask = new Uint8Array(N);
@@ -318,7 +347,16 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       for (let k = 0; k < N; k++) {
         const pSurf = pHalf[nz * N + k];
         const pTop = pHalf[k]; // interface at model top
-        const pTopPbl = pSurf - pblDepthFrac * (pSurf - pTop);
+        const idxSurface = (nz - 1) * N + k;
+        const idxSurfaceAbove = Math.max(0, nz - 2) * N + k;
+        const surfaceStable = theta[idxSurfaceAbove] > theta[idxSurface];
+        const baseDepthFrac = surfaceStable ? pblDepthFracStable : pblDepthFracUnstable;
+        const legacyDepthFrac = Number.isFinite(pblDepthFrac) ? pblDepthFrac : 0.22;
+        let pblDepthFracColumn = Number.isFinite(baseDepthFrac) ? baseDepthFrac : legacyDepthFrac;
+        if (landMask?.[k] >= 0.5) pblDepthFracColumn += pblDepthFracLandBonus;
+        else pblDepthFracColumn -= pblDepthFracOceanPenalty;
+        pblDepthFracColumn = clamp(pblDepthFracColumn, 0.08, 0.9);
+        const pTopPbl = pSurf - pblDepthFracColumn * (pSurf - pTop);
         let levTopPbl = nz - 1;
         for (let lev = nz - 1; lev >= 0; lev--) {
           if (pMid[lev * N + k] < pTopPbl) {
@@ -351,6 +389,17 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           const qvMean = (qv[idxA] * dpA + qv[idxB] * dpB) / denom;
           qv[idxA] += mixFrac * (qvMean - qv[idxA]);
           qv[idxB] += mixFrac * (qvMean - qv[idxB]);
+
+          if (enablePblMomentumMix) {
+            const momentumMixFrac = clamp(mixFrac * Math.max(0, pblMomentumMixScale), 0, maxMixFracPbl);
+            const uMean = (u[idxA] * dpA + u[idxB] * dpB) / denom;
+            u[idxA] += momentumMixFrac * (uMean - u[idxA]);
+            u[idxB] += momentumMixFrac * (uMean - u[idxB]);
+
+            const vMean = (v[idxA] * dpA + v[idxB] * dpB) / denom;
+            v[idxA] += momentumMixFrac * (vMean - v[idxA]);
+            v[idxB] += momentumMixFrac * (vMean - v[idxB]);
+          }
 
           if (pblMixCondensate) {
             const mixFracC = mixFrac * pblCondMixScale;

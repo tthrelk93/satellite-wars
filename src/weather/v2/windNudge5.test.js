@@ -92,6 +92,66 @@ test('stepWindNudge5 blends 500 hPa and 250 hPa targets for upper-level nudging'
   assert.ok(Math.abs(state.v[levU * state.N + 0] - 5.2) < 1e-6);
 });
 
+test('stepWindNudge5 boosts surface relaxation when strong targets are underpowered', () => {
+  const sigmaHalf = createSigmaHalfLevels({ nz: 6 });
+  const baseState = createState5({ grid: { count: 1 }, nz: 6, sigmaHalf });
+  const boostedState = createState5({ grid: { count: 1 }, nz: 6, sigmaHalf });
+  const grid = {
+    nx: 1,
+    ny: 1,
+    latDeg: new Float32Array([45]),
+    cosLat: new Float32Array([Math.cos(45 * Math.PI / 180)])
+  };
+  baseState.u.fill(0);
+  baseState.v.fill(0);
+  boostedState.u.fill(0);
+  boostedState.v.fill(0);
+  const levS = baseState.nz - 1;
+  const levU = findClosestLevelIndex(baseState.sigmaHalf, 0.28);
+  baseState.pMid[levU * baseState.N + 0] = 30000;
+  boostedState.pMid[levU * boostedState.N + 0] = 30000;
+  const climo = {
+    hasWind: true,
+    hasWind500: true,
+    hasWind250: false,
+    windNowU: new Float32Array([12]),
+    windNowV: new Float32Array([0]),
+    wind500NowU: new Float32Array([18]),
+    wind500NowV: new Float32Array([0])
+  };
+
+  stepWindNudge5({
+    dt: 3600,
+    grid,
+    state: baseState,
+    climo,
+    params: {
+      tauSurfaceSeconds: 7 * 86400,
+      tauUpperSeconds: 7 * 86400,
+      tauVSeconds: 7 * 86400,
+      surfaceDeficitRelaxBoostMax: 1
+    }
+  });
+
+  const boostedResult = stepWindNudge5({
+    dt: 3600,
+    grid,
+    state: boostedState,
+    climo,
+    params: {
+      tauSurfaceSeconds: 7 * 86400,
+      tauUpperSeconds: 7 * 86400,
+      tauVSeconds: 7 * 86400,
+      surfaceDeficitRelaxBoostMax: 8
+    }
+  });
+
+  assert.ok(boostedState.u[levS * boostedState.N + 0] > baseState.u[levS * baseState.N + 0]);
+  assert.ok(boostedState.u[levS * boostedState.N + 0] < climo.windNowU[0]);
+  assert.ok((boostedResult.surfaceRelaxBoostMean ?? 1) > 1);
+  assert.ok((boostedResult.surfaceRelaxBoostMax ?? 1) > 1);
+});
+
 test('stepWindNudge5 caps runaway upper winds relative to climatology targets', () => {
   const sigmaHalf = createSigmaHalfLevels({ nz: 6 });
   const state = createState5({ grid: { count: 1 }, nz: 6, sigmaHalf });
