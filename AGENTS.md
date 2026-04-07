@@ -14,8 +14,10 @@ Read these first at the start of every cycle:
 - `weather-validation/reports/earth-accuracy-status.md`
 - `weather-validation/reports/realism-investigation-playbook.md`
 - `weather-validation/reports/smoothness-investigation-playbook.md`
+- `weather-validation/reports/blocker-breaker-playbook.md`
 - the newest `weather-validation/output/cycle-*/checkpoint.md`
 - `git log --oneline -n 10`
+- `npm run agent:cycle-streak`
 
 Non-negotiable rules:
 - No fake progress.
@@ -40,21 +42,25 @@ Mandatory cycle protocol:
 1. Reassess the highest-leverage remaining realism weakness first, and only choose smoothness instead when the cycle selection rule allows it.
 2. Write a testable hypothesis and explicit pass/fail criteria in `plan.md`.
 3. Create `weather-validation/output/cycle-<UTC>-<slug>/`.
-4. If realism is the blocker, capture the fresh evidence needed to prove the weakness is real in a mature live window before changing behavior.
-5. If smoothness is the blocker, capture fresh profiler evidence first:
+4. If `npm run agent:cycle-streak` reports a soft or hard stall, convert the run into a blocker-breaker cycle before any ordinary experimentation.
+5. If realism is the blocker, capture the fresh evidence needed to prove the weakness is real in a mature live window before changing behavior.
+   - If the blocker is orographic realism, start with `npm run agent:orographic-audit -- --targets 75600,105480`.
+   - If that audit reports `terrainSampleCount = 0`, treat headless terrain parity as a tooling blocker and use `npm run agent:orographic-probe-cdp` on the reused localhost page or fix the parity gap before more micro-experiments.
+   - Reuse the latest clean baseline for the same blocker family when the code under test does not change browser/init/logging behavior.
+6. If smoothness is the blocker, capture fresh profiler evidence first:
    - run `npm run agent:summarize-runtime-log`
    - run `npm run agent:profile-runtime-hotspots`
    - identify the dominant stage before changing renderer/smoothness code
-6. Make the smallest code change that can test the hypothesis.
-7. Run targeted tests and objective validation before live observation.
-8. Start or restart the canonical dev server with `npm run agent:dev-server -- --restart --port 3000`.
-9. Reuse the existing browser tab with `npm run agent:reuse-localhost-tab`.
-10. Observe the live app on localhost for long enough to evaluate the target behavior.
-11. Summarize runtime telemetry with `npm run agent:summarize-runtime-log`.
-12. If smoothness is still the blocker, write `hotspot-profile.json` from the same fresh run.
-13. Write `checkpoint.md` and `evidence-summary.json`.
-14. Update `weather-validation/reports/world-class-weather-status.md` and `.json` only when the verified baseline materially improves. Failed cycles should keep conclusions in the cycle-local artifacts and then revert tracked status-file edits.
-15. If the improvement is verified, commit immediately. If it is not verified, revert your changes and end with `NO NEW VERIFIED PROGRESS`.
+7. Make the smallest code change that can test the hypothesis.
+8. Run targeted tests and cheap objective validation before live observation.
+9. Start or restart the canonical dev server with `npm run agent:dev-server -- --restart --port 3000` only when the candidate already deserves one live verification run.
+10. Reuse the existing browser tab with `npm run agent:reuse-localhost-tab`.
+11. Observe the live app on localhost for long enough to evaluate the target behavior.
+12. Summarize runtime telemetry with `npm run agent:summarize-runtime-log`, but treat `lineCount = 0` as degraded logging rather than meaningful telemetry.
+13. If smoothness is still the blocker, write `hotspot-profile.json` from the same fresh run.
+14. Write `checkpoint.md` and `evidence-summary.json`.
+15. Update `weather-validation/reports/world-class-weather-status.md` and `.json` only when the verified baseline materially improves. Failed cycles should keep conclusions in the cycle-local artifacts and then revert tracked status-file edits.
+16. If the improvement is verified, commit immediately. If it is not verified, revert your changes and end with `NO NEW VERIFIED PROGRESS`.
 
 Browser and dev-server policy:
 - Use one canonical app URL: `http://127.0.0.1:3000/` unless a different port is unavoidable.
@@ -68,6 +74,7 @@ Observation policy:
 - Default live observation window: 3-10 minutes.
 - Maximum long observation window per cycle: 20 minutes.
 - Prefer short browser checks plus logs when a long watch is not necessary.
+- In a blocker-breaker cycle, use at most one browser verification run. Do not spend the cycle on repeated fresh baselines.
 
 Performance policy:
 - Smoothness is a first-class requirement.
@@ -83,6 +90,7 @@ Required artifacts per cycle:
 - `plan.md`
 - `checkpoint.md`
 - `evidence-summary.json`
+- `agent:cycle-streak` output summary when a stall guard triggers
 - `hotspot-profile.json` whenever smoothness is blocked
 - realism comparison evidence whenever realism is blocked
 - changed file paths
@@ -99,6 +107,10 @@ World-class bar:
 - The model has been re-audited across circulation, vertical coupling, clouds/precipitation, storm structure, and multi-day realism, not just wind targets.
 - Performance remains smooth and shippable.
 - Every claim is backed by fresh metrics and observation artifacts.
+
+Stall guard:
+- If `npm run agent:cycle-streak` reports `stallGuardTriggered.soft = true`, the run must follow `weather-validation/reports/blocker-breaker-playbook.md`.
+- If it reports `stallGuardTriggered.hard = true`, do not run another ordinary browser-first micro-experiment. The cycle must either land a new permanent harness/diagnostic improvement, land a verified fix, or keep the cron job disabled.
 
 If no verified progress:
 NO NEW VERIFIED PROGRESS

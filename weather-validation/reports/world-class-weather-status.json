@@ -1,10 +1,10 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-07T13:21:00Z",
+  "updatedAt": "2026-04-07T23:30:00Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
-  "baselineCommit": "255c084",
+  "baselineCommit": "32e1eea",
   "latestCycle": {
     "id": "cycle-2026-04-07T13-07-12Z-topography-climo-restoration",
     "goal": "restore missing terrain climatology in the live browser worker so the weather model stops running with a flat land field",
