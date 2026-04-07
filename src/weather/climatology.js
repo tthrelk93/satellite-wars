@@ -69,18 +69,38 @@ export function sampleImageToGrid({ imageData, imgW, imgH, nx, ny, decodeFn }) {
   return out;
 }
 
-const loadImageData = async (url) => {
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.src = url;
-  await img.decode();
-  const c = document.createElement('canvas');
-  c.width = img.width;
-  c.height = img.height;
-  const ctx = c.getContext('2d');
-  ctx.drawImage(img, 0, 0);
-  const data = ctx.getImageData(0, 0, c.width, c.height).data;
-  return { data, width: c.width, height: c.height };
+const canUseDomImageDecode = () => typeof Image !== 'undefined' && typeof document !== 'undefined';
+const canUseBitmapImageDecode = () => typeof createImageBitmap === 'function' && typeof OffscreenCanvas !== 'undefined';
+
+export const loadImageData = async (url) => {
+  if (canUseDomImageDecode()) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = url;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.width;
+    c.height = img.height;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, c.width, c.height).data;
+    return { data, width: c.width, height: c.height };
+  }
+
+  if (typeof fetch === 'undefined' || !canUseBitmapImageDecode()) {
+    throw new Error('No image decode path available for climatology assets.');
+  }
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Image fetch failed: ${res.status}`);
+  const blob = await res.blob();
+  const bitmap = await createImageBitmap(blob);
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0);
+  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+  return { data, width: canvas.width, height: canvas.height };
 };
 
 const createFallbackClimo = ({ nx, ny, latDeg }) => {
@@ -131,7 +151,7 @@ const createFallbackClimo = ({ nx, ny, latDeg }) => {
 };
 
 export async function loadClimatology({ nx, ny, latDeg }) {
-  if (typeof fetch === 'undefined' || typeof Image === 'undefined' || typeof document === 'undefined') {
+  if (typeof fetch === 'undefined' || (!canUseDomImageDecode() && !canUseBitmapImageDecode())) {
     return createFallbackClimo({ nx, ny, latDeg });
   }
 
