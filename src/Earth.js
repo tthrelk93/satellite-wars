@@ -16,6 +16,7 @@ import { AmvSensor } from './sensors/weather/AmvSensor';
 import { paintGridToTexture } from './sensors/weather/paintGridToTexture';
 import WindStreamlineRenderer from './WindStreamlineRenderer';
 import { CLOUD_WATCH_GRID_LON_OFFSET_RAD, WIND_REALISM_TARGETS } from './constants';
+import { takeBoundedAccumulatedStep } from './weather/workerStepBudget';
 import { findClosestLevelIndex } from './weather/v2/verticalGrid';
 import { interpolatePressureFieldAtCell } from './weather/v2/analysisData.js';
 import { armAnalysisIncrement5, clearAnalysisIncrement5 } from './weather/v2/analysisIncrement5.js';
@@ -429,6 +430,7 @@ class Earth {
     this._weatherWorkerPendingEnable = false;
     this._weatherWorkerLastRequestRealMs = 0;
     this._weatherWorkerMinIntervalMs = 80;
+    this._weatherWorkerMaxStepSeconds = 6 * 3600;
     this._weatherWorkerSnapshotMode = 'compact';
     this.latestForecastByPlayerId = new Map();
     this.forecastHistoryByPlayerId = new Map();
@@ -794,14 +796,18 @@ class Earth {
     if (!(this._weatherWorkerAccumSeconds > 0)) return;
     const nowMs = performance.now();
     if (nowMs - this._weatherWorkerLastRequestRealMs < this._weatherWorkerMinIntervalMs) return;
-    const deltaSeconds = this._weatherWorkerAccumSeconds;
-    this._weatherWorkerAccumSeconds = 0;
+    const { stepSeconds, remainingSeconds } = takeBoundedAccumulatedStep(
+      this._weatherWorkerAccumSeconds,
+      this._weatherWorkerMaxStepSeconds
+    );
+    if (!(stepSeconds > 0)) return;
+    this._weatherWorkerAccumSeconds = remainingSeconds;
     this._weatherWorkerBusy = true;
     this._weatherWorkerLastRequestRealMs = nowMs;
     this._weatherWorker.postMessage({
       type: 'step',
       payload: {
-        deltaSeconds,
+        deltaSeconds: stepSeconds,
         simSpeed,
         snapshotMode: this._weatherWorkerSnapshotMode
       }

@@ -1,25 +1,25 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-07T05:25:34Z",
+  "updatedAt": "2026-04-07T09:24:30Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
-  "baselineCommit": "fd3ea07",
+  "baselineCommit": "1db18a7",
   "latestCycle": {
-    "id": "cycle-2026-04-07T05-06-50Z-surface-drag-relaxation",
-    "goal": "raise mature live 10 m wind energy enough to clear the remaining mean/p99 realism gate on the canonical localhost run",
-    "verifiedImprovement": "a small near-surface drag relaxation moved the mature live wind field into the documented model/viz target band",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-07T05-06-50Z-surface-drag-relaxation/runtime-summary.json",
-    "runtimeLogPath": "logs/weather-2026-04-07T05-17-20Z-62482.jsonl"
+    "id": "cycle-2026-04-07T09-08-03Z-mature-precipitation-organization",
+    "goal": "restore a trustworthy mature live window by preventing the truth weather worker from hard-freezing under reproduced multi-day backlog",
+    "verifiedImprovement": "truth-worker catch-up now advances again in bounded 6-hour chunks instead of remaining fully frozen during the reproduced burst case",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-07T09-08-03Z-mature-precipitation-organization/runtime-summary.json",
+    "runtimeLogPath": "logs/weather-2026-04-07T09-16-35Z-57192.jsonl"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
     "overallPass": true
   },
   "blockingGaps": [
-    "long-horizon live realism still needs repeated documented checkpoints on the energized wind field",
-    "broader Earth-like realism still needs explicit re-audits across circulation, vertical coupling, storm behavior, cloud structure, and precipitation organization",
-    "runtime smoothness still has high p95/max Earth.update spikes but should only take priority when it blocks reliable realism observation or regresses after a realism fix",
+    "truth-worker lag still becomes too large during aggressive burst stepping, so the Day 6-8 live window is not yet trustworthy enough for a mature realism audit",
+    "canonical runtime-log helpers still received zero server-side log lines in this run, so fresh hotspot attribution is still missing",
+    "broader Earth-like realism still needs explicit re-audits across circulation, vertical coupling, storm behavior, cloud structure, and precipitation organization once the worker lag blocker is under control",
     "world-class status still requires realism and smoothness to pass in the same fresh live run"
   ],
   "cycleInputs": [
@@ -33,31 +33,37 @@
   "latestTelemetry": {
     "singleTabLocalhostVerified": true,
     "runtimeHealthWarnings": [
-      "earth_update_p95_high",
-      "earth_update_max_high"
+      "runtime_log_empty",
+      "weather_worker_backlog_high"
     ],
     "updateMs": {
-      "p95": 23.50499999895691,
-      "max": 97.79999999701977
+      "p95": null,
+      "max": null
     },
     "simLagSeconds": {
-      "p95": 112.67700001470641,
-      "max": 115.02000001966736
+      "p95": null,
+      "max": null
+    },
+    "workerCatchup": {
+      "preFixTruthCoreAdvanceSeconds": 0,
+      "preFixUiSimAdvanceSeconds": 12000,
+      "postFixTruthCoreAdvanceSeconds": 64800,
+      "postFixWorkerChunkSeconds": 21600
     },
     "windTargets": {
-      "meanSpeed": 4.760389429538729,
-      "p90": 11.507087501086998,
-      "p99": 14.01945202709714,
-      "maxSpeed": 14.840267217312451,
-      "stepMeanPx": 0.05708248834703792,
+      "meanSpeed": 4.816509966583703,
+      "p90": 11.638237075587353,
+      "p99": 14.153074121069743,
+      "maxSpeed": 15.09103428117464,
+      "stepMeanPx": 0.057398536647168326,
       "failingReasons": [],
       "overallPass": true
     }
   },
   "defaultNextPriority": [
-    "re-audit the mature live weather for the highest-leverage realism weakness using the realism investigation playbook",
-    "document repeated mature-window checkpoints on the energized field so realism claims cover multi-day behavior",
-    "reserve smoothness-focused cycles for the periodic health check or when runtime noise prevents reliable realism observation",
+    "reduce truth-worker lag / sim-time desynchronization so the Day 6-8 live window is trustworthy again",
+    "re-audit the mature live weather for the highest-leverage realism weakness using the realism investigation playbook once the worker lag blocker is under control",
+    "restore canonical runtime-log instrumentation so hotspot attribution is evidence-based instead of speculative",
     "keep validation on the clean world-class checkout only"
   ],
   "rules": {
