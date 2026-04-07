@@ -6,33 +6,35 @@ Verdict: NOT WORLD CLASS YET
 ## Current baseline
 
 - Clean worker worktree: `codex/world-class-weather-loop`
-- Latest verified cycle: `cycle-2026-04-07T04-44-00Z-baseline-live-smoothness`
+- Latest verified cycle: `cycle-2026-04-07T05-06-50Z-surface-drag-relaxation`
 - Earth accuracy suite: PASS (`weather-validation/reports/earth-accuracy-status.md`)
-- Canonical localhost reuse is now working again: `npm run agent:reuse-localhost-tab` successfully reused `http://127.0.0.1:3000/` on the OpenClaw `openclaw` profile.
-- Single-tab enforcement was verified with one live localhost tab only.
-- Fresh runtime summary (`weather-validation/output/cycle-2026-04-07T04-44-00Z-baseline-live-smoothness/runtime-summary.json`) says `likelySmoothEnough: false`.
-- Fresh live run exposed the next concrete blocker: winds and streamline motion are still under-energized in browser telemetry.
+- Canonical localhost reuse remains working: `npm run agent:reuse-localhost-tab` successfully reused `http://127.0.0.1:3000/` on the OpenClaw `openclaw` profile and cleaned duplicate localhost tabs during the cycle.
+- Single-tab enforcement was verified again with one live localhost tab only.
+- Fresh runtime summary (`weather-validation/output/cycle-2026-04-07T05-06-50Z-surface-drag-relaxation/runtime-summary.json`) still says `likelySmoothEnough: false`.
+- Fresh live wind telemetry no longer fails the documented wind-energy gate; the next concrete blocker is runtime smoothness.
 
 ## Fresh evidence from the latest cycle
 
-- Canonical helper fix: `scripts/agent/reuse-localhost-tab.mjs` now passes CLI options in the order the current OpenClaw browser CLI expects.
-- Runtime summary:
-  - `updateMs p95`: `22.52 ms`
-  - `updateMs max`: `90.40 ms`
-  - `simLagSeconds p95`: `110.84 s`
-- Latest wind target status from the same run:
-  - model mean speed: `3.80 m/s` vs target `4.5–9.5`
-  - model p90 speed: `8.77 m/s` vs target `9–15`
-  - model p99 speed: `11.14 m/s` vs target `14–24`
-  - streamline mean step: `0.0475 px` vs target `>= 0.05 px`
-- Live browser observation: the in-sim globe loaded cleanly on the canonical localhost tab, but the streamline field still looked sparse / low-energy rather than world-class.
+- Physics change: `src/weather/v2/core5.js` now gives the near-surface wind solver a slightly longer drag timescale (`tauDragSurface: 4h -> 5h`).
+- Targeted automated validation: `npm run weather:validate:test` passed (`31/31`).
+- Fresh steady-state runtime summary:
+  - `updateMs p95`: `23.50 ms`
+  - `updateMs max`: `97.80 ms`
+  - `simLagSeconds p95`: `112.68 s`
+  - `stepsSkippedTotal`: `0`
+- Latest wind target status from the same live run:
+  - model mean speed: `4.7604 m/s` vs target `4.5–9.5`
+  - model p90 speed: `11.5071 m/s` vs target `9–15`
+  - model p99 speed: `14.0195 m/s` vs target `14–24`
+  - streamline mean step: `0.05708 px` vs target `>= 0.05 px`
+  - overall wind target verdict: **PASS**
+- Live browser observation: on the spun-up canonical localhost tab (Day 6–8), the streamline field looked materially denser and more continuous than the prior baseline and no fresh clipping/churn issue was visible.
 
 ## What still blocks "world class"
 
-- Wind energy remains too low in fresh live telemetry (`model_mean_low`, `model_p90_low`, `model_p99_low`).
-- Streamline motion is still slightly too weak in fresh live telemetry (`viz_step_mean_low`).
-- Runtime smoothness still shows update spikes (`earth_update_p95_high`, `earth_update_max_high`).
-- Long-horizon live realism still needs repeated documented checkpoints, not just one fresh baseline.
+- Runtime smoothness still shows `Earth.update` spikes (`earth_update_p95_high`, `earth_update_max_high`).
+- Long-horizon live realism still needs repeated documented checkpoints on the newly-energized field, not just a single successful mature-window run.
+- The weather worker still needs a clean pass where realism and smoothness are both inside the world-class bar at the same time.
 
 ## Canonical cycle inputs
 
@@ -43,10 +45,10 @@ Verdict: NOT WORLD CLASS YET
 
 ## Default next priority
 
-1. Raise the live wind field toward the documented target band without introducing overspeed or noisy churn.
-2. Increase streamline step mean above the minimum target while preserving stable particle behavior.
-3. Investigate and reduce `Earth.update` runtime spikes that pushed `updateMs p95` and `max` above the smoothness gate.
-4. Re-run the canonical single-tab observation path and document a longer live checkpoint after the wind/smoothness fix.
+1. Investigate and reduce `Earth.update` runtime spikes that still push `updateMs p95` and `max` above the smoothness gate.
+2. Re-run the canonical single-tab observation path on the energized wind field and document a longer live checkpoint without step-induced validation artifacts.
+3. Confirm the mean/p99 wind pass remains stable over repeated mature live windows.
+4. Keep the localhost validation path clean: one tab, canonical port `3000`, no drift into the sibling dirty checkout.
 
 ## Commit discipline
 

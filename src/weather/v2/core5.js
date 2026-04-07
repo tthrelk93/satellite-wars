@@ -96,7 +96,7 @@ export class WeatherCore5 {
     };
     this.dynParams = {
       maxWind: 70,
-      tauDragSurface: 4 * 3600,
+      tauDragSurface: 5 * 3600,
       tauDragTop: 6 * 3600,
       nuLaplacian: 4_000_000,
       quadDragAlphaSurface: 0.02,
