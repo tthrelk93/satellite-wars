@@ -128,6 +128,16 @@ const assertPortAvailable = (listenPort, allowedPid = null) => {
   throw new Error(`Port ${listenPort} is already owned by another process: ${detail}`);
 };
 
+const killPid = (pid, signal = 'SIGTERM') => {
+  if (!Number.isFinite(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, signal);
+    return true;
+  } catch (_) {
+    return false;
+  }
+};
+
 const processAlive = (pid) => {
   if (!Number.isFinite(pid) || pid <= 0) return false;
   try {
@@ -188,6 +198,35 @@ const waitForPortOwnedByRepo = async (listenPort, expectedCwd, maxWaitMs) => {
   throw new Error(`Timed out waiting for a ${expectedCwd} process to own port ${listenPort}; current listeners: ${detail}`);
 };
 
+const reclaimRepoPort = async (listenPort, expectedCwd, maxWaitMs = 10000) => {
+  const matchingListeners = () => describePortListeners(listenPort).filter((entry) => entry.cwd === expectedCwd);
+  const waitUntilFree = async (timeoutMs) => {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      if (!matchingListeners().length) return true;
+      await sleep(250);
+    }
+    return false;
+  };
+
+  let listeners = matchingListeners();
+  if (!listeners.length) return false;
+
+  for (const entry of listeners) {
+    killPid(entry.pid, 'SIGTERM');
+  }
+  if (await waitUntilFree(Math.min(maxWaitMs, 5000))) return true;
+
+  listeners = matchingListeners();
+  for (const entry of listeners) {
+    killPid(entry.pid, 'SIGKILL');
+  }
+  if (await waitUntilFree(maxWaitMs)) return true;
+
+  const detail = matchingListeners().map((entry) => `${entry.pid}:${entry.command || 'unknown'} cwd=${entry.cwd || 'unknown'}`).join(', ') || 'none';
+  throw new Error(`Failed to reclaim repo-owned listener(s) on port ${listenPort}: ${detail}`);
+};
+
 const waitForJsonEndpoint = async (url, maxWaitMs) => {
   const startedAt = Date.now();
   while (Date.now() - startedAt < maxWaitMs) {
@@ -226,24 +265,29 @@ const observationUrl = buildObservationUrl(appUrl);
 const sessionUrl = `http://${host}:${weatherLogPort}/session`;
 
 const stopExistingProcess = async (state) => {
-  if (!state || !processAlive(state.pid)) {
+  const targetPort = state?.port ?? port;
+  const targetWeatherLogPort = state?.weatherLogPort ?? weatherLogPort;
+  const hadStatePid = Boolean(state?.pid && processAlive(state.pid));
+  if (!state || !hadStatePid) {
+    await reclaimRepoPort(targetPort, repoRoot).catch(() => false);
+    await reclaimRepoPort(targetWeatherLogPort, repoRoot).catch(() => false);
     deleteFileIfExists(statePath);
     return false;
   }
-  try {
-    process.kill(state.pid, 'SIGTERM');
-  } catch (_) {}
+  killPid(state.pid, 'SIGTERM');
   const stopStart = Date.now();
   while (Date.now() - stopStart < 10000) {
     if (!processAlive(state.pid)) {
+      await reclaimRepoPort(targetPort, repoRoot).catch(() => false);
+      await reclaimRepoPort(targetWeatherLogPort, repoRoot).catch(() => false);
       deleteFileIfExists(statePath);
       return true;
     }
     await sleep(250);
   }
-  try {
-    process.kill(state.pid, 'SIGKILL');
-  } catch (_) {}
+  killPid(state.pid, 'SIGKILL');
+  await reclaimRepoPort(targetPort, repoRoot).catch(() => false);
+  await reclaimRepoPort(targetWeatherLogPort, repoRoot).catch(() => false);
   deleteFileIfExists(statePath);
   return true;
 };
@@ -283,6 +327,11 @@ if (!restart && existingState?.pid && processAlive(existingState.pid)) {
   }
 } else if (existingState?.pid) {
   await stopExistingProcess(existingState);
+}
+
+if (restart) {
+  await reclaimRepoPort(port, repoRoot).catch(() => false);
+  await reclaimRepoPort(weatherLogPort, repoRoot).catch(() => false);
 }
 
 assertPortAvailable(port);
