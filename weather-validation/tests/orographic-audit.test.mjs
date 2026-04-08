@@ -10,7 +10,7 @@ import {
   failAtomicJsonOutput
 } from '../../scripts/agent/orographic-audit.mjs';
 
-const makeMockCore = ({ useRhField }) => {
+const makeMockCore = ({ useRhField, useDeliveryDiagnostics = false }) => {
   const nx = 6;
   const ny = 3;
   const nz = 2;
@@ -38,10 +38,18 @@ const makeMockCore = ({ useRhField }) => {
   const u = new Float32Array(nz * N);
   const v = new Float32Array(nz * N);
   const RH = new Float32Array(N);
+  const terrainFlowForcing = new Float32Array(N);
+  const terrainSlopeFactor = new Float32Array(N);
+  const terrainOmegaSurface = new Float32Array(N);
+  const orographicDeliveryAccum = new Float32Array(N);
+  const orographicDeliveryExposureAccum = new Float32Array(N);
+  const orographicDeliveryLastStep = new Float32Array(N);
+  const orographicDeliveryActiveSteps = new Uint32Array(N);
 
   const surfaceRhByColumn = [0.65, 0.7, 0.82, 1.18, 1.1, 0.95];
   const surfacePrecipByColumn = [0.4, 0.6, 1.2, 2.1, 1.8, 0.9];
   const surfaceOmegaByColumn = [-0.5, -0.8, -1.1, -3.2, -2.8, -1.5];
+  const terrainFlowByColumn = [-1.8, -1.0, -0.35, 0.85, 1.35, 2.2];
 
   for (let j = 0; j < ny; j += 1) {
     for (let i = 0; i < nx; i += 1) {
@@ -57,6 +65,13 @@ const makeMockCore = ({ useRhField }) => {
       qv[idxS] = 0.0035 + i * 0.00035;
       qc[idxS] = 0.0004 + i * 0.0001;
       qr[idxS] = 0.0008 + i * 0.0002;
+      terrainFlowForcing[k] = terrainFlowByColumn[i];
+      terrainSlopeFactor[k] = 0.4 + i * 0.25;
+      terrainOmegaSurface[k] = i >= 3 ? -1.4 - i * 0.2 : 0.35 + i * 0.12;
+      orographicDeliveryAccum[k] = i >= 3 ? 3.5 + i * 0.6 : 0.08 + i * 0.03;
+      orographicDeliveryExposureAccum[k] = i >= 3 ? 45 + i * 6 : 7 + i * 2;
+      orographicDeliveryLastStep[k] = i >= 3 ? 0.28 + i * 0.04 : 0.01 + i * 0.005;
+      orographicDeliveryActiveSteps[k] = i >= 3 ? 8 + i : 1 + i;
     }
   }
 
@@ -83,7 +98,18 @@ const makeMockCore = ({ useRhField }) => {
       T,
       soilW,
       soilCap,
-      omega
+      omega,
+      ...(useDeliveryDiagnostics
+        ? {
+            terrainFlowForcing,
+            terrainSlopeFactor,
+            terrainOmegaSurface,
+            orographicDeliveryAccum,
+            orographicDeliveryExposureAccum,
+            orographicDeliveryLastStep,
+            orographicDeliveryActiveSteps
+          }
+        : {})
     },
     fields: {
       precipRate,
@@ -159,6 +185,21 @@ test('summarizeCore separates terrain-forced omega from residual omega structure
   assert.ok(andes.omegaLowContrast > 0);
   assert.ok(Number.isFinite(andes.upslope.slopeFactorMean));
   assert.ok(Number.isFinite(andes.downslope.slopeFactorMean));
+});
+
+test('summarizeCore reports coupled-run moisture-delivery footprint diagnostics when available', () => {
+  const summary = summarizeCore(makeMockCore({ useRhField: true, useDeliveryDiagnostics: true }), 75600);
+  const andes = summary.regions.find((region) => region.name === 'Andes');
+
+  assert.ok(summary.global.orographicDeliveryUpslopeVsDownslope > 1);
+  assert.ok(summary.global.orographicDeliveryExposureUpslopeVsDownslope > 1);
+  assert.ok(summary.global.orographicDeliveryContrast > 0);
+  assert.ok(andes);
+  assert.ok(andes.upslope.orographicDeliveryMean > andes.downslope.orographicDeliveryMean);
+  assert.ok(andes.orographicDeliveryRatio > 1);
+  assert.ok(andes.orographicDeliveryExposureRatio > 1);
+  assert.ok(andes.orographicDeliveryActiveStepsRatio > 1);
+  assert.ok(andes.orographicDeliveryLastStepContrast > 0);
 });
 
 test('prepareAtomicJsonOutput removes stale final output until the fresh audit commits', () => {

@@ -141,6 +141,39 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const convMask = state.convMask;
   convMask.fill(0);
 
+  if (!state.terrainFlowForcing || state.terrainFlowForcing.length !== N) {
+    state.terrainFlowForcing = new Float32Array(N);
+  }
+  if (!state.terrainSlopeFactor || state.terrainSlopeFactor.length !== N) {
+    state.terrainSlopeFactor = new Float32Array(N);
+  }
+  if (!state.terrainOmegaSurface || state.terrainOmegaSurface.length !== N) {
+    state.terrainOmegaSurface = new Float32Array(N);
+  }
+  if (!state.orographicDeliveryAccum || state.orographicDeliveryAccum.length !== N) {
+    state.orographicDeliveryAccum = new Float32Array(N);
+  }
+  if (!state.orographicDeliveryExposureAccum || state.orographicDeliveryExposureAccum.length !== N) {
+    state.orographicDeliveryExposureAccum = new Float32Array(N);
+  }
+  if (!state.orographicDeliveryLastStep || state.orographicDeliveryLastStep.length !== N) {
+    state.orographicDeliveryLastStep = new Float32Array(N);
+  }
+  if (!state.orographicDeliveryActiveSteps || state.orographicDeliveryActiveSteps.length !== N) {
+    state.orographicDeliveryActiveSteps = new Uint32Array(N);
+  }
+  const terrainFlowForcingDiag = state.terrainFlowForcing;
+  const terrainSlopeFactorDiag = state.terrainSlopeFactor;
+  const terrainOmegaSurfaceDiag = state.terrainOmegaSurface;
+  const orographicDeliveryAccum = state.orographicDeliveryAccum;
+  const orographicDeliveryExposureAccum = state.orographicDeliveryExposureAccum;
+  const orographicDeliveryLastStep = state.orographicDeliveryLastStep;
+  const orographicDeliveryActiveSteps = state.orographicDeliveryActiveSteps;
+  terrainFlowForcingDiag.fill(0);
+  terrainSlopeFactorDiag.fill(0);
+  terrainOmegaSurfaceDiag.fill(0);
+  orographicDeliveryLastStep.fill(0);
+
   let convectiveColumnsCount = 0;
   let totalCondensed = 0;
   let totalDetrainedQc = 0;
@@ -243,6 +276,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           : terrainNormalFlow * leeScale;
         const wTerrain = terrainFlowForcing * slopeFactor;
         const omegaTerrain = -rho * g * wTerrain * orographicLiftScale;
+        terrainFlowForcingDiag[k] = terrainFlowForcing;
+        terrainSlopeFactorDiag[k] = slopeFactor;
+        terrainOmegaSurfaceDiag[k] = omegaTerrain;
         for (let lev = 1; lev <= nz; lev++) {
           const decay = Math.exp(-Math.max(0, levS - (lev - 1)) * orographicDecayFrac);
           omega[lev * N + k] += omegaTerrain * decay;
@@ -285,7 +321,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const qvNext = state._vertAdvQv;
       const thetaNext = state._vertAdvTheta;
       const taperExp = Math.max(0, verticalAdvectionSigmaTaperExp);
+      const lowLevelStart = Math.max(0, nz - 4);
       for (let k = 0; k < N; k++) {
+        let columnDelivery = 0;
+        let columnExposure = 0;
+        const terrainFlowForcing = terrainFlowForcingDiag[k];
         for (let lev = 0; lev < nz; lev++) {
           const idx = lev * N + k;
           let qvUpdated = qv[idx];
@@ -303,8 +343,18 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             const dpNeighbor = pMid[idxBelow] - pMid[idx];
             if (dpNeighbor > 0) {
               const frac = clamp(((-omegaMid) * dt * transportScale) / dpNeighbor, 0, cflMax);
-              qvUpdated += frac * (qv[idxBelow] - qv[idx]);
+              const qvDelta = frac * (qv[idxBelow] - qv[idx]);
+              qvUpdated += qvDelta;
               thetaUpdated += frac * (theta[idxBelow] - theta[idx]);
+              if (terrainFlowForcing > 0 && lev >= lowLevelStart) {
+                columnExposure += (-omegaMid) * dt;
+                if (qvDelta > 0) {
+                  const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+                  if (dpLev > 0) {
+                    columnDelivery += qvDelta * (dpLev / g);
+                  }
+                }
+              }
             }
           } else if (omegaMid > 0 && lev > 0) {
             const idxAbove = (lev - 1) * N + k;
@@ -323,6 +373,14 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
               theta[idx] + clamp(dTheta, -dThetaMaxVertAdvPerStep, dThetaMaxVertAdvPerStep);
           } else {
             thetaNext[idx] = thetaUpdated;
+          }
+        }
+        orographicDeliveryLastStep[k] = columnDelivery;
+        if (terrainFlowForcing > 0 && columnExposure > 0) {
+          orographicDeliveryExposureAccum[k] += columnExposure;
+          if (columnDelivery > 0) {
+            orographicDeliveryAccum[k] += columnDelivery;
+            orographicDeliveryActiveSteps[k] += 1;
           }
         }
       }

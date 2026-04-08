@@ -213,3 +213,57 @@ test('stepVertical5 broad terrain sampling softens narrow-ridge lee forcing', ()
   assert.ok(broadLeeMax < localLeeMax);
   assert.ok(broadUpslopeMin < 0);
 });
+
+test('stepVertical5 tracks terrain-forced low-level moisture-delivery footprint', () => {
+  const grid = makeGrid({ nx: 4, ny: 2 });
+  const sigmaHalf = createSigmaHalfLevels({ nz: 4 });
+  const elev = new Float32Array([
+    0, 600, 1800, 2600,
+    0, 600, 1800, 2600
+  ]);
+
+  const runCase = (terrainHeightM) => {
+    const state = createState5({ grid, nz: 4, sigmaHalf });
+    state.ps.fill(100000);
+    state.theta.fill(290);
+    updateHydrostatic(state, { pTop: 20000, terrainHeightM });
+    const levS = state.nz - 1;
+    for (let k = 0; k < state.N; k += 1) {
+      state.u[levS * state.N + k] = 22;
+      state.v[levS * state.N + k] = 0;
+      state.qv[(levS - 1) * state.N + k] = 0.0025;
+      state.qv[levS * state.N + k] = 0.012;
+    }
+
+    stepVertical5({
+      dt: 120,
+      grid,
+      state,
+      geo: { elev: terrainHeightM },
+      params: {
+        enableMixing: false,
+        enableConvection: false,
+        enableOmegaMassFix: false,
+        enableLargeScaleVerticalAdvection: true,
+        verticalAdvectionCflMax: 0.8,
+        orographicLiftScale: 1.0
+      }
+    });
+    return state;
+  };
+
+  const flat = runCase(new Float32Array(elev.length).fill(0));
+  const terrain = runCase(elev);
+
+  const terrainMaxDelivery = Math.max(...terrain.orographicDeliveryAccum);
+  const terrainMaxExposure = Math.max(...terrain.orographicDeliveryExposureAccum);
+  const terrainMaxActiveSteps = Math.max(...terrain.orographicDeliveryActiveSteps);
+  const flatMaxDelivery = Math.max(...flat.orographicDeliveryAccum);
+  const flatMaxExposure = Math.max(...flat.orographicDeliveryExposureAccum);
+
+  assert.ok(terrainMaxDelivery > 0);
+  assert.ok(terrainMaxExposure > 0);
+  assert.ok(terrainMaxActiveSteps > 0);
+  assert.equal(flatMaxDelivery, 0);
+  assert.equal(flatMaxExposure, 0);
+});

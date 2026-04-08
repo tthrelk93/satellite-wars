@@ -187,6 +187,10 @@ const summarizeGroup = (entries) => ({
   qrLowMean: mean(entries, (entry) => entry.qrLow),
   qvLowMean: mean(entries, (entry) => entry.qvLow),
   rhLowMean: mean(entries, (entry) => entry.rhLow),
+  orographicDeliveryMean: mean(entries, (entry) => entry.orographicDelivery),
+  orographicDeliveryExposureMean: mean(entries, (entry) => entry.orographicDeliveryExposure),
+  orographicDeliveryLastStepMean: mean(entries, (entry) => entry.orographicDeliveryLastStep),
+  orographicDeliveryActiveStepsMean: mean(entries, (entry) => entry.orographicDeliveryActiveSteps),
   soilFracMean: mean(entries, (entry) => entry.soilFrac),
   pLowMean: mean(entries, (entry) => entry.pLow),
   elevMean: mean(entries, (entry) => entry.elev),
@@ -204,6 +208,13 @@ export function summarizeCore(core, targetSeconds) {
   const { grid, state, fields, geo } = core;
   const { nx, ny, invDx, invDy, latDeg, lonDeg } = grid;
   const { N, nz, u, v, qv, qc, qr, pMid, soilW, soilCap, omega } = state;
+  const terrainFlowForcingDiag = state.terrainFlowForcing?.length === N ? state.terrainFlowForcing : null;
+  const terrainSlopeFactorDiag = state.terrainSlopeFactor?.length === N ? state.terrainSlopeFactor : null;
+  const terrainOmegaSurfaceDiag = state.terrainOmegaSurface?.length === N ? state.terrainOmegaSurface : null;
+  const orographicDeliveryAccum = state.orographicDeliveryAccum?.length === N ? state.orographicDeliveryAccum : null;
+  const orographicDeliveryExposureAccum = state.orographicDeliveryExposureAccum?.length === N ? state.orographicDeliveryExposureAccum : null;
+  const orographicDeliveryLastStep = state.orographicDeliveryLastStep?.length === N ? state.orographicDeliveryLastStep : null;
+  const orographicDeliveryActiveSteps = state.orographicDeliveryActiveSteps?.length === N ? state.orographicDeliveryActiveSteps : null;
   const levS = nz - 1;
   const elev = geo.elev;
   const precip = fields.precipRate || state.precipRate;
@@ -248,12 +259,16 @@ export function summarizeCore(core, targetSeconds) {
       const idxS = levS * N + k;
       const cap = soilCap[k];
       const soilFrac = cap > 1e-6 ? soilW[k] / cap : 0;
-      const terrainFlow = u[idxS] * slopeX + v[idxS] * slopeY;
+      const terrainFlow = terrainFlowForcingDiag ? terrainFlowForcingDiag[k] : u[idxS] * slopeX + v[idxS] * slopeY;
       const slopeRatio = Math.max(0, slopeMag / Math.max(1e-6, terrainSlopeRef));
-      const slopeFactor = clamp(Math.pow(slopeRatio, Math.max(0.25, terrainSlopeExponent)), 0, 3);
+      const slopeFactor = terrainSlopeFactorDiag
+        ? terrainSlopeFactorDiag[k]
+        : clamp(Math.pow(slopeRatio, Math.max(0.25, terrainSlopeExponent)), 0, 3);
       const nearSurfaceT = Math.max(180, state.T?.[idxS] ?? 0);
       const rho = Math.max(0.2, pMid[idxS] / Math.max(1e-6, RD * nearSurfaceT));
-      const terrainOmegaSurface = -rho * G * terrainFlow * slopeFactor * orographicLiftScale;
+      const terrainOmegaSurface = terrainOmegaSurfaceDiag
+        ? terrainOmegaSurfaceDiag[k]
+        : -rho * G * terrainFlow * slopeFactor * orographicLiftScale;
       const terrainOmegaLow = terrainOmegaSurface * Math.exp(-orographicDecayFrac);
       const omegaLow = omega[levS * N + k];
       const omegaSurface = omega[nz * N + k];
@@ -266,6 +281,10 @@ export function summarizeCore(core, targetSeconds) {
         qrLow: qr[idxS],
         qvLow: qv[idxS],
         rhLow: getRhLow({ fields, state, k, idxS }),
+        orographicDelivery: orographicDeliveryAccum ? orographicDeliveryAccum[k] : 0,
+        orographicDeliveryExposure: orographicDeliveryExposureAccum ? orographicDeliveryExposureAccum[k] : 0,
+        orographicDeliveryLastStep: orographicDeliveryLastStep ? orographicDeliveryLastStep[k] : 0,
+        orographicDeliveryActiveSteps: orographicDeliveryActiveSteps ? orographicDeliveryActiveSteps[k] : 0,
         soilFrac,
         pLow: pMid[idxS],
         elev: elev[k],
@@ -314,10 +333,18 @@ export function summarizeCore(core, targetSeconds) {
       qrLowRatio: mean(upslope, (entry) => entry.qrLow) / Math.max(1e-9, mean(downslope, (entry) => entry.qrLow)),
       qvLowRatio: mean(upslope, (entry) => entry.qvLow) / Math.max(1e-9, mean(downslope, (entry) => entry.qvLow)),
       rhLowRatio: mean(upslope, (entry) => entry.rhLow) / Math.max(1e-9, mean(downslope, (entry) => entry.rhLow)),
+      orographicDeliveryRatio: mean(upslope, (entry) => entry.orographicDelivery) / Math.max(1e-9, mean(downslope, (entry) => entry.orographicDelivery)),
+      orographicDeliveryExposureRatio: mean(upslope, (entry) => entry.orographicDeliveryExposure) / Math.max(1e-9, mean(downslope, (entry) => entry.orographicDeliveryExposure)),
+      orographicDeliveryLastStepRatio: mean(upslope, (entry) => entry.orographicDeliveryLastStep) / Math.max(1e-9, mean(downslope, (entry) => entry.orographicDeliveryLastStep)),
+      orographicDeliveryActiveStepsRatio: mean(upslope, (entry) => entry.orographicDeliveryActiveSteps) / Math.max(1e-9, mean(downslope, (entry) => entry.orographicDeliveryActiveSteps)),
       soilFracRatio: mean(upslope, (entry) => entry.soilFrac) / Math.max(1e-9, mean(downslope, (entry) => entry.soilFrac)),
       pLowRatio: mean(upslope, (entry) => entry.pLow) / Math.max(1e-9, mean(downslope, (entry) => entry.pLow)),
       elevRatio: mean(upslope, (entry) => entry.elev) / Math.max(1e-9, mean(downslope, (entry) => entry.elev)),
       terrainFlowContrast: mean(upslope, (entry) => entry.upslope) - mean(downslope, (entry) => entry.upslope),
+      orographicDeliveryContrast: mean(upslope, (entry) => entry.orographicDelivery) - mean(downslope, (entry) => entry.orographicDelivery),
+      orographicDeliveryExposureContrast: mean(upslope, (entry) => entry.orographicDeliveryExposure) - mean(downslope, (entry) => entry.orographicDeliveryExposure),
+      orographicDeliveryLastStepContrast: mean(upslope, (entry) => entry.orographicDeliveryLastStep) - mean(downslope, (entry) => entry.orographicDeliveryLastStep),
+      orographicDeliveryActiveStepsContrast: mean(upslope, (entry) => entry.orographicDeliveryActiveSteps) - mean(downslope, (entry) => entry.orographicDeliveryActiveSteps),
       moistureFluxNormalContrast: mean(upslope, (entry) => entry.moistureFluxNormal) - mean(downslope, (entry) => entry.moistureFluxNormal),
       terrainOmegaLowContrast: mean(upslope, (entry) => entry.terrainOmegaLow) - mean(downslope, (entry) => entry.terrainOmegaLow),
       terrainOmegaSurfaceContrast: mean(upslope, (entry) => entry.terrainOmegaSurface) - mean(downslope, (entry) => entry.terrainOmegaSurface),
@@ -340,10 +367,18 @@ export function summarizeCore(core, targetSeconds) {
       qrLowUpslopeVsDownslope: mean(high, (entry) => entry.qrLow) / Math.max(1e-9, mean(low, (entry) => entry.qrLow)),
       qvLowUpslopeVsDownslope: mean(high, (entry) => entry.qvLow) / Math.max(1e-9, mean(low, (entry) => entry.qvLow)),
       rhLowUpslopeVsDownslope: mean(high, (entry) => entry.rhLow) / Math.max(1e-9, mean(low, (entry) => entry.rhLow)),
+      orographicDeliveryUpslopeVsDownslope: mean(high, (entry) => entry.orographicDelivery) / Math.max(1e-9, mean(low, (entry) => entry.orographicDelivery)),
+      orographicDeliveryExposureUpslopeVsDownslope: mean(high, (entry) => entry.orographicDeliveryExposure) / Math.max(1e-9, mean(low, (entry) => entry.orographicDeliveryExposure)),
+      orographicDeliveryLastStepUpslopeVsDownslope: mean(high, (entry) => entry.orographicDeliveryLastStep) / Math.max(1e-9, mean(low, (entry) => entry.orographicDeliveryLastStep)),
+      orographicDeliveryActiveStepsUpslopeVsDownslope: mean(high, (entry) => entry.orographicDeliveryActiveSteps) / Math.max(1e-9, mean(low, (entry) => entry.orographicDeliveryActiveSteps)),
       soilFracUpslopeVsDownslope: mean(high, (entry) => entry.soilFrac) / Math.max(1e-9, mean(low, (entry) => entry.soilFrac)),
       pLowUpslopeVsDownslope: mean(high, (entry) => entry.pLow) / Math.max(1e-9, mean(low, (entry) => entry.pLow)),
       elevUpslopeVsDownslope: mean(high, (entry) => entry.elev) / Math.max(1e-9, mean(low, (entry) => entry.elev)),
       terrainFlowContrast: mean(high, (entry) => entry.upslope) - mean(low, (entry) => entry.upslope),
+      orographicDeliveryContrast: mean(high, (entry) => entry.orographicDelivery) - mean(low, (entry) => entry.orographicDelivery),
+      orographicDeliveryExposureContrast: mean(high, (entry) => entry.orographicDeliveryExposure) - mean(low, (entry) => entry.orographicDeliveryExposure),
+      orographicDeliveryLastStepContrast: mean(high, (entry) => entry.orographicDeliveryLastStep) - mean(low, (entry) => entry.orographicDeliveryLastStep),
+      orographicDeliveryActiveStepsContrast: mean(high, (entry) => entry.orographicDeliveryActiveSteps) - mean(low, (entry) => entry.orographicDeliveryActiveSteps),
       moistureFluxNormalContrast: mean(high, (entry) => entry.moistureFluxNormal) - mean(low, (entry) => entry.moistureFluxNormal),
       terrainOmegaLowContrast: mean(high, (entry) => entry.terrainOmegaLow) - mean(low, (entry) => entry.terrainOmegaLow),
       terrainOmegaSurfaceContrast: mean(high, (entry) => entry.terrainOmegaSurface) - mean(low, (entry) => entry.terrainOmegaSurface),
