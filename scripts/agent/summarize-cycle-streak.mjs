@@ -6,9 +6,16 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, '..', '..');
-const outputDir = path.join(repoRoot, 'weather-validation', 'output');
-const statusJsonPath = path.join(repoRoot, 'weather-validation', 'reports', 'world-class-weather-status.json');
+const defaultRepoRoot = path.resolve(__dirname, '..', '..');
+const repoRoot = process.env.SATELLITE_WARS_REPO_ROOT
+  ? path.resolve(process.env.SATELLITE_WARS_REPO_ROOT)
+  : defaultRepoRoot;
+const outputDir = process.env.SATELLITE_WARS_OUTPUT_DIR
+  ? path.resolve(process.env.SATELLITE_WARS_OUTPUT_DIR)
+  : path.join(repoRoot, 'weather-validation', 'output');
+const statusJsonPath = process.env.SATELLITE_WARS_STATUS_JSON_PATH
+  ? path.resolve(process.env.SATELLITE_WARS_STATUS_JSON_PATH)
+  : path.join(repoRoot, 'weather-validation', 'reports', 'world-class-weather-status.json');
 
 const argv = process.argv.slice(2);
 let limit = 12;
@@ -88,7 +95,10 @@ const parseCycle = (cycleId) => {
 };
 
 const cycles = cycleDirs.map(parseCycle);
-const activeCycle = cycles.find((cycle) => cycle.outcome === 'in_progress') || null;
+const activeCycle = cycles[0]?.outcome === 'in_progress' ? cycles[0] : null;
+const staleIncompleteCycles = cycles.filter(
+  (cycle, index) => cycle.outcome === 'in_progress' && (!activeCycle || index !== 0)
+);
 const completedCycles = cycles.filter((cycle) => cycle.outcome !== 'in_progress');
 
 const countLeading = (entries, predicate) => {
@@ -154,6 +164,9 @@ const soft = consecutiveNoProgress >= 3 || sameFamilyNoProgress >= 3 || emptyRun
 const hard = consecutiveNoProgress >= 6 || sameFamilyNoProgress >= 5;
 const recommendations = [];
 
+if (staleIncompleteCycles.length) {
+  recommendations.push('Do not treat older incomplete cycle directories as the active run; close the current cycle cleanly and inspect the stale directories separately.');
+}
 if (soft) {
   recommendations.push('Run a blocker-breaker cycle instead of another ordinary browser-first micro-experiment.');
 }
@@ -176,6 +189,7 @@ const summary = {
   generatedAt: new Date().toISOString(),
   limit,
   activeCycle,
+  staleIncompleteCycles,
   lastVerifiedBaseline: {
     cycleId: statusJson?.latestCycle?.id ?? null,
     baselineCommit: baselineCommitInfo
