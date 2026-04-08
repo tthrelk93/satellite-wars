@@ -57,6 +57,12 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
     convTauEvapCloudScale = 0.35,
     convKAutoScale = 2.0,
     convPrecipEffBoost = 0.15,
+    terrainLeeOmega0 = 0.3,
+    terrainLeeOmega1 = 2.0,
+    terrainLeeEvapBoost = 1.0,
+    terrainLeeWarmRainSuppress = 0.45,
+    terrainDeliveryProtectExposure0 = 0.5,
+    terrainDeliveryProtectExposure1 = 8.0,
     enable = true
   } = params;
   if (!enable) return;
@@ -74,6 +80,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   const iceAggMax = clamp(iceAggMaxFrac, 0, 1);
   const tauIceAggSafe = Math.max(1e-6, tauIceAgg);
   const Ls = Lv + Lf;
+  const lowLevelStart = Math.max(0, nz - 4);
 
   for (let lev = 0; lev < nz; lev++) {
     const base = lev * N;
@@ -87,11 +94,28 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
       const warmFrac = 1 - iceFrac;
 
       const convCol = enableConvectiveOutcome && state.convMask && state.convMask[k] === 1;
-      const tauEvapCloudMinEff = convCol ? Math.max(1, tauEvapCloudMin * convTauEvapCloudScale) : tauEvapCloudMin;
-      const tauEvapCloudMaxEff = convCol ? Math.max(1, tauEvapCloudMax * convTauEvapCloudScale) : tauEvapCloudMax;
-      const kAutoRainEff = convCol ? kAutoRain * convKAutoScale : kAutoRain;
+      const terrainOmegaSurface = Number.isFinite(state.terrainOmegaSurface?.[k]) ? state.terrainOmegaSurface[k] : 0;
+      const deliveryExposure = Number.isFinite(state.orographicDeliveryExposureAccum?.[k])
+        ? state.orographicDeliveryExposureAccum[k]
+        : 0;
+      const leeBase = lev >= lowLevelStart
+        ? smoothstep(terrainLeeOmega0, terrainLeeOmega1, terrainOmegaSurface)
+        : 0;
+      const deliveryProtect = lev >= lowLevelStart
+        ? smoothstep(terrainDeliveryProtectExposure0, terrainDeliveryProtectExposure1, deliveryExposure)
+        : 0;
+      const leeNoDelivery = clamp(leeBase * (1 - deliveryProtect), 0, 1);
+      const evapScale = 1 + leeNoDelivery * Math.max(0, terrainLeeEvapBoost);
+      const tauEvapCloudMinEffBase = convCol ? Math.max(1, tauEvapCloudMin * convTauEvapCloudScale) : tauEvapCloudMin;
+      const tauEvapCloudMaxEffBase = convCol ? Math.max(1, tauEvapCloudMax * convTauEvapCloudScale) : tauEvapCloudMax;
+      const tauEvapCloudMinEff = Math.max(1, tauEvapCloudMinEffBase / evapScale);
+      const tauEvapCloudMaxEff = Math.max(1, tauEvapCloudMaxEffBase / evapScale);
+      const tauEvapRainMinEff = Math.max(1, tauEvapRainMin / evapScale);
+      const tauEvapRainMaxEff = Math.max(1, tauEvapRainMax / evapScale);
+      const warmRainSuppress = 1 - leeNoDelivery * clamp(terrainLeeWarmRainSuppress, 0, 1);
+      const kAutoRainEff = (convCol ? kAutoRain * convKAutoScale : kAutoRain) * warmRainSuppress;
       const kAutoSnowEff = convCol ? kAutoSnow * convKAutoScale : kAutoSnow;
-      const precipEff = clamp(basePrecipEff + (convCol ? convPrecipEffBoost : 0), 0, 1);
+      const precipEff = clamp((basePrecipEff + (convCol ? convPrecipEffBoost : 0)) * warmRainSuppress, 0, 1);
       const dThetaCapEff = Math.max(0, convCol ? dThetaMaxMicroPerStepConv : dThetaMaxMicroPerStep);
 
       let qvVal = qv[idx];
@@ -122,7 +146,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
       } else if (qvVal < qsat) {
         const RH = clamp(qvVal / Math.max(1e-8, qsat), 0, 2);
         const tauEvapCloud = tauEvapCloudMinEff + (tauEvapCloudMaxEff - tauEvapCloudMinEff) * RH;
-        const tauEvapRain = tauEvapRainMin + (tauEvapRainMax - tauEvapRainMin) * RH;
+        const tauEvapRain = tauEvapRainMinEff + (tauEvapRainMaxEff - tauEvapRainMinEff) * RH;
         const tauSubSnow = tauSubSnowMin + (tauSubSnowMax - tauSubSnowMin) * RH;
         let deficit = qsat - qvVal;
 

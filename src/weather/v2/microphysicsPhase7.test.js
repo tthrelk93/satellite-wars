@@ -46,3 +46,33 @@ test('mixed-phase microphysics can melt snow into rain in a warm column', () => 
     for (const value of arr) assert.ok(value >= 0);
   }
 });
+
+test('terrain-coupled lee columns evaporate and convert warm rain less when delivery exposure is absent', () => {
+  const makeWarmState = () => {
+    const state = setupState(279);
+    state.qv.fill(0.004);
+    state.qc.fill(0);
+    state.qr.fill(0);
+    const lowBase = (state.nz - 1) * state.N;
+    state.qc[lowBase] = 0.0022;
+    state.qr[lowBase] = 0.0020;
+    state.terrainOmegaSurface = new Float32Array([2.4]);
+    state.orographicDeliveryExposureAccum = new Float32Array([0]);
+    return state;
+  };
+
+  const leeNoDelivery = makeWarmState();
+  stepMicrophysics5({ dt: 900, state: leeNoDelivery, params: { enableConvectiveOutcome: false } });
+
+  const leeWithDelivery = makeWarmState();
+  leeWithDelivery.orographicDeliveryExposureAccum[0] = 12;
+  stepMicrophysics5({ dt: 900, state: leeWithDelivery, params: { enableConvectiveOutcome: false } });
+
+  const lowIdx = (leeNoDelivery.nz - 1) * leeNoDelivery.N;
+  const noDeliveryHydrometeors = leeNoDelivery.qc[lowIdx] + leeNoDelivery.qr[lowIdx];
+  const protectedHydrometeors = leeWithDelivery.qc[lowIdx] + leeWithDelivery.qr[lowIdx];
+
+  assert.ok(noDeliveryHydrometeors < protectedHydrometeors);
+  assert.ok(leeNoDelivery.precipRainRate[0] <= leeWithDelivery.precipRainRate[0]);
+  assert.ok(leeNoDelivery.qv[lowIdx] >= leeWithDelivery.qv[lowIdx]);
+});

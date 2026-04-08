@@ -1,25 +1,26 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-08T08:10:00Z",
+  "updatedAt": "2026-04-08T12:43:00Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
-  "baselineCommit": "3d81507",
+  "baselineCommit": "9e48da2",
   "latestCycle": {
-    "id": "cycle-2026-04-08T07-32-00Z-andes-sampling-design-refinement",
-    "goal": "improve the late Andes mature-window precipitation split by blending local terrain-normal flow with a short broad-terrain sample",
-    "verifiedImprovement": "default terrainDirectionalBlend is now 0.05, improving Andes precipRatio from 1.0099 to 1.0394 at 75600 and from 0.9226 to 0.9271 at 105480 while Rockies and Himalaya-Tibet stayed windward-favored and the validation suite still passed",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-08T07-32-00Z-andes-sampling-design-refinement/runtime-summary.json",
-    "runtimeLogPath": "logs/weather-2026-04-08T08-05-09Z-44638.jsonl"
+    "id": "cycle-2026-04-08T12-26-47Z-terrain-coupling-lee-retention",
+    "goal": "improve the late Andes mature-window precipitation split by suppressing lee-side low-level warm-rain persistence where terrain subsidence is strong but delivery exposure is absent",
+    "verifiedImprovement": "terrain-coupled lee drying in src/weather/v2/microphysics5.js improved Andes precipRatio from 1.0394 to 1.0566 at 75600 and from 0.9271 to 0.9631 at 105480 while qrLowRatio at 105480 improved from 0.8871 to 0.9211 and the validation suite still passed",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-08T12-26-47Z-terrain-coupling-lee-retention/runtime-summary.json",
+    "runtimeLogPath": "logs/weather-2026-04-08T12-40-59Z-4794.jsonl"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
     "overallPass": true
   },
   "blockingGaps": [
-    "broader Earth-like realism still needs fresh mature-window re-audits in the live app with the new broad-terrain sampling blend active across circulation, clouds, storms, and precipitation placement",
-    "orographic realism improved but is not solved: the Andes mature-window precipRatio now clears 1.0 at 75600 but is still only 0.9271 at 105480, and the terrain/flow interaction still needs more selective refinement",
+    "broader Earth-like realism still needs fresh mature-window re-audits in the live app with the new terrain-coupled lee drying active across circulation, clouds, storms, and precipitation placement",
+    "orographic realism improved but is not solved: the Andes mature-window precipRatio is now 0.9631 at 105480, materially better than 0.9271 but still short of a clearly windward-favored late-window split",
     "runtime smoothness is still not signed off; the latest live run now has healthy telemetry and still reports earth_update_p95_high, earth_update_max_high, and wind_targets_failing",
+    "the live browser path is functional, but the console still emits repeated THREE.WebGLRenderer texture-update warnings",
     "world-class status still requires realism and smoothness to pass in the same fresh live run"
   ],
   "cycleInputs": [
@@ -34,55 +35,49 @@
     "singleTabLocalhostVerified": true,
     "localhostTabReuse": {
       "url": "http://127.0.0.1:3000/?mode=solo",
-      "duplicatesClosed": 2,
-      "targetId": "3E78E7E81B1CCAC96E03A1E5C432C41E"
+      "duplicatesClosed": 0,
+      "targetId": "0101253A477583FDF582DF0C9D899269"
     },
-    "terrainDirectionalBlend": {
-      "before": 0,
-      "after": 0.05,
+    "terrainCoupledLeeDrying": {
       "andesPrecipRatio": {
         "target75600": {
-          "before": 1.0098762943607258,
-          "after": 1.0393756840734408
+          "before": 1.0393757548207367,
+          "after": 1.0566271696394067
         },
         "target105480": {
-          "before": 0.9225765910976285,
-          "after": 0.9270698864486208
+          "before": 0.9270697297097061,
+          "after": 0.9630743787044505
         }
       },
-      "andesTerrainOmegaLowContrast": {
-        "target75600": {
-          "before": -3.1230731435607003,
-          "after": -3.1227914473626235
-        },
+      "andesQrLowRatio": {
         "target105480": {
-          "before": -3.1196964738752926,
-          "after": -3.11944636309598
+          "before": 0.8871190925775457,
+          "after": 0.9210632887800503
         }
       },
       "rockiesPrecipRatio": {
         "target75600": {
-          "before": 1.3679288229861994,
-          "after": 1.3691042952386898
+          "before": 1.369103913338332,
+          "after": 1.3701714004481316
         },
         "target105480": {
-          "before": 1.3411989965930289,
-          "after": 1.3421487667799437
+          "before": 1.3421486895375672,
+          "after": 1.3430272514168617
         }
       },
       "himalayaTibetPrecipRatio": {
         "target75600": {
-          "before": 1.018825500438328,
-          "after": 1.0083302409065112
+          "before": 1.0083300499944083,
+          "after": 1.2096577695263109
         },
         "target105480": {
-          "before": 1.418113402236284,
-          "after": 1.4147975767294072
+          "before": 1.4147979170086364,
+          "after": 1.6334961593164208
         }
       }
     },
     "runtimeSummary": {
-      "lineCount": 66,
+      "lineCount": 173,
       "validationSnapshotCount": 0,
       "warnings": [
         "earth_update_p95_high",
@@ -92,13 +87,13 @@
     },
     "browserObservation": {
       "singlePlayerLoaded": true,
-      "note": "reused the canonical localhost solo-mode tab, kept the single-page-tab path clean, and the run still emitted non-empty runtime telemetry"
+      "note": "reused the canonical localhost solo-mode tab, kept the single-page-tab path clean, saw sim time advance from Day 0, 01:58 to Day 0, 07:38 in the same tab, and still captured non-empty runtime telemetry while repeated renderer texture warnings remained visible in the console"
     }
   },
   "defaultNextPriority": [
-    "stay on orographic realism and re-audit the Andes with the new broad-terrain sampling blend active, prioritizing the remaining later-window shortfall at 105480",
-    "target the next physics cycle at one concrete src-side fix area before taking any new diagnostics-only detour",
-    "use browser verification only after an offline candidate looks promising, and keep it to one canonical localhost run",
+    "stay on orographic realism and re-audit the Andes with the new terrain-coupled lee drying active, prioritizing the remaining later-window shortfall at 105480",
+    "keep the next physics cycle focused on one concrete src-side fix area before another broad terrain retune",
+    "decide whether the remaining Andes shortfall is now mostly a terrain/flow problem or a residual low-level condensate-retention problem before touching microphysics again",
     "when smoothness becomes the blocker again, use the fresh non-empty runtime telemetry before changing renderer or worker performance behavior",
     "keep validation on the clean world-class checkout only"
   ],
