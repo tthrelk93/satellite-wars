@@ -278,6 +278,7 @@ export class WeatherCore5 {
       terrainLeeOmega0: 0.3,
       terrainLeeOmega1: 2.0,
       terrainLeeAscentDamp: 1.0,
+      terrainLeeOmegaFloorBlend: 1.0,
       terrainDeliveryProtectExposure0: 0.5,
       terrainDeliveryProtectExposure1: 8.0,
       eps: 1e-12,

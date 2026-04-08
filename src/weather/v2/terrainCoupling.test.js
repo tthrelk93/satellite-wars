@@ -307,6 +307,7 @@ test('stepVertical5 damps lee-side ascent-driven low-level transport when no del
         terrainLeeOmega0: 0.01,
         terrainLeeOmega1: 0.2,
         terrainLeeAscentDamp,
+        terrainLeeOmegaFloorBlend: 0,
         terrainDeliveryProtectExposure0: 0.5,
         terrainDeliveryProtectExposure1: 8.0
       }
@@ -326,4 +327,65 @@ test('stepVertical5 damps lee-side ascent-driven low-level transport when no del
   assert.ok(Math.max(...damped.terrainLeeNoDelivery) > 0.9);
   assert.ok(dampedQv < noDampQv);
   assert.ok(protectedQv > dampedQv);
+});
+
+test('stepVertical5 blends lee-side effective omega back toward terrain subsidence when residual ascent disagrees', () => {
+  const grid = makeGrid();
+  const sigmaHalf = createSigmaHalfLevels({ nz: 4 });
+  const elev = new Float32Array([3000, 3000, 3000, 0, 0, 0]);
+
+  const runCase = ({ terrainLeeOmegaFloorBlend, deliveryExposure = 0 }) => {
+    const state = createState5({ grid, nz: 4, sigmaHalf });
+    state.ps.fill(100000);
+    state.theta.fill(290);
+    state.qv.fill(0.001);
+    state.orographicDeliveryExposureAccum = new Float32Array(state.N);
+    state.orographicDeliveryExposureAccum.fill(deliveryExposure);
+    updateHydrostatic(state, { pTop: 20000, terrainHeightM: elev });
+    const levS = state.nz - 1;
+    for (let k = 0; k < state.N; k += 1) {
+      state.u[levS * state.N + k] = 0;
+      state.v[levS * state.N + k] = -30;
+      state.dpsDtApplied[k] = -3000;
+      state.qv[levS * state.N + k] = 0.02;
+      state.qv[(levS - 1) * state.N + k] = 0.002;
+      state.qv[(levS - 2) * state.N + k] = 0.001;
+    }
+
+    stepVertical5({
+      dt: 120,
+      grid,
+      state,
+      geo: { elev },
+      params: {
+        enableMixing: false,
+        enableConvection: false,
+        enableOmegaMassFix: true,
+        enableLargeScaleVerticalAdvection: true,
+        verticalAdvectionCflMax: 0.8,
+        orographicLiftScale: 1.0,
+        orographicLeeSubsidenceScale: 1.0,
+        terrainLeeOmega0: 0.01,
+        terrainLeeOmega1: 0.2,
+        terrainLeeAscentDamp: 0,
+        terrainLeeOmegaFloorBlend,
+        terrainDeliveryProtectExposure0: 0.5,
+        terrainDeliveryProtectExposure1: 8.0
+      }
+    });
+    return state;
+  };
+
+  const noFloor = runCase({ terrainLeeOmegaFloorBlend: 0, deliveryExposure: 0 });
+  const floored = runCase({ terrainLeeOmegaFloorBlend: 1, deliveryExposure: 0 });
+  const protectedExposure = runCase({ terrainLeeOmegaFloorBlend: 1, deliveryExposure: 20 });
+  const lev = noFloor.nz - 2;
+  const levBase = lev * noFloor.N;
+  const noFloorQv = noFloor.qv[levBase];
+  const flooredQv = floored.qv[levBase];
+  const protectedQv = protectedExposure.qv[levBase];
+
+  assert.ok(Math.max(...floored.terrainLeeNoDelivery) > 0.9);
+  assert.ok(flooredQv < noFloorQv);
+  assert.ok(protectedQv > flooredQv);
 });

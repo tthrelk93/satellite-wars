@@ -51,6 +51,7 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'terrainLeeOmega0',
   'terrainLeeOmega1',
   'terrainLeeAscentDamp',
+  'terrainLeeOmegaFloorBlend',
   'terrainDeliveryProtectExposure0',
   'terrainDeliveryProtectExposure1',
   'eps',
@@ -140,6 +141,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     terrainLeeOmega0 = 0.3,
     terrainLeeOmega1 = 2.0,
     terrainLeeAscentDamp = 1.0,
+    terrainLeeOmegaFloorBlend = 1.0,
     terrainDeliveryProtectExposure0 = 0.5,
     terrainDeliveryProtectExposure1 = 8.0,
 
@@ -354,6 +356,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const qvNext = state._vertAdvQv;
       const thetaNext = state._vertAdvTheta;
       const taperExp = Math.max(0, verticalAdvectionSigmaTaperExp);
+      const levS = nz - 1;
       const lowLevelStart = Math.max(0, nz - 4);
       for (let k = 0; k < N; k++) {
         let columnDelivery = 0;
@@ -371,8 +374,16 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             : 1;
           const transportScale = taperExp > 0 ? Math.pow(sigmaMid, taperExp) : 1;
           const leeNoDelivery = lev >= lowLevelStart ? terrainLeeNoDeliveryDiag[k] : 0;
+          const leeOmegaFloorBlend = leeNoDelivery * clamp(terrainLeeOmegaFloorBlend, 0, 1);
+          const terrainOmegaMid = lev >= lowLevelStart
+            ? Math.max(0, terrainOmegaSurfaceDiag[k]) * Math.exp(-Math.max(0, levS - lev) * orographicDecayFrac)
+            : 0;
+          let omegaMidEffective = omegaMidRaw;
+          if (leeOmegaFloorBlend > 0 && terrainOmegaMid > omegaMidEffective) {
+            omegaMidEffective += (terrainOmegaMid - omegaMidEffective) * leeOmegaFloorBlend;
+          }
           const ascentDamp = 1 - leeNoDelivery * clamp(terrainLeeAscentDamp, 0, 1);
-          const omegaMid = omegaMidRaw < 0 ? omegaMidRaw * ascentDamp : omegaMidRaw;
+          const omegaMid = omegaMidEffective < 0 ? omegaMidEffective * ascentDamp : omegaMidEffective;
 
           if (omegaMid < 0 && lev < nz - 1) {
             const idxBelow = (lev + 1) * N + k;
@@ -573,9 +584,15 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const rhS = qvS / Math.max(qsS, eps);
 
       const leeNoDelivery = terrainLeeNoDeliveryDiag[k];
-      const ascentDamp = 1 - leeNoDelivery * clamp(terrainLeeAscentDamp, 0, 1);
+      const leeOmegaFloorBlend = leeNoDelivery * clamp(terrainLeeOmegaFloorBlend, 0, 1);
       const omegaLowRaw = omega[levS * N + k];
-      const omegaLow = omegaLowRaw < 0 ? omegaLowRaw * ascentDamp : omegaLowRaw;
+      let omegaLowEffective = omegaLowRaw;
+      const terrainOmegaLow = Math.max(0, terrainOmegaSurfaceDiag[k]) * Math.exp(-orographicDecayFrac);
+      if (leeOmegaFloorBlend > 0 && terrainOmegaLow > omegaLowEffective) {
+        omegaLowEffective += (terrainOmegaLow - omegaLowEffective) * leeOmegaFloorBlend;
+      }
+      const ascentDamp = 1 - leeNoDelivery * clamp(terrainLeeAscentDamp, 0, 1);
+      const omegaLow = omegaLowEffective < 0 ? omegaLowEffective * ascentDamp : omegaLowEffective;
       if (omegaLow < 0) omegaPos[nOmegaPos++] = -omegaLow;
       const ascent = -omegaLow > omegaThreshDynamic; // ascent based on negative tail
 
