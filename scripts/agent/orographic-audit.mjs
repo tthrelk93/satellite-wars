@@ -112,6 +112,8 @@ const applyOverrides = (core, nextOverrides) => {
 
 const summarizeGroup = (entries) => ({
   count: entries.length,
+  terrainFlowMean: mean(entries, (entry) => entry.upslope),
+  moistureFluxNormalMean: mean(entries, (entry) => entry.moistureFluxNormal),
   precipMean: mean(entries, (entry) => entry.precip),
   cloudMean: mean(entries, (entry) => entry.cloudLow),
   qcLowMean: mean(entries, (entry) => entry.qcLow),
@@ -161,8 +163,10 @@ export function summarizeCore(core, targetSeconds) {
       const idxS = levS * N + k;
       const cap = soilCap[k];
       const soilFrac = cap > 1e-6 ? soilW[k] / cap : 0;
+      const terrainFlow = u[idxS] * slopeX + v[idxS] * slopeY;
       const entry = {
-        upslope: u[idxS] * slopeX + v[idxS] * slopeY,
+        upslope: terrainFlow,
+        moistureFluxNormal: terrainFlow * qv[idxS],
         precip: precip[k],
         cloudLow: cloudLow[k],
         qcLow: qc[idxS],
@@ -213,6 +217,8 @@ export function summarizeCore(core, targetSeconds) {
       soilFracRatio: mean(upslope, (entry) => entry.soilFrac) / Math.max(1e-9, mean(downslope, (entry) => entry.soilFrac)),
       pLowRatio: mean(upslope, (entry) => entry.pLow) / Math.max(1e-9, mean(downslope, (entry) => entry.pLow)),
       elevRatio: mean(upslope, (entry) => entry.elev) / Math.max(1e-9, mean(downslope, (entry) => entry.elev)),
+      terrainFlowContrast: mean(upslope, (entry) => entry.upslope) - mean(downslope, (entry) => entry.upslope),
+      moistureFluxNormalContrast: mean(upslope, (entry) => entry.moistureFluxNormal) - mean(downslope, (entry) => entry.moistureFluxNormal),
       omegaLowContrast: mean(upslope, (entry) => entry.omegaLow) - mean(downslope, (entry) => entry.omegaLow),
       omegaSurfaceContrast: mean(upslope, (entry) => entry.omegaSurface) - mean(downslope, (entry) => entry.omegaSurface)
     };
@@ -232,6 +238,8 @@ export function summarizeCore(core, targetSeconds) {
       soilFracUpslopeVsDownslope: mean(high, (entry) => entry.soilFrac) / Math.max(1e-9, mean(low, (entry) => entry.soilFrac)),
       pLowUpslopeVsDownslope: mean(high, (entry) => entry.pLow) / Math.max(1e-9, mean(low, (entry) => entry.pLow)),
       elevUpslopeVsDownslope: mean(high, (entry) => entry.elev) / Math.max(1e-9, mean(low, (entry) => entry.elev)),
+      terrainFlowContrast: mean(high, (entry) => entry.upslope) - mean(low, (entry) => entry.upslope),
+      moistureFluxNormalContrast: mean(high, (entry) => entry.moistureFluxNormal) - mean(low, (entry) => entry.moistureFluxNormal),
       omegaLowContrast: mean(high, (entry) => entry.omegaLow) - mean(low, (entry) => entry.omegaLow),
       omegaSurfaceContrast: mean(high, (entry) => entry.omegaSurface) - mean(low, (entry) => entry.omegaSurface)
     },

@@ -92,6 +92,8 @@ test('summarizeCore uses existing near-surface RH diagnostics when present', () 
 
   assert.ok(summary.global.terrainSampleCount > 0);
   assert.ok(summary.global.rhLowUpslopeVsDownslope > 0);
+  assert.ok(Number.isFinite(summary.global.terrainFlowContrast));
+  assert.ok(Number.isFinite(summary.global.moistureFluxNormalContrast));
   assert.ok(andes);
   assert.ok(andes.upslope.rhLowMean > 0);
   assert.ok(andes.downslope.rhLowMean > 0);
@@ -107,4 +109,19 @@ test('summarizeCore falls back to thermodynamic RH when RH diagnostics are absen
   assert.ok(andes.upslope.rhLowMean > 0);
   assert.ok(andes.downslope.rhLowMean > 0);
   assert.ok(andes.rhLowRatio > 0);
+});
+
+test('summarizeCore reports terrain-flow and moisture-flux contrasts for orographic diagnosis', () => {
+  const summary = summarizeCore(makeMockCore({ useRhField: true }), 75600);
+  const andes = summary.regions.find((region) => region.name === 'Andes');
+
+  assert.ok(summary.global.terrainFlowContrast > 0);
+  assert.ok(summary.global.moistureFluxNormalContrast > 0);
+  assert.ok(andes);
+  assert.ok(andes.upslope.terrainFlowMean > 0);
+  assert.ok(andes.downslope.terrainFlowMean < 0);
+  assert.ok(andes.upslope.moistureFluxNormalMean > 0);
+  assert.ok(andes.downslope.moistureFluxNormalMean < 0);
+  assert.ok(andes.terrainFlowContrast > 0);
+  assert.ok(andes.moistureFluxNormalContrast > 0);
 });
