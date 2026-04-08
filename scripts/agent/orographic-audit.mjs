@@ -63,6 +63,18 @@ const mean = (entries, selector) => (
     : 0
 );
 
+const minValue = (entries, selector) => (
+  entries.length
+    ? entries.reduce((best, entry) => Math.min(best, selector(entry)), Infinity)
+    : 0
+);
+
+const maxValue = (entries, selector) => (
+  entries.length
+    ? entries.reduce((best, entry) => Math.max(best, selector(entry)), -Infinity)
+    : 0
+);
+
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const P0 = 100000;
 const KAPPA = 287.05 / 1004;
@@ -114,6 +126,12 @@ const applyOverrides = (core, nextOverrides) => {
 
 const summarizeGroup = (entries) => ({
   count: entries.length,
+  latMean: mean(entries, (entry) => entry.lat),
+  lonMean: mean(entries, (entry) => entry.lon),
+  latMin: minValue(entries, (entry) => entry.lat),
+  latMax: maxValue(entries, (entry) => entry.lat),
+  lonMin: minValue(entries, (entry) => entry.lon),
+  lonMax: maxValue(entries, (entry) => entry.lon),
   terrainFlowMean: mean(entries, (entry) => entry.upslope),
   moistureFluxNormalMean: mean(entries, (entry) => entry.moistureFluxNormal),
   precipMean: mean(entries, (entry) => entry.precip),
@@ -125,6 +143,7 @@ const summarizeGroup = (entries) => ({
   soilFracMean: mean(entries, (entry) => entry.soilFrac),
   pLowMean: mean(entries, (entry) => entry.pLow),
   elevMean: mean(entries, (entry) => entry.elev),
+  slopeMagMean: mean(entries, (entry) => entry.slopeMag),
   slopeFactorMean: mean(entries, (entry) => entry.slopeFactor),
   terrainOmegaLowMean: mean(entries, (entry) => entry.terrainOmegaLow),
   terrainOmegaSurfaceMean: mean(entries, (entry) => entry.terrainOmegaSurface),
@@ -199,6 +218,7 @@ export function summarizeCore(core, targetSeconds) {
         soilFrac,
         pLow: pMid[idxS],
         elev: elev[k],
+        slopeMag,
         slopeFactor,
         terrainOmegaLow,
         terrainOmegaSurface,
@@ -234,6 +254,7 @@ export function summarizeCore(core, targetSeconds) {
     return {
       name: region.name,
       count: region.entries.length,
+      terrainFlowQuantiles: { q25, q75 },
       upslope: summarizeGroup(upslope),
       downslope: summarizeGroup(downslope),
       precipRatio: mean(upslope, (entry) => entry.precip) / Math.max(1e-6, mean(downslope, (entry) => entry.precip)),
@@ -261,6 +282,7 @@ export function summarizeCore(core, targetSeconds) {
     timeUTC: core.timeUTC,
     global: {
       terrainSampleCount: terrain.length,
+      terrainFlowQuantiles: { q10, q90 },
       precipUpslopeVsDownslope: mean(high, (entry) => entry.precip) / Math.max(1e-6, mean(low, (entry) => entry.precip)),
       cloudUpslopeVsDownslope: mean(high, (entry) => entry.cloudLow) / Math.max(1e-6, mean(low, (entry) => entry.cloudLow)),
       qcLowUpslopeVsDownslope: mean(high, (entry) => entry.qcLow) / Math.max(1e-9, mean(low, (entry) => entry.qcLow)),

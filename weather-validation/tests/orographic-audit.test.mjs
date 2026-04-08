@@ -117,11 +117,21 @@ test('summarizeCore reports terrain-flow and moisture-flux contrasts for orograp
 
   assert.ok(summary.global.terrainFlowContrast > 0);
   assert.ok(summary.global.moistureFluxNormalContrast > 0);
+  assert.ok(summary.global.terrainFlowQuantiles.q90 > summary.global.terrainFlowQuantiles.q10);
   assert.ok(andes);
+  assert.ok(andes.terrainFlowQuantiles.q75 > andes.terrainFlowQuantiles.q25);
   assert.ok(andes.upslope.terrainFlowMean > 0);
   assert.ok(andes.downslope.terrainFlowMean < 0);
   assert.ok(andes.upslope.moistureFluxNormalMean > 0);
   assert.ok(andes.downslope.moistureFluxNormalMean < 0);
+  assert.ok(Number.isFinite(andes.upslope.latMean));
+  assert.ok(Number.isFinite(andes.upslope.lonMean));
+  assert.ok(Number.isFinite(andes.downslope.latMean));
+  assert.ok(Number.isFinite(andes.downslope.lonMean));
+  assert.ok(Number.isFinite(andes.upslope.slopeMagMean));
+  assert.ok(Number.isFinite(andes.downslope.slopeMagMean));
+  assert.ok(andes.upslope.lonMax >= andes.upslope.lonMin);
+  assert.ok(andes.downslope.lonMax >= andes.downslope.lonMin);
   assert.ok(andes.terrainFlowContrast > 0);
   assert.ok(andes.moistureFluxNormalContrast > 0);
 });
