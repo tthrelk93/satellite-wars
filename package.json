@@ -23,6 +23,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "agent:cycle-streak": "node scripts/agent/summarize-cycle-streak.mjs",
+    "agent:recover-interrupted-cycle": "node scripts/agent/recover-interrupted-cycle.mjs",
     "agent:dev-server": "node scripts/agent/dev-server.mjs",
     "agent:orographic-audit": "node --experimental-default-type=module --loader ./scripts/agent/resolve-js-loader.mjs scripts/agent/orographic-audit.mjs",
     "agent:orographic-probe-cdp": "node scripts/agent/orographic-probe-cdp.mjs",

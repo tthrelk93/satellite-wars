@@ -18,6 +18,7 @@ Read these first at the start of every cycle:
 - the newest `weather-validation/output/cycle-*/checkpoint.md`
 - `git log --oneline -n 10`
 - `npm run agent:cycle-streak`
+- `npm run agent:recover-interrupted-cycle`
 
 Non-negotiable rules:
 - No fake progress.
@@ -46,34 +47,36 @@ Concrete realism fix areas:
 - `precipitation placement/conversion after upslope moisture transport`
 
 Mandatory cycle protocol:
-1. Reassess the highest-leverage remaining realism weakness first, and only choose smoothness instead when the cycle selection rule allows it.
-2. Write a testable hypothesis and explicit pass/fail criteria in `plan.md`.
+1. Run `npm run agent:recover-interrupted-cycle` immediately after `npm run agent:cycle-streak`.
+   - If it reports `recovered = true`, inspect the recovery artifacts, keep the recovered cycle closed, and start a fresh cycle directory instead of continuing inside the interrupted one.
+2. Reassess the highest-leverage remaining realism weakness first, and only choose smoothness instead when the cycle selection rule allows it.
+3. Write a testable hypothesis and explicit pass/fail criteria in `plan.md`.
    - `plan.md` must exist before any heavy audit, browser, dev-server, or runtime-log command runs.
    - If heavy work starts after cycle-local artifacts already exist but `plan.md` is still missing, that is a workflow violation and the cycle should abort immediately.
    - If realism is the blocker, name one concrete target area from the list above.
    - If `npm run agent:cycle-streak` reports `physicsGuard.triggered = true`, the plan must name the expected `src/` file(s) to change.
-3. Create `weather-validation/output/cycle-<UTC>-<slug>/`.
-4. If `npm run agent:cycle-streak` reports a soft or hard stall, convert the run into a blocker-breaker cycle before any ordinary experimentation.
+4. Create `weather-validation/output/cycle-<UTC>-<slug>/`.
+5. If `npm run agent:cycle-streak` reports a soft or hard stall, convert the run into a blocker-breaker cycle before any ordinary experimentation.
    - If it reports `physicsGuard.triggered = true`, this is a physics-delivery cycle, not a tooling-victory cycle.
-5. If realism is the blocker, capture the fresh evidence needed to prove the weakness is real in a mature live window before changing behavior.
+6. If realism is the blocker, capture the fresh evidence needed to prove the weakness is real in a mature live window before changing behavior.
    - If the blocker is orographic realism, start with `npm run agent:orographic-audit -- --targets 75600,105480`.
    - If that audit reports `terrainSampleCount = 0`, treat headless terrain parity as a tooling blocker and use `npm run agent:orographic-probe-cdp` on the reused localhost page or fix the parity gap before more micro-experiments.
    - Reuse the latest clean baseline for the same blocker family when the code under test does not change browser/init/logging behavior.
-6. If smoothness is the blocker, capture fresh profiler evidence first:
+7. If smoothness is the blocker, capture fresh profiler evidence first:
    - run `npm run agent:summarize-runtime-log`
    - run `npm run agent:profile-runtime-hotspots`
    - identify the dominant stage before changing renderer/smoothness code
-7. Make the smallest code change that can test the hypothesis.
+8. Make the smallest code change that can test the hypothesis.
    - When `physicsGuard.triggered = true`, the change must touch actual weather or performance code under `src/`; changing only `scripts/agent/*`, tests, reports, prompts, or package metadata does not satisfy the cycle.
-8. Run targeted tests and cheap objective validation before live observation.
-9. Start or restart the canonical dev server with `npm run agent:dev-server -- --restart --port 3000` only when the candidate already deserves one live verification run.
-10. Reuse the existing browser tab with `npm run agent:reuse-localhost-tab`.
-11. Observe the live app on localhost for long enough to evaluate the target behavior.
-12. Summarize runtime telemetry with `npm run agent:summarize-runtime-log`, but treat `lineCount = 0` as degraded logging rather than meaningful telemetry.
-13. If smoothness is still the blocker, write `hotspot-profile.json` from the same fresh run.
-14. Write `checkpoint.md` and `evidence-summary.json`.
-15. Update `weather-validation/reports/world-class-weather-status.md` and `.json` only when the verified baseline materially improves. Failed cycles should keep conclusions in the cycle-local artifacts and then revert tracked status-file edits.
-16. If the improvement is verified, commit immediately. If it is not verified, revert your changes and end with `NO NEW VERIFIED PROGRESS`.
+9. Run targeted tests and cheap objective validation before live observation.
+10. Start or restart the canonical dev server with `npm run agent:dev-server -- --restart --port 3000` only when the candidate already deserves one live verification run.
+11. Reuse the existing browser tab with `npm run agent:reuse-localhost-tab`.
+12. Observe the live app on localhost for long enough to evaluate the target behavior.
+13. Summarize runtime telemetry with `npm run agent:summarize-runtime-log`, but treat `lineCount = 0` as degraded logging rather than meaningful telemetry.
+14. If smoothness is still the blocker, write `hotspot-profile.json` from the same fresh run.
+15. Write `checkpoint.md` and `evidence-summary.json`.
+16. Update `weather-validation/reports/world-class-weather-status.md` and `.json` only when the verified baseline materially improves. Failed cycles should keep conclusions in the cycle-local artifacts and then revert tracked status-file edits.
+17. If the improvement is verified, commit immediately. If it is not verified, revert your changes and end with `NO NEW VERIFIED PROGRESS`.
 
 Physics delivery guard:
 - `npm run agent:cycle-streak` reports `physicsGuard.consecutiveNonPhysicsCommits`.

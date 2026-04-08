@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 const defaultRepoRoot = path.resolve(__dirname, '..', '..');
 const defaultOutputDir = path.join(defaultRepoRoot, 'weather-validation', 'output');
 
-const listCycleDirs = (outputDir) => {
+export const listCycleDirs = (outputDir) => {
   if (!fs.existsSync(outputDir)) return [];
   return fs.readdirSync(outputDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith('cycle-'))
@@ -17,7 +17,7 @@ const listCycleDirs = (outputDir) => {
     .reverse();
 };
 
-const resolveCycleDirFromArtifactPath = (artifactPath) => {
+export const resolveCycleDirFromArtifactPath = (artifactPath) => {
   if (!artifactPath) return null;
   const resolved = path.resolve(artifactPath);
   const parts = resolved.split(path.sep).filter(Boolean);
@@ -27,7 +27,7 @@ const resolveCycleDirFromArtifactPath = (artifactPath) => {
   return `${prefix}${path.join(...parts.slice(0, cycleIndex + 1))}`;
 };
 
-const findNewestActiveCycleDir = (outputDir) => (
+export const findNewestActiveCycleDir = (outputDir) => (
   listCycleDirs(outputDir).find((cycleDir) => !fs.existsSync(path.join(cycleDir, 'checkpoint.md'))) || null
 );
 
