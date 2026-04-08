@@ -20,6 +20,7 @@ Use this playbook when the worker has gone multiple cycles without a verified im
      - `precipitation placement/conversion after upslope moisture transport`
 2. If reusable tooling exists only inside a cycle-local artifact, promote it into `scripts/agent/` before running another ordinary experiment.
 3. If the blocker is mountain/orographic realism, start with `npm run agent:orographic-audit -- --targets 75600,105480`.
+   - When you need a saved audit artifact, use `--out <cycle>/...json`. Do not build `.json` artifacts by redirecting `npm run agent:orographic-audit` stdout or by piping it through `awk`, `sed`, or similar text filters first.
    - If that audit reports `terrainSampleCount = 0`, headless terrain parity is not trustworthy yet. Treat that as a tooling blocker and either fix headless climatology parity or fall back to `npm run agent:orographic-probe-cdp` on the reused localhost page.
 4. Reuse the latest clean baseline for the same blocker family when the candidate patch does not change browser/init/logging behavior. Do not recollect the same browser baseline just because the cycle id is new.
 5. Use browser/CDP only to verify a candidate that already looks promising offline or to check a browser-only regression.

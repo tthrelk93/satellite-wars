@@ -28,6 +28,21 @@ import WeatherLogger from '../WeatherLogger.js';
 
 const P_TOP = 20000;
 const DEBUG_INIT_TEST_BLOB = false;
+const hasNodeStderr = typeof process !== 'undefined' && typeof process?.stderr?.write === 'function';
+const debugStdErr = (message) => {
+  if (hasNodeStderr) {
+    process.stderr.write(`${message}\n`);
+    return;
+  }
+  console.log(message);
+};
+const debugWarn = (message) => {
+  if (hasNodeStderr) {
+    process.stderr.write(`${message}\n`);
+    return;
+  }
+  console.warn(message);
+};
 
 const makeArray = (count, value = 0) => {
   const arr = new Float32Array(count);
@@ -49,9 +64,9 @@ export class WeatherCore5 {
     if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
       const lat0 = this.grid.latDeg[0];
       const latN = this.grid.latDeg[this.grid.ny - 1];
-      console.log(`[V2 grid] latDeg[0]=${lat0?.toFixed?.(3)} latDeg[ny-1]=${latN?.toFixed?.(3)}`);
+      debugStdErr(`[V2 grid] latDeg[0]=${lat0?.toFixed?.(3)} latDeg[ny-1]=${latN?.toFixed?.(3)}`);
       if (!(lat0 > latN)) {
-        console.warn('[V2 grid] Expected lat decreases with j (j increases southward); advect5 assumes this.');
+        debugWarn('[V2 grid] Expected lat decreases with j (j increases southward); advect5 assumes this.');
       }
     }
     this.nz = Math.max(5, Math.floor(Number(nz) || 26));
@@ -445,7 +460,7 @@ export class WeatherCore5 {
 
     this._updateHydrostatic();
 
-    console.log(`[V2] seed=${this.seed} version=v2 nz=${this.nz}`);
+    debugStdErr(`[V2] seed=${this.seed} version=v2 nz=${this.nz}`);
     this._initPromise = this._init();
   }
 

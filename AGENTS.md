@@ -61,6 +61,8 @@ Mandatory cycle protocol:
    - If it reports `physicsGuard.triggered = true`, this is a physics-delivery cycle, not a tooling-victory cycle.
 6. If realism is the blocker, capture the fresh evidence needed to prove the weakness is real in a mature live window before changing behavior.
    - If the blocker is orographic realism, start with `npm run agent:orographic-audit -- --targets 75600,105480`.
+   - If you need a machine-readable audit artifact, write it with `--out <cycle>/prefix-orographic-audit.json` or `--out <cycle>/postfix-orographic-audit.json`.
+   - Never create a `.json` artifact by redirecting `npm run agent:orographic-audit` stdout with `> file.json` or by piping it through text filters first. Keep machine-readable JSON and human-readable logs as separate files.
    - If that audit reports `terrainSampleCount = 0`, treat headless terrain parity as a tooling blocker and use `npm run agent:orographic-probe-cdp` on the reused localhost page or fix the parity gap before more micro-experiments.
    - Reuse the latest clean baseline for the same blocker family when the code under test does not change browser/init/logging behavior.
 7. If smoothness is the blocker, capture fresh profiler evidence first:
@@ -113,6 +115,7 @@ Required artifacts per cycle:
 - `plan.md`
 - `checkpoint.md`
 - `evidence-summary.json`
+- machine-readable JSON artifacts must be produced with helper `--out` flags, not shell-redirection into `.json` files
 - `agent:cycle-streak` output summary when a stall guard triggers
 - `hotspot-profile.json` whenever smoothness is blocked
 - realism comparison evidence whenever realism is blocked
