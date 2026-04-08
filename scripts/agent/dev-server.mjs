@@ -213,7 +213,16 @@ const waitForOkEndpoint = async (url, maxWaitMs) => {
   throw new Error(`Timed out waiting for ${url}`);
 };
 
+const buildObservationUrl = (rawUrl) => {
+  const next = new URL(rawUrl);
+  if (!next.searchParams.get('mode')) {
+    next.searchParams.set('mode', 'solo');
+  }
+  return next.href;
+};
+
 const appUrl = `http://${host}:${port}/`;
+const observationUrl = buildObservationUrl(appUrl);
 const sessionUrl = `http://${host}:${weatherLogPort}/session`;
 
 const stopExistingProcess = async (state) => {
@@ -255,10 +264,11 @@ if (stop) {
 
 if (!restart && existingState?.pid && processAlive(existingState.pid)) {
   try {
-    await waitForOkEndpoint(existingState.url || appUrl, 5000);
+    await waitForOkEndpoint(existingState.url || observationUrl, 5000);
     const session = await waitForJsonEndpoint(existingState.sessionUrl || sessionUrl, 5000);
     const currentState = {
       ...existingState,
+      url: existingState.url || observationUrl,
       sessionUrl: existingState.sessionUrl || sessionUrl,
       weatherLogPath: session?.filename ? path.resolve(repoRoot, session.filename) : existingState.weatherLogPath ?? null,
       weatherLogRunId: session?.runId ?? existingState.weatherLogRunId ?? null,
@@ -307,7 +317,7 @@ try {
     pid: child.pid,
     host,
     port,
-    url: appUrl,
+    url: observationUrl,
     sessionUrl,
     logPath,
     statePath,

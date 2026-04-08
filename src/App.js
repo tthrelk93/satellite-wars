@@ -298,9 +298,14 @@ const DEFAULT_TUNING = {
     }
 };
 
+const resolveInitialGameMode = () => {
+    const mode = new URLSearchParams(window.location.search).get('mode');
+    return mode === 'solo' || mode === 'pvp' ? mode : null;
+};
+
 const App = () => {
     const mountRef = useRef(null);
-    const [gameMode, setGameMode] = useState(null); // 'solo' or 'pvp'
+    const [gameMode, setGameMode] = useState(() => resolveInitialGameMode()); // 'solo' or 'pvp'
     const params = new URLSearchParams(window.location.search);
     const initialSeedParam = params.get('weatherSeed');
     const envSeedParam = process.env.REACT_APP_WEATHER_SEED;

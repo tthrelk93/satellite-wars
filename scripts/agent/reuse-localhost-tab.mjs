@@ -43,7 +43,14 @@ if (!targetUrl) {
 }
 
 const normalizedTargetUrl = new URL(targetUrl).href;
-const normalizedTarget = new URL(normalizedTargetUrl);
+const normalizeObservationTarget = (rawUrl) => {
+  const next = new URL(rawUrl);
+  if (!next.searchParams.get('mode')) {
+    next.searchParams.set('mode', 'solo');
+  }
+  return next;
+};
+const normalizedTarget = normalizeObservationTarget(normalizedTargetUrl);
 
 const runBrowser = (args, { expectJson = false, allowFailure = false } = {}) => {
   const fullArgs = ['browser', '--browser-profile', profile];
@@ -89,6 +96,7 @@ const scoreTab = (tab) => {
   if (url.href === normalizedTarget.href) score += 100;
   if (url.origin === normalizedTarget.origin) score += 50;
   if (url.pathname === normalizedTarget.pathname) score += 10;
+  if (url.searchParams.get('mode') === normalizedTarget.searchParams.get('mode')) score += 10;
   if (tabFocused(tab)) score += 5;
   if ((tabTitleOf(tab) || '').toLowerCase().includes('satellite')) score += 2;
   return score;

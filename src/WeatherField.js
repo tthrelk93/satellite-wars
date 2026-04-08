@@ -6,6 +6,7 @@ import { WeatherLogSink } from './weather/logSink';
 
 const AUTO_LOG_CADENCE_SECONDS = 6 * 3600;
 const AUTO_LOG_MAX_ENTRIES = 20000;
+const AUTO_LOG_INIT_RETRY_MS = 5000;
 
 // WeatherField: rendering wrapper around the physics core
 class WeatherField {
@@ -37,11 +38,13 @@ class WeatherField {
         this.core.setLogger?.(this.logger);
         this._logSink = null;
         this._autoLogReady = false;
+        this._autoLogInitInFlight = false;
+        this._nextAutoLogInitAtMs = 0;
 
         const autoLogEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_AUTO_LOG === '1';
         if (autoLogEnabled && typeof fetch !== 'undefined') {
             this._logSink = new WeatherLogSink({ baseUrl: '/__weatherlog', flushIntervalMs: 300 });
-            this._initAutoLogging();
+            this._maybeInitAutoLogging(true);
         }
 
         const texW = nx * renderScale;
@@ -100,8 +103,16 @@ class WeatherField {
         this.textureDebug.needsUpdate = true;
     }
 
+    _maybeInitAutoLogging(force = false) {
+        if (!this._logSink || this._autoLogReady || this._autoLogInitInFlight) return;
+        const nowMs = Date.now();
+        if (!force && nowMs < this._nextAutoLogInitAtMs) return;
+        void this._initAutoLogging();
+    }
+
     async _initAutoLogging() {
-        if (!this._logSink || this._autoLogReady) return;
+        if (!this._logSink || this._autoLogReady || this._autoLogInitInFlight) return;
+        this._autoLogInitInFlight = true;
         try {
             if (this.core?._initPromise) {
                 await this.core._initPromise;
@@ -109,38 +120,47 @@ class WeatherField {
         } catch (_) {
             // proceed with whatever init data is available
         }
-        const session = await this._logSink.init();
-        if (!session) return;
+        try {
+            const session = await this._logSink.init();
+            if (!session) {
+                this._nextAutoLogInitAtMs = Date.now() + AUTO_LOG_INIT_RETRY_MS;
+                return;
+            }
 
-        this.logger.setOnLine((line) => this._logSink.enqueue(line));
-        this.logger.setRunInfo({
-            runId: session.runId,
-            seqStart: Number.isFinite(session.seqStart) ? session.seqStart : 0
-        });
-        this.logger.start(this.core.timeUTC, {
-            cadenceSeconds: AUTO_LOG_CADENCE_SECONDS,
-            maxEntries: AUTO_LOG_MAX_ENTRIES
-        });
-        this.logger.recordRunStart(this.core, {
-            session,
-            cadenceSeconds: AUTO_LOG_CADENCE_SECONDS,
-            modelKind: 'v2'
-        });
-        this.logger.recordNow(
-            {
-                simTimeSeconds: this.core.timeUTC,
-                simSpeed: this._simContext.simSpeed,
-                paused: this._simContext.paused,
-                stepsRanThisTick: this._lastStepsRan
-            },
-            this.core,
-            { reason: 'autoStart' }
-        );
-        this._autoLogReady = true;
+            this.logger.setOnLine((line) => this._logSink.enqueue(line));
+            this.logger.setRunInfo({
+                runId: session.runId,
+                seqStart: Number.isFinite(session.seqStart) ? session.seqStart : 0
+            });
+            this.logger.start(this.core.timeUTC, {
+                cadenceSeconds: AUTO_LOG_CADENCE_SECONDS,
+                maxEntries: AUTO_LOG_MAX_ENTRIES
+            });
+            this.logger.recordRunStart(this.core, {
+                session,
+                cadenceSeconds: AUTO_LOG_CADENCE_SECONDS,
+                modelKind: 'v2'
+            });
+            this.logger.recordNow(
+                {
+                    simTimeSeconds: this.core.timeUTC,
+                    simSpeed: this._simContext.simSpeed,
+                    paused: this._simContext.paused,
+                    stepsRanThisTick: this._lastStepsRan
+                },
+                this.core,
+                { reason: 'autoStart' }
+            );
+            this._autoLogReady = true;
+            this._nextAutoLogInitAtMs = 0;
+        } finally {
+            this._autoLogInitInFlight = false;
+        }
     }
 
     update(simTimeSeconds, realDtSeconds, simContext = {}) {
         if (!Number.isFinite(simTimeSeconds)) return;
+        this._maybeInitAutoLogging();
         if (!this.core.ready) {
             this._lastSimTimeSeconds = simTimeSeconds;
             return;

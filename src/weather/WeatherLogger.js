@@ -1,5 +1,5 @@
-import { Re, g } from './constants';
-import { buildValidationDiagnostics } from './validation/diagnostics';
+import { Re, g } from './constants.js';
+import { buildValidationDiagnostics } from './validation/diagnostics.js';
 
 const EARTH_AREA = 4 * Math.PI * Re * Re;
 const DEFAULT_MAX_ENTRIES = 20000;

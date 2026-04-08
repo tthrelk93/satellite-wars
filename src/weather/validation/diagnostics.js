@@ -1,5 +1,5 @@
-import { g, Rd } from '../constants';
-import { computeGeopotentialHeightByPressure, DEFAULT_PRESSURE_LEVELS_PA } from '../v2/verticalGrid';
+import { g, Rd } from '../constants.js';
+import { computeGeopotentialHeightByPressure, DEFAULT_PRESSURE_LEVELS_PA } from '../v2/verticalGrid.js';
 
 const EPS = 1e-6;
 

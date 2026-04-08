@@ -1,30 +1,30 @@
-import { createLatLonGridV2 } from './grid';
-import { createState5 } from './state5';
-import { updateHydrostatic } from './hydrostatic';
-import { stepWinds5 } from './dynamics5';
-import { stepWindEddyNudge5 } from './windEddyNudge5';
-import { stepWindNudge5 } from './windNudge5';
-import { stepSurfacePressure5 } from './mass5';
-import { stepAdvection5 } from './advect5';
-import { stepVertical5 } from './vertical5';
-import { stepMicrophysics5 } from './microphysics5';
-import { stepSurface2D5 } from './surface2d';
-import { initClimo2D } from './climo2d';
-import { stepRadiation2D5 } from './radiation2d';
-import { updateDiagnostics2D5 } from './diagnostics2d';
-import { initializeV2FromClimo } from './initializeFromClimo';
+import { createLatLonGridV2 } from './grid.js';
+import { createState5 } from './state5.js';
+import { updateHydrostatic } from './hydrostatic.js';
+import { stepWinds5 } from './dynamics5.js';
+import { stepWindEddyNudge5 } from './windEddyNudge5.js';
+import { stepWindNudge5 } from './windNudge5.js';
+import { stepSurfacePressure5 } from './mass5.js';
+import { stepAdvection5 } from './advect5.js';
+import { stepVertical5 } from './vertical5.js';
+import { stepMicrophysics5 } from './microphysics5.js';
+import { stepSurface2D5 } from './surface2d.js';
+import { initClimo2D } from './climo2d.js';
+import { stepRadiation2D5 } from './radiation2d.js';
+import { updateDiagnostics2D5 } from './diagnostics2d.js';
+import { initializeV2FromClimo } from './initializeFromClimo.js';
 import { initializeV2FromAnalysis } from './initializeFromAnalysis.js';
 import { loadAnalysisDataset } from './analysisLoader.js';
 import { stepAnalysisIncrement5 } from './analysisIncrement5.js';
-import { stepNudging5 } from './nudging5';
+import { stepNudging5 } from './nudging5.js';
 import {
   buildVerticalLayout,
   computeGeopotentialHeightByPressure,
   createSigmaHalfLevels,
   DEFAULT_PRESSURE_LEVELS_PA,
   levelSubarray
-} from './verticalGrid';
-import WeatherLogger from '../WeatherLogger';
+} from './verticalGrid.js';
+import WeatherLogger from '../WeatherLogger.js';
 
 const P_TOP = 20000;
 const DEBUG_INIT_TEST_BLOB = false;
@@ -258,6 +258,7 @@ export class WeatherCore5 {
       dThetaMaxVertAdvPerStep: 2.0,
       enableOmegaMassFix: true,
       orographicLiftScale: 0.5,
+      orographicLeeSubsidenceScale: 0.35,
       eps: 1e-12,
       debugConservation: false
     };
