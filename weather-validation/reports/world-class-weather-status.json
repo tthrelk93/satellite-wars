@@ -1,25 +1,25 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-08T05:05:00Z",
+  "updatedAt": "2026-04-08T06:04:55Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
-  "baselineCommit": "32e1eea",
+  "baselineCommit": "5cb8dc2",
   "latestCycle": {
-    "id": "cycle-2026-04-08T04-47-37Z-orographic-lift-scale",
-    "goal": "reduce overly strong terrain-forced lift coupling that was still favoring the wrong side of the Andes mature-window precip split",
-    "verifiedImprovement": "default orographic lift scale is now 0.5, improving Andes precipRatio from 0.7164 to 0.8353 at 75600 and from 0.7385 to 0.8217 at 105480 while Rockies stayed windward-favored",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-08T04-47-37Z-orographic-lift-scale/runtime-summary.json",
-    "runtimeLogPath": "logs/weather-2026-04-08T05-02-35Z-3819.jsonl"
+    "id": "cycle-2026-04-08T05-24-30Z-upslope-only-terrain-coupling",
+    "goal": "reduce wrong-signed Andes lee suppression by damping lee-side terrain subsidence without removing upslope lift",
+    "verifiedImprovement": "default lee-side subsidence damping is now 0.35, improving Andes precipRatio from 0.8353 to 1.0099 at 75600 and from 0.8217 to 0.9226 at 105480 while Rockies stayed windward-favored and the full validation suite passed",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-08T05-24-30Z-upslope-only-terrain-coupling/runtime-summary.json",
+    "runtimeLogPath": "logs/weather-2026-04-08T05-47-56Z-79413.jsonl"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
     "overallPass": true
   },
   "blockingGaps": [
-    "broader Earth-like realism still needs explicit mature-window re-audits with the weaker terrain-coupling default active in the live app",
-    "orographic realism improved but is not solved: Andes mature-window precipRatio is still below 1.0 and the regional quartile split still samples all-negative terrain-flow cells",
-    "runtime smoothness is still not signed off; the latest live run again produced a degraded runtime summary with lineCount = 0",
+    "broader Earth-like realism still needs fresh mature-window re-audits in the live app with lee-side terrain-subsidence damping active across circulation, clouds, storms, and precipitation placement",
+    "orographic realism improved but is not solved: the Andes mature-window precipRatio now clears 1.0 at 75600 but is still 0.9226 at 105480, and the terrain-flow sample geometry still needs refinement",
+    "runtime smoothness is still not signed off; the latest live run now has healthy telemetry and still reports earth_update_p95_high, earth_update_max_high, and wind_targets_failing",
     "world-class status still requires realism and smoothness to pass in the same fresh live run"
   ],
   "cycleInputs": [
@@ -33,59 +33,63 @@
   "latestTelemetry": {
     "singleTabLocalhostVerified": true,
     "localhostTabReuse": {
-      "url": "http://127.0.0.1:3000/",
+      "url": "http://127.0.0.1:3000/?mode=solo",
       "duplicatesClosed": 2,
       "targetId": "3E78E7E81B1CCAC96E03A1E5C432C41E"
     },
-    "orographicLiftScale": {
+    "orographicLeeSubsidenceScale": {
       "before": 1,
-      "after": 0.5,
+      "after": 0.35,
       "andesPrecipRatio": {
         "target75600": {
-          "before": 0.716436648707517,
-          "after": 0.835310350824286
+          "before": 0.835310350824286,
+          "after": 1.0098762943607258
         },
         "target105480": {
-          "before": 0.7384526773835948,
-          "after": 0.8217498365959043
+          "before": 0.8217498365959043,
+          "after": 0.9225765910976285
         }
       },
       "andesTerrainOmegaLowContrast": {
         "target75600": {
-          "before": -9.199703158281975,
-          "after": -4.608054369720954
+          "before": -4.608054369720954,
+          "after": -4.6180694615063125
         },
         "target105480": {
-          "before": -9.1853239695012,
-          "after": -4.601889062563846
+          "before": -4.601889062563846,
+          "after": -4.61295505627266
         }
       },
       "rockiesPrecipRatio": {
         "target75600": {
-          "before": 1.2021258060759417,
-          "after": 1.2983544331221624
+          "before": 1.2983544331221624,
+          "after": 1.3679288229861994
         },
         "target105480": {
-          "before": 1.209725009789817,
-          "after": 1.2861143216809838
+          "before": 1.2861143216809838,
+          "after": 1.3411989965930289
         }
       }
     },
     "runtimeSummary": {
-      "lineCount": 0,
+      "lineCount": 252,
       "validationSnapshotCount": 0,
-      "warnings": []
+      "warnings": [
+        "earth_update_p95_high",
+        "earth_update_max_high",
+        "wind_targets_failing"
+      ]
     },
     "browserObservation": {
       "singlePlayerLoaded": true,
-      "simLabel": "Day 0, 00:38",
-      "note": "reused canonical localhost tab reached in-game globe view with weather layers active and no obvious immediate terrain-coupling regression"
+      "note": "reused canonical localhost solo-mode tab emitted 252 live weather-log lines after the restart, so runtime logging is healthy enough again to guide future smoothness work"
     }
   },
   "defaultNextPriority": [
-    "stay on orographic realism and re-audit the Andes with the weaker default lift coupling active, prioritizing the remaining terrain-flow-sign / sampling mismatch",
-    "verify the same blocker family in a mature browser window once a candidate deserves it instead of recollecting duplicate early baselines",
-    "when smoothness becomes the blocker again, collect fresh hotspot attribution before changing renderer or worker performance behavior",
+    "stay on orographic realism and re-audit the Andes with lee-side subsidence damping active, prioritizing the remaining later-window shortfall and terrain-flow sample-geometry mismatch",
+    "target the next physics cycle at one concrete src-side fix area before taking any new diagnostics-only detour",
+    "use browser verification only after an offline candidate looks promising, and keep it to one canonical localhost run",
+    "when smoothness becomes the blocker again, use the fresh non-empty runtime telemetry before changing renderer or worker performance behavior",
     "keep validation on the clean world-class checkout only"
   ],
   "rules": {
