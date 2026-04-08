@@ -5,14 +5,14 @@ import { createSigmaHalfLevels } from './verticalGrid.js';
 import { updateHydrostatic } from './hydrostatic.js';
 import { stepVertical5 } from './vertical5.js';
 
-const makeGrid = () => ({
-  nx: 3,
-  ny: 2,
-  count: 6,
-  invDx: new Float32Array([1 / 100000, 1 / 100000]),
-  invDy: new Float32Array([1 / 100000, 1 / 100000]),
-  cosLat: new Float32Array([1, 1]),
-  latDeg: new Float32Array([10, -10])
+const makeGrid = ({ nx = 3, ny = 2 } = {}) => ({
+  nx,
+  ny,
+  count: nx * ny,
+  invDx: new Float32Array(Array.from({ length: ny }, () => 1 / 100000)),
+  invDy: new Float32Array(Array.from({ length: ny }, () => 1 / 100000)),
+  cosLat: new Float32Array(Array.from({ length: ny }, () => 1)),
+  latDeg: new Float32Array(Array.from({ length: ny }, (_, idx) => 10 - idx * 20))
 });
 
 test('updateHydrostatic incorporates terrain height into geopotential', () => {
@@ -160,4 +160,56 @@ test('stepVertical5 damps lee-side terrain subsidence separately from upslope li
   assert.ok(leeFullMax > leeDampedMax);
   assert.ok(leeDampedMax > leeOffMax);
   assert.equal(leeOffMax, 0);
+});
+
+test('stepVertical5 broad terrain sampling softens narrow-ridge lee forcing', () => {
+  const grid = makeGrid({ nx: 7, ny: 2 });
+  const sigmaHalf = createSigmaHalfLevels({ nz: 4 });
+  const elev = new Float32Array([
+    0, 0, 800, 2600, 700, 0, 0,
+    0, 0, 800, 2600, 700, 0, 0
+  ]);
+  const runCase = (terrainDirectionalBlend) => {
+    const state = createState5({ grid, nz: 4, sigmaHalf });
+    state.ps.fill(100000);
+    state.theta.fill(290);
+    state.qv.fill(0.004);
+    updateHydrostatic(state, { pTop: 20000, terrainHeightM: elev });
+    const levS = state.nz - 1;
+    for (let k = 0; k < state.N; k += 1) {
+      state.u[levS * state.N + k] = 18;
+      state.v[levS * state.N + k] = 0;
+    }
+    stepVertical5({
+      dt: 60,
+      grid,
+      state,
+      geo: { elev },
+      params: {
+        enableMixing: false,
+        enableConvection: false,
+        enableLargeScaleVerticalAdvection: false,
+        enableOmegaMassFix: false,
+        orographicLiftScale: 0.5,
+        orographicLeeSubsidenceScale: 0.35,
+        terrainDirectionalBlend
+      }
+    });
+    return state;
+  };
+
+  const localOnly = runCase(0.0);
+  const broadBlend = runCase(0.75);
+  let localLeeMax = 0;
+  let broadLeeMax = 0;
+  let broadUpslopeMin = 0;
+  for (let i = 0; i < localOnly.omega.length; i += 1) {
+    localLeeMax = Math.max(localLeeMax, localOnly.omega[i]);
+    broadLeeMax = Math.max(broadLeeMax, broadBlend.omega[i]);
+    broadUpslopeMin = Math.min(broadUpslopeMin, broadBlend.omega[i]);
+  }
+
+  assert.ok(localLeeMax > 0);
+  assert.ok(broadLeeMax < localLeeMax);
+  assert.ok(broadUpslopeMin < 0);
 });

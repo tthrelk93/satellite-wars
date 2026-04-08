@@ -259,6 +259,7 @@ export class WeatherCore5 {
       enableOmegaMassFix: true,
       orographicLiftScale: 0.5,
       orographicLeeSubsidenceScale: 0.35,
+      terrainDirectionalBlend: 0.05,
       eps: 1e-12,
       debugConservation: false
     };

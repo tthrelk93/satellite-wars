@@ -43,6 +43,7 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'orographicLeeSubsidenceScale',
   'orographicDecayFrac',
   'terrainSlopeRef',
+  'terrainDirectionalBlend',
   'eps',
   'debugConservation'
 ]);
@@ -126,6 +127,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     orographicLeeSubsidenceScale = 0.35,
     orographicDecayFrac = 0.35,
     terrainSlopeRef = 0.003,
+    terrainDirectionalBlend = 0.05,
 
     // Numerical/heating
     eps = 1e-12
@@ -212,14 +214,29 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         const iE = (i + 1) % nx;
         const iW = (i - 1 + nx) % nx;
         const k = row + i;
-        const slopeX = (elevField[row + iE] - elevField[row + iW]) * 0.5 * invDxRow;
-        const slopeY = (elevField[rowN + i] - elevField[rowS + i]) * 0.5 * invDyRow;
-        const slopeMag = Math.hypot(slopeX, slopeY);
-        const slopeFactor = clamp(slopeMag / Math.max(1e-6, terrainSlopeRef), 0, 3);
+        const slopeXLocal = (elevField[row + iE] - elevField[row + iW]) * 0.5 * invDxRow;
+        const slopeYLocal = (elevField[rowN + i] - elevField[rowS + i]) * 0.5 * invDyRow;
         const idxS = levS * N + k;
+        const directionalBlend = clamp(terrainDirectionalBlend, 0, 1);
+        let slopeMag = Math.hypot(slopeXLocal, slopeYLocal);
+        let terrainNormalFlow = u[idxS] * slopeXLocal + v[idxS] * slopeYLocal;
+        if (directionalBlend > 0) {
+          const iE2 = (i + 2) % nx;
+          const iW2 = (i - 2 + nx) % nx;
+          const jN2 = Math.max(0, j - 2);
+          const jS2 = Math.min(ny - 1, j + 2);
+          const rowN2 = jN2 * nx;
+          const rowS2 = jS2 * nx;
+          const slopeXBroad = (elevField[row + iE2] - elevField[row + iW2]) * 0.25 * invDxRow;
+          const slopeYBroad = (elevField[rowN2 + i] - elevField[rowS2 + i]) * 0.25 * invDyRow;
+          const terrainNormalFlowBroad = u[idxS] * slopeXBroad + v[idxS] * slopeYBroad;
+          terrainNormalFlow += (terrainNormalFlowBroad - terrainNormalFlow) * directionalBlend;
+          const slopeMagBroad = Math.hypot(slopeXBroad, slopeYBroad);
+          slopeMag += (slopeMagBroad - slopeMag) * directionalBlend;
+        }
+        const slopeFactor = clamp(slopeMag / Math.max(1e-6, terrainSlopeRef), 0, 3);
         const nearSurfaceT = Math.max(180, T[idxS]);
         const rho = Math.max(0.2, pMid[idxS] / Math.max(1e-6, Rd * nearSurfaceT));
-        const terrainNormalFlow = u[idxS] * slopeX + v[idxS] * slopeY;
         const leeScale = clamp(orographicLeeSubsidenceScale, 0, 1);
         const terrainFlowForcing = terrainNormalFlow >= 0
           ? terrainNormalFlow
