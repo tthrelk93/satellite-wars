@@ -139,7 +139,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     terrainDirectionalBlend = 0.05,
     terrainLeeOmega0 = 0.3,
     terrainLeeOmega1 = 2.0,
-    terrainLeeAscentDamp = 0.8,
+    terrainLeeAscentDamp = 1.0,
     terrainDeliveryProtectExposure0 = 0.5,
     terrainDeliveryProtectExposure1 = 8.0,
 

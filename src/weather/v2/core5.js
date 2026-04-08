@@ -277,7 +277,7 @@ export class WeatherCore5 {
       terrainDirectionalBlend: 0.05,
       terrainLeeOmega0: 0.3,
       terrainLeeOmega1: 2.0,
-      terrainLeeAscentDamp: 0.8,
+      terrainLeeAscentDamp: 1.0,
       terrainDeliveryProtectExposure0: 0.5,
       terrainDeliveryProtectExposure1: 8.0,
       eps: 1e-12,
@@ -318,6 +318,7 @@ export class WeatherCore5 {
       convTauEvapCloudScale: 0.35,
       convKAutoScale: 2.0,
       convPrecipEffBoost: 0.15,
+      terrainLeeWarmRainSuppress: 0.55,
       dThetaMaxMicroPerStepConv: 2.5,
       enable: true
     };
