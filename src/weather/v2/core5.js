@@ -275,6 +275,11 @@ export class WeatherCore5 {
       orographicLiftScale: 0.5,
       orographicLeeSubsidenceScale: 0.35,
       terrainDirectionalBlend: 0.05,
+      terrainLeeOmega0: 0.3,
+      terrainLeeOmega1: 2.0,
+      terrainLeeAscentDamp: 0.8,
+      terrainDeliveryProtectExposure0: 0.5,
+      terrainDeliveryProtectExposure1: 8.0,
       eps: 1e-12,
       debugConservation: false
     };

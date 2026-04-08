@@ -267,3 +267,63 @@ test('stepVertical5 tracks terrain-forced low-level moisture-delivery footprint'
   assert.equal(flatMaxDelivery, 0);
   assert.equal(flatMaxExposure, 0);
 });
+
+test('stepVertical5 damps lee-side ascent-driven low-level transport when no delivery exposure exists', () => {
+  const grid = makeGrid();
+  const sigmaHalf = createSigmaHalfLevels({ nz: 4 });
+  const elev = new Float32Array([3000, 3000, 3000, 0, 0, 0]);
+
+  const runCase = ({ terrainLeeAscentDamp, deliveryExposure = 0 }) => {
+    const state = createState5({ grid, nz: 4, sigmaHalf });
+    state.ps.fill(100000);
+    state.theta.fill(290);
+    state.qv.fill(0.001);
+    state.orographicDeliveryExposureAccum = new Float32Array(state.N);
+    state.orographicDeliveryExposureAccum.fill(deliveryExposure);
+    updateHydrostatic(state, { pTop: 20000, terrainHeightM: elev });
+    const levS = state.nz - 1;
+    for (let k = 0; k < state.N; k += 1) {
+      state.u[levS * state.N + k] = 0;
+      state.v[levS * state.N + k] = -30;
+      state.dpsDtApplied[k] = -3000;
+      state.qv[levS * state.N + k] = 0.02;
+      state.qv[(levS - 1) * state.N + k] = 0.002;
+      state.qv[(levS - 2) * state.N + k] = 0.001;
+    }
+
+    stepVertical5({
+      dt: 120,
+      grid,
+      state,
+      geo: { elev },
+      params: {
+        enableMixing: false,
+        enableConvection: false,
+        enableOmegaMassFix: true,
+        enableLargeScaleVerticalAdvection: true,
+        verticalAdvectionCflMax: 0.8,
+        orographicLiftScale: 1.0,
+        orographicLeeSubsidenceScale: 1.0,
+        terrainLeeOmega0: 0.01,
+        terrainLeeOmega1: 0.2,
+        terrainLeeAscentDamp,
+        terrainDeliveryProtectExposure0: 0.5,
+        terrainDeliveryProtectExposure1: 8.0
+      }
+    });
+    return state;
+  };
+
+  const noDamp = runCase({ terrainLeeAscentDamp: 0, deliveryExposure: 0 });
+  const damped = runCase({ terrainLeeAscentDamp: 1, deliveryExposure: 0 });
+  const protectedExposure = runCase({ terrainLeeAscentDamp: 1, deliveryExposure: 20 });
+  const lev = noDamp.nz - 2;
+  const levBase = lev * noDamp.N;
+  const noDampQv = noDamp.qv[levBase];
+  const dampedQv = damped.qv[levBase];
+  const protectedQv = protectedExposure.qv[levBase];
+
+  assert.ok(Math.max(...damped.terrainLeeNoDelivery) > 0.9);
+  assert.ok(dampedQv < noDampQv);
+  assert.ok(protectedQv > dampedQv);
+});
