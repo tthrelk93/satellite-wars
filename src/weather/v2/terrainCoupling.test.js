@@ -31,7 +31,7 @@ test('updateHydrostatic incorporates terrain height into geopotential', () => {
 test('stepVertical5 adds terrain-driven omega for upslope flow', () => {
   const grid = makeGrid();
   const sigmaHalf = createSigmaHalfLevels({ nz: 4 });
-  const runCase = (elev) => {
+  const runCase = (elev, orographicLiftScale = 1.0) => {
     const state = createState5({ grid, nz: 4, sigmaHalf });
     state.ps.fill(100000);
     state.theta.fill(290);
@@ -52,7 +52,7 @@ test('stepVertical5 adds terrain-driven omega for upslope flow', () => {
         enableConvection: false,
         enableLargeScaleVerticalAdvection: false,
         enableOmegaMassFix: false,
-        orographicLiftScale: 1.0
+        orographicLiftScale
       }
     });
     return state;
@@ -65,4 +65,47 @@ test('stepVertical5 adds terrain-driven omega for upslope flow', () => {
     maxDiff = Math.max(maxDiff, Math.abs(terrain.omega[i] - flat.omega[i]));
   }
   assert.ok(maxDiff > 0);
+});
+
+test('stepVertical5 scales terrain-driven omega with orographicLiftScale', () => {
+  const grid = makeGrid();
+  const sigmaHalf = createSigmaHalfLevels({ nz: 4 });
+  const elev = new Float32Array([0, 1000, 2000, 0, 1000, 2000]);
+  const runCase = (orographicLiftScale) => {
+    const state = createState5({ grid, nz: 4, sigmaHalf });
+    state.ps.fill(100000);
+    state.theta.fill(290);
+    state.qv.fill(0.004);
+    updateHydrostatic(state, { pTop: 20000, terrainHeightM: elev });
+    const levS = state.nz - 1;
+    for (let k = 0; k < state.N; k += 1) {
+      state.u[levS * state.N + k] = 20;
+      state.v[levS * state.N + k] = 0;
+    }
+    stepVertical5({
+      dt: 60,
+      grid,
+      state,
+      geo: { elev },
+      params: {
+        enableMixing: false,
+        enableConvection: false,
+        enableLargeScaleVerticalAdvection: false,
+        enableOmegaMassFix: false,
+        orographicLiftScale
+      }
+    });
+    return state;
+  };
+
+  const terrainStrong = runCase(1.0);
+  const terrainWeak = runCase(0.5);
+  let strongMax = 0;
+  let weakMax = 0;
+  for (let i = 0; i < terrainStrong.omega.length; i += 1) {
+    strongMax = Math.max(strongMax, Math.abs(terrainStrong.omega[i]));
+    weakMax = Math.max(weakMax, Math.abs(terrainWeak.omega[i]));
+  }
+  assert.ok(weakMax > 0);
+  assert.ok(strongMax > weakMax);
 });

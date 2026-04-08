@@ -1,25 +1,25 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-07T23:30:00Z",
+  "updatedAt": "2026-04-08T05:05:00Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
   "baselineCommit": "32e1eea",
   "latestCycle": {
-    "id": "cycle-2026-04-07T13-07-12Z-topography-climo-restoration",
-    "goal": "restore missing terrain climatology in the live browser worker so the weather model stops running with a flat land field",
-    "verifiedImprovement": "canonical localhost browser runs now ingest nonzero land-only terrain from climatology; the verified run held elev.max 3825.27 m, elevLand.mean 894.67 m, and elevOcean.max 0 through Day 1, 09:06",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-07T13-07-12Z-topography-climo-restoration/runtime-summary.json",
-    "runtimeLogPath": "logs/weather-2026-04-07T13-14-48Z-45673.jsonl"
+    "id": "cycle-2026-04-08T04-47-37Z-orographic-lift-scale",
+    "goal": "reduce overly strong terrain-forced lift coupling that was still favoring the wrong side of the Andes mature-window precip split",
+    "verifiedImprovement": "default orographic lift scale is now 0.5, improving Andes precipRatio from 0.7164 to 0.8353 at 75600 and from 0.7385 to 0.8217 at 105480 while Rockies stayed windward-favored",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-08T04-47-37Z-orographic-lift-scale/runtime-summary.json",
+    "runtimeLogPath": "logs/weather-2026-04-08T05-02-35Z-3819.jsonl"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
     "overallPass": true
   },
   "blockingGaps": [
-    "broader Earth-like realism still needs explicit mature-window re-audits now that terrain coupling is active in the browser worker",
-    "orographic realism still needs direct validation: mountain precipitation structure, upslope lift organization, lee-side drying, and storm interaction with terrain all need fresh evidence",
-    "runtime smoothness is still not signed off; any further smoothness-only work must start from fresh hotspot attribution again",
+    "broader Earth-like realism still needs explicit mature-window re-audits with the weaker terrain-coupling default active in the live app",
+    "orographic realism improved but is not solved: Andes mature-window precipRatio is still below 1.0 and the regional quartile split still samples all-negative terrain-flow cells",
+    "runtime smoothness is still not signed off; the latest live run again produced a degraded runtime summary with lineCount = 0",
     "world-class status still requires realism and smoothness to pass in the same fresh live run"
   ],
   "cycleInputs": [
@@ -32,31 +32,59 @@
   ],
   "latestTelemetry": {
     "singleTabLocalhostVerified": true,
-    "terrainRestored": {
-      "preFix": {
-        "simLabel": "Day 0, 02:52",
-        "elevMaxM": 0,
-        "elevMeanM": 0
+    "localhostTabReuse": {
+      "url": "http://127.0.0.1:3000/",
+      "duplicatesClosed": 2,
+      "targetId": "3E78E7E81B1CCAC96E03A1E5C432C41E"
+    },
+    "orographicLiftScale": {
+      "before": 1,
+      "after": 0.5,
+      "andesPrecipRatio": {
+        "target75600": {
+          "before": 0.716436648707517,
+          "after": 0.835310350824286
+        },
+        "target105480": {
+          "before": 0.7384526773835948,
+          "after": 0.8217498365959043
+        }
       },
-      "postFix": {
-        "earlySimLabel": "Day 0, 01:28",
-        "matureSimLabel": "Day 1, 09:06",
-        "elevMaxM": 3825.272216796875,
-        "elevMeanAwM": 321.8599749604572,
-        "elevLandMeanM": 894.6691136512364,
-        "elevOceanMaxM": 0,
-        "landFrac": 0.35975308641975307
+      "andesTerrainOmegaLowContrast": {
+        "target75600": {
+          "before": -9.199703158281975,
+          "after": -4.608054369720954
+        },
+        "target105480": {
+          "before": -9.1853239695012,
+          "after": -4.601889062563846
+        }
+      },
+      "rockiesPrecipRatio": {
+        "target75600": {
+          "before": 1.2021258060759417,
+          "after": 1.2983544331221624
+        },
+        "target105480": {
+          "before": 1.209725009789817,
+          "after": 1.2861143216809838
+        }
       }
     },
     "runtimeSummary": {
       "lineCount": 0,
       "validationSnapshotCount": 0,
       "warnings": []
+    },
+    "browserObservation": {
+      "singlePlayerLoaded": true,
+      "simLabel": "Day 0, 00:38",
+      "note": "reused canonical localhost tab reached in-game globe view with weather layers active and no obvious immediate terrain-coupling regression"
     }
   },
   "defaultNextPriority": [
-    "re-audit the highest-leverage remaining realism weakness now that browser terrain coupling is restored, prioritizing mountain/orographic precipitation and terrain-shaped storm structure",
-    "keep realism-first discipline: use the mature live window to verify circulation, clouds, precipitation, and vertical coupling instead of drifting into smoothness-only tweaks",
+    "stay on orographic realism and re-audit the Andes with the weaker default lift coupling active, prioritizing the remaining terrain-flow-sign / sampling mismatch",
+    "verify the same blocker family in a mature browser window once a candidate deserves it instead of recollecting duplicate early baselines",
     "when smoothness becomes the blocker again, collect fresh hotspot attribution before changing renderer or worker performance behavior",
     "keep validation on the clean world-class checkout only"
   ],

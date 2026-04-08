@@ -257,6 +257,7 @@ export class WeatherCore5 {
       verticalAdvectionCflMax: 0.4,
       dThetaMaxVertAdvPerStep: 2.0,
       enableOmegaMassFix: true,
+      orographicLiftScale: 0.5,
       eps: 1e-12,
       debugConservation: false
     };
