@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { WeatherCore5 } from '../../src/weather/v2/core5.js';
 import { applyHeadlessTerrainFixture } from './headless-terrain-fixture.mjs';
 
@@ -63,6 +63,35 @@ const mean = (entries, selector) => (
     : 0
 );
 
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const P0 = 100000;
+const KAPPA = 287.05 / 1004;
+const saturationMixingRatio = (T, p) => {
+  const Tuse = clamp(T, 180, 330);
+  const Tc = Tuse - 273.15;
+  const es = 610.94 * Math.exp((17.625 * Tc) / (Tc + 243.04));
+  const esClamped = Math.min(es, 0.95 * p);
+  const eps = 0.622;
+  const qs = (eps * esClamped) / Math.max(1, p - esClamped);
+  return Math.min(qs, 0.2);
+};
+
+const getRhLow = ({ fields, state, k, idxS }) => {
+  if (fields?.RH && Number.isFinite(fields.RH[k])) {
+    return fields.RH[k];
+  }
+  const p = Math.max(20000, state.pMid[idxS]);
+  const theta = state.theta?.[idxS];
+  const T = Number.isFinite(state.T?.[idxS])
+    ? state.T[idxS]
+    : Number.isFinite(theta)
+      ? theta * Math.pow(p / P0, KAPPA)
+      : NaN;
+  if (!Number.isFinite(T)) return 0;
+  const qs = saturationMixingRatio(T, p);
+  return clamp(state.qv[idxS] / Math.max(1e-8, qs), 0, 2);
+};
+
 const applyOverrides = (core, nextOverrides) => {
   const buckets = [
     'vertParams',
@@ -96,7 +125,7 @@ const summarizeGroup = (entries) => ({
   omegaSurfaceMean: mean(entries, (entry) => entry.omegaSurface)
 });
 
-function summarizeCore(core, targetSeconds) {
+export function summarizeCore(core, targetSeconds) {
   const { grid, state, fields, geo } = core;
   const { nx, ny, invDx, invDy, latDeg, lonDeg } = grid;
   const { N, nz, u, v, qv, qc, qr, pMid, soilW, soilCap, omega } = state;
@@ -139,7 +168,7 @@ function summarizeCore(core, targetSeconds) {
         qcLow: qc[idxS],
         qrLow: qr[idxS],
         qvLow: qv[idxS],
-        rhLow: fields.rh3D ? fields.rh3D[idxS] : 0,
+        rhLow: getRhLow({ fields, state, k, idxS }),
         soilFrac,
         pLow: pMid[idxS],
         elev: elev[k],
@@ -210,78 +239,86 @@ function summarizeCore(core, targetSeconds) {
   };
 }
 
-const startedAtMs = Date.now();
-const timings = {
-  initMs: null,
-  terrainFallbackMs: null,
-  totalMs: null,
-  targets: []
-};
+export async function main() {
+  const startedAtMs = Date.now();
+  const timings = {
+    initMs: null,
+    terrainFallbackMs: null,
+    totalMs: null,
+    targets: []
+  };
 
-console.error(`[orographic-audit] init start seed=${seed} targets=${targets.join(',')}`);
-const initStartedAtMs = Date.now();
-const core = new WeatherCore5({ seed });
-await core._initPromise;
-timings.initMs = Date.now() - initStartedAtMs;
-console.error(`[orographic-audit] init complete in ${timings.initMs} ms`);
+  console.error(`[orographic-audit] init start seed=${seed} targets=${targets.join(',')}`);
+  const initStartedAtMs = Date.now();
+  const core = new WeatherCore5({ seed });
+  await core._initPromise;
+  timings.initMs = Date.now() - initStartedAtMs;
+  console.error(`[orographic-audit] init complete in ${timings.initMs} ms`);
 
-const terrainFallbackStartedAtMs = Date.now();
-const terrainFallback = applyHeadlessTerrainFixture(core);
-timings.terrainFallbackMs = Date.now() - terrainFallbackStartedAtMs;
-console.error(
-  `[orographic-audit] terrain source=${terrainFallback.source} applied=${terrainFallback.applied} ` +
-  `samples=${terrainFallback.after?.terrainSampleCount ?? 0} elevMax=${(terrainFallback.after?.elevMax ?? 0).toFixed(2)} ` +
-  `in ${timings.terrainFallbackMs} ms`
-);
-
-applyOverrides(core, overrides);
-
-const snapshots = [];
-for (const targetSeconds of targets) {
-  const targetStartedAtMs = Date.now();
-  const advanceSeconds = Math.max(0, targetSeconds - core.timeUTC);
-  console.error(`[orographic-audit] target=${targetSeconds} advanceSeconds=${advanceSeconds}`);
-  if (targetSeconds > core.timeUTC) {
-    core.advanceModelSeconds(targetSeconds - core.timeUTC);
-  }
-  const summarizeStartedAtMs = Date.now();
-  const snapshot = summarizeCore(core, targetSeconds);
-  const finishedAtMs = Date.now();
-  timings.targets.push({
-    targetSeconds,
-    advanceMs: summarizeStartedAtMs - targetStartedAtMs,
-    summarizeMs: finishedAtMs - summarizeStartedAtMs,
-    totalMs: finishedAtMs - targetStartedAtMs,
-    terrainSampleCount: snapshot.global?.terrainSampleCount ?? 0
-  });
+  const terrainFallbackStartedAtMs = Date.now();
+  const terrainFallback = applyHeadlessTerrainFixture(core);
+  timings.terrainFallbackMs = Date.now() - terrainFallbackStartedAtMs;
   console.error(
-    `[orographic-audit] target=${targetSeconds} done totalMs=${finishedAtMs - targetStartedAtMs} ` +
-    `terrainSampleCount=${snapshot.global?.terrainSampleCount ?? 0}`
+    `[orographic-audit] terrain source=${terrainFallback.source} applied=${terrainFallback.applied} ` +
+    `samples=${terrainFallback.after?.terrainSampleCount ?? 0} elevMax=${(terrainFallback.after?.elevMax ?? 0).toFixed(2)} ` +
+    `in ${timings.terrainFallbackMs} ms`
   );
-  snapshots.push(snapshot);
+
+  applyOverrides(core, overrides);
+
+  const snapshots = [];
+  for (const targetSeconds of targets) {
+    const targetStartedAtMs = Date.now();
+    const advanceSeconds = Math.max(0, targetSeconds - core.timeUTC);
+    console.error(`[orographic-audit] target=${targetSeconds} advanceSeconds=${advanceSeconds}`);
+    if (targetSeconds > core.timeUTC) {
+      core.advanceModelSeconds(targetSeconds - core.timeUTC);
+    }
+    const summarizeStartedAtMs = Date.now();
+    const snapshot = summarizeCore(core, targetSeconds);
+    const finishedAtMs = Date.now();
+    timings.targets.push({
+      targetSeconds,
+      advanceMs: summarizeStartedAtMs - targetStartedAtMs,
+      summarizeMs: finishedAtMs - summarizeStartedAtMs,
+      totalMs: finishedAtMs - targetStartedAtMs,
+      terrainSampleCount: snapshot.global?.terrainSampleCount ?? 0
+    });
+    console.error(
+      `[orographic-audit] target=${targetSeconds} done totalMs=${finishedAtMs - targetStartedAtMs} ` +
+      `terrainSampleCount=${snapshot.global?.terrainSampleCount ?? 0}`
+    );
+    snapshots.push(snapshot);
+  }
+
+  timings.totalMs = Date.now() - startedAtMs;
+
+  const summary = {
+    schema: 'satellite-wars.orographic-audit.v1',
+    generatedAt: new Date().toISOString(),
+    seed,
+    overrides,
+    targets,
+    headlessTerrainSource: terrainFallback.source,
+    headlessTerrainFixture: terrainFallback,
+    headlessTerrainParity: snapshots.some((snapshot) => (snapshot.global?.terrainSampleCount || 0) > 0),
+    warnings: snapshots.some((snapshot) => (snapshot.global?.terrainSampleCount || 0) > 0)
+      ? []
+      : ['headless_terrain_unavailable'],
+    timings,
+    snapshots
+  };
+
+  if (outPath) {
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    fs.writeFileSync(outPath, `${JSON.stringify(summary, null, 2)}\n`);
+  }
+
+  process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+  return summary;
 }
 
-timings.totalMs = Date.now() - startedAtMs;
-
-const summary = {
-  schema: 'satellite-wars.orographic-audit.v1',
-  generatedAt: new Date().toISOString(),
-  seed,
-  overrides,
-  targets,
-  headlessTerrainSource: terrainFallback.source,
-  headlessTerrainFixture: terrainFallback,
-  headlessTerrainParity: snapshots.some((snapshot) => (snapshot.global?.terrainSampleCount || 0) > 0),
-  warnings: snapshots.some((snapshot) => (snapshot.global?.terrainSampleCount || 0) > 0)
-    ? []
-    : ['headless_terrain_unavailable'],
-  timings,
-  snapshots
-};
-
-if (outPath) {
-  fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, `${JSON.stringify(summary, null, 2)}\n`);
+const isMain = Boolean(process.argv[1]) && pathToFileURL(process.argv[1]).href === import.meta.url;
+if (isMain) {
+  await main();
 }
-
-process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
