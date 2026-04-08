@@ -2,7 +2,7 @@
 import fs from 'fs';
 import http from 'http';
 import path from 'path';
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -56,6 +56,14 @@ if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const readTextIfExists = (filePath) => {
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch (_) {
+    return null;
+  }
+};
+
 const readJsonIfExists = (filePath) => {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -73,6 +81,51 @@ const deleteFileIfExists = (filePath) => {
   try {
     fs.unlinkSync(filePath);
   } catch (_) {}
+};
+
+const listListeningPids = (listenPort) => {
+  const result = spawnSync(
+    'lsof',
+    ['-nP', `-iTCP:${listenPort}`, '-sTCP:LISTEN', '-Fp'],
+    { encoding: 'utf8' }
+  );
+  if (result.status !== 0 || !result.stdout) {
+    return [];
+  }
+  return result.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('p'))
+    .map((line) => Number.parseInt(line.slice(1), 10))
+    .filter((pid) => Number.isFinite(pid) && pid > 0);
+};
+
+const readPidCommand = (pid) => {
+  if (!Number.isFinite(pid) || pid <= 0) return null;
+  const result = spawnSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' });
+  if (result.status !== 0) return null;
+  return result.stdout.trim() || null;
+};
+
+const readPidCwd = (pid) => {
+  if (!Number.isFinite(pid) || pid <= 0) return null;
+  const result = spawnSync('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'], { encoding: 'utf8' });
+  if (result.status !== 0 || !result.stdout) return null;
+  const line = result.stdout.split('\n').map((entry) => entry.trim()).find((entry) => entry.startsWith('n'));
+  return line ? line.slice(1) : null;
+};
+
+const describePortListeners = (listenPort) => listListeningPids(listenPort).map((pid) => ({
+  pid,
+  command: readPidCommand(pid),
+  cwd: readPidCwd(pid)
+}));
+
+const assertPortAvailable = (listenPort, allowedPid = null) => {
+  const listeners = describePortListeners(listenPort).filter((entry) => entry.pid !== allowedPid);
+  if (!listeners.length) return;
+  const detail = listeners.map((entry) => `${entry.pid}:${entry.command || 'unknown'} cwd=${entry.cwd || 'unknown'}`).join(', ');
+  throw new Error(`Port ${listenPort} is already owned by another process: ${detail}`);
 };
 
 const processAlive = (pid) => {
@@ -120,6 +173,20 @@ const requestOk = (url) => new Promise((resolve, reject) => {
   });
   req.on('error', reject);
 });
+
+const waitForPortOwnedByRepo = async (listenPort, expectedCwd, maxWaitMs) => {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < maxWaitMs) {
+    const listeners = describePortListeners(listenPort);
+    const match = listeners.find((entry) => entry.cwd === expectedCwd);
+    if (match) {
+      return match;
+    }
+    await sleep(500);
+  }
+  const detail = describePortListeners(listenPort).map((entry) => `${entry.pid}:${entry.command || 'unknown'} cwd=${entry.cwd || 'unknown'}`).join(', ') || 'none';
+  throw new Error(`Timed out waiting for a ${expectedCwd} process to own port ${listenPort}; current listeners: ${detail}`);
+};
 
 const waitForJsonEndpoint = async (url, maxWaitMs) => {
   const startedAt = Date.now();
@@ -172,6 +239,13 @@ const stopExistingProcess = async (state) => {
   return true;
 };
 
+const failIfPortCollisionLogged = (listenPort) => {
+  const logText = readTextIfExists(logPath) || '';
+  if (new RegExp(`already running on port ${listenPort}`, 'i').test(logText)) {
+    throw new Error(`Dev server reported port ${listenPort} collision. Log: ${logPath}`);
+  }
+};
+
 const existingState = readJsonIfExists(statePath);
 if (stop) {
   const stopped = await stopExistingProcess(existingState);
@@ -201,6 +275,9 @@ if (!restart && existingState?.pid && processAlive(existingState.pid)) {
   await stopExistingProcess(existingState);
 }
 
+assertPortAvailable(port);
+assertPortAvailable(weatherLogPort);
+
 fs.mkdirSync(path.dirname(logPath), { recursive: true });
 const outFd = fs.openSync(logPath, 'w');
 const child = spawn(process.execPath, ['scripts/dev.js'], {
@@ -219,23 +296,40 @@ const child = spawn(process.execPath, ['scripts/dev.js'], {
 child.unref();
 fs.closeSync(outFd);
 
-await waitForOkEndpoint(appUrl, timeoutMs);
-const session = await waitForJsonEndpoint(sessionUrl, timeoutMs);
-const state = {
-  schema: 'satellite-wars.agent-dev-server.v1',
-  pid: child.pid,
-  host,
-  port,
-  url: appUrl,
-  sessionUrl,
-  logPath,
-  statePath,
-  weatherLogPort,
-  weatherLogPath: session?.filename ? path.resolve(repoRoot, session.filename) : null,
-  weatherLogRunId: session?.runId ?? null,
-  weatherLogStartedAtUtc: session?.startedAtUtc ?? null,
-  startedAt: new Date().toISOString(),
-  branch: 'codex/world-class-weather-loop'
-};
-writeJson(statePath, state);
-process.stdout.write(`${JSON.stringify({ status: 'started', reused: false, state }, null, 2)}\n`);
+try {
+  await waitForOkEndpoint(appUrl, timeoutMs);
+  failIfPortCollisionLogged(port);
+  const appOwner = await waitForPortOwnedByRepo(port, repoRoot, timeoutMs);
+  const session = await waitForJsonEndpoint(sessionUrl, timeoutMs);
+  const sessionOwner = await waitForPortOwnedByRepo(weatherLogPort, repoRoot, timeoutMs);
+  const state = {
+    schema: 'satellite-wars.agent-dev-server.v1',
+    pid: child.pid,
+    host,
+    port,
+    url: appUrl,
+    sessionUrl,
+    logPath,
+    statePath,
+    weatherLogPort,
+    weatherLogPath: session?.filename ? path.resolve(repoRoot, session.filename) : null,
+    weatherLogRunId: session?.runId ?? null,
+    weatherLogStartedAtUtc: session?.startedAtUtc ?? null,
+    appOwnerPid: appOwner?.pid ?? null,
+    appOwnerCommand: appOwner?.command ?? null,
+    appOwnerCwd: appOwner?.cwd ?? null,
+    sessionOwnerPid: sessionOwner?.pid ?? null,
+    sessionOwnerCommand: sessionOwner?.command ?? null,
+    sessionOwnerCwd: sessionOwner?.cwd ?? null,
+    startedAt: new Date().toISOString(),
+    branch: 'codex/world-class-weather-loop'
+  };
+  writeJson(statePath, state);
+  process.stdout.write(`${JSON.stringify({ status: 'started', reused: false, state }, null, 2)}\n`);
+} catch (error) {
+  try {
+    process.kill(child.pid, 'SIGTERM');
+  } catch (_) {}
+  deleteFileIfExists(statePath);
+  throw error;
+}
