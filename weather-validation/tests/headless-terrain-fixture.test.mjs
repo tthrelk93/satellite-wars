@@ -16,6 +16,9 @@ test('headless terrain fixture restores nonzero terrain to node WeatherCore5 aud
 
   assert.equal(result.applied, true);
   assert.equal(result.source, 'fixture');
+  assert.equal(after.terrainSampleCount, result.fixtureStats.terrainSampleCount);
+  assert.equal(after.landFrac, result.fixtureStats.landFrac);
+  assert.equal(after.elevMax, result.fixtureStats.elevMax);
   assert.ok(after.terrainSampleCount > 1000, `expected many terrain samples, got ${after.terrainSampleCount}`);
   assert.ok(after.elevMax > 3000, `expected realistic mountain height, got ${after.elevMax}`);
   assert.ok(after.landFrac > 0.2 && after.landFrac < 0.6, `unexpected land fraction ${after.landFrac}`);

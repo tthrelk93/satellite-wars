@@ -48,12 +48,28 @@ const sampleBilinear = (source, srcW, srcH, x, y) => {
   return v0 * (1 - ty) + v1 * ty;
 };
 
+const mapDestIndexToSourceCoord = (index, srcSize, dstSize) => {
+  if (dstSize <= 1 || srcSize <= 1) return 0;
+  return (index / (dstSize - 1)) * (srcSize - 1);
+};
+
 const resampleScalarField = (source, srcW, srcH, dstW, dstH, { clampMin = null, clampMax = null } = {}) => {
+  if (srcW === dstW && srcH === dstH) {
+    const out = Float32Array.from(source);
+    if (Number.isFinite(clampMin) || Number.isFinite(clampMax)) {
+      for (let i = 0; i < out.length; i += 1) {
+        if (Number.isFinite(clampMin)) out[i] = Math.max(clampMin, out[i]);
+        if (Number.isFinite(clampMax)) out[i] = Math.min(clampMax, out[i]);
+      }
+    }
+    return out;
+  }
+
   const out = new Float32Array(dstW * dstH);
   for (let j = 0; j < dstH; j += 1) {
-    const y = dstH > 1 ? (j / dstH) * (srcH - 1) : 0;
+    const y = mapDestIndexToSourceCoord(j, srcH, dstH);
     for (let i = 0; i < dstW; i += 1) {
-      const x = dstW > 1 ? (i / dstW) * (srcW - 1) : 0;
+      const x = mapDestIndexToSourceCoord(i, srcW, dstW);
       let value = sampleBilinear(source, srcW, srcH, x, y);
       if (Number.isFinite(clampMin)) value = Math.max(clampMin, value);
       if (Number.isFinite(clampMax)) value = Math.min(clampMax, value);
@@ -64,11 +80,15 @@ const resampleScalarField = (source, srcW, srcH, dstW, dstH, { clampMin = null, 
 };
 
 const resampleMaskField = (source, srcW, srcH, dstW, dstH) => {
+  if (srcW === dstW && srcH === dstH) {
+    return Uint8Array.from(source);
+  }
+
   const out = new Uint8Array(dstW * dstH);
   for (let j = 0; j < dstH; j += 1) {
-    const y = dstH > 1 ? (j / dstH) * (srcH - 1) : 0;
+    const y = mapDestIndexToSourceCoord(j, srcH, dstH);
     for (let i = 0; i < dstW; i += 1) {
-      const x = dstW > 1 ? (i / dstW) * (srcW - 1) : 0;
+      const x = mapDestIndexToSourceCoord(i, srcW, dstW);
       const value = sampleBilinear(source, srcW, srcH, x, y);
       out[j * dstW + i] = value >= 0.5 ? 1 : 0;
     }
