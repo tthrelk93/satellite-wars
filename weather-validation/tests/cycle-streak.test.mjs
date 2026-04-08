@@ -18,6 +18,11 @@ const writeCheckpoint = (dirPath, text) => {
   fs.writeFileSync(path.join(dirPath, 'checkpoint.md'), text);
 };
 
+const writeText = (filePath, text) => {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, text);
+};
+
 const runSummary = (rootDir) => JSON.parse(execFileSync(
   process.execPath,
   [scriptPath, '--limit', '8'],
@@ -93,4 +98,38 @@ test('surfaces abandoned incomplete cycles even when there is no current active 
     ['cycle-2026-04-07T23-05-00Z-orographic-warm-rain-terrain']
   );
   assert.equal(summary.recentCycles[0].id, 'cycle-2026-04-08T00-17-23Z-headless-terrain-parity-harness');
+});
+
+test('triggers the physics guard after two consecutive non-physics commits', () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cycle-streak-physics-guard-'));
+  const outputDir = path.join(rootDir, 'weather-validation', 'output');
+  const reportsDir = path.join(rootDir, 'weather-validation', 'reports');
+  fs.mkdirSync(outputDir, { recursive: true });
+  fs.mkdirSync(reportsDir, { recursive: true });
+  writeJson(path.join(reportsDir, 'world-class-weather-status.json'), {});
+
+  execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.name', 'Test Agent'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: rootDir, stdio: 'ignore' });
+
+  writeText(path.join(rootDir, 'src', 'Earth.js'), 'export const earth = 1;\n');
+  execFileSync('git', ['add', '.'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['commit', '-m', 'physics commit'], { cwd: rootDir, stdio: 'ignore' });
+
+  writeText(path.join(rootDir, 'scripts', 'agent', 'probe.mjs'), 'export const probe = 1;\n');
+  execFileSync('git', ['add', '.'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['commit', '-m', 'diagnostic commit'], { cwd: rootDir, stdio: 'ignore' });
+
+  writeText(path.join(rootDir, 'weather-validation', 'tests', 'probe.test.mjs'), 'export const testProbe = 1;\n');
+  execFileSync('git', ['add', '.'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['commit', '-m', 'test commit'], { cwd: rootDir, stdio: 'ignore' });
+
+  const summary = runSummary(rootDir);
+  assert.equal(summary.physicsGuard.triggered, true);
+  assert.equal(summary.physicsGuard.consecutiveNonPhysicsCommits, 2);
+  assert.equal(summary.physicsGuard.lastPhysicsCommit?.subject, 'physics commit');
+  assert.match(
+    summary.recommendations.join('\n'),
+    /The next cycle must target real weather or performance code under src\//
+  );
 });

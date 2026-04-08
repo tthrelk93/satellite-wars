@@ -47,6 +47,88 @@ const readJsonIfExists = (filePath) => {
   }
 };
 
+const runGit = (args) => execFileSync(
+  'git',
+  args,
+  {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore']
+  }
+);
+
+const PHYSICS_TARGET_AREAS = [
+  'terrain-flow orientation',
+  'Andes sampling design',
+  'terrain/coupling interaction',
+  'precipitation placement/conversion after upslope moisture transport'
+];
+
+const NON_PHYSICS_PREFIXES = [
+  'scripts/agent/',
+  'weather-validation/tests/',
+  'weather-validation/output/',
+  'weather-validation/reports/'
+];
+
+const NON_PHYSICS_EXACT_PATHS = new Set([
+  'AGENTS.md',
+  'package.json',
+  '.gitignore'
+]);
+
+const isPhysicsSourcePath = (filePath) => (
+  filePath.startsWith('src/')
+  && !/\.test\.[cm]?[jt]sx?$/.test(filePath)
+);
+
+const isKnownNonPhysicsPath = (filePath) => (
+  NON_PHYSICS_EXACT_PATHS.has(filePath)
+  || NON_PHYSICS_PREFIXES.some((prefix) => filePath.startsWith(prefix))
+);
+
+const parseCommitFiles = (commitHash) => {
+  try {
+    const output = runGit(['-C', repoRoot, 'show', '--name-only', '--format=', commitHash]);
+    return output
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+};
+
+const classifyCommit = (files) => {
+  if (files.some(isPhysicsSourcePath)) return 'physics';
+  if (files.length > 0 && files.every(isKnownNonPhysicsPath)) return 'non_physics';
+  return 'mixed';
+};
+
+const readRecentCommits = (count) => {
+  try {
+    const output = runGit(['-C', repoRoot, 'log', `-n${count}`, '--format=%H%x09%ct%x09%s']);
+    return output
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [hash, unixTs, subject] = line.split('\t');
+        const files = parseCommitFiles(hash);
+        const committedAtMs = Number.parseInt(unixTs, 10) * 1000;
+        return {
+          hash,
+          short: hash.slice(0, 7),
+          subject,
+          committedAt: Number.isFinite(committedAtMs) ? new Date(committedAtMs).toISOString() : null,
+          files,
+          classification: classifyCommit(files)
+        };
+      });
+  } catch (_) {
+    return [];
+  }
+};
+
 const cycleDirs = fs.existsSync(outputDir)
   ? fs.readdirSync(outputDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith('cycle-'))
@@ -142,11 +224,9 @@ let baselineCommitInfo = null;
 
 if (baselineCommit) {
   try {
-    const raw = execFileSync(
-      'git',
-      ['-C', repoRoot, 'show', '-s', '--format=%H%n%ct%n%s', baselineCommit],
-      { encoding: 'utf8' }
-    ).trim().split('\n');
+    const raw = runGit(['-C', repoRoot, 'show', '-s', '--format=%H%n%ct%n%s', baselineCommit])
+      .trim()
+      .split('\n');
     const [, unixTs, subject] = raw;
     const commitTimeMs = Number.parseInt(unixTs, 10) * 1000;
     baselineCommitInfo = {
@@ -159,6 +239,14 @@ if (baselineCommit) {
     };
   } catch (_) {}
 }
+
+const recentCommits = readRecentCommits(Math.max(limit, 10));
+const consecutiveNonPhysicsCommits = countLeading(
+  recentCommits,
+  (commit) => commit.classification === 'non_physics'
+);
+const lastPhysicsCommit = recentCommits.find((commit) => commit.classification === 'physics') || null;
+const physicsGuardTriggered = consecutiveNonPhysicsCommits >= 2;
 
 const soft = consecutiveNoProgress >= 3 || sameFamilyNoProgress >= 3 || emptyRuntimeSummaryStreak >= 2;
 const hard = consecutiveNoProgress >= 6 || sameFamilyNoProgress >= 5;
@@ -183,6 +271,11 @@ if (soft) {
 if (hard) {
   recommendations.push('Do not continue ordinary experimentation. Land a new permanent diagnostic/harness improvement or keep the cron job disabled.');
 }
+if (physicsGuardTriggered) {
+  recommendations.push(`The next cycle must target real weather or performance code under src/ and choose one focus area: ${PHYSICS_TARGET_AREAS.join('; ')}.`);
+  recommendations.push('Diagnostic-only commits are allowed only if they unblock a named physics hypothesis that the same cycle could not test.');
+  recommendations.push('If the current cycle cannot land a verified physics/weather fix, disable the cron job instead of committing another non-physics change.');
+}
 
 const summary = {
   schema: 'satellite-wars.cycle-streak.v1',
@@ -204,6 +297,13 @@ const summary = {
   stallGuardTriggered: {
     soft,
     hard
+  },
+  physicsGuard: {
+    triggered: physicsGuardTriggered,
+    consecutiveNonPhysicsCommits,
+    requiredTargetAreas: PHYSICS_TARGET_AREAS,
+    lastPhysicsCommit,
+    recentCommits
   },
   recommendations,
   recentCycles: cycles

@@ -13,6 +13,11 @@ Use this playbook when the worker has gone multiple cycles without a verified im
 ## Required blocker-breaker protocol
 
 1. Run `npm run agent:cycle-streak` first and read the last 4 relevant checkpoints before picking the next move.
+   - If `physicsGuard.triggered = true`, the next move must name one concrete physics target area:
+     - `terrain-flow orientation`
+     - `Andes sampling design`
+     - `terrain/coupling interaction`
+     - `precipitation placement/conversion after upslope moisture transport`
 2. If reusable tooling exists only inside a cycle-local artifact, promote it into `scripts/agent/` before running another ordinary experiment.
 3. If the blocker is mountain/orographic realism, start with `npm run agent:orographic-audit -- --targets 75600,105480`.
    - If that audit reports `terrainSampleCount = 0`, headless terrain parity is not trustworthy yet. Treat that as a tooling blocker and either fix headless climatology parity or fall back to `npm run agent:orographic-probe-cdp` on the reused localhost page.
@@ -21,6 +26,13 @@ Use this playbook when the worker has gone multiple cycles without a verified im
 6. One browser verification run per cycle maximum. If tab reuse or the CDP probe hangs longer than 90 seconds, stop, inspect browser target state once, and continue offline.
 7. Treat `runtime-summary.json -> lineCount = 0` as a degraded logging pipeline. Do not wait on runtime-log evidence that cycle unless you are explicitly fixing the logging path.
 8. Do not repeat the same file-family tweak unless the new cycle has a new permanent metric, new permanent tooling, or a clearly different hypothesis than the prior failed checkpoints.
+9. If `physicsGuard.triggered = true`, a commit that changes only `scripts/agent/*`, tests, reports, prompts, or package metadata does not satisfy the cycle. Touch real app/weather code under `src/` or disable the cron job.
+
+## Diagnostic-only commit rule
+
+- Diagnostic-only commits are allowed only if they unblock a named physics hypothesis that the same cycle could not test.
+- The checkpoint must say what physics hypothesis was attempted, what new blocker prevented the actual `src/` change, and why the new tooling removes that blocker for the very next cycle.
+- If the cycle cannot make that case clearly, it must end as `NO NEW VERIFIED PROGRESS` or disable cron rather than creating another diagnostic-only commit.
 
 ## Validation ladder
 
@@ -38,3 +50,9 @@ The next cycle must do one of these:
 - land a new permanent diagnostic or harness improvement,
 - land a verified code fix, or
 - keep the cron job disabled instead of burning more cycles
+
+If `npm run agent:cycle-streak` reports `physicsGuard.triggered = true`, tighten that further:
+
+- prefer a verified weather/performance fix in `src/`,
+- allow a diagnostic-only commit only under the rule above,
+- after 2 consecutive non-physics commits, if the cycle still cannot land a `src/` fix, disable cron instead of taking another tooling-only win.
