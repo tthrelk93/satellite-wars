@@ -38,6 +38,19 @@ test('recoverInterruptedCycle is a no-op when there is no active cycle', () => {
   assert.equal(result.reason, 'no_active_cycle');
 });
 
+test('recoverInterruptedCycle surfaces a dirty worktree when no active cycle exists', () => {
+  const repoRoot = initTempRepo();
+  const outputDir = path.join(repoRoot, 'weather-validation', 'output');
+  fs.mkdirSync(outputDir, { recursive: true });
+  fs.writeFileSync(path.join(repoRoot, 'src', 'weather', 'v2', 'vertical5.js'), 'export const value = 3;\n');
+
+  const result = recoverInterruptedCycle({ repoRoot, outputDir });
+
+  assert.equal(result.recovered, false);
+  assert.equal(result.reason, 'dirty_worktree_without_active_cycle');
+  assert.deepEqual(result.dirtyTrackedPaths, ['src/weather/v2/vertical5.js']);
+});
+
 test('recoverInterruptedCycle closes the stale cycle, snapshots the patch, and restores tracked files', () => {
   const repoRoot = initTempRepo();
   const outputDir = path.join(repoRoot, 'weather-validation', 'output');

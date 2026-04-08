@@ -143,11 +143,20 @@ export function recoverInterruptedCycle({
   outputDir = defaultOutputDir,
   explicitCycleDir = process.env.SATELLITE_WARS_CYCLE_DIR || null
 } = {}) {
+  const dirtyTrackedPaths = listDirtyTrackedPaths(repoRoot);
   const cycleDir = explicitCycleDir
     ? path.resolve(explicitCycleDir)
     : findNewestActiveCycleDir(outputDir);
 
   if (!cycleDir) {
+    if (dirtyTrackedPaths.length) {
+      return {
+        schema: 'satellite-wars.recovered-cycle.v1',
+        recovered: false,
+        reason: 'dirty_worktree_without_active_cycle',
+        dirtyTrackedPaths
+      };
+    }
     return {
       schema: 'satellite-wars.recovered-cycle.v1',
       recovered: false,
@@ -156,7 +165,6 @@ export function recoverInterruptedCycle({
   }
 
   const cycleId = path.basename(cycleDir);
-  const dirtyTrackedPaths = listDirtyTrackedPaths(repoRoot);
   const dirtyPatch = readDirtyPatch(repoRoot, dirtyTrackedPaths);
   const patchPath = dirtyPatch
     ? path.join(cycleDir, 'interrupted-worktree.patch')

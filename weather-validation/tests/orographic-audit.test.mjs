@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { summarizeCore } from '../../scripts/agent/orographic-audit.mjs';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import {
+  summarizeCore,
+  prepareAtomicJsonOutput,
+  commitAtomicJsonOutput,
+  failAtomicJsonOutput
+} from '../../scripts/agent/orographic-audit.mjs';
 
 const makeMockCore = ({ useRhField }) => {
   const nx = 6;
@@ -151,4 +159,49 @@ test('summarizeCore separates terrain-forced omega from residual omega structure
   assert.ok(andes.omegaLowContrast > 0);
   assert.ok(Number.isFinite(andes.upslope.slopeFactorMean));
   assert.ok(Number.isFinite(andes.downslope.slopeFactorMean));
+});
+
+test('prepareAtomicJsonOutput removes stale final output until the fresh audit commits', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'satwars-orographic-audit-'));
+  const outPath = path.join(tempDir, 'candidate-terrain-directional-blend-050-audit.json');
+  fs.writeFileSync(outPath, JSON.stringify({ stale: true, overrides: { vertParams: { terrainDirectionalBlend: 0.5 } } }));
+
+  const outputState = prepareAtomicJsonOutput(outPath, {
+    seed: 12345,
+    targets: [75600, 105480],
+    overrides: { vertParams: { terrainDirectionalBlend: 0.05 } }
+  });
+
+  assert.ok(outputState);
+  assert.equal(fs.existsSync(outPath), false);
+  assert.equal(fs.existsSync(outputState.runningPath), true);
+  const runningState = JSON.parse(fs.readFileSync(outputState.runningPath, 'utf8'));
+  assert.equal(runningState.status, 'running');
+  assert.equal(runningState.overrides.vertParams.terrainDirectionalBlend, 0.05);
+
+  commitAtomicJsonOutput(outputState, {
+    schema: 'satellite-wars.orographic-audit.v1',
+    overrides: { vertParams: { terrainDirectionalBlend: 0.05 } }
+  });
+
+  assert.equal(fs.existsSync(outPath), true);
+  assert.equal(fs.existsSync(outputState.runningPath), false);
+  const written = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+  assert.equal(written.overrides.vertParams.terrainDirectionalBlend, 0.05);
+});
+
+test('failAtomicJsonOutput leaves failure state instead of stale final output', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'satwars-orographic-audit-fail-'));
+  const outPath = path.join(tempDir, 'candidate-terrain-directional-blend-050-audit.json');
+  fs.writeFileSync(outPath, JSON.stringify({ stale: true }));
+
+  const outputState = prepareAtomicJsonOutput(outPath, { seed: 7 });
+  failAtomicJsonOutput(outputState, new Error('boom'));
+
+  assert.equal(fs.existsSync(outPath), false);
+  assert.equal(fs.existsSync(outputState.tempPath), false);
+  assert.equal(fs.existsSync(outputState.runningPath), true);
+  const runningState = JSON.parse(fs.readFileSync(outputState.runningPath, 'utf8'));
+  assert.equal(runningState.status, 'failed');
+  assert.equal(runningState.error, 'boom');
 });

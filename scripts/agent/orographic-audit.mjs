@@ -87,6 +87,46 @@ const P0 = 100000;
 const KAPPA = 287.05 / 1004;
 const G = 9.81;
 const RD = 287.05;
+const toJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
+
+export function prepareAtomicJsonOutput(outFilePath, metadata = {}) {
+  if (!outFilePath) return null;
+  const finalPath = path.resolve(outFilePath);
+  const tempPath = `${finalPath}.tmp`;
+  const runningPath = `${finalPath}.running.json`;
+  fs.mkdirSync(path.dirname(finalPath), { recursive: true });
+  fs.rmSync(tempPath, { force: true });
+  fs.rmSync(finalPath, { force: true });
+  fs.writeFileSync(runningPath, toJson({
+    schema: 'satellite-wars.orographic-audit.running.v1',
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    outPath: finalPath,
+    ...metadata
+  }));
+  return { finalPath, tempPath, runningPath };
+}
+
+export function commitAtomicJsonOutput(outputState, value) {
+  if (!outputState) return;
+  fs.writeFileSync(outputState.tempPath, toJson(value));
+  fs.renameSync(outputState.tempPath, outputState.finalPath);
+  fs.rmSync(outputState.runningPath, { force: true });
+}
+
+export function failAtomicJsonOutput(outputState, error) {
+  if (!outputState) return;
+  fs.rmSync(outputState.tempPath, { force: true });
+  const message = error instanceof Error ? error.message : String(error);
+  fs.writeFileSync(outputState.runningPath, toJson({
+    schema: 'satellite-wars.orographic-audit.running.v1',
+    status: 'failed',
+    failedAt: new Date().toISOString(),
+    outPath: outputState.finalPath,
+    error: message
+  }));
+}
+
 const saturationMixingRatio = (T, p) => {
   const Tuse = clamp(T, 180, 330);
   const Tc = Tuse - 273.15;
@@ -317,6 +357,12 @@ export function summarizeCore(core, targetSeconds) {
 }
 
 export async function main() {
+  const outputState = prepareAtomicJsonOutput(outPath, {
+    seed,
+    targets,
+    overrides,
+    overridesFile
+  });
   const startedAtMs = Date.now();
   const timings = {
     initMs: null,
@@ -325,74 +371,75 @@ export async function main() {
     targets: []
   };
 
-  console.error(`[orographic-audit] init start seed=${seed} targets=${targets.join(',')}`);
-  const initStartedAtMs = Date.now();
-  const core = new WeatherCore5({ seed });
-  await core._initPromise;
-  timings.initMs = Date.now() - initStartedAtMs;
-  console.error(`[orographic-audit] init complete in ${timings.initMs} ms`);
+  try {
+    console.error(`[orographic-audit] init start seed=${seed} targets=${targets.join(',')}`);
+    const initStartedAtMs = Date.now();
+    const core = new WeatherCore5({ seed });
+    await core._initPromise;
+    timings.initMs = Date.now() - initStartedAtMs;
+    console.error(`[orographic-audit] init complete in ${timings.initMs} ms`);
 
-  const terrainFallbackStartedAtMs = Date.now();
-  const terrainFallback = applyHeadlessTerrainFixture(core);
-  timings.terrainFallbackMs = Date.now() - terrainFallbackStartedAtMs;
-  console.error(
-    `[orographic-audit] terrain source=${terrainFallback.source} applied=${terrainFallback.applied} ` +
-    `samples=${terrainFallback.after?.terrainSampleCount ?? 0} elevMax=${(terrainFallback.after?.elevMax ?? 0).toFixed(2)} ` +
-    `in ${timings.terrainFallbackMs} ms`
-  );
-
-  applyOverrides(core, overrides);
-
-  const snapshots = [];
-  for (const targetSeconds of targets) {
-    const targetStartedAtMs = Date.now();
-    const advanceSeconds = Math.max(0, targetSeconds - core.timeUTC);
-    console.error(`[orographic-audit] target=${targetSeconds} advanceSeconds=${advanceSeconds}`);
-    if (targetSeconds > core.timeUTC) {
-      core.advanceModelSeconds(targetSeconds - core.timeUTC);
-    }
-    const summarizeStartedAtMs = Date.now();
-    const snapshot = summarizeCore(core, targetSeconds);
-    const finishedAtMs = Date.now();
-    timings.targets.push({
-      targetSeconds,
-      advanceMs: summarizeStartedAtMs - targetStartedAtMs,
-      summarizeMs: finishedAtMs - summarizeStartedAtMs,
-      totalMs: finishedAtMs - targetStartedAtMs,
-      terrainSampleCount: snapshot.global?.terrainSampleCount ?? 0
-    });
+    const terrainFallbackStartedAtMs = Date.now();
+    const terrainFallback = applyHeadlessTerrainFixture(core);
+    timings.terrainFallbackMs = Date.now() - terrainFallbackStartedAtMs;
     console.error(
-      `[orographic-audit] target=${targetSeconds} done totalMs=${finishedAtMs - targetStartedAtMs} ` +
-      `terrainSampleCount=${snapshot.global?.terrainSampleCount ?? 0}`
+      `[orographic-audit] terrain source=${terrainFallback.source} applied=${terrainFallback.applied} ` +
+      `samples=${terrainFallback.after?.terrainSampleCount ?? 0} elevMax=${(terrainFallback.after?.elevMax ?? 0).toFixed(2)} ` +
+      `in ${timings.terrainFallbackMs} ms`
     );
-    snapshots.push(snapshot);
+
+    applyOverrides(core, overrides);
+
+    const snapshots = [];
+    for (const targetSeconds of targets) {
+      const targetStartedAtMs = Date.now();
+      const advanceSeconds = Math.max(0, targetSeconds - core.timeUTC);
+      console.error(`[orographic-audit] target=${targetSeconds} advanceSeconds=${advanceSeconds}`);
+      if (targetSeconds > core.timeUTC) {
+        core.advanceModelSeconds(targetSeconds - core.timeUTC);
+      }
+      const summarizeStartedAtMs = Date.now();
+      const snapshot = summarizeCore(core, targetSeconds);
+      const finishedAtMs = Date.now();
+      timings.targets.push({
+        targetSeconds,
+        advanceMs: summarizeStartedAtMs - targetStartedAtMs,
+        summarizeMs: finishedAtMs - summarizeStartedAtMs,
+        totalMs: finishedAtMs - targetStartedAtMs,
+        terrainSampleCount: snapshot.global?.terrainSampleCount ?? 0
+      });
+      console.error(
+        `[orographic-audit] target=${targetSeconds} done totalMs=${finishedAtMs - targetStartedAtMs} ` +
+        `terrainSampleCount=${snapshot.global?.terrainSampleCount ?? 0}`
+      );
+      snapshots.push(snapshot);
+    }
+
+    timings.totalMs = Date.now() - startedAtMs;
+
+    const summary = {
+      schema: 'satellite-wars.orographic-audit.v1',
+      generatedAt: new Date().toISOString(),
+      seed,
+      overrides,
+      targets,
+      headlessTerrainSource: terrainFallback.source,
+      headlessTerrainFixture: terrainFallback,
+      headlessTerrainParity: snapshots.some((snapshot) => (snapshot.global?.terrainSampleCount || 0) > 0),
+      warnings: snapshots.some((snapshot) => (snapshot.global?.terrainSampleCount || 0) > 0)
+        ? []
+        : ['headless_terrain_unavailable'],
+      timings,
+      snapshots
+    };
+
+    commitAtomicJsonOutput(outputState, summary);
+    process.stdout.write(toJson(summary));
+    return summary;
+  } catch (error) {
+    failAtomicJsonOutput(outputState, error);
+    throw error;
   }
-
-  timings.totalMs = Date.now() - startedAtMs;
-
-  const summary = {
-    schema: 'satellite-wars.orographic-audit.v1',
-    generatedAt: new Date().toISOString(),
-    seed,
-    overrides,
-    targets,
-    headlessTerrainSource: terrainFallback.source,
-    headlessTerrainFixture: terrainFallback,
-    headlessTerrainParity: snapshots.some((snapshot) => (snapshot.global?.terrainSampleCount || 0) > 0),
-    warnings: snapshots.some((snapshot) => (snapshot.global?.terrainSampleCount || 0) > 0)
-      ? []
-      : ['headless_terrain_unavailable'],
-    timings,
-    snapshots
-  };
-
-  if (outPath) {
-    fs.mkdirSync(path.dirname(outPath), { recursive: true });
-    fs.writeFileSync(outPath, `${JSON.stringify(summary, null, 2)}\n`);
-  }
-
-  process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
-  return summary;
 }
 
 const isMain = Boolean(process.argv[1]) && pathToFileURL(process.argv[1]).href === import.meta.url;

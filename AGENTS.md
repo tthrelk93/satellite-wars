@@ -49,6 +49,7 @@ Concrete realism fix areas:
 Mandatory cycle protocol:
 1. Run `npm run agent:recover-interrupted-cycle` immediately after `npm run agent:cycle-streak`.
    - If it reports `recovered = true`, inspect the recovery artifacts, keep the recovered cycle closed, and start a fresh cycle directory instead of continuing inside the interrupted one.
+   - If it reports `reason = dirty_worktree_without_active_cycle`, do not continue the cycle. Treat that as a worker-state violation, inspect the dirty tracked files, restore the worktree to `HEAD`, and only then start a fresh cycle.
 2. Reassess the highest-leverage remaining realism weakness first, and only choose smoothness instead when the cycle selection rule allows it.
 3. Write a testable hypothesis and explicit pass/fail criteria in `plan.md`.
    - `plan.md` must exist before any heavy audit, browser, dev-server, or runtime-log command runs.
