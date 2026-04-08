@@ -40,6 +40,7 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'enableOmegaMassFix',
   'omegaMassFixSigmaTaperExp',
   'orographicLiftScale',
+  'orographicLeeSubsidenceScale',
   'orographicDecayFrac',
   'terrainSlopeRef',
   'eps',
@@ -122,6 +123,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     enableOmegaMassFix = true,
     omegaMassFixSigmaTaperExp = 2.0,
     orographicLiftScale = 1.0,
+    orographicLeeSubsidenceScale = 0.35,
     orographicDecayFrac = 0.35,
     terrainSlopeRef = 0.003,
 
@@ -217,7 +219,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         const idxS = levS * N + k;
         const nearSurfaceT = Math.max(180, T[idxS]);
         const rho = Math.max(0.2, pMid[idxS] / Math.max(1e-6, Rd * nearSurfaceT));
-        const wTerrain = (u[idxS] * slopeX + v[idxS] * slopeY) * slopeFactor;
+        const terrainNormalFlow = u[idxS] * slopeX + v[idxS] * slopeY;
+        const leeScale = clamp(orographicLeeSubsidenceScale, 0, 1);
+        const terrainFlowForcing = terrainNormalFlow >= 0
+          ? terrainNormalFlow
+          : terrainNormalFlow * leeScale;
+        const wTerrain = terrainFlowForcing * slopeFactor;
         const omegaTerrain = -rho * g * wTerrain * orographicLiftScale;
         for (let lev = 1; lev <= nz; lev++) {
           const decay = Math.exp(-Math.max(0, levS - (lev - 1)) * orographicDecayFrac);

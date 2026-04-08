@@ -109,3 +109,55 @@ test('stepVertical5 scales terrain-driven omega with orographicLiftScale', () =>
   assert.ok(weakMax > 0);
   assert.ok(strongMax > weakMax);
 });
+
+test('stepVertical5 damps lee-side terrain subsidence separately from upslope lift', () => {
+  const grid = makeGrid();
+  const sigmaHalf = createSigmaHalfLevels({ nz: 4 });
+  const elev = new Float32Array([1000, 1000, 1000, 0, 0, 0]);
+  const runCase = (vWind, orographicLeeSubsidenceScale) => {
+    const state = createState5({ grid, nz: 4, sigmaHalf });
+    state.ps.fill(100000);
+    state.theta.fill(290);
+    state.qv.fill(0.004);
+    updateHydrostatic(state, { pTop: 20000, terrainHeightM: elev });
+    const levS = state.nz - 1;
+    for (let k = 0; k < state.N; k += 1) {
+      state.u[levS * state.N + k] = 0;
+      state.v[levS * state.N + k] = vWind;
+    }
+    stepVertical5({
+      dt: 60,
+      grid,
+      state,
+      geo: { elev },
+      params: {
+        enableMixing: false,
+        enableConvection: false,
+        enableLargeScaleVerticalAdvection: false,
+        enableOmegaMassFix: false,
+        orographicLiftScale: 0.5,
+        orographicLeeSubsidenceScale
+      }
+    });
+    return state;
+  };
+
+  const upslope = runCase(20, 0.35);
+  const leeFull = runCase(-20, 1.0);
+  const leeDamped = runCase(-20, 0.35);
+  const leeOff = runCase(-20, 0.0);
+  let upslopeMin = 0;
+  let leeFullMax = 0;
+  let leeDampedMax = 0;
+  let leeOffMax = 0;
+  for (let i = 0; i < upslope.omega.length; i += 1) {
+    upslopeMin = Math.min(upslopeMin, upslope.omega[i]);
+    leeFullMax = Math.max(leeFullMax, leeFull.omega[i]);
+    leeDampedMax = Math.max(leeDampedMax, leeDamped.omega[i]);
+    leeOffMax = Math.max(leeOffMax, leeOff.omega[i]);
+  }
+  assert.ok(upslopeMin < 0);
+  assert.ok(leeFullMax > leeDampedMax);
+  assert.ok(leeDampedMax > leeOffMax);
+  assert.equal(leeOffMax, 0);
+});
