@@ -66,6 +66,8 @@ const mean = (entries, selector) => (
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const P0 = 100000;
 const KAPPA = 287.05 / 1004;
+const G = 9.81;
+const RD = 287.05;
 const saturationMixingRatio = (T, p) => {
   const Tuse = clamp(T, 180, 330);
   const Tc = Tuse - 273.15;
@@ -123,6 +125,11 @@ const summarizeGroup = (entries) => ({
   soilFracMean: mean(entries, (entry) => entry.soilFrac),
   pLowMean: mean(entries, (entry) => entry.pLow),
   elevMean: mean(entries, (entry) => entry.elev),
+  slopeFactorMean: mean(entries, (entry) => entry.slopeFactor),
+  terrainOmegaLowMean: mean(entries, (entry) => entry.terrainOmegaLow),
+  terrainOmegaSurfaceMean: mean(entries, (entry) => entry.terrainOmegaSurface),
+  omegaLowResidualMean: mean(entries, (entry) => entry.omegaLowResidual),
+  omegaSurfaceResidualMean: mean(entries, (entry) => entry.omegaSurfaceResidual),
   omegaLowMean: mean(entries, (entry) => entry.omegaLow),
   omegaSurfaceMean: mean(entries, (entry) => entry.omegaSurface)
 });
@@ -135,6 +142,15 @@ export function summarizeCore(core, targetSeconds) {
   const elev = geo.elev;
   const precip = fields.precipRate || state.precipRate;
   const cloudLow = fields.cloudLow;
+  const orographicLiftScale = Number.isFinite(core?.vertParams?.orographicLiftScale)
+    ? core.vertParams.orographicLiftScale
+    : 1.0;
+  const orographicDecayFrac = Number.isFinite(core?.vertParams?.orographicDecayFrac)
+    ? core.vertParams.orographicDecayFrac
+    : 0.35;
+  const terrainSlopeRef = Number.isFinite(core?.vertParams?.terrainSlopeRef)
+    ? core.vertParams.terrainSlopeRef
+    : 0.003;
 
   const terrain = [];
   const regions = [
@@ -164,6 +180,13 @@ export function summarizeCore(core, targetSeconds) {
       const cap = soilCap[k];
       const soilFrac = cap > 1e-6 ? soilW[k] / cap : 0;
       const terrainFlow = u[idxS] * slopeX + v[idxS] * slopeY;
+      const slopeFactor = clamp(slopeMag / Math.max(1e-6, terrainSlopeRef), 0, 3);
+      const nearSurfaceT = Math.max(180, state.T?.[idxS] ?? 0);
+      const rho = Math.max(0.2, pMid[idxS] / Math.max(1e-6, RD * nearSurfaceT));
+      const terrainOmegaSurface = -rho * G * terrainFlow * slopeFactor * orographicLiftScale;
+      const terrainOmegaLow = terrainOmegaSurface * Math.exp(-orographicDecayFrac);
+      const omegaLow = omega[levS * N + k];
+      const omegaSurface = omega[nz * N + k];
       const entry = {
         upslope: terrainFlow,
         moistureFluxNormal: terrainFlow * qv[idxS],
@@ -176,8 +199,13 @@ export function summarizeCore(core, targetSeconds) {
         soilFrac,
         pLow: pMid[idxS],
         elev: elev[k],
-        omegaLow: omega[levS * N + k],
-        omegaSurface: omega[nz * N + k],
+        slopeFactor,
+        terrainOmegaLow,
+        terrainOmegaSurface,
+        omegaLowResidual: omegaLow - terrainOmegaLow,
+        omegaSurfaceResidual: omegaSurface - terrainOmegaSurface,
+        omegaLow,
+        omegaSurface,
         lat: latDeg[j],
         lon: normLon(lonDeg[i])
       };
@@ -219,6 +247,10 @@ export function summarizeCore(core, targetSeconds) {
       elevRatio: mean(upslope, (entry) => entry.elev) / Math.max(1e-9, mean(downslope, (entry) => entry.elev)),
       terrainFlowContrast: mean(upslope, (entry) => entry.upslope) - mean(downslope, (entry) => entry.upslope),
       moistureFluxNormalContrast: mean(upslope, (entry) => entry.moistureFluxNormal) - mean(downslope, (entry) => entry.moistureFluxNormal),
+      terrainOmegaLowContrast: mean(upslope, (entry) => entry.terrainOmegaLow) - mean(downslope, (entry) => entry.terrainOmegaLow),
+      terrainOmegaSurfaceContrast: mean(upslope, (entry) => entry.terrainOmegaSurface) - mean(downslope, (entry) => entry.terrainOmegaSurface),
+      omegaLowResidualContrast: mean(upslope, (entry) => entry.omegaLowResidual) - mean(downslope, (entry) => entry.omegaLowResidual),
+      omegaSurfaceResidualContrast: mean(upslope, (entry) => entry.omegaSurfaceResidual) - mean(downslope, (entry) => entry.omegaSurfaceResidual),
       omegaLowContrast: mean(upslope, (entry) => entry.omegaLow) - mean(downslope, (entry) => entry.omegaLow),
       omegaSurfaceContrast: mean(upslope, (entry) => entry.omegaSurface) - mean(downslope, (entry) => entry.omegaSurface)
     };
@@ -240,6 +272,10 @@ export function summarizeCore(core, targetSeconds) {
       elevUpslopeVsDownslope: mean(high, (entry) => entry.elev) / Math.max(1e-9, mean(low, (entry) => entry.elev)),
       terrainFlowContrast: mean(high, (entry) => entry.upslope) - mean(low, (entry) => entry.upslope),
       moistureFluxNormalContrast: mean(high, (entry) => entry.moistureFluxNormal) - mean(low, (entry) => entry.moistureFluxNormal),
+      terrainOmegaLowContrast: mean(high, (entry) => entry.terrainOmegaLow) - mean(low, (entry) => entry.terrainOmegaLow),
+      terrainOmegaSurfaceContrast: mean(high, (entry) => entry.terrainOmegaSurface) - mean(low, (entry) => entry.terrainOmegaSurface),
+      omegaLowResidualContrast: mean(high, (entry) => entry.omegaLowResidual) - mean(low, (entry) => entry.omegaLowResidual),
+      omegaSurfaceResidualContrast: mean(high, (entry) => entry.omegaSurfaceResidual) - mean(low, (entry) => entry.omegaSurfaceResidual),
       omegaLowContrast: mean(high, (entry) => entry.omegaLow) - mean(low, (entry) => entry.omegaLow),
       omegaSurfaceContrast: mean(high, (entry) => entry.omegaSurface) - mean(low, (entry) => entry.omegaSurface)
     },

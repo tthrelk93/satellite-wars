@@ -125,3 +125,20 @@ test('summarizeCore reports terrain-flow and moisture-flux contrasts for orograp
   assert.ok(andes.terrainFlowContrast > 0);
   assert.ok(andes.moistureFluxNormalContrast > 0);
 });
+
+test('summarizeCore separates terrain-forced omega from residual omega structure', () => {
+  const summary = summarizeCore(makeMockCore({ useRhField: true }), 75600);
+  const andes = summary.regions.find((region) => region.name === 'Andes');
+
+  assert.ok(Number.isFinite(summary.global.terrainOmegaLowContrast));
+  assert.ok(Number.isFinite(summary.global.omegaLowResidualContrast));
+  assert.ok(andes);
+  assert.ok(andes.upslope.terrainOmegaLowMean < 0);
+  assert.ok(andes.downslope.terrainOmegaLowMean > 0);
+  assert.ok(andes.terrainOmegaLowContrast < 0);
+  assert.ok(andes.terrainOmegaSurfaceContrast < 0);
+  assert.ok(andes.omegaLowResidualContrast > 0);
+  assert.ok(andes.omegaLowContrast > 0);
+  assert.ok(Number.isFinite(andes.upslope.slopeFactorMean));
+  assert.ok(Number.isFinite(andes.downslope.slopeFactorMean));
+});
