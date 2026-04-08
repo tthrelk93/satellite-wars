@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { WeatherCore5 } from '../../src/weather/v2/core5.js';
+import { applyHeadlessTerrainFixture } from './headless-terrain-fixture.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -209,17 +210,58 @@ function summarizeCore(core, targetSeconds) {
   };
 }
 
+const startedAtMs = Date.now();
+const timings = {
+  initMs: null,
+  terrainFallbackMs: null,
+  totalMs: null,
+  targets: []
+};
+
+console.error(`[orographic-audit] init start seed=${seed} targets=${targets.join(',')}`);
+const initStartedAtMs = Date.now();
 const core = new WeatherCore5({ seed });
 await core._initPromise;
+timings.initMs = Date.now() - initStartedAtMs;
+console.error(`[orographic-audit] init complete in ${timings.initMs} ms`);
+
+const terrainFallbackStartedAtMs = Date.now();
+const terrainFallback = applyHeadlessTerrainFixture(core);
+timings.terrainFallbackMs = Date.now() - terrainFallbackStartedAtMs;
+console.error(
+  `[orographic-audit] terrain source=${terrainFallback.source} applied=${terrainFallback.applied} ` +
+  `samples=${terrainFallback.after?.terrainSampleCount ?? 0} elevMax=${(terrainFallback.after?.elevMax ?? 0).toFixed(2)} ` +
+  `in ${timings.terrainFallbackMs} ms`
+);
+
 applyOverrides(core, overrides);
 
 const snapshots = [];
 for (const targetSeconds of targets) {
+  const targetStartedAtMs = Date.now();
+  const advanceSeconds = Math.max(0, targetSeconds - core.timeUTC);
+  console.error(`[orographic-audit] target=${targetSeconds} advanceSeconds=${advanceSeconds}`);
   if (targetSeconds > core.timeUTC) {
     core.advanceModelSeconds(targetSeconds - core.timeUTC);
   }
-  snapshots.push(summarizeCore(core, targetSeconds));
+  const summarizeStartedAtMs = Date.now();
+  const snapshot = summarizeCore(core, targetSeconds);
+  const finishedAtMs = Date.now();
+  timings.targets.push({
+    targetSeconds,
+    advanceMs: summarizeStartedAtMs - targetStartedAtMs,
+    summarizeMs: finishedAtMs - summarizeStartedAtMs,
+    totalMs: finishedAtMs - targetStartedAtMs,
+    terrainSampleCount: snapshot.global?.terrainSampleCount ?? 0
+  });
+  console.error(
+    `[orographic-audit] target=${targetSeconds} done totalMs=${finishedAtMs - targetStartedAtMs} ` +
+    `terrainSampleCount=${snapshot.global?.terrainSampleCount ?? 0}`
+  );
+  snapshots.push(snapshot);
 }
+
+timings.totalMs = Date.now() - startedAtMs;
 
 const summary = {
   schema: 'satellite-wars.orographic-audit.v1',
@@ -227,10 +269,13 @@ const summary = {
   seed,
   overrides,
   targets,
+  headlessTerrainSource: terrainFallback.source,
+  headlessTerrainFixture: terrainFallback,
   headlessTerrainParity: snapshots.some((snapshot) => (snapshot.global?.terrainSampleCount || 0) > 0),
   warnings: snapshots.some((snapshot) => (snapshot.global?.terrainSampleCount || 0) > 0)
     ? []
     : ['headless_terrain_unavailable'],
+  timings,
   snapshots
 };
 
