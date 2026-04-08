@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { WeatherCore5 } from '../../src/weather/v2/core5.js';
 import { applyHeadlessTerrainFixture } from './headless-terrain-fixture.mjs';
+import { ensureCyclePlanReady } from './plan-guard.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,6 +44,12 @@ for (let i = 0; i < argv.length; i += 1) {
 if (overridesFile) {
   overrides = JSON.parse(fs.readFileSync(overridesFile, 'utf8'));
 }
+
+ensureCyclePlanReady({
+  commandName: 'agent:orographic-audit',
+  artifactPath: outPath,
+  allowNoCycle: true
+});
 
 targets = [...new Set(targets)].filter((value) => Number.isFinite(value) && value >= 0).sort((a, b) => a - b);
 if (!targets.length) targets = [75600, 105480];
@@ -170,6 +177,9 @@ export function summarizeCore(core, targetSeconds) {
   const terrainSlopeRef = Number.isFinite(core?.vertParams?.terrainSlopeRef)
     ? core.vertParams.terrainSlopeRef
     : 0.003;
+  const terrainSlopeExponent = Number.isFinite(core?.vertParams?.terrainSlopeExponent)
+    ? core.vertParams.terrainSlopeExponent
+    : 0.6;
 
   const terrain = [];
   const regions = [
@@ -199,7 +209,8 @@ export function summarizeCore(core, targetSeconds) {
       const cap = soilCap[k];
       const soilFrac = cap > 1e-6 ? soilW[k] / cap : 0;
       const terrainFlow = u[idxS] * slopeX + v[idxS] * slopeY;
-      const slopeFactor = clamp(slopeMag / Math.max(1e-6, terrainSlopeRef), 0, 3);
+      const slopeRatio = Math.max(0, slopeMag / Math.max(1e-6, terrainSlopeRef));
+      const slopeFactor = clamp(Math.pow(slopeRatio, Math.max(0.25, terrainSlopeExponent)), 0, 3);
       const nearSurfaceT = Math.max(180, state.T?.[idxS] ?? 0);
       const rho = Math.max(0.2, pMid[idxS] / Math.max(1e-6, RD * nearSurfaceT));
       const terrainOmegaSurface = -rho * G * terrainFlow * slopeFactor * orographicLiftScale;

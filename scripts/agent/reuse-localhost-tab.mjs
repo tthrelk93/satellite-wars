@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { ensureCyclePlanReady } from './plan-guard.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,6 +42,11 @@ if (!targetUrl) {
 if (!targetUrl) {
   throw new Error('No target URL supplied and no dev-server state file with a URL was found.');
 }
+
+ensureCyclePlanReady({
+  commandName: 'agent:reuse-localhost-tab',
+  allowNoCycle: true
+});
 
 const normalizedTargetUrl = new URL(targetUrl).href;
 const normalizeObservationTarget = (rawUrl) => {

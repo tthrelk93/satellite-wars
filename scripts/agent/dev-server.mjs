@@ -4,6 +4,7 @@ import http from 'http';
 import path from 'path';
 import { spawn, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { ensureCyclePlanReady } from './plan-guard.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,6 +53,13 @@ if (!Number.isFinite(weatherLogPort) || weatherLogPort <= 0) {
 }
 if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
   throw new Error(`Invalid --timeout value: ${timeoutMs}`);
+}
+
+if (!stop) {
+  ensureCyclePlanReady({
+    commandName: 'agent:dev-server',
+    allowNoCycle: true
+  });
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

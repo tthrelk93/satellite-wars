@@ -48,6 +48,8 @@ Concrete realism fix areas:
 Mandatory cycle protocol:
 1. Reassess the highest-leverage remaining realism weakness first, and only choose smoothness instead when the cycle selection rule allows it.
 2. Write a testable hypothesis and explicit pass/fail criteria in `plan.md`.
+   - `plan.md` must exist before any heavy audit, browser, dev-server, or runtime-log command runs.
+   - If heavy work starts after cycle-local artifacts already exist but `plan.md` is still missing, that is a workflow violation and the cycle should abort immediately.
    - If realism is the blocker, name one concrete target area from the list above.
    - If `npm run agent:cycle-streak` reports `physicsGuard.triggered = true`, the plan must name the expected `src/` file(s) to change.
 3. Create `weather-validation/output/cycle-<UTC>-<slug>/`.

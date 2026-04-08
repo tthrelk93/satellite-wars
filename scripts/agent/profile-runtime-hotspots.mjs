@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
 import { fileURLToPath } from 'url';
+import { ensureCyclePlanReady } from './plan-guard.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,6 +42,12 @@ if (!inputPath) {
 if (!inputPath) {
   throw new Error('No log path supplied and no dev-server state file with a weather log path was found.');
 }
+
+ensureCyclePlanReady({
+  commandName: 'agent:profile-runtime-hotspots',
+  artifactPath: outPath,
+  allowNoCycle: true
+});
 
 const quantile = (values, q) => {
   if (!values.length) return null;
