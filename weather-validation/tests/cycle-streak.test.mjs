@@ -133,3 +133,76 @@ test('triggers the physics guard after two consecutive non-physics commits', () 
     /The next cycle must target real weather or performance code under src\//
   );
 });
+
+test('allows bounded same-focus retries before recommending cron disable', () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cycle-streak-retry-budget-'));
+  const outputDir = path.join(rootDir, 'weather-validation', 'output');
+  const reportsDir = path.join(rootDir, 'weather-validation', 'reports');
+  fs.mkdirSync(outputDir, { recursive: true });
+  fs.mkdirSync(reportsDir, { recursive: true });
+  writeJson(path.join(reportsDir, 'world-class-weather-status.json'), {});
+
+  execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.name', 'Test Agent'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: rootDir, stdio: 'ignore' });
+
+  writeText(path.join(rootDir, 'src', 'weather', 'v2', 'core5.js'), 'export const weather = 1;\n');
+  execFileSync('git', ['add', '.'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['commit', '-m', 'physics commit'], { cwd: rootDir, stdio: 'ignore' });
+
+  writeText(path.join(rootDir, 'scripts', 'agent', 'audit.mjs'), 'export const audit = 1;\n');
+  execFileSync('git', ['add', '.'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['commit', '-m', 'diagnostic commit'], { cwd: rootDir, stdio: 'ignore' });
+
+  writeText(path.join(rootDir, 'weather-validation', 'reports', 'note.md'), '# note\n');
+  execFileSync('git', ['add', '.'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['commit', '-m', 'report commit'], { cwd: rootDir, stdio: 'ignore' });
+
+  const focusArea = 'precipitation placement/conversion after upslope moisture transport';
+  const writeNoProgressCycle = (cycleId) => {
+    const dir = path.join(outputDir, cycleId);
+    writeCheckpoint(dir, '# Checkpoint\n\n## Outcome\nNO NEW VERIFIED PROGRESS\n');
+    writeJson(path.join(dir, 'evidence-summary.json'), {
+      focusArea,
+      blocker: {
+        type: 'physics_hypothesis_falsified',
+        details: 'The same focus area still needs another bounded physics try.'
+      },
+      artifacts: {
+        checkpoint: `weather-validation/output/${cycleId}/checkpoint.md`,
+        postfixAudit: `weather-validation/output/${cycleId}/postfix-orographic-audit.json`
+      },
+      changedFiles: [
+        {
+          path: 'src/weather/v2/microphysics5.js',
+          attempted: true,
+          reverted: true
+        }
+      ]
+    });
+  };
+
+  writeNoProgressCycle('cycle-2026-04-08T01-00-00Z-orographic-precip-placement-a');
+  writeNoProgressCycle('cycle-2026-04-08T02-00-00Z-orographic-precip-placement-b');
+
+  const retrySummary = runSummary(rootDir);
+  assert.equal(retrySummary.physicsGuard.triggered, true);
+  assert.equal(retrySummary.physicsGuard.allowRetry, true);
+  assert.equal(retrySummary.physicsGuard.shouldDisableForPhysicsStall, false);
+  assert.equal(retrySummary.physicsGuard.sameFocusValuableNoProgress, 2);
+  assert.match(
+    retrySummary.recommendations.join('\n'),
+    /Stay on precipitation placement\/conversion after upslope moisture transport/
+  );
+
+  writeNoProgressCycle('cycle-2026-04-08T03-00-00Z-orographic-precip-placement-c');
+
+  const disableSummary = runSummary(rootDir);
+  assert.equal(disableSummary.physicsGuard.allowRetry, false);
+  assert.equal(disableSummary.physicsGuard.shouldDisableForPhysicsStall, true);
+  assert.equal(disableSummary.physicsGuard.sameFocusValuableNoProgress, 3);
+  assert.match(
+    disableSummary.recommendations.join('\n'),
+    /Disable cron only if the next precipitation placement\/conversion after upslope moisture transport cycle still cannot land a verified src\/ fix/
+  );
+});

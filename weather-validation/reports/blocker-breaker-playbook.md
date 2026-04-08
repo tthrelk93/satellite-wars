@@ -28,6 +28,9 @@ Use this playbook when the worker has gone multiple cycles without a verified im
 7. Treat `runtime-summary.json -> lineCount = 0` as a degraded logging pipeline. Do not wait on runtime-log evidence that cycle unless you are explicitly fixing the logging path.
 8. Do not repeat the same file-family tweak unless the new cycle has a new permanent metric, new permanent tooling, or a clearly different hypothesis than the prior failed checkpoints.
 9. If `physicsGuard.triggered = true`, a commit that changes only `scripts/agent/*`, tests, reports, prompts, or package metadata does not satisfy the cycle. Touch real app/weather code under `src/` or disable the cron job.
+10. A no-progress physics cycle only counts as a valid retry if it leaves either:
+   - a real attempted `src/` change that was tested and then reverted, or
+   - a blocker-narrowing artifact that makes the next same-focus physics hypothesis more specific.
 
 ## Diagnostic-only commit rule
 
@@ -56,4 +59,5 @@ If `npm run agent:cycle-streak` reports `physicsGuard.triggered = true`, tighten
 
 - prefer a verified weather/performance fix in `src/`,
 - allow a diagnostic-only commit only under the rule above,
-- after 2 consecutive non-physics commits, if the cycle still cannot land a `src/` fix, disable cron instead of taking another tooling-only win.
+- after 2 consecutive non-physics commits, allow up to 3 consecutive bounded no-progress cycles on the same named focus area only when each one leaves a real `src/` attempt or blocker-narrowing artifact,
+- once `physicsGuard.shouldDisableForPhysicsStall = true`, the next same-focus cycle must either land a verified `src/` fix or disable cron instead of taking another tooling-only win.

@@ -152,17 +152,46 @@ const parseOutcome = (checkpointText) => {
 
 const parseCycle = (cycleId) => {
   const cyclePath = path.join(outputDir, cycleId);
+  const planPath = path.join(cyclePath, 'plan.md');
   const checkpointPath = path.join(cyclePath, 'checkpoint.md');
   const runtimeSummaryPath = path.join(cyclePath, 'runtime-summary.json');
   const evidenceSummaryPath = path.join(cyclePath, 'evidence-summary.json');
+  const planText = readTextIfExists(planPath);
   const checkpointText = readTextIfExists(checkpointPath);
   const runtimeSummary = readJsonIfExists(runtimeSummaryPath);
   const evidenceSummary = readJsonIfExists(evidenceSummaryPath);
+  const changedFiles = Array.isArray(evidenceSummary?.changedFiles) ? evidenceSummary.changedFiles : [];
+  const attemptedSrcFiles = changedFiles
+    .filter((entry) => entry?.attempted && typeof entry.path === 'string' && isPhysicsSourcePath(entry.path))
+    .map((entry) => entry.path);
+  const blockerDetails = typeof evidenceSummary?.blocker?.details === 'string'
+    ? evidenceSummary.blocker.details
+    : null;
+  const focusArea = typeof evidenceSummary?.focusArea === 'string'
+    ? evidenceSummary.focusArea
+    : null;
+  const planFocusArea = !focusArea && typeof planText === 'string'
+    ? (planText.match(/(?:focus area|chosen fix area):\s*`?([^`\n]+)`?/i)?.[1] ?? null)
+    : null;
+  const artifactPaths = evidenceSummary?.artifacts && typeof evidenceSummary.artifacts === 'object'
+    ? evidenceSummary.artifacts
+    : {};
+  const hasBlockerNarrowingArtifact = Boolean(
+    blockerDetails
+      && (
+        artifactPaths.prefixAudit
+        || artifactPaths.postfixAudit
+        || artifactPaths.hotspotProfile
+        || artifactPaths.runtimeSummary
+        || artifactPaths.checkpoint
+      )
+  );
   return {
     id: cycleId,
     family: cycleIdToFamily(cycleId),
     path: cyclePath,
     outcome: parseOutcome(checkpointText),
+    planPath: fs.existsSync(planPath) ? planPath : null,
     checkpointPath: fs.existsSync(checkpointPath) ? checkpointPath : null,
     runtimeSummaryPath: fs.existsSync(runtimeSummaryPath) ? runtimeSummaryPath : null,
     evidenceSummaryPath: fs.existsSync(evidenceSummaryPath) ? evidenceSummaryPath : null,
@@ -172,6 +201,13 @@ const parseCycle = (cycleId) => {
     browserTrouble: Boolean(
       checkpointText && /hung|timed out|signal SIGKILL|taking longer|stuck on the DevTools\/browser side/i.test(checkpointText)
     ),
+    focusArea: focusArea ?? planFocusArea,
+    blockerType: typeof evidenceSummary?.blocker?.type === 'string' ? evidenceSummary.blocker.type : null,
+    blockerDetails,
+    attemptedSrcFiles,
+    attemptedRealSrcChange: attemptedSrcFiles.length > 0,
+    hasBlockerNarrowingArtifact,
+    valuableNoProgress: attemptedSrcFiles.length > 0 || hasBlockerNarrowingArtifact,
     summary: typeof evidenceSummary?.summary === 'string' ? evidenceSummary.summary : null
   };
 };
@@ -205,6 +241,28 @@ const sameFamilyNoProgress = noProgressFamily
   ? countLeading(
       completedCycles,
       (cycle) => cycle.outcome === 'no_new_verified_progress' && cycle.family === noProgressFamily
+    )
+  : 0;
+
+const noProgressFocusArea = completedCycles[0]?.outcome === 'no_new_verified_progress'
+  ? completedCycles[0].focusArea
+  : null;
+
+const sameFocusNoProgress = noProgressFocusArea
+  ? countLeading(
+      completedCycles,
+      (cycle) => cycle.outcome === 'no_new_verified_progress' && cycle.focusArea === noProgressFocusArea
+    )
+  : 0;
+
+const sameFocusValuableNoProgress = noProgressFocusArea
+  ? countLeading(
+      completedCycles,
+      (cycle) => (
+        cycle.outcome === 'no_new_verified_progress'
+        && cycle.focusArea === noProgressFocusArea
+        && cycle.valuableNoProgress
+      )
     )
   : 0;
 
@@ -247,6 +305,18 @@ const consecutiveNonPhysicsCommits = countLeading(
 );
 const lastPhysicsCommit = recentCommits.find((commit) => commit.classification === 'physics') || null;
 const physicsGuardTriggered = consecutiveNonPhysicsCommits >= 2;
+const physicsRetryBudget = 3;
+const allowPhysicsRetry = Boolean(
+  physicsGuardTriggered
+  && noProgressFocusArea
+  && sameFocusValuableNoProgress > 0
+  && sameFocusValuableNoProgress < physicsRetryBudget
+);
+const shouldDisableForPhysicsStall = Boolean(
+  physicsGuardTriggered
+  && noProgressFocusArea
+  && sameFocusValuableNoProgress >= physicsRetryBudget
+);
 
 const soft = consecutiveNoProgress >= 3 || sameFamilyNoProgress >= 3 || emptyRuntimeSummaryStreak >= 2;
 const hard = consecutiveNoProgress >= 6 || sameFamilyNoProgress >= 5;
@@ -274,7 +344,13 @@ if (hard) {
 if (physicsGuardTriggered) {
   recommendations.push(`The next cycle must target real weather or performance code under src/ and choose one focus area: ${PHYSICS_TARGET_AREAS.join('; ')}.`);
   recommendations.push('Diagnostic-only commits are allowed only if they unblock a named physics hypothesis that the same cycle could not test.');
-  recommendations.push('If the current cycle cannot land a verified physics/weather fix, disable the cron job instead of committing another non-physics change.');
+  recommendations.push('A no-progress physics cycle is acceptable only if it leaves either a real src/ attempt or a blocker-narrowing artifact tied to the named focus area.');
+}
+if (allowPhysicsRetry) {
+  recommendations.push(`Stay on ${noProgressFocusArea} for up to ${physicsRetryBudget - sameFocusValuableNoProgress} more bounded physics cycle(s) before disabling cron, as long as each cycle produces a real src/ attempt or blocker-narrowing evidence.`);
+}
+if (shouldDisableForPhysicsStall) {
+  recommendations.push(`Disable cron only if the next ${noProgressFocusArea} cycle still cannot land a verified src/ fix after ${sameFocusValuableNoProgress} consecutive valuable no-progress cycles on that same focus area.`);
 }
 
 const summary = {
@@ -291,6 +367,9 @@ const summary = {
     consecutiveNoProgress,
     sameFamilyNoProgress,
     noProgressFamily,
+    sameFocusNoProgress,
+    noProgressFocusArea,
+    sameFocusValuableNoProgress,
     emptyRuntimeSummaryStreak,
     browserTroubleStreak
   },
@@ -301,6 +380,12 @@ const summary = {
   physicsGuard: {
     triggered: physicsGuardTriggered,
     consecutiveNonPhysicsCommits,
+    retryBudget: physicsRetryBudget,
+    allowRetry: allowPhysicsRetry,
+    noProgressFocusArea,
+    sameFocusNoProgress,
+    sameFocusValuableNoProgress,
+    shouldDisableForPhysicsStall,
     requiredTargetAreas: PHYSICS_TARGET_AREAS,
     lastPhysicsCommit,
     recentCommits

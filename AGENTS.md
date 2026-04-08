@@ -85,7 +85,12 @@ Physics delivery guard:
 - `npm run agent:cycle-streak` reports `physicsGuard.consecutiveNonPhysicsCommits`.
 - After 2 consecutive non-physics commits, the next cycle must try to land a verified weather/performance fix in real app code under `src/`.
 - A diagnostic-only commit is allowed only if it unblocks a named physics hypothesis that the same cycle could not test because it discovered a new tooling blocker while trying to make the physics change.
-- If `physicsGuard.triggered = true` and the cycle cannot land a verified physics/weather fix, disable the cron job instead of committing another non-physics change.
+- A no-progress physics cycle is acceptable only if it leaves one of these:
+  - a real attempted `src/` weather/performance change that was tested and then reverted, or
+  - a blocker-narrowing artifact that clearly changes what the very next physics cycle should try.
+- Do not disable cron after one honest failed physics cycle.
+- If `npm run agent:cycle-streak` reports `physicsGuard.allowRetry = true`, stay on the same named focus area and run another bounded physics cycle.
+- If `npm run agent:cycle-streak` reports `physicsGuard.shouldDisableForPhysicsStall = true`, the next same-focus cycle must either land a verified `src/` fix or disable the cron job instead of spending more cycles on that blocker.
 
 Browser and dev-server policy:
 - Use one canonical app URL: `http://127.0.0.1:3000/` unless a different port is unavoidable.
@@ -138,6 +143,8 @@ Stall guard:
 - If `npm run agent:cycle-streak` reports `stallGuardTriggered.soft = true`, the run must follow `weather-validation/reports/blocker-breaker-playbook.md`.
 - If it reports `stallGuardTriggered.hard = true`, do not run another ordinary browser-first micro-experiment. The cycle must either land a new permanent harness/diagnostic improvement, land a verified fix, or keep the cron job disabled.
 - If it reports `physicsGuard.triggered = true`, do not count another diagnostic-only commit as success unless it directly unblocked the named physics hypothesis for that cycle.
+- If it reports `physicsGuard.allowRetry = true`, keep the retry bounded to the same named focus area and require a fresh `src/` attempt or blocker-narrowing artifact again.
+- If it reports `physicsGuard.shouldDisableForPhysicsStall = true`, do not continue ordinary retries on that focus area after one more failed bounded cycle.
 
 If no verified progress:
 NO NEW VERIFIED PROGRESS
