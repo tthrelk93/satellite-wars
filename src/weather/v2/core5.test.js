@@ -13,6 +13,6 @@ test('WeatherCore5 defaults keep the stronger broad-circulation surface wind res
   assert.equal(core.vertParams.omegaTrig, 0.2);
   assert.equal(core.vertParams.instabTrig, 2.5);
   assert.equal(core.vertParams.qvTrig, 0.0018);
-  assert.equal(core.vertParams.thetaeCoeff, 11);
+  assert.equal(core.vertParams.thetaeCoeff, 10.5);
   assert.equal(core.microParams.precipEffMicro, 0.75);
 });

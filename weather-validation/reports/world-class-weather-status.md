@@ -6,75 +6,58 @@ Verdict: NOT WORLD CLASS YET
 ## Current baseline
 
 - Clean worker worktree: `codex/world-class-weather-loop`
-- Latest verified cycle: `cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard`
+- Latest verified cycle: `cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105`
 - Earth accuracy suite: PASS (`weather-validation/reports/earth-accuracy-status.md`)
-- The latest verified physics change promotes a seasonally durable convection-side moisture package in `src/weather/v2/core5.js`:
-  - `vertParams.rhTrig: 0.75 -> 0.72`
-  - `vertParams.rhMidMin: 0.25 -> 0.22`
-  - `vertParams.omegaTrig: 0.3 -> 0.2`
-  - `vertParams.instabTrig: 3 -> 2.5`
-  - `vertParams.qvTrig: 0.002 -> 0.0018`
-  - `vertParams.thetaeCoeff: 10 -> 11`
-  - `microParams.precipEffMicro: 0.8 -> 0.75`
-- Fresh 30-day quick screening keeps circulation, storm-track, cloud-balance, and stability categories passing while preserving the same single blocker:
-  - Tropical trades (N/S): `-0.791 / -0.330 -> -0.790 / -0.329 m/s`
-  - Midlatitude westerlies (S): `0.940 -> 0.945 m/s`
-  - North subtropical dry-belt ratio: `1.079 -> 1.094` (slight quick-screen regression, still failing)
-- Fresh 90-day seasonal follow-through materially improves the long-horizon moisture partitioning baseline while keeping the same single blocker:
-  - Day-90 equatorial precip: `0.111 -> 0.117 mm/hr`
-  - Day-90 north subtropical dry-belt precip: `0.132 -> 0.121 mm/hr`
-  - Day-90 north subtropical dry-belt ratio: `1.191 -> 1.031`
-  - Day-90 tropical trades (N/S): `-0.792 / -0.333 -> -0.793 / -0.331 m/s`
-  - Day-90 midlatitude westerlies (S): `0.948 -> 0.948 m/s`
-- A fresh live-runtime follow-up in `src/Earth.js` now guards anisotropy uploads behind texture-readiness via `src/textureUtils.js`, which removes the old startup `THREE.WebGLRenderer: Texture marked for update but no image data found.` spam on a fresh localhost tab.
-- Fresh patched-live telemetry still shows that browser signoff is not done yet:
-  - the lower-right white panel persists on fresh load,
-  - runtime summary still flags `earth_update_p95_high`, `earth_update_max_high`, and `wind_targets_failing`,
-  - the startup texture-warning spam no longer reproduces on a clean reopened tab.
-- The main blocker is still northern subtropical dry-belt moisture partitioning, but the seasonal gap is now materially smaller. The next cycles should optimize the quick-versus-seasonal balance around this convection package instead of re-discovering the same lever from scratch.
+- The latest verified physics change tightens the current seasonally durable convection package in `src/weather/v2/core5.js`:
+  - `vertParams.thetaeCoeff: 11 -> 10.5`
+  - The rest of the package remains at the previously verified settings:
+    - `vertParams.rhTrig: 0.72`
+    - `vertParams.rhMidMin: 0.22`
+    - `vertParams.omegaTrig: 0.2`
+    - `vertParams.instabTrig: 2.5`
+    - `vertParams.qvTrig: 0.0018`
+    - `microParams.precipEffMicro: 0.75`
+- Fresh 30-day tracked-code quick screening improves the short-horizon moisture score while keeping the same single blocker and preserving the broad category passes:
+  - Tropical trades (N/S): `-0.791 / -0.329 -> -0.790 / -0.329 m/s`
+  - Midlatitude westerlies (S): `0.945 -> 0.947 m/s`
+  - ITCZ latitude: `4.799 -> 4.266 deg`
+  - North subtropical dry-belt ratio: `1.094 -> 1.029`
+- Fresh 90-day tracked-code seasonal follow-through improves the long-horizon moisture partitioning baseline again while preserving the same single blocker:
+  - Day-90 equatorial precip: `0.117 -> 0.118 mm/hr`
+  - Day-90 north subtropical dry-belt precip: `0.121 -> 0.119 mm/hr`
+  - Day-90 north subtropical dry-belt ratio: `1.031 -> 1.015`
+  - Day-90 tropical trades (N/S): `-0.793 / -0.331 -> -0.794 / -0.328 m/s`
+  - Day-90 midlatitude westerlies (S): `0.948 -> 0.947 m/s`
+- The earlier live-runtime fix in `src/Earth.js` still removes the old startup `THREE.WebGLRenderer: Texture marked for update but no image data found.` spam on a fresh localhost tab, but browser signoff is not yet refreshed on this improved moisture baseline.
 
 ## Fresh evidence from the latest cycle
 
-- Fresh smoothness/runtime cycle (`cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard`) landed a real `src/` fix in the browser path:
-  - `src/Earth.js` now applies anisotropy through a texture-readiness guard instead of forcing premature uploads
-  - `src/textureUtils.js` centralizes the image-data readiness check
-  - `src/textureUtils.test.js` adds targeted automated coverage for unloaded-versus-ready textures
-- Targeted automated validation passed:
-  - `node --experimental-default-type=module --experimental-specifier-resolution=node --test src/textureUtils.test.js`: PASS
-- Fresh browser verification on a brand-new reopened localhost tab no longer emitted the old Three.js startup texture warning.
-- Fresh patched runtime summary (`weather-validation/output/cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard/runtime-summary.json`) still shows broader runtime work remaining:
-  - `likelySmoothEnough: false`
-  - `earth_update.updateMs`: `p50 0.10 ms`, `p95 23.64 ms`, `max 388.2 ms`
-  - Wind-target failures still include `model_mean_low`, `model_p90_low`, `model_p99_low`, and `viz_step_mean_low`
-- Fresh patched hotspot profile (`weather-validation/output/cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard/hotspot-profile.json`) no longer singled out the old texture-warning path; the remaining spikes were mixed and not yet strong enough to justify another runtime-only experiment ahead of the next physics cycle.
-- Fresh same-cycle seasonal baseline audit (`weather-validation/output/cycle-2026-04-09T03-55-50Z-convection-seasonal-durability/prefix-seasonal-planetary-audit.json`) confirmed the current verified long-horizon blocker:
-  - Day-90 north subtropical dry-belt ratio: `1.191`
-  - Only seasonal warning: `north_subtropical_dry_belt_too_wet`
-- Fresh same-cycle seasonal candidate sweep (`planetary-candidate-sweep-seasonal-convection.json`) ranked milder convection packages by the real 90-day target instead of the 30-day screen:
-  - `seasonal-thetae11-soft-eff075` was the best day-90 candidate, improving the ratio to `1.031`
-  - `seasonal-thetae11-soft` also improved the seasonal ratio to `1.072`
-  - More aggressive or less durable packages were discarded even when they looked better on the quick screen
+- Fresh quick half-step revert screening (`cycle-2026-04-09T05-13-43Z-quick-halfstep-reverts-after-qv-fail`) narrowed the next physics candidate set without drifting away from the current convection package:
+  - `thetaeCoeff = 10.5` was the best day-30 candidate (`1.029`)
+  - `rhTrig = 0.735` was the secondary fallback (`1.036`)
+  - `rhMidMin`, `instabTrig`, and `precipEffMicro` half-step reverts were all weaker or worse
 - The verified fix changed real app weather code:
-  - `src/weather/v2/core5.js` -> promoted the milder seasonally durable convection package (`rhTrig`, `rhMidMin`, `omegaTrig`, `instabTrig`, `qvTrig`, `thetaeCoeff`, `precipEffMicro`)
+  - `src/weather/v2/core5.js` -> promoted `vertParams.thetaeCoeff = 10.5`
 - Targeted automated validation passed:
   - `node --experimental-default-type=module --experimental-specifier-resolution=node --test src/weather/v2/core5.test.js src/weather/v2/nudging5.test.js src/weather/v2/microphysicsPhase7.test.js src/weather/v2/windNudge5.test.js`: PASS
-- Fresh same-cycle tracked-code quick audit (`weather-validation/output/cycle-2026-04-09T03-55-50Z-convection-seasonal-durability/postfix-planetary-audit.json`) showed the package keeps the same single blocker while only slightly softening the 30-day moisture score:
-  - Day-30 north subtropical dry-belt ratio: `1.094`
+- Fresh tracked-code quick audit (`weather-validation/output/cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105/postfix-planetary-audit.json`) confirmed the improved short-horizon baseline:
+  - Day-30 north subtropical dry-belt ratio: `1.029`
+  - ITCZ latitude: `4.266`
   - Tropical trades (N/S): `-0.790 / -0.329 m/s`
-  - Midlatitude westerlies (S): `0.945 m/s`
-- Fresh same-cycle tracked-code seasonal follow-through (`weather-validation/output/cycle-2026-04-09T03-55-50Z-convection-seasonal-durability/postfix-seasonal-planetary-audit.json`) confirmed the real long-horizon gain:
-  - Day-90 north subtropical dry-belt ratio: `1.031`
-  - Day-90 equatorial precip: `0.117 mm/hr`
-  - Day-90 north subtropical dry-belt precip: `0.121 mm/hr`
+  - Midlatitude westerlies (S): `0.947 m/s`
+- Fresh tracked-code seasonal follow-through (`weather-validation/output/cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105/postfix-seasonal-planetary-audit.json`) confirmed the improved long-horizon baseline:
+  - Day-90 north subtropical dry-belt ratio: `1.015`
+  - Day-90 equatorial precip: `0.118 mm/hr`
+  - Day-90 north subtropical dry-belt precip: `0.119 mm/hr`
   - Only remaining seasonal warning: `north_subtropical_dry_belt_too_wet`
 
 ## What still blocks "world class"
 
-- Northern subtropical dry-belt moisture partitioning is still the dominant planetary blocker: the new quick and seasonal audits both still fail `north_subtropical_dry_belt_too_wet` (`1.094` at 30 days, `1.031` at 90 days).
-- The quick screen now lags the seasonal gain slightly, so the next moisture cycle should improve the 30-day ratio without giving back the new 90-day durability.
-- Browser signoff is still blocked even after the fresh runtime patch: the lower-right white panel persists, runtime telemetry still fails the current smoothness gate, and wind targets remain too weak in the fresh patched run.
+- Northern subtropical dry-belt moisture partitioning is still the dominant planetary blocker, but the fresh quick and seasonal audits have narrowed it to `1.029` at 30 days and `1.015` at 90 days.
+- Live browser realism and runtime smoothness still need a fresh run on the improved `thetaeCoeff = 10.5` baseline before this moisture package can be considered signed off.
+- The lower-right white panel and the remaining runtime smoothness / wind-target issues from the last live run are still unresolved until a fresh browser-backed run proves otherwise.
 - Annual / 365-day stability and seasonality evidence is still required before any long-horizon or world-class claim.
-- World-class status still requires realism and smoothness to pass in the same verified browser-backed run.
+- World-class status still requires realism and smoothness to pass in the same fresh live run.
 
 ## Canonical cycle inputs
 
@@ -89,12 +72,11 @@ Verdict: NOT WORLD CLASS YET
 
 ## Default next priority
 
-1. Keep the next cycle on northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology, but tune around the new seasonally durable convection package so the 30-day ratio improves without losing the 90-day gain.
-2. Stay in real `src/` moisture/circulation code rather than returning to terrain-only tuning unless a fresh planetary audit re-ranks terrain highest.
-3. Preserve the new texture-readiness guard and only return to browser/runtime debugging if the lower-right white panel or Earth-update smoothness still blocks signoff after the next physics gain.
-4. Re-run live localhost verification and runtime telemetry after the next moisture fix so browser realism and smoothness are checked against the updated convection baseline.
-5. Run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through.
-6. Keep validation on the clean world-class checkout only.
+1. Run a browser-backed `live` verification cycle on the improved `thetaeCoeff = 10.5` baseline before another headless-only tuning cycle.
+2. If the live run confirms the improved baseline, keep the next physics cycle on northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology.
+3. Preserve both the new `thetaeCoeff = 10.5` moisture package and the texture-readiness guard while investigating the lower-right white panel / runtime issues only if they still block signoff after the new live run.
+4. Run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through.
+5. Keep validation on the clean world-class checkout only.
 
 ## Commit discipline
 

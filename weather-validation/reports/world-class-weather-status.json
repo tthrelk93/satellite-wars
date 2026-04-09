@@ -1,27 +1,27 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-09T04:46:49Z",
+  "updatedAt": "2026-04-09T05:28:27.061Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
   "baselineCommit": "94d5805",
   "latestCycle": {
-    "id": "cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard",
-    "goal": "remove the fresh live startup texture-warning spam without regressing the canonical localhost runtime path",
-    "verifiedImprovement": "guarding anisotropy uploads in src/Earth.js behind real texture image readiness eliminated the old Three.js startup texture-warning spam on a fresh reopened localhost tab while preserving the live app path; broader smoothness, wind-target, and white-panel blockers still remain",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard/checkpoint.md",
-    "runtimeLogPath": "logs/weather-2026-04-09T04-44-18Z-68278.jsonl"
+    "id": "cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105",
+    "goal": "trim thetaeCoeff inside the current convection package to recover the 30-day dry-belt ratio without giving back the 90-day gain",
+    "verifiedImprovement": "promoting vertParams.thetaeCoeff from 11 to 10.5 improved the tracked-code north subtropical dry-belt ratio from 1.094 to 1.029 at 30 days and from 1.031 to 1.015 at 90 days while keeping the same single blocker and preserving the broad circulation, storm-track, cloud-balance, and stability categories",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105/checkpoint.md",
+    "runtimeLogPath": null
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
     "overallPass": true
   },
   "blockingGaps": [
-    "northern subtropical dry-belt moisture partitioning still fails in both fresh quick and seasonal audits, even though the day-90 baseline improved materially",
-    "the next moisture cycle needs to recover the slight 30-day regression without losing the new 90-day durability",
-    "browser signoff is still blocked by the persistent lower-right white panel plus fresh earth-update and wind-target failures in the patched runtime run",
+    "northern subtropical dry-belt moisture partitioning still fails in both fresh quick and seasonal audits, though the gap is now smaller at 1.029 at 30 days and 1.015 at 90 days",
+    "live browser realism and runtime smoothness still need a fresh run on the thetaeCoeff=10.5 baseline before this improved moisture package can be considered signed off",
+    "the lower-right white panel plus the remaining earth-update and wind-target issues from the last live run are still unresolved until a fresh browser-backed run proves otherwise",
     "annual / 365-day evidence is still missing for any long-horizon or world-class claim",
-    "world-class status still requires realism and smoothness to pass in the same verified browser-backed run"
+    "world-class status still requires realism and smoothness to pass in the same fresh live run"
   ],
   "cycleInputs": [
     "weather-validation/reports/earth-accuracy-status.md",
@@ -40,54 +40,30 @@
       "duplicatesClosed": 0,
       "targetId": "1B3ABBD598471D43670113D5124F0BE1"
     },
-    "broadCirculationRecovery": {
-      "quickAuditPath": "weather-validation/output/cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery/postfix-planetary-audit.json",
-      "seasonalAuditPath": "weather-validation/output/cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery/postfix-seasonal-planetary-audit.json",
-      "candidateSweepPath": "weather-validation/output/cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery/planetary-candidate-sweep.json",
-      "runtimeMoistureSweepPath": "weather-validation/output/cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery/planetary-candidate-sweep-runtime-moisture.json",
-      "quickMetrics": {
-        "tropicalTradesNorthU10Ms": -0.791,
-        "tropicalTradesSouthU10Ms": -0.33,
-        "midlatitudeWesterliesSouthU10Ms": 0.94,
-        "subtropicalDryNorthRatio": 1.079,
-        "warnings": [
-          "north_subtropical_dry_belt_too_wet"
-        ]
-      },
-      "seasonalMetrics": {
-        "tropicalTradesNorthU10Ms": -0.792,
-        "tropicalTradesSouthU10Ms": -0.333,
-        "midlatitudeWesterliesSouthU10Ms": 0.948,
-        "subtropicalDryNorthRatio": 1.191,
-        "warnings": [
-          "north_subtropical_dry_belt_too_wet"
-        ]
-      },
-      "notableFinding": "Surface wind restoring was the dominant circulation lever. Moisture-only nudges were weaker, and post-init nudgeParams edits do not affect _nudgeParamsRuntime without targeting the runtime clone or core defaults."
-    },
     "seasonalDurabilityRecovery": {
-      "quickAuditPath": "weather-validation/output/cycle-2026-04-09T03-55-50Z-convection-seasonal-durability/postfix-planetary-audit.json",
-      "seasonalAuditPath": "weather-validation/output/cycle-2026-04-09T03-55-50Z-convection-seasonal-durability/postfix-seasonal-planetary-audit.json",
-      "seasonalCandidateSweepPath": "weather-validation/output/cycle-2026-04-09T03-55-50Z-convection-seasonal-durability/planetary-candidate-sweep-seasonal-convection.json",
+      "quickAuditPath": "weather-validation/output/cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105/postfix-planetary-audit.json",
+      "seasonalAuditPath": "weather-validation/output/cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105/postfix-seasonal-planetary-audit.json",
+      "seasonalCandidateSweepPath": "weather-validation/output/cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105/planetary-candidate-sweep-seasonal-thetae105.json",
+      "quickCandidateSweepPath": "weather-validation/output/cycle-2026-04-09T05-13-43Z-quick-halfstep-reverts-after-qv-fail/planetary-candidate-sweep-halfstep-reverts.json",
       "quickMetrics": {
-        "tropicalTradesNorthU10Ms": -0.791,
+        "tropicalTradesNorthU10Ms": -0.79,
         "tropicalTradesSouthU10Ms": -0.329,
-        "midlatitudeWesterliesSouthU10Ms": 0.945,
-        "subtropicalDryNorthRatio": 1.094,
+        "midlatitudeWesterliesSouthU10Ms": 0.947,
+        "subtropicalDryNorthRatio": 1.029,
         "warnings": [
           "north_subtropical_dry_belt_too_wet"
         ]
       },
       "seasonalMetrics": {
-        "tropicalTradesNorthU10Ms": -0.793,
-        "tropicalTradesSouthU10Ms": -0.331,
-        "midlatitudeWesterliesSouthU10Ms": 0.948,
-        "subtropicalDryNorthRatio": 1.031,
+        "tropicalTradesNorthU10Ms": -0.794,
+        "tropicalTradesSouthU10Ms": -0.328,
+        "midlatitudeWesterliesSouthU10Ms": 0.947,
+        "subtropicalDryNorthRatio": 1.015,
         "warnings": [
           "north_subtropical_dry_belt_too_wet"
         ]
       },
-      "tradeoffNote": "This package trades a small 30-day moisture-score regression for a materially better 90-day moisture partitioning baseline while preserving the circulation category."
+      "tradeoffNote": "Lowering thetaeCoeff to 10.5 recovers the 30-day dry-belt ratio and slightly improves the 90-day ratio as well, so the quick-versus-seasonal tradeoff is now materially smaller than before."
     },
     "runtimeSummary": {
       "lineCount": 344,
@@ -108,14 +84,13 @@
     },
     "browserObservation": {
       "singlePlayerLoaded": true,
-      "note": "The latest verified live-runtime cycle reused the canonical solo-mode tab, then reopened a fresh single localhost tab to verify that the startup Three.js texture-warning spam was gone. The lower-right white panel still persists and the patched run still fails the current smoothness gate."
+      "note": "The last live run predates the new thetaeCoeff=10.5 baseline. It already proved the startup texture-warning spam was fixed, but it still showed a lower-right white panel and runtime warnings. A fresh browser-backed rerun is now required on the improved moisture baseline."
     }
   },
   "defaultNextPriority": [
-    "keep the next cycle on northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology, but tune around the new seasonally durable convection package so the 30-day ratio improves without losing the 90-day gain",
-    "stay in real src-side moisture/circulation code rather than returning to terrain-only tuning unless a fresh planetary audit re-ranks terrain highest",
-    "preserve the new texture-readiness guard and only return to browser/runtime debugging if the lower-right white panel or Earth-update smoothness still blocks signoff after the next physics gain",
-    "re-run live localhost verification and runtime telemetry after the next moisture fix so browser realism and smoothness are checked against the updated convection baseline",
+    "run a browser-backed live verification cycle on the thetaeCoeff=10.5 baseline before another headless-only tuning cycle",
+    "if the live run confirms the improved baseline, keep the next physics cycle on northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology",
+    "preserve the thetaeCoeff=10.5 moisture package and the texture-readiness guard while investigating the lower-right white panel or runtime issues only if they still block signoff after the new live run",
     "run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through",
     "keep validation on the clean world-class checkout only"
   ],

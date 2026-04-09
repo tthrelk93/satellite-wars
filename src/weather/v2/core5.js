@@ -258,7 +258,7 @@ export class WeatherCore5 {
       omegaTrig: 0.2,
       instabTrig: 2.5,
       qvTrig: 0.0018,
-      thetaeCoeff: 11,
+      thetaeCoeff: 10.5,
       thetaeQvCap: 0.03,
       pblWarmRain: true,
        qcAuto0: 7e-4,
