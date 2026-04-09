@@ -1,16 +1,16 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-09T05:28:27.061Z",
+  "updatedAt": "2026-04-09T05:56:56.602Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
   "baselineCommit": "94d5805",
   "latestCycle": {
-    "id": "cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105",
-    "goal": "trim thetaeCoeff inside the current convection package to recover the 30-day dry-belt ratio without giving back the 90-day gain",
-    "verifiedImprovement": "promoting vertParams.thetaeCoeff from 11 to 10.5 improved the tracked-code north subtropical dry-belt ratio from 1.094 to 1.029 at 30 days and from 1.031 to 1.015 at 90 days while keeping the same single blocker and preserving the broad circulation, storm-track, cloud-balance, and stability categories",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105/checkpoint.md",
-    "runtimeLogPath": null
+    "id": "cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix",
+    "goal": "remove the solo-mode minimap white panel from the live signoff path without changing the verified weather baseline",
+    "verifiedImprovement": "gating the minimap overlay to PvP mode removed the persistent lower-right white panel on a fresh solo live run while preserving the thetaeCoeff=10.5 weather baseline and the earlier startup texture-warning fix; runtime smoothness still fails due Earth-update spikes and weak wind targets",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix/checkpoint.md",
+    "runtimeLogPath": "logs/weather-2026-04-09T05-54-26Z-69491.jsonl"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
@@ -18,10 +18,9 @@
   },
   "blockingGaps": [
     "northern subtropical dry-belt moisture partitioning still fails in both fresh quick and seasonal audits, though the gap is now smaller at 1.029 at 30 days and 1.015 at 90 days",
-    "live browser realism and runtime smoothness still need a fresh run on the thetaeCoeff=10.5 baseline before this improved moisture package can be considered signed off",
-    "the lower-right white panel plus the remaining earth-update and wind-target issues from the last live run are still unresolved until a fresh browser-backed run proves otherwise",
+    "browser/runtime signoff is still blocked by Earth-update smoothness and weak wind-target diagnostics in the latest live run",
     "annual / 365-day evidence is still missing for any long-horizon or world-class claim",
-    "world-class status still requires realism and smoothness to pass in the same fresh live run"
+    "world-class status still requires realism and smoothness to pass in the same browser-backed run"
   ],
   "cycleInputs": [
     "weather-validation/reports/earth-accuracy-status.md",
@@ -37,7 +36,7 @@
     "singleTabLocalhostVerified": true,
     "localhostTabReuse": {
       "url": "http://127.0.0.1:3000/?mode=solo",
-      "duplicatesClosed": 0,
+      "duplicatesClosed": 3,
       "targetId": "1B3ABBD598471D43670113D5124F0BE1"
     },
     "seasonalDurabilityRecovery": {
@@ -63,16 +62,7 @@
           "north_subtropical_dry_belt_too_wet"
         ]
       },
-      "tradeoffNote": "Lowering thetaeCoeff to 10.5 recovers the 30-day dry-belt ratio and slightly improves the 90-day ratio as well, so the quick-versus-seasonal tradeoff is now materially smaller than before."
-    },
-    "runtimeSummary": {
-      "lineCount": 344,
-      "validationSnapshotCount": 0,
-      "warnings": [
-        "earth_update_p95_high",
-        "earth_update_max_high",
-        "wind_targets_failing"
-      ]
+      "tradeoffNote": "Lowering thetaeCoeff to 10.5 recovered the 30-day dry-belt ratio and slightly improved the 90-day ratio as well, so the quick-versus-seasonal tradeoff is materially smaller than before."
     },
     "runtimeTextureWarningFix": {
       "cycleId": "cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard",
@@ -82,15 +72,32 @@
       "validatedBy": "node --experimental-default-type=module --experimental-specifier-resolution=node --test src/textureUtils.test.js",
       "result": "fresh reopened localhost tab no longer reproduced the startup THREE.WebGLRenderer texture-update warning"
     },
+    "soloMinimapFix": {
+      "cycleId": "cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix",
+      "checkpointPath": "weather-validation/output/cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix/checkpoint.md",
+      "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix/runtime-summary.json",
+      "hotspotProfilePath": "weather-validation/output/cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix/hotspot-profile.json",
+      "validatedBy": "node --experimental-default-type=module --experimental-specifier-resolution=node --test src/gameModeUi.test.js",
+      "result": "fresh solo localhost rerun no longer rendered the lower-right white minimap panel"
+    },
+    "runtimeSummary": {
+      "lineCount": 500,
+      "validationSnapshotCount": 0,
+      "warnings": [
+        "earth_update_p95_high",
+        "earth_update_max_high",
+        "wind_targets_failing"
+      ]
+    },
     "browserObservation": {
       "singlePlayerLoaded": true,
-      "note": "The last live run predates the new thetaeCoeff=10.5 baseline. It already proved the startup texture-warning spam was fixed, but it still showed a lower-right white panel and runtime warnings. A fresh browser-backed rerun is now required on the improved moisture baseline."
+      "note": "The latest fresh solo live run on the thetaeCoeff=10.5 baseline kept the startup texture-warning fix, removed the lower-right white panel, and still failed the smoothness gate due Earth-update spikes and weak wind-target diagnostics."
     }
   },
   "defaultNextPriority": [
-    "run a browser-backed live verification cycle on the thetaeCoeff=10.5 baseline before another headless-only tuning cycle",
-    "if the live run confirms the improved baseline, keep the next physics cycle on northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology",
-    "preserve the thetaeCoeff=10.5 moisture package and the texture-readiness guard while investigating the lower-right white panel or runtime issues only if they still block signoff after the new live run",
+    "run a direct src-side smoothness/runtime cycle on Earth wind/model diagnostics cadence and worker sync using the latest hotspot profile",
+    "rerun live verification on the thetaeCoeff=10.5 baseline after the next runtime fix",
+    "if runtime smoothness stops blocking signoff, return the next physics cycle to northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology",
     "run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through",
     "keep validation on the clean world-class checkout only"
   ],

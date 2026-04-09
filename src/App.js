@@ -13,6 +13,7 @@ import SimClock from './SimClock';
 import { solarDeclination } from './weather/solar';
 import { clampSimAdvanceByTruthBudget } from './weather/simAdvanceBudget';
 import { loadNullschoolWind } from './weather/reference/loadNullschoolWind';
+import { showMinimapOverlayForGameMode } from './gameModeUi';
 
 import { EventBus } from './EventBus';
 import { TurnManager, AP_MAX } from './TurnManager';
@@ -2055,6 +2056,7 @@ const App = () => {
 
     // Minimap overlay: continuously draw fog-of-war canvas from Earth
     useEffect(() => {
+        if (!showMinimapOverlayForGameMode(gameMode)) return undefined;
         let frameId;
         const drawMini = () => {
             const mini = miniRef.current;
@@ -2068,7 +2070,7 @@ const App = () => {
         };
         drawMini();
         return () => cancelAnimationFrame(frameId);
-    }, []);
+    }, [gameMode]);
 
 
     const slerp = (start, end, t) => {
@@ -7607,6 +7609,7 @@ const App = () => {
 
 
     const isSinglePlayer = gameMode === 'solo';
+    const showMinimapOverlay = showMinimapOverlayForGameMode(gameMode);
     const panelSurfaceStyle = {
         backgroundColor: 'rgba(12,16,24,0.92)',
         border: '1px solid rgba(148,163,184,0.22)',
@@ -9950,19 +9953,21 @@ const App = () => {
             )}
 
             {/* Minimap overlay */}
-            <canvas
-                ref={miniRef}
-                width={200}
-                height={100}
-                style={{
-                    position: 'absolute',
-                    bottom: 10,
-                    right: 10,
-                    border: '1px solid white',
-                    zIndex: 1000,
-                    backgroundColor: 'black'
-                }}
-            />
+            {showMinimapOverlay && (
+                <canvas
+                    ref={miniRef}
+                    width={200}
+                    height={100}
+                    style={{
+                        position: 'absolute',
+                        bottom: 10,
+                        right: 10,
+                        border: '1px solid white',
+                        zIndex: 1000,
+                        backgroundColor: 'black'
+                    }}
+                />
+            )}
 
             {/* Toasts (player-facing notifications) */}
             {toasts.map((t, i) => (

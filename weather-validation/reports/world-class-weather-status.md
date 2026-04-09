@@ -6,58 +6,46 @@ Verdict: NOT WORLD CLASS YET
 ## Current baseline
 
 - Clean worker worktree: `codex/world-class-weather-loop`
-- Latest verified cycle: `cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105`
+- Latest verified cycle: `cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix`
 - Earth accuracy suite: PASS (`weather-validation/reports/earth-accuracy-status.md`)
-- The latest verified physics change tightens the current seasonally durable convection package in `src/weather/v2/core5.js`:
+- Latest verified physics baseline in `src/weather/v2/core5.js`:
   - `vertParams.thetaeCoeff: 11 -> 10.5`
-  - The rest of the package remains at the previously verified settings:
-    - `vertParams.rhTrig: 0.72`
-    - `vertParams.rhMidMin: 0.22`
-    - `vertParams.omegaTrig: 0.2`
-    - `vertParams.instabTrig: 2.5`
-    - `vertParams.qvTrig: 0.0018`
-    - `microParams.precipEffMicro: 0.75`
-- Fresh 30-day tracked-code quick screening improves the short-horizon moisture score while keeping the same single blocker and preserving the broad category passes:
-  - Tropical trades (N/S): `-0.791 / -0.329 -> -0.790 / -0.329 m/s`
-  - Midlatitude westerlies (S): `0.945 -> 0.947 m/s`
-  - ITCZ latitude: `4.799 -> 4.266 deg`
-  - North subtropical dry-belt ratio: `1.094 -> 1.029`
-- Fresh 90-day tracked-code seasonal follow-through improves the long-horizon moisture partitioning baseline again while preserving the same single blocker:
-  - Day-90 equatorial precip: `0.117 -> 0.118 mm/hr`
-  - Day-90 north subtropical dry-belt precip: `0.121 -> 0.119 mm/hr`
-  - Day-90 north subtropical dry-belt ratio: `1.031 -> 1.015`
-  - Day-90 tropical trades (N/S): `-0.793 / -0.331 -> -0.794 / -0.328 m/s`
-  - Day-90 midlatitude westerlies (S): `0.948 -> 0.947 m/s`
-- The earlier live-runtime fix in `src/Earth.js` still removes the old startup `THREE.WebGLRenderer: Texture marked for update but no image data found.` spam on a fresh localhost tab, but browser signoff is not yet refreshed on this improved moisture baseline.
+  - Current dry-belt metrics remain:
+    - Day-30 north subtropical dry-belt ratio: `1.029`
+    - Day-90 north subtropical dry-belt ratio: `1.015`
+- Latest verified browser/runtime improvement in `src/App.js`:
+  - the solo-mode minimap overlay is now gated out of the solo/live-signoff path
+  - the persistent lower-right white panel is gone on a fresh localhost run
+  - the earlier startup texture-warning fix still holds on the same fresh run
+- Fresh live telemetry on the current baseline still blocks full signoff:
+  - `likelySmoothEnough = false`
+  - `earth_update.updateMs`: `p50 0.10 ms`, `p95 31.4 ms`, `max 391.4 ms`
+  - wind targets still fail on `model_mean_low`, `model_p90_low`, `model_p99_low`, and `viz_step_mean_low`
+  - hotspot attribution still points at `Earth` wind/model diagnostics cadence
 
 ## Fresh evidence from the latest cycle
 
-- Fresh quick half-step revert screening (`cycle-2026-04-09T05-13-43Z-quick-halfstep-reverts-after-qv-fail`) narrowed the next physics candidate set without drifting away from the current convection package:
-  - `thetaeCoeff = 10.5` was the best day-30 candidate (`1.029`)
-  - `rhTrig = 0.735` was the secondary fallback (`1.036`)
-  - `rhMidMin`, `instabTrig`, and `precipEffMicro` half-step reverts were all weaker or worse
-- The verified fix changed real app weather code:
-  - `src/weather/v2/core5.js` -> promoted `vertParams.thetaeCoeff = 10.5`
+- Fresh source inspection from the last live cycle tied the old white panel to `src/App.js` continuously drawing `earth.canvas` into the fixed minimap overlay, while `src/Earth.js` uses `this.canvas` as the fog-of-war canvas.
+- The verified UI/runtime fix changed real app code:
+  - `src/App.js` now gates the minimap draw loop and overlay rendering by game mode
+  - `src/gameModeUi.js` centralizes the minimap visibility rule
+  - `src/gameModeUi.test.js` covers the mode rule directly
 - Targeted automated validation passed:
-  - `node --experimental-default-type=module --experimental-specifier-resolution=node --test src/weather/v2/core5.test.js src/weather/v2/nudging5.test.js src/weather/v2/microphysicsPhase7.test.js src/weather/v2/windNudge5.test.js`: PASS
-- Fresh tracked-code quick audit (`weather-validation/output/cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105/postfix-planetary-audit.json`) confirmed the improved short-horizon baseline:
-  - Day-30 north subtropical dry-belt ratio: `1.029`
-  - ITCZ latitude: `4.266`
-  - Tropical trades (N/S): `-0.790 / -0.329 m/s`
-  - Midlatitude westerlies (S): `0.947 m/s`
-- Fresh tracked-code seasonal follow-through (`weather-validation/output/cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105/postfix-seasonal-planetary-audit.json`) confirmed the improved long-horizon baseline:
-  - Day-90 north subtropical dry-belt ratio: `1.015`
-  - Day-90 equatorial precip: `0.118 mm/hr`
-  - Day-90 north subtropical dry-belt precip: `0.119 mm/hr`
-  - Only remaining seasonal warning: `north_subtropical_dry_belt_too_wet`
+  - `node --experimental-default-type=module --experimental-specifier-resolution=node --test src/gameModeUi.test.js`: PASS
+- Fresh live rerun on the same `thetaeCoeff = 10.5` baseline confirmed:
+  - the lower-right white panel is gone
+  - the old startup `THREE.WebGLRenderer: Texture marked for update but no image data found.` spam is still gone
+  - the canonical solo localhost path still loads and advances normally
+- Fresh live runtime artifacts:
+  - runtime summary: `weather-validation/output/cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix/runtime-summary.json`
+  - hotspot profile: `weather-validation/output/cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix/hotspot-profile.json`
 
 ## What still blocks "world class"
 
-- Northern subtropical dry-belt moisture partitioning is still the dominant planetary blocker, but the fresh quick and seasonal audits have narrowed it to `1.029` at 30 days and `1.015` at 90 days.
-- Live browser realism and runtime smoothness still need a fresh run on the improved `thetaeCoeff = 10.5` baseline before this moisture package can be considered signed off.
-- The lower-right white panel and the remaining runtime smoothness / wind-target issues from the last live run are still unresolved until a fresh browser-backed run proves otherwise.
+- Northern subtropical dry-belt moisture partitioning is still the dominant planetary blocker, even though the quick and seasonal ratios are now down to `1.029` and `1.015`.
+- Browser/runtime signoff is no longer blocked by the old white panel, but it still fails on Earth-update smoothness and weak wind-target diagnostics in the latest live run.
 - Annual / 365-day stability and seasonality evidence is still required before any long-horizon or world-class claim.
-- World-class status still requires realism and smoothness to pass in the same fresh live run.
+- World-class status still requires realism and smoothness to pass in the same browser-backed run.
 
 ## Canonical cycle inputs
 
@@ -72,9 +60,9 @@ Verdict: NOT WORLD CLASS YET
 
 ## Default next priority
 
-1. Run a browser-backed `live` verification cycle on the improved `thetaeCoeff = 10.5` baseline before another headless-only tuning cycle.
-2. If the live run confirms the improved baseline, keep the next physics cycle on northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology.
-3. Preserve both the new `thetaeCoeff = 10.5` moisture package and the texture-readiness guard while investigating the lower-right white panel / runtime issues only if they still block signoff after the new live run.
+1. Run a direct `src/` smoothness/runtime cycle on `Earth` wind/model diagnostics cadence and worker sync using the fresh hotspot profile from the latest live run.
+2. Re-run live verification on the current `thetaeCoeff = 10.5` baseline after the next runtime fix.
+3. If runtime smoothness stops blocking signoff, return the next physics cycle to northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology.
 4. Run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through.
 5. Keep validation on the clean world-class checkout only.
 
