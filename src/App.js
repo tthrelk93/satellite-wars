@@ -755,6 +755,57 @@ const App = () => {
         if (process.env.NODE_ENV !== 'production') {
             window.__sw = window.__sw || {};
             window.__sw.earth = earth;
+            window.__sw.getSimProbeState = () => {
+                const simClock = simClockRef.current;
+                const core = earthRef.current?.weatherField?.core;
+                const elev = core?.geo?.elev;
+                let terrainMax = 0;
+                if (elev?.length) {
+                    for (let i = 0; i < elev.length; i += 1) {
+                        terrainMax = Math.max(terrainMax, elev[i] || 0);
+                    }
+                }
+                const simTimeSeconds = simClock?.simTimeSeconds ?? 0;
+                return {
+                    simTimeSeconds,
+                    simTimeLabel: formatSimTime(simTimeSeconds),
+                    simTimeLabelSeconds: simTimeSeconds,
+                    simSpeed: simClock?.simSpeed ?? null,
+                    paused: simClock?.paused ?? null,
+                    queuedAdvanceSeconds: simAdvanceQueueSecondsRef.current ?? 0,
+                    simAccumSeconds: simAccumSecondsRef.current ?? 0,
+                    burstActive: simBurstActiveRef.current ?? false,
+                    coreTimeUTC: core?.timeUTC ?? null,
+                    weatherReady: Boolean(core?.ready),
+                    terrainReady: terrainMax > 0,
+                    terrainMax,
+                    workerSyncStatus: earthRef.current?.getWeatherWorkerSyncStatus?.(simTimeSeconds) ?? null
+                };
+            };
+            window.__sw.setSimProbePaused = (paused = true) => {
+                simClockRef.current?.setPaused(Boolean(paused));
+                return window.__sw.getSimProbeState?.() ?? null;
+            };
+            window.__sw.queueSimProbeAdvance = (deltaSeconds, options = {}) => {
+                const delta = Number(deltaSeconds);
+                if (Number.isFinite(delta) && delta > 0) {
+                    queueSimAdvanceSeconds(delta, { burst: options?.burst !== false });
+                }
+                return window.__sw.getSimProbeState?.() ?? null;
+            };
+            window.__sw.advanceSimProbeTo = (targetSeconds, options = {}) => {
+                const simClock = simClockRef.current;
+                const current = simClock?.simTimeSeconds ?? 0;
+                const target = Number(targetSeconds);
+                if (!Number.isFinite(target)) {
+                    return window.__sw.getSimProbeState?.() ?? null;
+                }
+                const delta = target - current;
+                if (delta > 0) {
+                    queueSimAdvanceSeconds(delta, { burst: options?.burst !== false });
+                }
+                return window.__sw.getSimProbeState?.() ?? null;
+            };
             window.__sw.sampleRadarV2 = (lat, lon, sigma = 0.95) => sampleV2AtLatLonSigma(
                 earth.weatherField?.core,
                 lat,

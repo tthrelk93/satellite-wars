@@ -4,11 +4,21 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { ensureCyclePlanReady } from './plan-guard.mjs';
+import {
+  flattenTabs,
+  isTransientBrowserError,
+  normalizeObservationTarget,
+  selectMatchingTabs,
+  tabIdOf
+} from './browser-utils.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
 const DEFAULT_STATE_PATH = path.join(repoRoot, 'weather-validation/output/agent-dev-server.json');
+const DEFAULT_BROWSER_TIMEOUT_MS = 60000;
+const DEFAULT_RETRY_COUNT = 3;
+const DEFAULT_RETRY_DELAY_MS = 1500;
 
 const argv = process.argv.slice(2);
 let profile = process.env.OPENCLAW_BROWSER_PROFILE || 'openclaw';
@@ -48,75 +58,68 @@ ensureCyclePlanReady({
   allowNoCycle: true
 });
 
-const normalizedTargetUrl = new URL(targetUrl).href;
-const normalizeObservationTarget = (rawUrl) => {
-  const next = new URL(rawUrl);
-  if (!next.searchParams.get('mode')) {
-    next.searchParams.set('mode', 'solo');
-  }
-  return next;
-};
-const normalizedTarget = normalizeObservationTarget(normalizedTargetUrl);
+const normalizedTarget = normalizeObservationTarget(targetUrl);
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const runBrowser = (args, { expectJson = false, allowFailure = false } = {}) => {
-  const fullArgs = ['browser', '--browser-profile', profile];
+const runBrowserOnce = (args, { expectJson = false, allowFailure = false } = {}) => {
+  const fullArgs = ['browser', '--browser-profile', profile, '--timeout', String(DEFAULT_BROWSER_TIMEOUT_MS)];
   if (expectJson) fullArgs.push('--json');
   fullArgs.push(...args);
   const result = spawnSync('openclaw', fullArgs, {
     cwd: repoRoot,
     encoding: 'utf8'
   });
+  const stdout = result.stdout?.trim() || '';
+  const stderr = result.stderr?.trim() || '';
+  const failureText = stderr || stdout || `openclaw ${fullArgs.join(' ')} failed`;
   if (result.status !== 0 && !allowFailure) {
-    throw new Error(result.stderr || result.stdout || `openclaw ${fullArgs.join(' ')} failed`);
+    throw new Error(failureText);
   }
-  if (!expectJson) return result.stdout?.trim() || '';
-  const text = result.stdout?.trim();
-  if (!text) return null;
-  return JSON.parse(text);
+  if (!expectJson) return stdout;
+  if (!stdout) return null;
+  return JSON.parse(stdout);
 };
 
-const flattenTabs = (value) => {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-  for (const key of ['tabs', 'targets', 'items', 'data']) {
-    if (Array.isArray(value[key])) return value[key];
+const runBrowser = async (args, options = {}) => {
+  let lastError = null;
+  for (let attempt = 1; attempt <= DEFAULT_RETRY_COUNT; attempt += 1) {
+    try {
+      return runBrowserOnce(args, options);
+    } catch (error) {
+      lastError = error;
+      if (attempt >= DEFAULT_RETRY_COUNT || !isTransientBrowserError(error?.message || '')) {
+        break;
+      }
+      await sleep(DEFAULT_RETRY_DELAY_MS * attempt);
+    }
   }
-  return [];
+  throw lastError;
 };
 
-const tabIdOf = (tab) => tab?.id ?? tab?.targetId ?? tab?.tabId ?? tab?.target?.id ?? null;
-const tabUrlOf = (tab) => tab?.url ?? tab?.targetUrl ?? tab?.pageUrl ?? tab?.target?.url ?? null;
-const tabTitleOf = (tab) => tab?.title ?? tab?.target?.title ?? null;
-const tabFocused = (tab) => Boolean(tab?.focused ?? tab?.active ?? tab?.selected ?? tab?.current);
+const listTabs = async () => flattenTabs(await runBrowser(['tabs'], { expectJson: true }) || []);
 
-const scoreTab = (tab) => {
-  const rawUrl = tabUrlOf(tab);
-  if (!rawUrl) return -Infinity;
-  let url;
-  try {
-    url = new URL(rawUrl);
-  } catch (_) {
-    return -Infinity;
+const waitForTabs = async ({ requireMatch = false, timeoutMs = DEFAULT_BROWSER_TIMEOUT_MS } = {}) => {
+  const deadline = Date.now() + timeoutMs;
+  let lastTabs = [];
+  while (Date.now() < deadline) {
+    lastTabs = await listTabs().catch(() => []);
+    if (!requireMatch || selectMatchingTabs(lastTabs, normalizedTarget).length > 0) {
+      return lastTabs;
+    }
+    await sleep(1000);
   }
-  let score = 0;
-  if (url.href === normalizedTarget.href) score += 100;
-  if (url.origin === normalizedTarget.origin) score += 50;
-  if (url.pathname === normalizedTarget.pathname) score += 10;
-  if (url.searchParams.get('mode') === normalizedTarget.searchParams.get('mode')) score += 10;
-  if (tabFocused(tab)) score += 5;
-  if ((tabTitleOf(tab) || '').toLowerCase().includes('satellite')) score += 2;
-  return score;
+  return lastTabs;
 };
 
-runBrowser(['start']);
-const initialTabs = flattenTabs(runBrowser(['tabs'], { expectJson: true }) || []);
-const sortedTabs = [...initialTabs].sort((a, b) => scoreTab(b) - scoreTab(a));
-const matchingTabs = sortedTabs.filter((tab) => scoreTab(tab) > 0 && tabIdOf(tab));
+await runBrowser(['start']);
+await waitForTabs({ requireMatch: false, timeoutMs: 15000 });
+const initialTabs = await waitForTabs({ requireMatch: false, timeoutMs: 15000 });
+const matchingTabs = selectMatchingTabs(initialTabs, normalizedTarget);
 const primary = matchingTabs[0] || null;
 const duplicateIds = keepDuplicates ? [] : matchingTabs.slice(1).map(tabIdOf).filter(Boolean);
 
 for (const id of duplicateIds) {
-  runBrowser(['close', id], { allowFailure: true });
+  await runBrowser(['close', id], { allowFailure: true });
 }
 
 let action = 'opened';
@@ -124,16 +127,19 @@ let targetId = null;
 
 if (primary) {
   targetId = tabIdOf(primary);
-  runBrowser(['focus', targetId]);
-  runBrowser(['navigate', normalizedTarget.href]);
+  await runBrowser(['focus', targetId]);
+  await runBrowser(['navigate', normalizedTarget.href]);
   action = 'reused';
 } else {
-  runBrowser(['open', normalizedTarget.href]);
-  const refreshedTabs = flattenTabs(runBrowser(['tabs'], { expectJson: true }) || []);
-  const bestAfterOpen = [...refreshedTabs].sort((a, b) => scoreTab(b) - scoreTab(a))[0] || null;
-  targetId = tabIdOf(bestAfterOpen);
+  await runBrowser(['open', normalizedTarget.href]);
+}
+
+const refreshedTabs = await waitForTabs({ requireMatch: true, timeoutMs: 20000 });
+const bestAfterNavigation = selectMatchingTabs(refreshedTabs, normalizedTarget)[0] || null;
+if (bestAfterNavigation) {
+  targetId = tabIdOf(bestAfterNavigation);
   if (targetId) {
-    runBrowser(['focus', targetId], { allowFailure: true });
+    await runBrowser(['focus', targetId], { allowFailure: true });
   }
 }
 
