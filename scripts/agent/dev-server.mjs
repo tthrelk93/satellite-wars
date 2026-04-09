@@ -58,7 +58,8 @@ if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
 if (!stop) {
   ensureCyclePlanReady({
     commandName: 'agent:dev-server',
-    allowNoCycle: true
+    allowNoCycle: false,
+    requireCycleState: true
   });
 }
 

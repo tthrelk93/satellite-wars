@@ -44,7 +44,8 @@ if (!inputPath) {
 ensureCyclePlanReady({
   commandName: 'agent:summarize-runtime-log',
   artifactPath: outPath,
-  allowNoCycle: true
+  allowNoCycle: false,
+  requireCycleState: true
 });
 
 const quantile = (values, q) => {

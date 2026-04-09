@@ -3,11 +3,13 @@ import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { findNewestActiveCycleDir, readCycleState } from './plan-guard.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
 const reportsDir = path.join(repoRoot, 'weather-validation', 'reports');
+const outputDir = path.join(repoRoot, 'weather-validation', 'output');
 const workerBriefBase = path.join(reportsDir, 'worker-brief');
 
 const readJsonIfExists = (filePath) => {
@@ -68,6 +70,8 @@ const worldStatusJson = readJsonIfExists(path.join(reportsDir, 'world-class-weat
 const planetaryStatus = readJsonIfExists(path.join(reportsDir, 'planetary-realism-status.json'));
 const earthAccuracyMd = readTextIfExists(path.join(reportsDir, 'earth-accuracy-status.md'));
 const cycleStreak = runNodeJson('scripts/agent/summarize-cycle-streak.mjs');
+const activeCycleDir = findNewestActiveCycleDir(outputDir);
+const activeCycleState = activeCycleDir ? readCycleState(activeCycleDir) : null;
 
 const recentCommits = runGit(['log', '-n', '6', '--format=%h %s']).trim().split('\n').filter(Boolean);
 const verdictMatch = worldStatusMd?.match(/Verdict:\s*(.+)/i);
@@ -89,6 +93,14 @@ const brief = {
   lastPhysicsCommit: cycleStreak?.physicsGuard?.lastPhysicsCommit || null,
   currentPhysicsGuard: cycleStreak?.physicsGuard || null,
   currentStallGuard: cycleStreak?.stallGuardTriggered || null,
+  activeCycle: activeCycleDir ? {
+    id: path.basename(activeCycleDir),
+    path: path.relative(repoRoot, activeCycleDir),
+    mode: activeCycleState?.mode || null,
+    resumeAcrossHeartbeats: Boolean(activeCycleState?.resumeAcrossHeartbeats),
+    lastTouchedAt: activeCycleState?.lastTouchedAt || null,
+    focusArea: activeCycleState?.focusArea || null
+  } : null,
   blockingGaps,
   defaultNextPriorities,
   planetaryWarnings,
@@ -110,6 +122,17 @@ const markdown = [
   `Verdict: ${brief.verdict}`,
   `Latest verified cycle: ${brief.latestVerifiedCycle || 'unknown'}`,
   `Benchmark suite: ${brief.benchmarkOverallPass ? 'PASS' : 'unknown'}`,
+  '',
+  '## Active cycle',
+  '',
+  ...(brief.activeCycle ? [
+    `- Active cycle id: ${brief.activeCycle.id}`,
+    `- Focus area: ${brief.activeCycle.focusArea || 'unknown'}`,
+    `- Mode: ${brief.activeCycle.mode || 'unknown'}`,
+    `- Resume across heartbeats: ${brief.activeCycle.resumeAcrossHeartbeats ? 'yes' : 'no'}`,
+    `- Last touched: ${brief.activeCycle.lastTouchedAt || 'unknown'}`,
+    '- Resume this cycle instead of starting a fresh one unless recovery or a blocker-family change explicitly says otherwise.'
+  ] : ['- No active cycle. Start a fresh one with `npm run agent:start-cycle -- ...` before heavy work.']),
   '',
   '## Startup shortcut',
   '',

@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import { findNewestActiveCycleDir } from './plan-guard.mjs';
+import { findNewestActiveCycleDir, readCycleState } from './plan-guard.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -165,6 +165,18 @@ export function recoverInterruptedCycle({
   }
 
   const cycleId = path.basename(cycleDir);
+  const cycleState = readCycleState(cycleDir);
+  if (cycleState?.resumeAcrossHeartbeats && !dirtyTrackedPaths.length) {
+    return {
+      schema: 'satellite-wars.recovered-cycle.v1',
+      recovered: false,
+      reason: 'active_cycle_continuation_allowed',
+      cycleId,
+      cycleDir: rel(repoRoot, cycleDir),
+      mode: cycleState.mode,
+      resumeAcrossHeartbeats: true
+    };
+  }
   const dirtyPatch = readDirtyPatch(repoRoot, dirtyTrackedPaths);
   const patchPath = dirtyPatch
     ? path.join(cycleDir, 'interrupted-worktree.patch')

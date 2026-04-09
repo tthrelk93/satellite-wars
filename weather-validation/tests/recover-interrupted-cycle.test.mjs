@@ -74,3 +74,22 @@ test('recoverInterruptedCycle closes the stale cycle, snapshots the patch, and r
   assert.ok(fs.existsSync(path.join(cycleDir, 'interrupted-worktree.patch')));
   assert.ok(fs.existsSync(path.join(cycleDir, 'interrupted-cycle-recovery.json')));
 });
+
+test('recoverInterruptedCycle preserves a clean seasonal cycle for heartbeat continuation', () => {
+  const repoRoot = initTempRepo();
+  const outputDir = path.join(repoRoot, 'weather-validation', 'output');
+  const cycleDir = path.join(outputDir, 'cycle-2026-04-09T01-27-43Z-circulation-moisture-belt-recovery');
+  fs.mkdirSync(cycleDir, { recursive: true });
+  fs.writeFileSync(path.join(cycleDir, 'plan.md'), '# Plan\n');
+  fs.writeFileSync(path.join(cycleDir, 'cycle-state.json'), JSON.stringify({
+    mode: 'seasonal',
+    resumeAcrossHeartbeats: true
+  }));
+
+  const result = recoverInterruptedCycle({ repoRoot, outputDir });
+
+  assert.equal(result.recovered, false);
+  assert.equal(result.reason, 'active_cycle_continuation_allowed');
+  assert.equal(result.mode, 'seasonal');
+  assert.equal(fs.existsSync(path.join(cycleDir, 'checkpoint.md')), false);
+});

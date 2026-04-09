@@ -29,10 +29,16 @@ When reassessing the next blocker, prefer concrete weaknesses in one of these ar
 
 ## Primary offline realism harnesses
 
+- Declare the cycle mode first with `npm run agent:start-cycle -- ...`.
+- Use `mode=quick` for 30-day blocker ranking and cheap candidate screens.
+- Use `mode=seasonal` for 90-day follow-through after broad circulation, storm, cloud, or moisture fixes.
+- Use `mode=annual` for 365-day stability, seasonality, and tropical-cyclone-climatology claims.
+- Seasonal and annual cycles may stay open across multiple heartbeats while the worktree stays clean; resume them instead of starting from zero.
 - Use `npm run agent:planetary-realism-audit -- --preset quick` for broad 30-day realism screening.
 - Use `npm run agent:planetary-realism-audit -- --preset seasonal` when a change touches circulation, clouds, moisture partitioning, or storm organization.
 - Use `npm run agent:planetary-realism-audit -- --preset annual` before claiming world-class seasonal behavior or when the blocker is explicitly annual/seasonal stability.
 - Use `npm run agent:orographic-audit -- --targets 75600,105480` only when the broader realism screen or current evidence says the blocker is still terrain-specific.
+- If you need a broad parameter sweep, use `npm run agent:planetary-candidate-sweep` with a cycle-local candidates file instead of ad hoc inline scripts.
 
 The planetary realism audit exists to keep the worker from camping on mountain-only metrics while circulation, storm evolution, and seasonality remain under-audited.
 

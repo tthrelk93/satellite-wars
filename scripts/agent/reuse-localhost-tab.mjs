@@ -55,7 +55,8 @@ if (!targetUrl) {
 
 ensureCyclePlanReady({
   commandName: 'agent:reuse-localhost-tab',
-  allowNoCycle: true
+  allowNoCycle: false,
+  requireCycleState: true
 });
 
 const normalizedTarget = normalizeObservationTarget(targetUrl);

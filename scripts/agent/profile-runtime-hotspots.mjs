@@ -46,7 +46,8 @@ if (!inputPath) {
 ensureCyclePlanReady({
   commandName: 'agent:profile-runtime-hotspots',
   artifactPath: outPath,
-  allowNoCycle: true
+  allowNoCycle: false,
+  requireCycleState: true
 });
 
 const quantile = (values, q) => {

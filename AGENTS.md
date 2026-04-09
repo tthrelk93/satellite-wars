@@ -18,6 +18,7 @@ Wake model:
 Start-up sequence at the start of every wake:
 - run `npm run agent:wake-bootstrap`
 - read `weather-validation/reports/worker-brief.md`
+- if the worker brief reports an active cycle with `resumeAcrossHeartbeats = true`, resume that same cycle instead of opening a new one
 
 Only reopen the detailed playbooks or the newest checkpoint when:
 - the worker brief says the blocker family changed,
@@ -64,19 +65,29 @@ Mandatory cycle protocol:
 1. Run `npm run agent:wake-bootstrap`, then read `weather-validation/reports/worker-brief.md`.
    - If it reports `recovered = true`, inspect the recovery artifacts, keep the recovered cycle closed, and start a fresh cycle directory instead of continuing inside the interrupted one.
    - If it reports `reason = dirty_worktree_without_active_cycle`, do not continue the cycle. Treat that as a worker-state violation, inspect the dirty tracked files, restore the worktree to `HEAD`, and only then start a fresh cycle.
+   - If it reports `reason = active_cycle_continuation_allowed`, resume that same cycle and keep its existing plan/cycle-state contract.
 2. Reassess the highest-leverage remaining realism weakness first using the worker brief and the most recent planetary/offline audit, and only choose smoothness instead when the cycle selection rule allows it.
-3. Write a testable hypothesis and explicit pass/fail criteria in `plan.md`.
-   - `plan.md` must exist before any heavy audit, browser, dev-server, or runtime-log command runs.
+3. Declare the cycle contract with `npm run agent:start-cycle -- ...` unless you are explicitly resuming an already-open long-horizon cycle.
+   - Choose one execution mode before heavy work:
+     - `quick`: 30-day screening and fast candidate ranking
+     - `seasonal`: 90-day validation after broad circulation/cloud/moisture/storm changes
+     - `annual`: 365-day stability or seasonality validation before any world-class claim
+     - `terrain`: mountain/orographic investigation
+     - `smoothness`: runtime/performance investigation
+   - `npm run agent:start-cycle -- ...` must create both `plan.md` and `cycle-state.json`.
+   - `plan.md` and `cycle-state.json` must exist before any heavy audit, browser, dev-server, runtime-log, or candidate-sweep command runs.
    - If heavy work starts after cycle-local artifacts already exist but `plan.md` is still missing, that is a workflow violation and the cycle should abort immediately.
+   - A heavy command with `plan.md` but no `cycle-state.json` is also a workflow violation and the cycle should abort immediately.
    - If realism is the blocker, name one concrete target area from the list above.
    - If `npm run agent:cycle-streak` reports `physicsGuard.triggered = true`, the plan must name the expected `src/` file(s) to change.
-4. Create `weather-validation/output/cycle-<UTC>-<slug>/`.
+4. Create or resume `weather-validation/output/cycle-<UTC>-<slug>/` only through the cycle contract.
 5. If `npm run agent:cycle-streak` reports a soft or hard stall, convert the run into a blocker-breaker cycle before any ordinary experimentation.
    - If it reports `physicsGuard.triggered = true`, this is a physics-delivery cycle, not a tooling-victory cycle.
 6. If realism is the blocker, capture the freshest evidence that can rank the blocker against the rest of the planet before changing behavior.
    - If the blocker is broad realism, start with `npm run agent:planetary-realism-audit -- --preset quick`.
    - Escalate to `--preset seasonal` after a broad circulation/moisture/storm change.
    - Escalate to `--preset annual` before claiming world-class seasonality or when the blocker is explicitly annual/seasonal stability.
+   - If you need a parameter screen or broad candidate ranking, do not use ad hoc inline `node`, `python`, or shell heredocs. Use `npm run agent:planetary-candidate-sweep -- --candidates-file <cycle>/...json --out <cycle>/...json --md-out <cycle>/...md`.
    - If the blocker is already proven to be terrain-specific, start with `npm run agent:orographic-audit -- --targets 75600,105480`.
    - If you need a machine-readable audit artifact, write it with `--out <cycle>/...json`.
    - Never create a `.json` artifact by redirecting `npm run ...` stdout with `> file.json` or by piping it through text filters first.
@@ -124,6 +135,8 @@ Observation policy:
 - Long observation is allowed only when `plan.md` names the question being measured and the pass/fail criteria.
 - Default live observation window: 3-10 minutes.
 - Maximum long observation window per cycle: 20 minutes.
+- The 10-minute cron cadence is a heartbeat, not a kill timer. Long-horizon headless cycles may span multiple heartbeats.
+- Seasonal and annual cycles should stay open across wakes when the worktree is clean; the next wake should resume/checkpoint them instead of auto-closing them.
 - Prefer short browser checks plus logs when a long watch is not necessary.
 - In a blocker-breaker cycle, use at most one browser verification run. Do not spend the cycle on repeated fresh baselines.
 - Do not let live verification become the only realism gate. When browser/CDP reliability is degraded, continue progress with planetary and terrain-specific offline audits while isolating the live blocker.
@@ -140,6 +153,7 @@ Performance policy:
 
 Required artifacts per cycle:
 - `plan.md`
+- `cycle-state.json`
 - `checkpoint.md`
 - `evidence-summary.json`
 - `weather-validation/reports/worker-brief.md` refreshed whenever baseline/blocker ranking changes materially
@@ -157,6 +171,7 @@ Required artifacts per cycle:
 World-class bar:
 - The benchmark suite passes.
 - The planetary realism audit passes at the appropriate horizon for the claim being made.
+- 30-day, 90-day, and 365-day claims must be backed by the matching cycle mode and audit horizon.
 - Live browser runs still look Earth-like over time.
 - No obvious runaway drift, dead circulation, fake-looking cloud texture, or broken wind structure.
 - The model has been re-audited across circulation, vertical coupling, clouds/precipitation, storm structure, and multi-day realism, not just wind targets.

@@ -45,12 +45,6 @@ if (overridesFile) {
   overrides = JSON.parse(fs.readFileSync(overridesFile, 'utf8'));
 }
 
-ensureCyclePlanReady({
-  commandName: 'agent:orographic-audit',
-  artifactPath: outPath,
-  allowNoCycle: true
-});
-
 targets = [...new Set(targets)].filter((value) => Number.isFinite(value) && value >= 0).sort((a, b) => a - b);
 if (!targets.length) targets = [75600, 105480];
 if (!Number.isFinite(seed)) seed = 12345;
@@ -392,6 +386,13 @@ export function summarizeCore(core, targetSeconds) {
 }
 
 export async function main() {
+  ensureCyclePlanReady({
+    commandName: 'agent:orographic-audit',
+    artifactPath: outPath,
+    allowNoCycle: false,
+    requireCycleState: true,
+    allowedModes: ['terrain', 'quick', 'seasonal', 'annual']
+  });
   const outputState = prepareAtomicJsonOutput(outPath, {
     seed,
     targets,

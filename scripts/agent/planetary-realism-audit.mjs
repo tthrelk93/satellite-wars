@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
 const defaultReportBase = path.join(repoRoot, 'weather-validation', 'reports', 'planetary-realism-status');
 
-const PRESETS = {
+export const PLANETARY_PRESETS = {
   quick: {
     nx: 48,
     ny: 24,
@@ -85,7 +85,7 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--report-base=')) reportBase = path.resolve(arg.slice('--report-base='.length));
 }
 
-const presetConfig = PRESETS[preset] || PRESETS.quick;
+const presetConfig = PLANETARY_PRESETS[preset] || PLANETARY_PRESETS.quick;
 nx = Number.isFinite(nx) && nx > 0 ? nx : presetConfig.nx;
 ny = Number.isFinite(ny) && ny > 0 ? ny : presetConfig.ny;
 dt = Number.isFinite(dt) && dt > 0 ? dt : presetConfig.dt;
@@ -96,12 +96,6 @@ horizonsDays = Array.isArray(horizonsDays) && horizonsDays.length
 if (!Number.isFinite(seed)) seed = 12345;
 
 const effectiveReportBase = outPath || mdOutPath ? null : (reportBase || defaultReportBase);
-
-ensureCyclePlanReady({
-  commandName: 'agent:planetary-realism-audit',
-  artifactPath: outPath || mdOutPath || (effectiveReportBase ? `${effectiveReportBase}.json` : null),
-  allowNoCycle: true
-});
 
 const SECONDS_PER_DAY = 86400;
 const DEFAULT_TROPICAL_LAT = 12;
@@ -122,7 +116,7 @@ const dayToMonthIndex = (day) => {
 
 const monthName = (monthIndex) => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][monthIndex] || `M${monthIndex + 1}`;
 
-const buildSampleTargetsDays = (horizonList, cadenceDays) => {
+export const buildSampleTargetsDays = (horizonList, cadenceDays) => {
   const targets = new Set(horizonList);
   const maxHorizon = horizonList[horizonList.length - 1];
   for (let day = cadenceDays; day < maxHorizon; day += cadenceDays) {
@@ -226,7 +220,7 @@ const computeTropicalCycloneEnvironment = (diagnostics) => {
   return counts;
 };
 
-const classifySnapshot = (diagnostics, targetDay) => {
+export const classifySnapshot = (diagnostics, targetDay) => {
   const { grid, precipRateMmHr, cloudTotalFraction, wind10mU, wind10mSpeedMs, totalColumnWaterKgM2, cycloneSupportFields } = diagnostics;
   const { nx, ny, latitudesDeg } = grid;
   const rowWeights = makeRowWeights(latitudesDeg);
@@ -280,7 +274,7 @@ const classifySnapshot = (diagnostics, targetDay) => {
   };
 };
 
-const computeSeasonalityScore = (samples) => {
+export const computeSeasonalityScore = (samples) => {
   const buckets = Array.from({ length: 12 }, (_, monthIndex) => ({
     monthIndex,
     nh: [],
@@ -313,7 +307,7 @@ const computeSeasonalityScore = (samples) => {
   };
 };
 
-const evaluateHorizons = (samples, horizonDays) => {
+export const evaluateHorizons = (samples, horizonDays) => {
   const warnings = [];
   const latest = samples.find((sample) => sample.targetDay === horizonDays) || samples[samples.length - 1];
   if (!latest) return { warnings: ['no_samples'], categories: {}, latest: null };
@@ -424,6 +418,13 @@ const renderMarkdown = (summary) => {
 };
 
 export async function main() {
+  ensureCyclePlanReady({
+    commandName: 'agent:planetary-realism-audit',
+    artifactPath: outPath || mdOutPath || (effectiveReportBase ? `${effectiveReportBase}.json` : null),
+    allowNoCycle: false,
+    requireCycleState: true,
+    allowedModes: ['quick', 'seasonal', 'annual']
+  });
   if (typeof process !== 'undefined' && !process.env?.NODE_ENV) {
     process.env.NODE_ENV = 'production';
   }
@@ -521,6 +522,7 @@ if (isMain) {
 }
 
 export const _test = {
+  PLANETARY_PRESETS,
   buildSampleTargetsDays,
   classifySnapshot,
   computeSeasonalityScore,
