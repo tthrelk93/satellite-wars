@@ -6,7 +6,7 @@ Verdict: NOT WORLD CLASS YET
 ## Current baseline
 
 - Clean worker worktree: `codex/world-class-weather-loop`
-- Latest verified cycle: `cycle-2026-04-09T03-55-50Z-convection-seasonal-durability`
+- Latest verified cycle: `cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard`
 - Earth accuracy suite: PASS (`weather-validation/reports/earth-accuracy-status.md`)
 - The latest verified physics change promotes a seasonally durable convection-side moisture package in `src/weather/v2/core5.js`:
   - `vertParams.rhTrig: 0.75 -> 0.72`
@@ -26,10 +26,27 @@ Verdict: NOT WORLD CLASS YET
   - Day-90 north subtropical dry-belt ratio: `1.191 -> 1.031`
   - Day-90 tropical trades (N/S): `-0.792 / -0.333 -> -0.793 / -0.331 m/s`
   - Day-90 midlatitude westerlies (S): `0.948 -> 0.948 m/s`
+- A fresh live-runtime follow-up in `src/Earth.js` now guards anisotropy uploads behind texture-readiness via `src/textureUtils.js`, which removes the old startup `THREE.WebGLRenderer: Texture marked for update but no image data found.` spam on a fresh localhost tab.
+- Fresh patched-live telemetry still shows that browser signoff is not done yet:
+  - the lower-right white panel persists on fresh load,
+  - runtime summary still flags `earth_update_p95_high`, `earth_update_max_high`, and `wind_targets_failing`,
+  - the startup texture-warning spam no longer reproduces on a clean reopened tab.
 - The main blocker is still northern subtropical dry-belt moisture partitioning, but the seasonal gap is now materially smaller. The next cycles should optimize the quick-versus-seasonal balance around this convection package instead of re-discovering the same lever from scratch.
 
 ## Fresh evidence from the latest cycle
 
+- Fresh smoothness/runtime cycle (`cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard`) landed a real `src/` fix in the browser path:
+  - `src/Earth.js` now applies anisotropy through a texture-readiness guard instead of forcing premature uploads
+  - `src/textureUtils.js` centralizes the image-data readiness check
+  - `src/textureUtils.test.js` adds targeted automated coverage for unloaded-versus-ready textures
+- Targeted automated validation passed:
+  - `node --experimental-default-type=module --experimental-specifier-resolution=node --test src/textureUtils.test.js`: PASS
+- Fresh browser verification on a brand-new reopened localhost tab no longer emitted the old Three.js startup texture warning.
+- Fresh patched runtime summary (`weather-validation/output/cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard/runtime-summary.json`) still shows broader runtime work remaining:
+  - `likelySmoothEnough: false`
+  - `earth_update.updateMs`: `p50 0.10 ms`, `p95 23.64 ms`, `max 388.2 ms`
+  - Wind-target failures still include `model_mean_low`, `model_p90_low`, `model_p99_low`, and `viz_step_mean_low`
+- Fresh patched hotspot profile (`weather-validation/output/cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard/hotspot-profile.json`) no longer singled out the old texture-warning path; the remaining spikes were mixed and not yet strong enough to justify another runtime-only experiment ahead of the next physics cycle.
 - Fresh same-cycle seasonal baseline audit (`weather-validation/output/cycle-2026-04-09T03-55-50Z-convection-seasonal-durability/prefix-seasonal-planetary-audit.json`) confirmed the current verified long-horizon blocker:
   - Day-90 north subtropical dry-belt ratio: `1.191`
   - Only seasonal warning: `north_subtropical_dry_belt_too_wet`
@@ -55,10 +72,9 @@ Verdict: NOT WORLD CLASS YET
 
 - Northern subtropical dry-belt moisture partitioning is still the dominant planetary blocker: the new quick and seasonal audits both still fail `north_subtropical_dry_belt_too_wet` (`1.094` at 30 days, `1.031` at 90 days).
 - The quick screen now lags the seasonal gain slightly, so the next moisture cycle should improve the 30-day ratio without giving back the new 90-day durability.
-- Live browser realism and runtime smoothness still need a fresh run with the seasonally durable convection package before this broader-circulation baseline can be considered signed off.
-- The console texture-warning spam (`THREE.WebGLRenderer: Texture marked for update but no image data found.`) remains unresolved and was not part of this offline convection cycle.
+- Browser signoff is still blocked even after the fresh runtime patch: the lower-right white panel persists, runtime telemetry still fails the current smoothness gate, and wind targets remain too weak in the fresh patched run.
 - Annual / 365-day stability and seasonality evidence is still required before any long-horizon or world-class claim.
-- World-class status still requires realism and smoothness to pass in the same fresh live run.
+- World-class status still requires realism and smoothness to pass in the same verified browser-backed run.
 
 ## Canonical cycle inputs
 
@@ -75,9 +91,10 @@ Verdict: NOT WORLD CLASS YET
 
 1. Keep the next cycle on northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology, but tune around the new seasonally durable convection package so the 30-day ratio improves without losing the 90-day gain.
 2. Stay in real `src/` moisture/circulation code rather than returning to terrain-only tuning unless a fresh planetary audit re-ranks terrain highest.
-3. Re-run live localhost verification and runtime telemetry after the next moisture fix so browser realism and smoothness are checked against the updated convection baseline.
-4. Run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through.
-5. Keep validation on the clean world-class checkout only.
+3. Preserve the new texture-readiness guard and only return to browser/runtime debugging if the lower-right white panel or Earth-update smoothness still blocks signoff after the next physics gain.
+4. Re-run live localhost verification and runtime telemetry after the next moisture fix so browser realism and smoothness are checked against the updated convection baseline.
+5. Run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through.
+6. Keep validation on the clean world-class checkout only.
 
 ## Commit discipline
 

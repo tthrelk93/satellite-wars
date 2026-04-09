@@ -14,6 +14,7 @@ import { RadarSensor } from './sensors/weather/RadarSensor';
 import { SoundingSensor } from './sensors/weather/SoundingSensor';
 import { AmvSensor } from './sensors/weather/AmvSensor';
 import { paintGridToTexture } from './sensors/weather/paintGridToTexture';
+import { applyTextureAnisotropy } from './textureUtils.js';
 import WindStreamlineRenderer from './WindStreamlineRenderer';
 import { CLOUD_WATCH_GRID_LON_OFFSET_RAD, WIND_REALISM_TARGETS } from './constants';
 import { takeBoundedAccumulatedStep } from './weather/workerStepBudget';
@@ -4306,9 +4307,7 @@ class Earth {
     const value = Number.isFinite(anisotropy) ? Math.max(1, Math.floor(anisotropy)) : 1;
     this._textureAnisotropy = value;
     const apply = (texture) => {
-      if (!texture) return;
-      texture.anisotropy = value;
-      texture.needsUpdate = true;
+      applyTextureAnisotropy(texture, value);
     };
     apply(this._baseMapTexture);
     apply(this._bumpTexture);

@@ -1,16 +1,16 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-09T04:10:00Z",
+  "updatedAt": "2026-04-09T04:46:49Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
   "baselineCommit": "94d5805",
   "latestCycle": {
-    "id": "cycle-2026-04-09T03-55-50Z-convection-seasonal-durability",
-    "goal": "promote a seasonally durable convection-side moisture package that materially improves the day-90 north subtropical dry-belt ratio without rebreaking the recovered circulation",
-    "verifiedImprovement": "promoting a milder convection package in src/weather/v2/core5.js improved the day-90 north subtropical dry-belt ratio from 1.191 to 1.031 while keeping circulation, storm-track, cloud-balance, and stability categories passing; the day-30 ratio softened slightly from 1.079 to 1.094 but the same single blocker remained",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T03-55-50Z-convection-seasonal-durability/checkpoint.md",
-    "runtimeLogPath": null
+    "id": "cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard",
+    "goal": "remove the fresh live startup texture-warning spam without regressing the canonical localhost runtime path",
+    "verifiedImprovement": "guarding anisotropy uploads in src/Earth.js behind real texture image readiness eliminated the old Three.js startup texture-warning spam on a fresh reopened localhost tab while preserving the live app path; broader smoothness, wind-target, and white-panel blockers still remain",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard/checkpoint.md",
+    "runtimeLogPath": "logs/weather-2026-04-09T04-44-18Z-68278.jsonl"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
@@ -19,10 +19,9 @@
   "blockingGaps": [
     "northern subtropical dry-belt moisture partitioning still fails in both fresh quick and seasonal audits, even though the day-90 baseline improved materially",
     "the next moisture cycle needs to recover the slight 30-day regression without losing the new 90-day durability",
-    "live browser realism and runtime smoothness still need a fresh run with the updated convection package",
-    "the live app still has unresolved THREE.WebGLRenderer texture-update warnings",
+    "browser signoff is still blocked by the persistent lower-right white panel plus fresh earth-update and wind-target failures in the patched runtime run",
     "annual / 365-day evidence is still missing for any long-horizon or world-class claim",
-    "world-class status still requires realism and smoothness to pass in the same fresh live run"
+    "world-class status still requires realism and smoothness to pass in the same verified browser-backed run"
   ],
   "cycleInputs": [
     "weather-validation/reports/earth-accuracy-status.md",
@@ -39,7 +38,7 @@
     "localhostTabReuse": {
       "url": "http://127.0.0.1:3000/?mode=solo",
       "duplicatesClosed": 0,
-      "targetId": "0101253A477583FDF582DF0C9D899269"
+      "targetId": "1B3ABBD598471D43670113D5124F0BE1"
     },
     "broadCirculationRecovery": {
       "quickAuditPath": "weather-validation/output/cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery/postfix-planetary-audit.json",
@@ -91,7 +90,7 @@
       "tradeoffNote": "This package trades a small 30-day moisture-score regression for a materially better 90-day moisture partitioning baseline while preserving the circulation category."
     },
     "runtimeSummary": {
-      "lineCount": 212,
+      "lineCount": 344,
       "validationSnapshotCount": 0,
       "warnings": [
         "earth_update_p95_high",
@@ -99,14 +98,23 @@
         "wind_targets_failing"
       ]
     },
+    "runtimeTextureWarningFix": {
+      "cycleId": "cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard",
+      "checkpointPath": "weather-validation/output/cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard/checkpoint.md",
+      "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard/runtime-summary.json",
+      "hotspotProfilePath": "weather-validation/output/cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard/hotspot-profile.json",
+      "validatedBy": "node --experimental-default-type=module --experimental-specifier-resolution=node --test src/textureUtils.test.js",
+      "result": "fresh reopened localhost tab no longer reproduced the startup THREE.WebGLRenderer texture-update warning"
+    },
     "browserObservation": {
       "singlePlayerLoaded": true,
-      "note": "The last verified live localhost run still reused the canonical solo-mode tab, kept the single-page-tab path clean, and preserved non-empty runtime telemetry; the recent broad-realism cycles stayed headless by design and did not reopen the browser."
+      "note": "The latest verified live-runtime cycle reused the canonical solo-mode tab, then reopened a fresh single localhost tab to verify that the startup Three.js texture-warning spam was gone. The lower-right white panel still persists and the patched run still fails the current smoothness gate."
     }
   },
   "defaultNextPriority": [
     "keep the next cycle on northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology, but tune around the new seasonally durable convection package so the 30-day ratio improves without losing the 90-day gain",
     "stay in real src-side moisture/circulation code rather than returning to terrain-only tuning unless a fresh planetary audit re-ranks terrain highest",
+    "preserve the new texture-readiness guard and only return to browser/runtime debugging if the lower-right white panel or Earth-update smoothness still blocks signoff after the next physics gain",
     "re-run live localhost verification and runtime telemetry after the next moisture fix so browser realism and smoothness are checked against the updated convection baseline",
     "run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through",
     "keep validation on the clean world-class checkout only"
