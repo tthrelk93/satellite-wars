@@ -1,27 +1,26 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-09T01:22:00Z",
+  "updatedAt": "2026-04-09T02:31:00Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
   "baselineCommit": "c566484",
   "latestCycle": {
-    "id": "cycle-2026-04-08T21-25-17Z-terrain-coupling-lee-rain-retention-gate",
-    "goal": "clear the mature Andes windward-parity blocker by tightening the coupled lee no-delivery and warm-rain suppression defaults without breaking Rockies or Himalaya-Tibet windward favorability",
-    "verifiedImprovement": "the coupled lee rain-retention gate in src/weather/v2/vertical5.js, src/weather/v2/microphysics5.js, and src/weather/v2/core5.js pushed the audited Andes mature-window precipRatio from 0.9759 to 1.0899 at 105480 while preserving windward-favored Rockies and Himalaya-Tibet behavior, and the targeted validation suite still passed",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-08T21-25-17Z-terrain-coupling-lee-rain-retention-gate/checkpoint.md",
-    "runtimeLogPath": "logs/weather-2026-04-08T22-12-34Z-16419.jsonl"
+    "id": "cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery",
+    "goal": "restore broad circulation by strengthening the default surface wind restore so tropical trades and southern westerlies recover without destabilizing the 30-day or 90-day planetary screens",
+    "verifiedImprovement": "promoting the stronger default surface-wind restore in src/weather/v2/core5.js collapsed the planetary warning set from four broad circulation/moisture failures to one remaining north-subtropical dry-belt blocker in the 30-day audit and preserved the same single blocker through the 90-day seasonal follow-through",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery/checkpoint.md",
+    "runtimeLogPath": null
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
     "overallPass": true
   },
   "blockingGaps": [
-    "the newest planetary quick audit says the dominant blocker is now broad circulation and moisture-belt realism, not Andes parity: trades are missing in both hemispheres, southern westerlies are weak, and the northern subtropical dry belt is too wet",
-    "broader Earth-like realism still needs fresh multi-day and seasonal re-audits in the live app and headless path with the new terrain-coupled lee drying active across circulation, clouds, storms, and precipitation placement",
-    "orographic realism improved enough that it should not monopolize the worker; terrain-only tuning should stay secondary unless a fresh planetary audit ranks it first again",
-    "runtime smoothness is still not signed off; the latest live run now has healthy telemetry and still reports earth_update_p95_high, earth_update_max_high, and wind_targets_failing",
-    "the live browser path is functional, but the console still emits repeated THREE.WebGLRenderer texture-update warnings",
+    "northern subtropical dry-belt moisture partitioning is still failing in both fresh quick and seasonal audits even after circulation recovery",
+    "live browser realism and runtime smoothness still need a fresh run with the stronger surface-wind restore",
+    "the live app still has unresolved THREE.WebGLRenderer texture-update warnings",
+    "annual / 365-day evidence is still missing for any long-horizon or world-class claim",
     "world-class status still requires realism and smoothness to pass in the same fresh live run"
   ],
   "cycleInputs": [
@@ -41,46 +40,33 @@
       "duplicatesClosed": 0,
       "targetId": "0101253A477583FDF582DF0C9D899269"
     },
-    "terrainCoupledLeeDrying": {
-      "andesPrecipRatio": {
-        "target75600": {
-          "before": 1.0393757548207367,
-          "after": 1.0566271696394067
-        },
-        "target105480": {
-          "before": 0.9270697297097061,
-          "after": 0.9630743787044505
-        }
+    "broadCirculationRecovery": {
+      "quickAuditPath": "weather-validation/output/cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery/postfix-planetary-audit.json",
+      "seasonalAuditPath": "weather-validation/output/cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery/postfix-seasonal-planetary-audit.json",
+      "candidateSweepPath": "weather-validation/output/cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery/planetary-candidate-sweep.json",
+      "runtimeMoistureSweepPath": "weather-validation/output/cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery/planetary-candidate-sweep-runtime-moisture.json",
+      "quickMetrics": {
+        "tropicalTradesNorthU10Ms": -0.791,
+        "tropicalTradesSouthU10Ms": -0.33,
+        "midlatitudeWesterliesSouthU10Ms": 0.94,
+        "subtropicalDryNorthRatio": 1.079,
+        "warnings": [
+          "north_subtropical_dry_belt_too_wet"
+        ]
       },
-      "andesQrLowRatio": {
-        "target105480": {
-          "before": 0.8871190925775457,
-          "after": 0.9210632887800503
-        }
+      "seasonalMetrics": {
+        "tropicalTradesNorthU10Ms": -0.792,
+        "tropicalTradesSouthU10Ms": -0.333,
+        "midlatitudeWesterliesSouthU10Ms": 0.948,
+        "subtropicalDryNorthRatio": 1.191,
+        "warnings": [
+          "north_subtropical_dry_belt_too_wet"
+        ]
       },
-      "rockiesPrecipRatio": {
-        "target75600": {
-          "before": 1.369103913338332,
-          "after": 1.3701714004481316
-        },
-        "target105480": {
-          "before": 1.3421486895375672,
-          "after": 1.3430272514168617
-        }
-      },
-      "himalayaTibetPrecipRatio": {
-        "target75600": {
-          "before": 1.0083300499944083,
-          "after": 1.2096577695263109
-        },
-        "target105480": {
-          "before": 1.4147979170086364,
-          "after": 1.6334961593164208
-        }
-      }
+      "notableFinding": "Surface wind restoring was the dominant circulation lever. Moisture-only nudges were weaker, and post-init nudgeParams edits do not affect _nudgeParamsRuntime without targeting the runtime clone or core defaults."
     },
     "runtimeSummary": {
-      "lineCount": 173,
+      "lineCount": 212,
       "validationSnapshotCount": 0,
       "warnings": [
         "earth_update_p95_high",
@@ -90,15 +76,14 @@
     },
     "browserObservation": {
       "singlePlayerLoaded": true,
-      "note": "reused the canonical localhost solo-mode tab, kept the single-page-tab path clean, saw sim time advance from Day 0, 01:58 to Day 0, 07:38 in the same tab, and still captured non-empty runtime telemetry while repeated renderer texture warnings remained visible in the console"
+      "note": "The last verified live localhost run still reused the canonical solo-mode tab, kept the single-page-tab path clean, and preserved non-empty runtime telemetry; this circulation cycle stayed headless by design and did not reopen the browser."
     }
   },
   "defaultNextPriority": [
-    "land a direct src-side circulation fix so tropical trades and southern westerlies recover before another terrain-only retune",
-    "correct the northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology with a broad circulation/moisture cycle",
-    "run the seasonal planetary audit after the first successful broad-circulation fix so seasonality and storm organization stop being inferred from mountain-only proxies",
-    "fix worker/core versus app sim-clock parity if live verification still diverges during queued advancement",
-    "when smoothness becomes the blocker again, use the fresh non-empty runtime telemetry before changing renderer or worker performance behavior",
+    "fix the northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology now that trades and southern westerlies recover in fresh quick and seasonal audits",
+    "keep the next cycle in real src-side moisture/circulation code rather than returning to terrain-only tuning unless a fresh planetary audit re-ranks terrain highest",
+    "re-run live localhost verification and runtime telemetry after the next moisture fix so browser realism and smoothness are checked against the recovered circulation baseline",
+    "run the annual planetary audit after the moisture-belt fix holds through another seasonal follow-through",
     "keep validation on the clean world-class checkout only"
   ],
   "rules": {

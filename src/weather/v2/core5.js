@@ -187,7 +187,7 @@ export class WeatherCore5 {
     this._nudgeParamsRuntime = { ...this.nudgeParams };
     this.windNudgeParams = {
       enable: true,
-      tauSurfaceSeconds: 7 * 86400,
+      tauSurfaceSeconds: 8 * 3600,
       tauUpperSeconds: 1 * 3600,
       tauVSeconds: 2 * 3600,
       upperWindCapFactor: 1.35,
