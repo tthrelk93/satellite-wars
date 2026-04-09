@@ -1,30 +1,33 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-08T12:43:00Z",
+  "updatedAt": "2026-04-09T01:22:00Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
-  "baselineCommit": "9e48da2",
+  "baselineCommit": "c566484",
   "latestCycle": {
-    "id": "cycle-2026-04-08T12-26-47Z-terrain-coupling-lee-retention",
-    "goal": "improve the late Andes mature-window precipitation split by suppressing lee-side low-level warm-rain persistence where terrain subsidence is strong but delivery exposure is absent",
-    "verifiedImprovement": "terrain-coupled lee drying in src/weather/v2/microphysics5.js improved Andes precipRatio from 1.0394 to 1.0566 at 75600 and from 0.9271 to 0.9631 at 105480 while qrLowRatio at 105480 improved from 0.8871 to 0.9211 and the validation suite still passed",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-08T12-26-47Z-terrain-coupling-lee-retention/runtime-summary.json",
-    "runtimeLogPath": "logs/weather-2026-04-08T12-40-59Z-4794.jsonl"
+    "id": "cycle-2026-04-08T21-25-17Z-terrain-coupling-lee-rain-retention-gate",
+    "goal": "clear the mature Andes windward-parity blocker by tightening the coupled lee no-delivery and warm-rain suppression defaults without breaking Rockies or Himalaya-Tibet windward favorability",
+    "verifiedImprovement": "the coupled lee rain-retention gate in src/weather/v2/vertical5.js, src/weather/v2/microphysics5.js, and src/weather/v2/core5.js pushed the audited Andes mature-window precipRatio from 0.9759 to 1.0899 at 105480 while preserving windward-favored Rockies and Himalaya-Tibet behavior, and the targeted validation suite still passed",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-08T21-25-17Z-terrain-coupling-lee-rain-retention-gate/checkpoint.md",
+    "runtimeLogPath": "logs/weather-2026-04-08T22-12-34Z-16419.jsonl"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
     "overallPass": true
   },
   "blockingGaps": [
-    "broader Earth-like realism still needs fresh mature-window re-audits in the live app with the new terrain-coupled lee drying active across circulation, clouds, storms, and precipitation placement",
-    "orographic realism improved but is not solved: the Andes mature-window precipRatio is now 0.9631 at 105480, materially better than 0.9271 but still short of a clearly windward-favored late-window split",
+    "the newest planetary quick audit says the dominant blocker is now broad circulation and moisture-belt realism, not Andes parity: trades are missing in both hemispheres, southern westerlies are weak, and the northern subtropical dry belt is too wet",
+    "broader Earth-like realism still needs fresh multi-day and seasonal re-audits in the live app and headless path with the new terrain-coupled lee drying active across circulation, clouds, storms, and precipitation placement",
+    "orographic realism improved enough that it should not monopolize the worker; terrain-only tuning should stay secondary unless a fresh planetary audit ranks it first again",
     "runtime smoothness is still not signed off; the latest live run now has healthy telemetry and still reports earth_update_p95_high, earth_update_max_high, and wind_targets_failing",
     "the live browser path is functional, but the console still emits repeated THREE.WebGLRenderer texture-update warnings",
     "world-class status still requires realism and smoothness to pass in the same fresh live run"
   ],
   "cycleInputs": [
     "weather-validation/reports/earth-accuracy-status.md",
+    "weather-validation/reports/planetary-realism-status.md",
+    "weather-validation/reports/worker-brief.md",
     "weather-validation/reports/realism-investigation-playbook.md",
     "weather-validation/reports/smoothness-investigation-playbook.md",
     "newest weather-validation/output/cycle-*/checkpoint.md",
@@ -91,9 +94,10 @@
     }
   },
   "defaultNextPriority": [
-    "stay on orographic realism and re-audit the Andes with the new terrain-coupled lee drying active, prioritizing the remaining later-window shortfall at 105480",
-    "keep the next physics cycle focused on one concrete src-side fix area before another broad terrain retune",
-    "decide whether the remaining Andes shortfall is now mostly a terrain/flow problem or a residual low-level condensate-retention problem before touching microphysics again",
+    "land a direct src-side circulation fix so tropical trades and southern westerlies recover before another terrain-only retune",
+    "correct the northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology with a broad circulation/moisture cycle",
+    "run the seasonal planetary audit after the first successful broad-circulation fix so seasonality and storm organization stop being inferred from mountain-only proxies",
+    "fix worker/core versus app sim-clock parity if live verification still diverges during queued advancement",
     "when smoothness becomes the blocker again, use the fresh non-empty runtime telemetry before changing renderer or worker performance behavior",
     "keep validation on the clean world-class checkout only"
   ],

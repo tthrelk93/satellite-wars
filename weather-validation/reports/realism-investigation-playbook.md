@@ -27,6 +27,15 @@ When reassessing the next blocker, prefer concrete weaknesses in one of these ar
 6. Diurnal/seasonal behavior: day-night convection response, land/ocean contrast, polar/tropical contrast, unrealistic time evolution.
 7. Multi-day credibility: mature windows should still look Earth-like after several simulated days, not only right after initialization.
 
+## Primary offline realism harnesses
+
+- Use `npm run agent:planetary-realism-audit -- --preset quick` for broad 30-day realism screening.
+- Use `npm run agent:planetary-realism-audit -- --preset seasonal` when a change touches circulation, clouds, moisture partitioning, or storm organization.
+- Use `npm run agent:planetary-realism-audit -- --preset annual` before claiming world-class seasonal behavior or when the blocker is explicitly annual/seasonal stability.
+- Use `npm run agent:orographic-audit -- --targets 75600,105480` only when the broader realism screen or current evidence says the blocker is still terrain-specific.
+
+The planetary realism audit exists to keep the worker from camping on mountain-only metrics while circulation, storm evolution, and seasonality remain under-audited.
+
 ## Required questions before changing code
 
 1. What specific realism weakness most limits credibility right now?
@@ -44,6 +53,8 @@ If those questions are not answered with current-cycle evidence, do not make a r
 - fresh runtime/weather logs from the current cycle
 - browser observation notes from a mature live window
 - one concrete before/after metric or comparison artifact tied to the realism weakness
+
+Broad-realism cycles should prefer the planetary audit as that concrete before/after artifact unless the blocker is already proven to be terrain-specific.
 
 ## Pass standard for a verified realism improvement
 

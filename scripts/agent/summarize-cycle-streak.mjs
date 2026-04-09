@@ -57,10 +57,17 @@ const runGit = (args) => execFileSync(
 );
 
 const PHYSICS_TARGET_AREAS = [
+  'large-scale circulation and jet placement',
+  'storm evolution and cyclone structure',
+  'tropical cyclone / hurricane seasonality',
+  'cloud belts and subtropical stratocumulus structure',
+  'multi-day or seasonal stability',
   'terrain-flow orientation',
   'Andes sampling design',
   'terrain/coupling interaction',
-  'precipitation placement/conversion after upslope moisture transport'
+  'precipitation placement/conversion after upslope moisture transport',
+  'worker/core and app sim-clock parity',
+  'earth-update smoothness and worker sync'
 ];
 
 const NON_PHYSICS_PREFIXES = [
@@ -276,6 +283,11 @@ const browserTroubleStreak = countLeading(
   (cycle) => cycle.outcome === 'no_new_verified_progress' && cycle.browserTrouble
 );
 
+const liveVerificationBlockerStreak = countLeading(
+  completedCycles,
+  (cycle) => cycle.blockerType === 'worker_core_vs_app_sim_clock_live_probe_parity'
+);
+
 const statusJson = readJsonIfExists(statusJsonPath);
 const baselineCommit = typeof statusJson?.baselineCommit === 'string' ? statusJson.baselineCommit : null;
 let baselineCommitInfo = null;
@@ -346,6 +358,9 @@ if (physicsGuardTriggered) {
   recommendations.push('Diagnostic-only commits are allowed only if they unblock a named physics hypothesis that the same cycle could not test.');
   recommendations.push('A no-progress physics cycle is acceptable only if it leaves either a real src/ attempt or a blocker-narrowing artifact tied to the named focus area.');
 }
+if (liveVerificationBlockerStreak >= 1) {
+  recommendations.push('Do not let live verification monopolize the next cycle. Either land a direct src-side sim-clock parity fix or use the broader offline realism audits before another browser-helper-only win.');
+}
 if (allowPhysicsRetry) {
   recommendations.push(`Stay on ${noProgressFocusArea} for up to ${physicsRetryBudget - sameFocusValuableNoProgress} more bounded physics cycle(s) before disabling cron, as long as each cycle produces a real src/ attempt or blocker-narrowing evidence.`);
 }
@@ -371,7 +386,8 @@ const summary = {
     noProgressFocusArea,
     sameFocusValuableNoProgress,
     emptyRuntimeSummaryStreak,
-    browserTroubleStreak
+    browserTroubleStreak,
+    liveVerificationBlockerStreak
   },
   stallGuardTriggered: {
     soft,

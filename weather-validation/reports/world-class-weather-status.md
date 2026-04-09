@@ -1,6 +1,6 @@
 # World-Class Weather Status
 
-Updated: 2026-04-08
+Updated: 2026-04-09
 Verdict: NOT WORLD CLASS YET
 
 ## Current baseline
@@ -23,7 +23,12 @@ Verdict: NOT WORLD CLASS YET
     - `75600`: `1.4374 -> 1.0067`
     - `105480`: `1.3310 -> 1.9379`
 - The live runtime telemetry path remains healthy: the canonical localhost verification run produced `212` weather-log lines and preserved the honest smoothness warnings instead of falling back to `lineCount = 0`.
-- The main mission is still broader Earth-like realism, not one mountain-ratio win. This cycle clears the specific audited Andes mature-window parity blocker in the trusted offline audit, but broader browser realism still needs re-audits across circulation, storm organization, clouds, precipitation placement, and multi-day credibility.
+- The main mission is still broader Earth-like realism, not one mountain-ratio win. This cycle clears the specific audited Andes mature-window parity blocker in the trusted offline audit, but broader browser realism still needs re-audits across circulation, storm organization, clouds, precipitation placement, multi-day credibility, and seasonal behavior.
+- Fresh 30-day planetary realism screening now ranks broad circulation and moisture partitioning ahead of another mountain-only retune:
+  - `trade_winds_missing_north`
+  - `trade_winds_missing_south`
+  - `westerlies_missing_south`
+  - `north_subtropical_dry_belt_too_wet`
 
 ## Fresh evidence from the latest cycle
 
@@ -52,8 +57,8 @@ Verdict: NOT WORLD CLASS YET
 
 ## What still blocks "world class"
 
-- Broader Earth-like realism still needs explicit mature-window re-audits in the live app with the tighter lee/no-delivery coupling active.
-- Orographic realism is materially better, but not fully signed off: the audited Andes mature-window split now clears parity, yet the weakest retained mountain ratio is still only `1.0067` (Himalaya-Tibet at `75600`), so more margin would be healthier before calling the coupling robust.
+- The newest broad-realism screen says the dominant blocker is no longer Andes parity. The next physics cycles should target large-scale circulation and moisture-belt realism first: missing trades in both hemispheres, weak southern westerlies, and an overly wet northern subtropical dry belt.
+- Broader Earth-like realism still needs explicit multi-day and seasonal re-audits in both headless and live paths with the tighter lee/no-delivery coupling active. Terrain-only tuning should stay secondary unless a fresh planetary audit says otherwise.
 - Runtime smoothness is still not signed off; the latest run has good telemetry and still shows genuine performance issues instead of degraded logging.
 - The live browser path is functional, but the console still emits repeated `THREE.WebGLRenderer: Texture marked for update but no image data found.` warnings.
 - World-class status still requires realism and smoothness to pass in the same fresh live run.
@@ -61,6 +66,8 @@ Verdict: NOT WORLD CLASS YET
 ## Canonical cycle inputs
 
 - `weather-validation/reports/earth-accuracy-status.md`
+- `weather-validation/reports/planetary-realism-status.md`
+- `weather-validation/reports/worker-brief.md`
 - `weather-validation/reports/realism-investigation-playbook.md`
 - `weather-validation/reports/smoothness-investigation-playbook.md`
 - the newest `weather-validation/output/cycle-*/checkpoint.md`
@@ -69,10 +76,11 @@ Verdict: NOT WORLD CLASS YET
 
 ## Default next priority
 
-1. Re-audit broader live realism with the new lee/no-delivery defaults active instead of assuming the mountain-only offline win generalizes automatically.
-2. If more terrain work is needed, protect the newly-cleared Andes `105480` parity and add margin to the weakest surviving mountain ratio (`Himalaya-Tibet 75600 = 1.0067`) rather than reopening broad terrain retunes.
-3. Use the fresh non-empty runtime telemetry before changing renderer or worker performance behavior; the honest blocker remains `earth_update_*` plus weak wind targets.
-4. Keep the localhost validation path clean: one tab, canonical port `3000`, no drift into the sibling dirty checkout.
+1. Land a direct `src/` physics cycle on large-scale circulation and jet placement so tropical trades and southern westerlies recover before reopening terrain-only tuning.
+2. Fix the northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology with a broad circulation/moisture cycle rather than another lee-side micro-tune.
+3. Run the seasonal planetary audit after the first successful broad-circulation fix so storm organization and seasonality stop being inferred from mountain-only proxies.
+4. Fix worker/core versus app sim-clock parity if live verification still diverges during queued advancement.
+5. Use the fresh non-empty runtime telemetry before changing renderer or worker performance behavior; the honest blocker remains `earth_update_*` plus weak wind targets.
 
 ## Commit discipline
 
