@@ -3,6 +3,10 @@ import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
 import { fileURLToPath } from 'url';
+import {
+  dominantParticleEvolvePhase,
+  PARTICLE_EVOLVE_PHASE_KEYS
+} from '../../src/windParticlePerf.js';
 import { ensureCyclePlanReady } from './plan-guard.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -100,6 +104,13 @@ const dominantPerfStage = (perf) => {
   return candidates[0][0];
 };
 
+const summarizePhaseBreakdowns = (phaseBreakdowns) => Object.fromEntries(
+  PARTICLE_EVOLVE_PHASE_KEYS.map((phaseKey) => [
+    phaseKey,
+    summarizeSeries(phaseBreakdowns.map((phases) => phases?.[phaseKey]))
+  ])
+);
+
 const functionHintsFor = (area) => {
   if (area === 'WindStreamlineRenderer._buildField') {
     return ['src/WindStreamlineRenderer.js:_buildField', 'src/WindStreamlineRenderer.js:_shouldRebuildField'];
@@ -168,7 +179,10 @@ const topSpikes = [...simPerfEvents]
     const nearestViz = nearestEvent(windVizEvents, event.simTimeSeconds, HOTSPOT_WINDOW_SECONDS);
     const nearestModel = nearestEvent(windModelEvents, event.simTimeSeconds, HOTSPOT_WINDOW_SECONDS);
     const perf = nearestViz?.payload?.perf ?? null;
+    const framePhases = nearestViz?.payload?.frame?.perfPhases ?? null;
+    const evolvePhases = perf?.evolveParticlesPhases ?? framePhases;
     const dominantStage = dominantPerfStage(perf);
+    const dominantEvolvePhase = dominantParticleEvolvePhase(evolvePhases);
     return {
       updateMs: event.updateMs,
       simLagSeconds: event.simLagSeconds,
@@ -184,6 +198,8 @@ const topSpikes = [...simPerfEvents]
           totalMs: perf.totalMs ?? null,
           buildFieldMs: perf.buildFieldMs ?? null,
           evolveParticlesMs: perf.evolveParticlesMs ?? null,
+          evolveParticlesPhases: evolvePhases,
+          dominantEvolvePhase,
           drawMs: perf.drawMs ?? null,
           renderSteps: perf.renderSteps ?? null,
           fieldAgeSimSeconds: perf.fieldAgeSimSeconds ?? null
@@ -210,6 +226,9 @@ const topSpikes = [...simPerfEvents]
 const perfBreakdowns = windVizEvents
   .map((event) => event.payload?.perf ?? null)
   .filter(Boolean);
+const evolvePhaseBreakdowns = windVizEvents
+  .map((event) => event.payload?.perf?.evolveParticlesPhases ?? event.payload?.frame?.perfPhases ?? null)
+  .filter(Boolean);
 
 const causeCounts = {};
 for (const spike of topSpikes) {
@@ -218,6 +237,15 @@ for (const spike of topSpikes) {
 
 const topSpikeFieldRebuildCount = topSpikes.filter((spike) => spike.fieldRebuilt === true).length;
 const topSpikeNearModelDiagCount = topSpikes.filter((spike) => Number.isFinite(spike.modelDiagDeltaSeconds)).length;
+const evolvePhaseCauseCounts = {};
+for (const spike of topSpikes) {
+  const phase = spike.windVizPerf?.dominantEvolvePhase;
+  if (spike.likelyCause === 'particle_evolve' && phase) {
+    evolvePhaseCauseCounts[phase] = (evolvePhaseCauseCounts[phase] || 0) + 1;
+  }
+}
+const recommendedEvolvePhase = Object.entries(evolvePhaseCauseCounts)
+  .sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
 let recommendedArea = 'collect_more_profiling_evidence';
 let rationale = 'No hotspot pattern was strong enough yet to justify another code experiment.';
@@ -255,6 +283,7 @@ const report = {
     totalMs: summarizeSeries(perfBreakdowns.map((perf) => perf.totalMs)),
     buildFieldMs: summarizeSeries(perfBreakdowns.map((perf) => perf.buildFieldMs)),
     evolveParticlesMs: summarizeSeries(perfBreakdowns.map((perf) => perf.evolveParticlesMs)),
+    evolveParticlesPhases: summarizePhaseBreakdowns(evolvePhaseBreakdowns),
     drawMs: summarizeSeries(perfBreakdowns.map((perf) => perf.drawMs)),
     renderSteps: summarizeSeries(perfBreakdowns.map((perf) => perf.renderSteps)),
     rebuildFrames: perfBreakdowns.filter((perf) => perf.fieldRebuilt === true).length
@@ -263,12 +292,16 @@ const report = {
   spikeCauseSummary: {
     causeCounts,
     topSpikeFieldRebuildCount,
-    topSpikeNearModelDiagCount
+    topSpikeNearModelDiagCount,
+    evolvePhaseCauseCounts
   },
   recommendedNextFocus: {
     area: recommendedArea,
     rationale,
-    functionHints: functionHintsFor(recommendedArea)
+    functionHints: functionHintsFor(recommendedArea),
+    evolvePhase: recommendedArea === 'WindStreamlineRenderer._evolveParticles'
+      ? recommendedEvolvePhase
+      : null
   }
 };
 

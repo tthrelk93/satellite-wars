@@ -1,4 +1,10 @@
 import * as THREE from 'three';
+import {
+  addParticleEvolvePhase,
+  createParticleEvolvePhaseTotals,
+  hasParticleEvolvePhaseData,
+  mergeParticleEvolvePhaseTotals
+} from './windParticlePerf.js';
 import { bilinear } from './weather/shared/bilinear';
 
 const DEFAULT_WIDTH = 1024;
@@ -565,7 +571,7 @@ class WindStreamlineRenderer {
     const shouldRebuild = this._shouldRebuildField(core, simTimeSeconds);
     let rebuiltField = false;
     let buildPerf = null;
-    const finalizePerf = (renderSteps, evolveParticlesMs, drawMs, frameDiag) => {
+    const finalizePerf = (renderSteps, evolveParticlesMs, evolveParticlesPhases, drawMs, frameDiag) => {
       const fieldAgeSimSeconds = Number.isFinite(simTimeSeconds) && Number.isFinite(this._lastFieldSimTimeSeconds)
         ? simTimeSeconds - this._lastFieldSimTimeSeconds
         : null;
@@ -577,6 +583,9 @@ class WindStreamlineRenderer {
         buildFieldPhases: buildPerf?.phases ?? null,
         renderSteps,
         evolveParticlesMs,
+        evolveParticlesPhases: hasParticleEvolvePhaseData(evolveParticlesPhases)
+          ? evolveParticlesPhases
+          : null,
         drawMs,
         particleCount: frameDiag?.particleCount ?? this.particles.length,
         fieldCadenceSeconds: this.fieldUpdateCadenceSeconds,
@@ -592,28 +601,33 @@ class WindStreamlineRenderer {
       }
     }
     if (!this._fieldReady) {
-      finalizePerf(0, 0, 0, null);
+      finalizePerf(0, 0, null, 0, null);
       return;
     }
     if (!(realDtSeconds > 0)) {
-      finalizePerf(0, 0, 0, null);
+      finalizePerf(0, 0, null, 0, null);
       return;
     }
     this._frameAccumSeconds += realDtSeconds;
     const maxSubsteps = 3;
     const steps = Math.min(maxSubsteps, Math.floor(this._frameAccumSeconds / this._frameIntervalSeconds));
     if (steps <= 0) {
-      finalizePerf(0, 0, 0, null);
+      finalizePerf(0, 0, null, 0, null);
       return;
     }
     this._frameAccumSeconds -= steps * this._frameIntervalSeconds;
     let frameDiag = null;
     let evolveParticlesMs = 0;
+    let evolveParticlesPhases = createParticleEvolvePhaseTotals();
     let drawMs = 0;
     for (let i = 0; i < steps; i++) {
       const evolveStartMs = nowMs();
       frameDiag = this._evolveParticles();
       evolveParticlesMs += nowMs() - evolveStartMs;
+      evolveParticlesPhases = mergeParticleEvolvePhaseTotals(
+        evolveParticlesPhases,
+        frameDiag?.perfPhases
+      );
       const drawStartMs = nowMs();
       this._draw();
       drawMs += nowMs() - drawStartMs;
@@ -622,13 +636,16 @@ class WindStreamlineRenderer {
       ...frameDiag,
       simTimeSeconds: Number.isFinite(simTimeSeconds) ? simTimeSeconds : null
     };
-    finalizePerf(steps, evolveParticlesMs, drawMs, frameDiag);
+    finalizePerf(steps, evolveParticlesMs, evolveParticlesPhases, drawMs, frameDiag);
   }
 
   _evolveParticles() {
+    const perfPhases = createParticleEvolvePhaseTotals();
+    let phaseStartMs = nowMs();
     this.buckets.forEach((bucket) => {
       bucket.length = 0;
     });
+    addParticleEvolvePhase(perfPhases, 'clearBucketsMs', nowMs() - phaseStartMs);
     const width = this.width;
     const height = this.height;
     let movedCount = 0;
@@ -638,10 +655,13 @@ class WindStreamlineRenderer {
 
     for (const particle of this.particles) {
       if (particle.age >= particle.maxAge) {
+        phaseStartMs = nowMs();
         this._randomizeParticle(particle);
+        addParticleEvolvePhase(perfPhases, 'respawnMs', nowMs() - phaseStartMs);
         respawnedCount += 1;
         continue;
       }
+      phaseStartMs = nowMs();
       const sample0 = sampleFieldBilinear({
         x: particle.x,
         y: particle.y,
@@ -652,6 +672,7 @@ class WindStreamlineRenderer {
         fieldSpeed: this.fieldSpeed,
         fieldValid: this.fieldValid
       });
+      addParticleEvolvePhase(perfPhases, 'sample0Ms', nowMs() - phaseStartMs);
       if (!sample0.valid) {
         particle.age = particle.maxAge;
         invalidCount += 1;
@@ -659,6 +680,7 @@ class WindStreamlineRenderer {
       }
       const midX = particle.x + sample0.dx * 0.5;
       const midY = particle.y + sample0.dy * 0.5;
+      phaseStartMs = nowMs();
       const sample1 = sampleFieldBilinear({
         x: midX,
         y: midY,
@@ -669,36 +691,43 @@ class WindStreamlineRenderer {
         fieldSpeed: this.fieldSpeed,
         fieldValid: this.fieldValid
       });
+      addParticleEvolvePhase(perfPhases, 'sample1Ms', nowMs() - phaseStartMs);
       if (!sample1.valid) {
         particle.age = particle.maxAge;
         invalidCount += 1;
         continue;
       }
+      phaseStartMs = nowMs();
       let xt = particle.x + sample1.dx;
       let yt = particle.y + sample1.dy;
       if (!Number.isFinite(xt) || !Number.isFinite(yt)) {
+        addParticleEvolvePhase(perfPhases, 'projectValidateMs', nowMs() - phaseStartMs);
         particle.age = particle.maxAge;
         invalidCount += 1;
         continue;
       }
       if (yt < 0 || yt >= height) {
+        addParticleEvolvePhase(perfPhases, 'projectValidateMs', nowMs() - phaseStartMs);
         particle.age = particle.maxAge;
         outOfBoundsCount += 1;
         continue;
       }
       xt = ((xt % width) + width) % width;
       const nextIdx = Math.floor(yt) * width + Math.floor(xt);
+      addParticleEvolvePhase(perfPhases, 'projectValidateMs', nowMs() - phaseStartMs);
       if (!this.fieldValid[nextIdx]) {
         particle.age = particle.maxAge;
         invalidCount += 1;
         continue;
       }
+      phaseStartMs = nowMs();
       const dxScreen = xt - particle.x;
       if (Math.abs(dxScreen) > width / 2) {
         particle.x = xt;
         particle.y = yt;
         movedCount += 1;
         particle.age += 1;
+        addParticleEvolvePhase(perfPhases, 'bucketStageMs', nowMs() - phaseStartMs);
         continue;
       }
       particle.xt = xt;
@@ -706,6 +735,7 @@ class WindStreamlineRenderer {
       this.buckets[this.colorStyles.indexFor(sample1.speed)].push(particle);
       movedCount += 1;
       particle.age += 1;
+      addParticleEvolvePhase(perfPhases, 'bucketStageMs', nowMs() - phaseStartMs);
     }
 
     return {
@@ -716,7 +746,8 @@ class WindStreamlineRenderer {
       outOfBoundsCount,
       movedFrac: this.particles.length > 0 ? movedCount / this.particles.length : 0,
       respawnedFrac: this.particles.length > 0 ? respawnedCount / this.particles.length : 0,
-      outOfBoundsFrac: this.particles.length > 0 ? outOfBoundsCount / this.particles.length : 0
+      outOfBoundsFrac: this.particles.length > 0 ? outOfBoundsCount / this.particles.length : 0,
+      perfPhases
     };
   }
 
