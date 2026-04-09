@@ -1,16 +1,16 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-09T05:56:56.602Z",
+  "updatedAt": "2026-04-09T06:29:41.839Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
   "baselineCommit": "94d5805",
   "latestCycle": {
-    "id": "cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix",
-    "goal": "remove the solo-mode minimap white panel from the live signoff path without changing the verified weather baseline",
-    "verifiedImprovement": "gating the minimap overlay to PvP mode removed the persistent lower-right white panel on a fresh solo live run while preserving the thetaeCoeff=10.5 weather baseline and the earlier startup texture-warning fix; runtime smoothness still fails due Earth-update spikes and weak wind targets",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix/checkpoint.md",
-    "runtimeLogPath": "logs/weather-2026-04-09T05-54-26Z-69491.jsonl"
+    "id": "cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry",
+    "goal": "reduce the sampled wind-model diagnostics cost inside Earth.update without breaking the telemetry path",
+    "verifiedImprovement": "reducing the wind diagnostics sample target cut model diagnostics from about 29.4–32.1 ms to about 9.1–10.2 ms on due ticks and improved Earth.update p95 from 31.96 ms to 26.32 ms on a fresh live rerun while preserving the existing live fixes; the overall smoothness gate still fails because larger unknown spikes remain",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry/checkpoint.md",
+    "runtimeLogPath": "logs/weather-2026-04-09T06-25-49Z-26830.jsonl"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
@@ -18,7 +18,7 @@
   },
   "blockingGaps": [
     "northern subtropical dry-belt moisture partitioning still fails in both fresh quick and seasonal audits, though the gap is now smaller at 1.029 at 30 days and 1.015 at 90 days",
-    "browser/runtime signoff is still blocked by Earth-update smoothness and weak wind-target diagnostics in the latest live run",
+    "browser/runtime signoff is still blocked by larger remaining Earth.update spikes and weak wind-target diagnostics in the latest live run, even after reducing the model-diagnostics payload cost",
     "annual / 365-day evidence is still missing for any long-horizon or world-class claim",
     "world-class status still requires realism and smoothness to pass in the same browser-backed run"
   ],
@@ -80,8 +80,28 @@
       "validatedBy": "node --experimental-default-type=module --experimental-specifier-resolution=node --test src/gameModeUi.test.js",
       "result": "fresh solo localhost rerun no longer rendered the lower-right white minimap panel"
     },
+    "windDiagnosticsSampling": {
+      "cycleId": "cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry",
+      "checkpointPath": "weather-validation/output/cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry/checkpoint.md",
+      "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry/postfix-runtime-summary.json",
+      "hotspotProfilePath": "weather-validation/output/cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry/postfix-hotspot-profile.json",
+      "instrumentedRuntimeLog": "logs/weather-2026-04-09T06-25-49Z-26830.jsonl",
+      "result": "sampled model diagnostics reduced due-tick cost from about 30 ms to about 9-10 ms and improved Earth.update p95 to 26.32 ms, but larger unknown spikes still block signoff",
+      "before": {
+        "sampleStride": 1,
+        "sampleCount": 16200,
+        "modelDiagMsRange": [29.4, 32.1],
+        "earthUpdateP95Ms": 31.960000014305095
+      },
+      "after": {
+        "sampleStride": 3,
+        "sampleCount": 5400,
+        "modelDiagMsRange": [9.1, 10.2],
+        "earthUpdateP95Ms": 26.319999989867192
+      }
+    },
     "runtimeSummary": {
-      "lineCount": 500,
+      "lineCount": 920,
       "validationSnapshotCount": 0,
       "warnings": [
         "earth_update_p95_high",
@@ -91,11 +111,11 @@
     },
     "browserObservation": {
       "singlePlayerLoaded": true,
-      "note": "The latest fresh solo live run on the thetaeCoeff=10.5 baseline kept the startup texture-warning fix, removed the lower-right white panel, and still failed the smoothness gate due Earth-update spikes and weak wind-target diagnostics."
+      "note": "The latest fresh solo live run kept both the texture-warning fix and the minimap-panel fix. Sampled wind diagnostics reduced model-diagnostics cost materially, but larger Earth.update spikes still remain."
     }
   },
   "defaultNextPriority": [
-    "run a direct src-side smoothness/runtime cycle on Earth wind/model diagnostics cadence and worker sync using the latest hotspot profile",
+    "run a direct src-side smoothness/runtime cycle on the remaining unknown Earth.update spikes and worker/core sync path now that the model-diagnostics payload has been reduced",
     "rerun live verification on the thetaeCoeff=10.5 baseline after the next runtime fix",
     "if runtime smoothness stops blocking signoff, return the next physics cycle to northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology",
     "run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through",

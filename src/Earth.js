@@ -99,6 +99,7 @@ const WIND_COLOR_MAP = makeColorMap([
 ]);
 const WIND_MODEL_DIAGNOSTICS_CADENCE_SECONDS = 1800;
 const WIND_VIZ_DIAGNOSTICS_CADENCE_SECONDS = 600;
+const WIND_DIAGNOSTICS_SAMPLE_TARGET = 5400;
 
 const computePercentiles = (values, percentiles) => {
   if (!values || values.length === 0) return {};
@@ -1712,7 +1713,7 @@ class Earth {
       v: fields.v,
       div: fields.div,
       vort: fields.vort,
-      sampleTarget: 20000
+      sampleTarget: WIND_DIAGNOSTICS_SAMPLE_TARGET
     });
     if (!diag) return false;
     const speedPct = diag.speedPercentiles || {};
@@ -1725,7 +1726,7 @@ class Earth {
         grid,
         u: fields.uU,
         v: fields.vU,
-        sampleTarget: 20000
+        sampleTarget: WIND_DIAGNOSTICS_SAMPLE_TARGET
       })
       : null;
     const upperPct = upperDiag?.speedPercentiles || {};
@@ -1792,7 +1793,7 @@ class Earth {
       v: fields.v,
       div: fields.div,
       vort: fields.vort,
-      sampleTarget: 20000
+      sampleTarget: WIND_DIAGNOSTICS_SAMPLE_TARGET
     });
     if (!diag) return false;
     const payload = {
