@@ -41,6 +41,7 @@ Non-negotiable rules:
 Cycle selection rule:
 - Realism is the main mission. By default, choose the highest-leverage Earth-like realism weakness before a smoothness-only task.
 - Use the planetary audit to rank broad realism blockers before defaulting to terrain-specific work.
+- If `weather-validation/reports/worker-brief.md` reports `liveVerificationDue = true` and there is no active long-horizon cycle to resume, the next fresh cycle must be a browser-backed `live` verification cycle before another headless-only tuning cycle.
 - Choose a smoothness-only cycle only when:
   - runtime problems prevent reliable realism observation,
   - the latest realism fix introduced a performance regression,
@@ -54,6 +55,7 @@ Concrete realism fix areas:
 - `tropical cyclone / hurricane seasonality`
 - `cloud belts and subtropical stratocumulus structure`
 - `multi-day or seasonal stability`
+- `live browser realism and runtime telemetry signoff`
 - `terrain-flow orientation`
 - `Andes sampling design`
 - `terrain/coupling interaction`
@@ -72,6 +74,7 @@ Mandatory cycle protocol:
      - `quick`: 30-day screening and fast candidate ranking
      - `seasonal`: 90-day validation after broad circulation/cloud/moisture/storm changes
      - `annual`: 365-day stability or seasonality validation before any world-class claim
+     - `live`: browser-backed localhost verification of the latest verified baseline, including runtime telemetry
      - `terrain`: mountain/orographic investigation
      - `smoothness`: runtime/performance investigation
    - `npm run agent:start-cycle -- ...` must create both `plan.md` and `cycle-state.json`.
@@ -101,16 +104,17 @@ Mandatory cycle protocol:
 8. Make the smallest code change that can test the hypothesis.
    - When `physicsGuard.triggered = true`, the change must touch actual weather or performance code under `src/`; changing only `scripts/agent/*`, tests, reports, prompts, or package metadata does not satisfy the cycle.
 9. Run targeted tests and cheap objective validation before live observation.
-10. Start or restart the canonical dev server with `npm run agent:dev-server -- --restart --port 3000` only when the candidate already deserves one live verification run.
-11. Reuse the existing browser tab with `npm run agent:reuse-localhost-tab`.
-12. Observe the live app on localhost for long enough to evaluate the target behavior.
-13. Summarize runtime telemetry with `npm run agent:summarize-runtime-log`, but treat `lineCount = 0` as degraded logging rather than meaningful telemetry.
-14. If smoothness is still the blocker, write `hotspot-profile.json` from the same fresh run.
-15. Write `checkpoint.md` and `evidence-summary.json`.
-16. Update `weather-validation/reports/world-class-weather-status.md` and `.json` only when the verified baseline materially improves. Failed cycles should keep conclusions in the cycle-local artifacts and then revert tracked status-file edits.
-17. Update `weather-validation/reports/planetary-realism-status.md` and `.json` whenever a planetary audit was part of the cycle.
-18. Refresh `weather-validation/reports/worker-brief.md` whenever the verified baseline or blocker ranking changes materially.
-19. If the improvement is verified, commit immediately. If it is not verified, revert your changes and end with `NO NEW VERIFIED PROGRESS`.
+10. If the cycle mode is `live`, start or restart the canonical dev server with `npm run agent:dev-server -- --restart --port 3000` immediately after the cheap validation passes.
+11. If the cycle mode is not `live`, start or restart the canonical dev server only when the candidate already deserves one live verification run.
+12. Reuse the existing browser tab with `npm run agent:reuse-localhost-tab`.
+13. Observe the live app on localhost for long enough to evaluate the target behavior.
+14. Summarize runtime telemetry with `npm run agent:summarize-runtime-log`, but treat `lineCount = 0` as degraded logging rather than meaningful telemetry.
+15. If smoothness is still the blocker, write `hotspot-profile.json` from the same fresh run.
+16. Write `checkpoint.md` and `evidence-summary.json`.
+17. Update `weather-validation/reports/world-class-weather-status.md` and `.json` only when the verified baseline materially improves. Failed cycles should keep conclusions in the cycle-local artifacts and then revert tracked status-file edits.
+18. Update `weather-validation/reports/planetary-realism-status.md` and `.json` whenever a planetary audit was part of the cycle.
+19. Refresh `weather-validation/reports/worker-brief.md` whenever the verified baseline or blocker ranking changes materially.
+20. If the improvement is verified, commit immediately. If it is not verified, revert your changes and end with `NO NEW VERIFIED PROGRESS`.
 
 Physics delivery guard:
 - `npm run agent:cycle-streak` reports `physicsGuard.consecutiveNonPhysicsCommits`.
@@ -130,6 +134,7 @@ Browser and dev-server policy:
 - Reuse/focus/navigate the existing localhost tab instead of opening another.
 - Keep at most one active satellite-wars localhost tab per cycle.
 - If you need a fresh run, restart the dev server or reload the reused tab.
+- A `live` cycle is not optional once the worker brief says live verification is due; do not keep stacking headless-only cycles after a verified physics change that still lacks browser/runtime signoff.
 
 Observation policy:
 - Long observation is allowed only when `plan.md` names the question being measured and the pass/fail criteria.

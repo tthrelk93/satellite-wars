@@ -423,7 +423,7 @@ export async function main() {
     artifactPath: outPath || mdOutPath || (effectiveReportBase ? `${effectiveReportBase}.json` : null),
     allowNoCycle: false,
     requireCycleState: true,
-    allowedModes: ['quick', 'seasonal', 'annual']
+    allowedModes: ['quick', 'seasonal', 'annual', 'live']
   });
   if (typeof process !== 'undefined' && !process.env?.NODE_ENV) {
     process.env.NODE_ENV = 'production';

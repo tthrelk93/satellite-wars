@@ -83,6 +83,7 @@ const planetaryPriorities = Array.isArray(planetaryStatus?.defaultNextPriorities
 const planetaryWarnings = Array.isArray(planetaryStatus?.horizons)
   ? planetaryStatus.horizons.flatMap((horizon) => horizon?.warnings || [])
   : [];
+const liveVerificationDue = blockingGaps.some((gap) => /live browser realism|fresh live run|runtime smoothness still need/i.test(gap));
 
 const brief = {
   schema: 'satellite-wars.worker-brief.v1',
@@ -101,6 +102,7 @@ const brief = {
     lastTouchedAt: activeCycleState?.lastTouchedAt || null,
     focusArea: activeCycleState?.focusArea || null
   } : null,
+  liveVerificationDue,
   blockingGaps,
   defaultNextPriorities,
   planetaryWarnings,
@@ -109,6 +111,7 @@ const brief = {
 };
 
 const rankedPriorities = [
+  ...(liveVerificationDue ? ['Run a browser-backed live verification cycle on the latest verified baseline before another headless-only tuning cycle.'] : []),
   ...planetaryPriorities,
   ...blockingGaps,
   ...defaultNextPriorities,
@@ -134,11 +137,19 @@ const markdown = [
     '- Resume this cycle instead of starting a fresh one unless recovery or a blocker-family change explicitly says otherwise.'
   ] : ['- No active cycle. Start a fresh one with `npm run agent:start-cycle -- ...` before heavy work.']),
   '',
+  '## Live verification debt',
+  '',
+  `- Fresh live browser verification due: ${liveVerificationDue ? 'yes' : 'no'}`,
+  ...(liveVerificationDue
+    ? ['- The next fresh cycle must be `live` mode unless an active long-horizon cycle is already being resumed.']
+    : ['- No forced live-verification debt is currently flagged by the latest verified baseline.']),
+  '',
   '## Startup shortcut',
   '',
   '- Refresh this file, then read it first.',
   '- Only reopen the full realism/smoothness/blocker-breaker playbooks if you are entering a new blocker family or this brief points to them explicitly.',
   '- Prefer the highest failing broad-realism category from `planetary-realism-status` before another narrow terrain retune unless the planetary audit still ranks terrain highest.',
+  ...(liveVerificationDue ? ['- Because live verification is due, the next fresh cycle should be `live` mode and should start the canonical dev server/browser path before further headless-only tuning.'] : []),
   '',
   '## Current guards',
   '',

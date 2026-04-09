@@ -27,6 +27,12 @@ const MODE_CONFIG = {
     defaultAuditPreset: 'annual',
     resumeAcrossHeartbeats: true
   },
+  live: {
+    label: 'Browser-backed live verification',
+    horizonDays: null,
+    defaultAuditPreset: 'live',
+    resumeAcrossHeartbeats: false
+  },
   terrain: {
     label: 'Terrain-specific audit',
     horizonDays: null,

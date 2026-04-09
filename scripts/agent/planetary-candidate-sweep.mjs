@@ -38,7 +38,7 @@ const { cycleState } = ensureCyclePlanReady({
   artifactPath: outPath || mdOutPath,
   allowNoCycle: false,
   requireCycleState: true,
-  allowedModes: ['quick', 'seasonal', 'annual']
+  allowedModes: ['quick', 'seasonal', 'annual', 'live']
 });
 
 const effectivePreset = preset || cycleState?.defaultAuditPreset || 'quick';
