@@ -1,15 +1,15 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-09T02:31:00Z",
+  "updatedAt": "2026-04-09T04:10:00Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
-  "baselineCommit": "c566484",
+  "baselineCommit": "94d5805",
   "latestCycle": {
-    "id": "cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery",
-    "goal": "restore broad circulation by strengthening the default surface wind restore so tropical trades and southern westerlies recover without destabilizing the 30-day or 90-day planetary screens",
-    "verifiedImprovement": "promoting the stronger default surface-wind restore in src/weather/v2/core5.js collapsed the planetary warning set from four broad circulation/moisture failures to one remaining north-subtropical dry-belt blocker in the 30-day audit and preserved the same single blocker through the 90-day seasonal follow-through",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T02-07-58Z-circulation-trade-westerly-recovery/checkpoint.md",
+    "id": "cycle-2026-04-09T03-55-50Z-convection-seasonal-durability",
+    "goal": "promote a seasonally durable convection-side moisture package that materially improves the day-90 north subtropical dry-belt ratio without rebreaking the recovered circulation",
+    "verifiedImprovement": "promoting a milder convection package in src/weather/v2/core5.js improved the day-90 north subtropical dry-belt ratio from 1.191 to 1.031 while keeping circulation, storm-track, cloud-balance, and stability categories passing; the day-30 ratio softened slightly from 1.079 to 1.094 but the same single blocker remained",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T03-55-50Z-convection-seasonal-durability/checkpoint.md",
     "runtimeLogPath": null
   },
   "benchmarkSuite": {
@@ -17,8 +17,9 @@
     "overallPass": true
   },
   "blockingGaps": [
-    "northern subtropical dry-belt moisture partitioning is still failing in both fresh quick and seasonal audits even after circulation recovery",
-    "live browser realism and runtime smoothness still need a fresh run with the stronger surface-wind restore",
+    "northern subtropical dry-belt moisture partitioning still fails in both fresh quick and seasonal audits, even though the day-90 baseline improved materially",
+    "the next moisture cycle needs to recover the slight 30-day regression without losing the new 90-day durability",
+    "live browser realism and runtime smoothness still need a fresh run with the updated convection package",
     "the live app still has unresolved THREE.WebGLRenderer texture-update warnings",
     "annual / 365-day evidence is still missing for any long-horizon or world-class claim",
     "world-class status still requires realism and smoothness to pass in the same fresh live run"
@@ -65,6 +66,30 @@
       },
       "notableFinding": "Surface wind restoring was the dominant circulation lever. Moisture-only nudges were weaker, and post-init nudgeParams edits do not affect _nudgeParamsRuntime without targeting the runtime clone or core defaults."
     },
+    "seasonalDurabilityRecovery": {
+      "quickAuditPath": "weather-validation/output/cycle-2026-04-09T03-55-50Z-convection-seasonal-durability/postfix-planetary-audit.json",
+      "seasonalAuditPath": "weather-validation/output/cycle-2026-04-09T03-55-50Z-convection-seasonal-durability/postfix-seasonal-planetary-audit.json",
+      "seasonalCandidateSweepPath": "weather-validation/output/cycle-2026-04-09T03-55-50Z-convection-seasonal-durability/planetary-candidate-sweep-seasonal-convection.json",
+      "quickMetrics": {
+        "tropicalTradesNorthU10Ms": -0.791,
+        "tropicalTradesSouthU10Ms": -0.329,
+        "midlatitudeWesterliesSouthU10Ms": 0.945,
+        "subtropicalDryNorthRatio": 1.094,
+        "warnings": [
+          "north_subtropical_dry_belt_too_wet"
+        ]
+      },
+      "seasonalMetrics": {
+        "tropicalTradesNorthU10Ms": -0.793,
+        "tropicalTradesSouthU10Ms": -0.331,
+        "midlatitudeWesterliesSouthU10Ms": 0.948,
+        "subtropicalDryNorthRatio": 1.031,
+        "warnings": [
+          "north_subtropical_dry_belt_too_wet"
+        ]
+      },
+      "tradeoffNote": "This package trades a small 30-day moisture-score regression for a materially better 90-day moisture partitioning baseline while preserving the circulation category."
+    },
     "runtimeSummary": {
       "lineCount": 212,
       "validationSnapshotCount": 0,
@@ -76,14 +101,14 @@
     },
     "browserObservation": {
       "singlePlayerLoaded": true,
-      "note": "The last verified live localhost run still reused the canonical solo-mode tab, kept the single-page-tab path clean, and preserved non-empty runtime telemetry; this circulation cycle stayed headless by design and did not reopen the browser."
+      "note": "The last verified live localhost run still reused the canonical solo-mode tab, kept the single-page-tab path clean, and preserved non-empty runtime telemetry; the recent broad-realism cycles stayed headless by design and did not reopen the browser."
     }
   },
   "defaultNextPriority": [
-    "fix the northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology now that trades and southern westerlies recover in fresh quick and seasonal audits",
-    "keep the next cycle in real src-side moisture/circulation code rather than returning to terrain-only tuning unless a fresh planetary audit re-ranks terrain highest",
-    "re-run live localhost verification and runtime telemetry after the next moisture fix so browser realism and smoothness are checked against the recovered circulation baseline",
-    "run the annual planetary audit after the moisture-belt fix holds through another seasonal follow-through",
+    "keep the next cycle on northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology, but tune around the new seasonally durable convection package so the 30-day ratio improves without losing the 90-day gain",
+    "stay in real src-side moisture/circulation code rather than returning to terrain-only tuning unless a fresh planetary audit re-ranks terrain highest",
+    "re-run live localhost verification and runtime telemetry after the next moisture fix so browser realism and smoothness are checked against the updated convection baseline",
+    "run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through",
     "keep validation on the clean world-class checkout only"
   ],
   "rules": {
