@@ -83,7 +83,14 @@ const planetaryPriorities = Array.isArray(planetaryStatus?.defaultNextPriorities
 const planetaryWarnings = Array.isArray(planetaryStatus?.horizons)
   ? planetaryStatus.horizons.flatMap((horizon) => horizon?.warnings || [])
   : [];
-const liveVerificationDue = blockingGaps.some((gap) => /live browser realism|fresh live run|runtime smoothness still need/i.test(gap));
+const rawLiveVerificationDue = blockingGaps.some((gap) => /live browser realism|fresh live run|runtime smoothness still need/i.test(gap));
+const climateGuard = cycleStreak?.climateGuard || null;
+const climatePhysicsDue = Boolean(climateGuard?.triggered);
+const liveVerificationDue = rawLiveVerificationDue && !climatePhysicsDue;
+const forcedClimatePriority = climateGuard?.recommendedFocusArea
+  ? `Return to broad climate physics: ${climateGuard.recommendedFocusArea}.`
+  : null;
+const forcedClimateMode = climateGuard?.recommendedMode || 'quick';
 
 const brief = {
   schema: 'satellite-wars.worker-brief.v1',
@@ -92,7 +99,9 @@ const brief = {
   latestVerifiedCycle: latestCycleMatch?.[1] || worldStatusJson?.latestCycle?.id || null,
   benchmarkOverallPass: overallPassMatch?.[1] === 'PASS',
   lastPhysicsCommit: cycleStreak?.physicsGuard?.lastPhysicsCommit || null,
+  lastClimatePhysicsCommit: climateGuard?.lastClimatePhysicsCommit || null,
   currentPhysicsGuard: cycleStreak?.physicsGuard || null,
+  climateGuard,
   currentStallGuard: cycleStreak?.stallGuardTriggered || null,
   activeCycle: activeCycleDir ? {
     id: path.basename(activeCycleDir),
@@ -102,6 +111,7 @@ const brief = {
     lastTouchedAt: activeCycleState?.lastTouchedAt || null,
     focusArea: activeCycleState?.focusArea || null
   } : null,
+  climatePhysicsDue,
   liveVerificationDue,
   blockingGaps,
   defaultNextPriorities,
@@ -111,10 +121,12 @@ const brief = {
 };
 
 const rankedPriorities = [
-  ...(liveVerificationDue ? ['Run a browser-backed live verification cycle on the latest verified baseline before another headless-only tuning cycle.'] : []),
+  ...(climatePhysicsDue ? [`The next fresh cycle must be a ${forcedClimateMode} climate-physics cycle focused on ${climateGuard?.recommendedFocusArea || 'the dominant planetary blocker'}.`] : []),
+  ...(climatePhysicsDue && forcedClimatePriority ? [forcedClimatePriority] : []),
   ...planetaryPriorities,
   ...blockingGaps,
   ...defaultNextPriorities,
+  ...(liveVerificationDue ? ['Run a browser-backed live verification cycle on the latest verified baseline before another headless-only tuning cycle.'] : []),
   ...(cycleStreak?.recommendations || [])
 ].filter(Boolean);
 
@@ -137,9 +149,21 @@ const markdown = [
     '- Resume this cycle instead of starting a fresh one unless recovery or a blocker-family change explicitly says otherwise.'
   ] : ['- No active cycle. Start a fresh one with `npm run agent:start-cycle -- ...` before heavy work.']),
   '',
+  '## Climate physics guard',
+  '',
+  `- Broad climate-physics cycle due: ${climatePhysicsDue ? 'yes' : 'no'}`,
+  `- Consecutive non-climate commits: ${climateGuard?.consecutiveNonClimateCommits ?? 'n/a'}`,
+  `- Runtime/parity focus streak: ${climateGuard?.runtimeFocusStreak ?? 'n/a'}`,
+  `- Recommended climate mode: ${climateGuard?.recommendedMode || 'n/a'}`,
+  `- Recommended climate target: ${climateGuard?.recommendedFocusArea || 'n/a'}`,
+  ...(climatePhysicsDue
+    ? ['- The next fresh cycle must return to broad weather physics before another runtime/parity-only cycle.']
+    : ['- No forced return-to-climate-physics cycle is currently active.']),
+  '',
   '## Live verification debt',
   '',
   `- Fresh live browser verification due: ${liveVerificationDue ? 'yes' : 'no'}`,
+  ...(rawLiveVerificationDue && climatePhysicsDue ? ['- Live verification is still owed, but it is intentionally deferred until the climate-physics guard is satisfied.'] : []),
   ...(liveVerificationDue
     ? ['- The next fresh cycle must be `live` mode unless an active long-horizon cycle is already being resumed.']
     : ['- No forced live-verification debt is currently flagged by the latest verified baseline.']),
@@ -148,7 +172,9 @@ const markdown = [
   '',
   '- Refresh this file, then read it first.',
   '- Only reopen the full realism/smoothness/blocker-breaker playbooks if you are entering a new blocker family or this brief points to them explicitly.',
+  ...(climatePhysicsDue ? ['- Reopen `weather-validation/reports/climate-physics-campaign.md` before picking the next fresh cycle.'] : []),
   '- Prefer the highest failing broad-realism category from `planetary-realism-status` before another narrow terrain retune unless the planetary audit still ranks terrain highest.',
+  ...(climatePhysicsDue ? ['- Because broad climate physics is overdue, the next fresh cycle should be a weather-physics `quick`, `seasonal`, or `annual` cycle rather than another runtime/parity-only lane.'] : []),
   ...(liveVerificationDue ? ['- Because live verification is due, the next fresh cycle should be `live` mode and should start the canonical dev server/browser path before further headless-only tuning.'] : []),
   '',
   '## Current guards',

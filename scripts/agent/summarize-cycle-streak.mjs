@@ -56,7 +56,8 @@ const runGit = (args) => execFileSync(
   }
 );
 
-const PHYSICS_TARGET_AREAS = [
+const CLIMATE_TARGET_AREAS = [
+  'ITCZ placement and subtropical dry-belt moisture partitioning',
   'large-scale circulation and jet placement',
   'storm evolution and cyclone structure',
   'tropical cyclone / hurricane seasonality',
@@ -65,10 +66,102 @@ const PHYSICS_TARGET_AREAS = [
   'terrain-flow orientation',
   'Andes sampling design',
   'terrain/coupling interaction',
-  'precipitation placement/conversion after upslope moisture transport',
+  'precipitation placement/conversion after upslope moisture transport'
+];
+
+const RUNTIME_TARGET_AREAS = [
+  'live browser realism and runtime telemetry signoff',
   'worker/core and app sim-clock parity',
   'earth-update smoothness and worker sync'
 ];
+
+const PHYSICS_TARGET_AREAS = [
+  ...CLIMATE_TARGET_AREAS,
+  ...RUNTIME_TARGET_AREAS
+];
+
+const CLIMATE_SOURCE_PREFIXES = [
+  'src/weather/'
+];
+
+const CLIMATE_SOURCE_EXACT_PATHS = new Set([
+  'src/WeatherField.js',
+  'src/workers/weatherCore.worker.js'
+]);
+
+const RUNTIME_SOURCE_EXACT_PATHS = new Set([
+  'src/App.js',
+  'src/Earth.js',
+  'src/WindStreamlineRenderer.js',
+  'src/textureUtils.js',
+  'src/gameModeUi.js',
+  'src/simProbeFastForward.js',
+  'src/windDiagnosticsPerf.js',
+  'src/windParticlePerf.js'
+]);
+
+const CLIMATE_BLOCKER_KEYWORDS = [
+  /dry-belt/i,
+  /\bitcz\b/i,
+  /subtropical/i,
+  /circulation/i,
+  /storm/i,
+  /cyclone/i,
+  /cloud/i,
+  /seasonal/i,
+  /annual/i,
+  /moisture/i,
+  /hydrology/i
+];
+
+const DEFAULT_CLIMATE_FOCUS = 'ITCZ placement and subtropical dry-belt moisture partitioning';
+
+const guessClimateFocusFromBlockingGaps = (blockingGaps) => {
+  const joined = Array.isArray(blockingGaps) ? blockingGaps.join('\n') : '';
+  if (/dry-belt|itcz|subtropical|moisture|hydrology/i.test(joined)) {
+    return 'ITCZ placement and subtropical dry-belt moisture partitioning';
+  }
+  if (/storm|cyclone|front/i.test(joined)) {
+    return 'storm evolution and cyclone structure';
+  }
+  if (/cloud|stratocumulus/i.test(joined)) {
+    return 'cloud belts and subtropical stratocumulus structure';
+  }
+  if (/seasonal|annual|stability/i.test(joined)) {
+    return 'multi-day or seasonal stability';
+  }
+  if (/terrain|orographic|andes|rockies|himalaya/i.test(joined)) {
+    return 'terrain/coupling interaction';
+  }
+  return DEFAULT_CLIMATE_FOCUS;
+};
+
+const guessClimateModeFromBlockingGaps = (blockingGaps) => {
+  const joined = Array.isArray(blockingGaps) ? blockingGaps.join('\n') : '';
+  const explicitSeasonalRequirement = /90-day|seasonal follow|seasonal stability|seasonal evidence|required seasonal/i.test(joined);
+  const explicitAnnualRequirement = /365-day|annual stability|annual evidence|required annual/i.test(joined);
+  if (/dry-belt|itcz|subtropical|moisture|hydrology|circulation|storm|cyclone|cloud/i.test(joined)) {
+    if (explicitSeasonalRequirement) return 'seasonal';
+    return 'quick';
+  }
+  if (explicitAnnualRequirement) return 'annual';
+  if (explicitSeasonalRequirement || /stability/i.test(joined)) return 'seasonal';
+  return 'quick';
+};
+
+const isClimateFocusArea = (focusArea) => CLIMATE_TARGET_AREAS.includes(focusArea || '');
+const isRuntimeFocusArea = (focusArea) => RUNTIME_TARGET_AREAS.includes(focusArea || '');
+
+const isClimateSourcePath = (filePath) => (
+  CLIMATE_SOURCE_EXACT_PATHS.has(filePath)
+  || CLIMATE_SOURCE_PREFIXES.some((prefix) => filePath.startsWith(prefix))
+);
+
+const isRuntimeSourcePath = (filePath) => (
+  filePath.startsWith('src/')
+  && !/\.test\.[cm]?[jt]sx?$/.test(filePath)
+  && !isClimateSourcePath(filePath)
+);
 
 const NON_PHYSICS_PREFIXES = [
   'scripts/agent/',
@@ -83,10 +176,7 @@ const NON_PHYSICS_EXACT_PATHS = new Set([
   '.gitignore'
 ]);
 
-const isPhysicsSourcePath = (filePath) => (
-  filePath.startsWith('src/')
-  && !/\.test\.[cm]?[jt]sx?$/.test(filePath)
-);
+const isPhysicsSourcePath = (filePath) => isClimateSourcePath(filePath) || isRuntimeSourcePath(filePath);
 
 const isKnownNonPhysicsPath = (filePath) => (
   NON_PHYSICS_EXACT_PATHS.has(filePath)
@@ -106,7 +196,8 @@ const parseCommitFiles = (commitHash) => {
 };
 
 const classifyCommit = (files) => {
-  if (files.some(isPhysicsSourcePath)) return 'physics';
+  if (files.some(isClimateSourcePath)) return 'climate_physics';
+  if (files.some(isRuntimeSourcePath)) return 'runtime_physics';
   if (files.length > 0 && files.every(isKnownNonPhysicsPath)) return 'non_physics';
   return 'mixed';
 };
@@ -289,6 +380,12 @@ const liveVerificationBlockerStreak = countLeading(
 );
 
 const statusJson = readJsonIfExists(statusJsonPath);
+const statusBlockingGaps = Array.isArray(statusJson?.blockingGaps) ? statusJson.blockingGaps : [];
+const broadClimateBlockerPresent = statusBlockingGaps.some(
+  (gap) => CLIMATE_BLOCKER_KEYWORDS.some((pattern) => pattern.test(gap))
+);
+const recommendedClimateFocusArea = guessClimateFocusFromBlockingGaps(statusBlockingGaps);
+const recommendedClimateMode = guessClimateModeFromBlockingGaps(statusBlockingGaps);
 const baselineCommit = typeof statusJson?.baselineCommit === 'string' ? statusJson.baselineCommit : null;
 let baselineCommitInfo = null;
 
@@ -311,12 +408,38 @@ if (baselineCommit) {
 }
 
 const recentCommits = readRecentCommits(Math.max(limit, 10));
+const isPhysicsClassification = (classification) => (
+  classification === 'climate_physics'
+  || classification === 'runtime_physics'
+  || classification === 'mixed'
+);
 const consecutiveNonPhysicsCommits = countLeading(
   recentCommits,
-  (commit) => commit.classification === 'non_physics'
+  (commit) => !isPhysicsClassification(commit.classification)
 );
-const lastPhysicsCommit = recentCommits.find((commit) => commit.classification === 'physics') || null;
+const lastPhysicsCommit = recentCommits.find((commit) => isPhysicsClassification(commit.classification)) || null;
+const consecutiveNonClimateCommits = countLeading(
+  recentCommits,
+  (commit) => commit.classification !== 'climate_physics'
+);
+const lastClimatePhysicsCommit = recentCommits.find((commit) => commit.classification === 'climate_physics') || null;
 const physicsGuardTriggered = consecutiveNonPhysicsCommits >= 2;
+const runtimeFocusStreak = countLeading(
+  completedCycles,
+  (cycle) => isRuntimeFocusArea(cycle.focusArea)
+);
+const climateFocusStreak = countLeading(
+  completedCycles,
+  (cycle) => isClimateFocusArea(cycle.focusArea)
+);
+const climateGuardTriggered = Boolean(
+  broadClimateBlockerPresent
+  && (
+    consecutiveNonClimateCommits >= 2
+    || runtimeFocusStreak >= 2
+    || liveVerificationBlockerStreak >= 2
+  )
+);
 const physicsRetryBudget = 3;
 const allowPhysicsRetry = Boolean(
   physicsGuardTriggered
@@ -357,6 +480,10 @@ if (physicsGuardTriggered) {
   recommendations.push(`The next cycle must target real weather or performance code under src/ and choose one focus area: ${PHYSICS_TARGET_AREAS.join('; ')}.`);
   recommendations.push('Diagnostic-only commits are allowed only if they unblock a named physics hypothesis that the same cycle could not test.');
   recommendations.push('A no-progress physics cycle is acceptable only if it leaves either a real src/ attempt or a blocker-narrowing artifact tied to the named focus area.');
+}
+if (climateGuardTriggered) {
+  recommendations.push(`Broad climate physics is overdue. The next fresh cycle must return to a ${recommendedClimateMode} climate-physics campaign on ${recommendedClimateFocusArea}, not another runtime/parity-only cycle.`);
+  recommendations.push('Do not count runtime signoff, live-probe parity, or renderer-only work as success while planetary blockers still show unresolved circulation/moisture/cloud/storm defects.');
 }
 if (liveVerificationBlockerStreak >= 1) {
   recommendations.push('Do not let live verification monopolize the next cycle. Either land a direct src-side sim-clock parity fix or use the broader offline realism audits before another browser-helper-only win.');
@@ -405,6 +532,18 @@ const summary = {
     requiredTargetAreas: PHYSICS_TARGET_AREAS,
     lastPhysicsCommit,
     recentCommits
+  },
+  climateGuard: {
+    triggered: climateGuardTriggered,
+    broadClimateBlockerPresent,
+    consecutiveNonClimateCommits,
+    runtimeFocusStreak,
+    climateFocusStreak,
+    liveVerificationBlockerStreak,
+    recommendedMode: recommendedClimateMode,
+    recommendedFocusArea: recommendedClimateFocusArea,
+    requiredTargetAreas: CLIMATE_TARGET_AREAS,
+    lastClimatePhysicsCommit
   },
   recommendations,
   recentCycles: cycles

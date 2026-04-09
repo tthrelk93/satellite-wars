@@ -206,3 +206,37 @@ test('allows bounded same-focus retries before recommending cron disable', () =>
     /Disable cron only if the next precipitation placement\/conversion after upslope moisture transport cycle still cannot land a verified src\/ fix/
   );
 });
+
+test('keeps broad dry-belt blockers in quick mode even when annual evidence is still missing', () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cycle-streak-climate-mode-'));
+  const reportsDir = path.join(rootDir, 'weather-validation', 'reports');
+  fs.mkdirSync(reportsDir, { recursive: true });
+
+  writeJson(path.join(reportsDir, 'world-class-weather-status.json'), {
+    blockingGaps: [
+      'Northern subtropical dry-belt moisture partitioning is still the dominant planetary blocker.',
+      'Annual / 365-day evidence is still required before any long-horizon or world-class claim.'
+    ]
+  });
+
+  execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.name', 'Test Agent'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['config', 'user.email', 'test@example.com'], { cwd: rootDir, stdio: 'ignore' });
+
+  writeText(path.join(rootDir, 'src', 'weather', 'v2', 'core5.js'), 'export const weather = 1;\n');
+  execFileSync('git', ['add', '.'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['commit', '-m', 'climate fix'], { cwd: rootDir, stdio: 'ignore' });
+
+  writeText(path.join(rootDir, 'src', 'Earth.js'), 'export const earth = 1;\n');
+  execFileSync('git', ['add', '.'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['commit', '-m', 'runtime fix'], { cwd: rootDir, stdio: 'ignore' });
+
+  writeText(path.join(rootDir, 'scripts', 'agent', 'probe.mjs'), 'export const probe = 1;\n');
+  execFileSync('git', ['add', '.'], { cwd: rootDir, stdio: 'ignore' });
+  execFileSync('git', ['commit', '-m', 'probe helper'], { cwd: rootDir, stdio: 'ignore' });
+
+  const summary = runSummary(rootDir);
+  assert.equal(summary.climateGuard.triggered, true);
+  assert.equal(summary.climateGuard.recommendedFocusArea, 'ITCZ placement and subtropical dry-belt moisture partitioning');
+  assert.equal(summary.climateGuard.recommendedMode, 'quick');
+});

@@ -24,6 +24,7 @@ Only reopen the detailed playbooks or the newest checkpoint when:
 - the worker brief says the blocker family changed,
 - a stall guard triggers,
 - the chosen cycle is explicitly smoothness-focused,
+- the worker brief says `climatePhysicsDue = true`,
 - or you are about to claim a world-class milestone.
 
 Non-negotiable rules:
@@ -37,10 +38,13 @@ Non-negotiable rules:
 - Failed experiments must be reverted before the cycle ends.
 - Do not create status-only commits for failed experiments.
 - Do not let diagnostic-only commits substitute for weather-model progress once the audit already exposes a testable physics target.
+- Do not count runtime/perf/UI/parity work as climate-model progress while the planetary audit still shows unresolved circulation, moisture-belt, cloud, storm, or seasonal blockers.
 
 Cycle selection rule:
 - Realism is the main mission. By default, choose the highest-leverage Earth-like realism weakness before a smoothness-only task.
 - Use the planetary audit to rank broad realism blockers before defaulting to terrain-specific work.
+- If `weather-validation/reports/worker-brief.md` reports `climatePhysicsDue = true`, the next fresh cycle must be a climate-physics cycle in `quick`, `seasonal`, `annual`, or climate-justified `terrain` mode. Do not choose `live`, `smoothness`, or `worker/core and app sim-clock parity` as the primary lane for that fresh cycle.
+- A runtime/perf/parity cycle is allowed only when it directly validates the immediately previous climate change or when the climate cycle cannot be judged without one bounded unblocker.
 - If `weather-validation/reports/worker-brief.md` reports `liveVerificationDue = true` and there is no active long-horizon cycle to resume, the next fresh cycle must be a browser-backed `live` verification cycle before another headless-only tuning cycle.
 - Choose a smoothness-only cycle only when:
   - runtime problems prevent reliable realism observation,
@@ -50,16 +54,19 @@ Cycle selection rule:
 - Do not spend more than one out of every four cycles on smoothness-only work while realism still has obvious unresolved weaknesses.
 
 Concrete realism fix areas:
+- `ITCZ placement and subtropical dry-belt moisture partitioning`
 - `large-scale circulation and jet placement`
 - `storm evolution and cyclone structure`
 - `tropical cyclone / hurricane seasonality`
 - `cloud belts and subtropical stratocumulus structure`
 - `multi-day or seasonal stability`
-- `live browser realism and runtime telemetry signoff`
 - `terrain-flow orientation`
 - `Andes sampling design`
 - `terrain/coupling interaction`
 - `precipitation placement/conversion after upslope moisture transport`
+
+Runtime/signoff unblocker areas:
+- `live browser realism and runtime telemetry signoff`
 - `worker/core and app sim-clock parity`
 - `earth-update smoothness and worker sync`
 
@@ -69,6 +76,7 @@ Mandatory cycle protocol:
    - If it reports `reason = dirty_worktree_without_active_cycle`, do not continue the cycle. Treat that as a worker-state violation, inspect the dirty tracked files, restore the worktree to `HEAD`, and only then start a fresh cycle.
    - If it reports `reason = active_cycle_continuation_allowed`, resume that same cycle and keep its existing plan/cycle-state contract.
 2. Reassess the highest-leverage remaining realism weakness first using the worker brief and the most recent planetary/offline audit, and only choose smoothness instead when the cycle selection rule allows it.
+   - If `climatePhysicsDue = true`, default to the recommended climate target in `worker-brief.md` before any runtime/parity lane.
 3. Declare the cycle contract with `npm run agent:start-cycle -- ...` unless you are explicitly resuming an already-open long-horizon cycle.
    - Choose one execution mode before heavy work:
      - `quick`: 30-day screening and fast candidate ranking
@@ -94,6 +102,7 @@ Mandatory cycle protocol:
    - If the blocker is already proven to be terrain-specific, start with `npm run agent:orographic-audit -- --targets 75600,105480`.
    - If you need a machine-readable audit artifact, write it with `--out <cycle>/...json`.
    - Never create a `.json` artifact by redirecting `npm run ...` stdout with `> file.json` or by piping it through text filters first.
+   - When the planetary audit still shows a broad blocker like dry-belt moisture partitioning, storm structure, cloud-belt realism, or annual stability, do not let runtime/parity work monopolize more than one fresh cycle before returning to climate physics.
    - If the orographic audit reports `terrainSampleCount = 0`, treat headless terrain parity as a tooling blocker and use `npm run agent:orographic-probe-cdp` on the reused localhost page or fix the parity gap before more micro-experiments.
    - Reuse the latest clean baseline for the same blocker family when the code under test does not change browser/init/logging behavior.
    - Do not stay on terrain-only tuning for more than 2 consecutive broad-realism cycles unless the planetary audit still ranks terrain as the dominant blocker.
@@ -118,9 +127,12 @@ Mandatory cycle protocol:
 
 Physics delivery guard:
 - `npm run agent:cycle-streak` reports `physicsGuard.consecutiveNonPhysicsCommits`.
+- `npm run agent:cycle-streak` also reports `climateGuard`; treat that as the stronger rule whenever broad planetary blockers remain.
 - After 2 consecutive non-physics commits, the next cycle must try to land a verified weather/performance fix in real app code under `src/`.
+- After 2 consecutive non-climate commits, or 2 consecutive runtime/parity fresh cycles while a planetary blocker remains, the next fresh cycle must return to climate-model code under `src/weather/`, `src/WeatherField.js`, or another weather-core path.
 - A diagnostic-only commit is allowed only if it unblocks a named physics hypothesis that the same cycle could not test because it discovered a new tooling blocker while trying to make the physics change.
 - After one diagnostic-only live-verification commit, the next cycle must return to real physics or direct app/core parity work. Do not spend two consecutive cycles on browser-helper-only wins.
+- A runtime/perf/parity commit does not satisfy the climate campaign if the planetary audit still shows unresolved circulation/moisture/cloud/storm/seasonality blockers.
 - A no-progress physics cycle is acceptable only if it leaves one of these:
   - a real attempted `src/` weather/performance change that was tested and then reverted, or
   - a blocker-narrowing artifact that clearly changes what the very next physics cycle should try.
