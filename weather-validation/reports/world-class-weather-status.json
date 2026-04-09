@@ -1,16 +1,16 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-09T06:29:41.839Z",
+  "updatedAt": "2026-04-09T11:28:44.725Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
   "baselineCommit": "94d5805",
   "latestCycle": {
-    "id": "cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry",
-    "goal": "reduce the sampled wind-model diagnostics cost inside Earth.update without breaking the telemetry path",
-    "verifiedImprovement": "reducing the wind diagnostics sample target cut model diagnostics from about 29.4–32.1 ms to about 9.1–10.2 ms on due ticks and improved Earth.update p95 from 31.96 ms to 26.32 ms on a fresh live rerun while preserving the existing live fixes; the overall smoothness gate still fails because larger unknown spikes remain",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry/checkpoint.md",
-    "runtimeLogPath": "logs/weather-2026-04-09T06-25-49Z-26830.jsonl"
+    "id": "cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun",
+    "goal": "reduce the dominant sample0Ms cost inside WindStreamlineRenderer._evolveParticles without breaking the live solo path",
+    "verifiedImprovement": "adding an in-range bilinear fast path plus scratch-sample reuse in WindStreamlineRenderer reduced the mature live Earth.update p95 from 42.01 ms on the recent sample0 baseline to 34.20 ms and then 33.39 ms on two fresh reruns, while lowering sample0Ms p95 from 2.60 ms to 2.30 ms on the confirming rerun; the overall smoothness gate still fails because larger unknown max spikes and weak wind targets remain",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun/checkpoint.md",
+    "runtimeLogPath": "logs/weather-2026-04-09T11-21-35Z-24721.jsonl"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
@@ -18,7 +18,7 @@
   },
   "blockingGaps": [
     "northern subtropical dry-belt moisture partitioning still fails in both fresh quick and seasonal audits, though the gap is now smaller at 1.029 at 30 days and 1.015 at 90 days",
-    "browser/runtime signoff is still blocked by larger remaining Earth.update spikes and weak wind-target diagnostics in the latest live run, even after reducing the model-diagnostics payload cost",
+    "browser/runtime signoff is still blocked by larger remaining Earth.update max spikes and weak wind-target diagnostics in the latest live run, even after reducing both the model-diagnostics payload cost and the dominant particle sample0 path",
     "annual / 365-day evidence is still missing for any long-horizon or world-class claim",
     "world-class status still requires realism and smoothness to pass in the same browser-backed run"
   ],
@@ -86,7 +86,7 @@
       "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry/postfix-runtime-summary.json",
       "hotspotProfilePath": "weather-validation/output/cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry/postfix-hotspot-profile.json",
       "instrumentedRuntimeLog": "logs/weather-2026-04-09T06-25-49Z-26830.jsonl",
-      "result": "sampled model diagnostics reduced due-tick cost from about 30 ms to about 9-10 ms and improved Earth.update p95 to 26.32 ms, but larger unknown spikes still block signoff",
+      "result": "sampled model diagnostics reduced due-tick cost from about 30 ms to about 9-10 ms and improved Earth.update p95 to 26.32 ms, but larger unknown spikes still blocked signoff",
       "before": {
         "sampleStride": 1,
         "sampleCount": 16200,
@@ -100,8 +100,37 @@
         "earthUpdateP95Ms": 26.319999989867192
       }
     },
+    "windParticleSampleFastPath": {
+      "cycleId": "cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun",
+      "checkpointPath": "weather-validation/output/cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun/checkpoint.md",
+      "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun/runtime-summary-rerun.json",
+      "hotspotProfilePath": "weather-validation/output/cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun/hotspot-profile-rerun.json",
+      "instrumentedRuntimeLog": "logs/weather-2026-04-09T11-21-35Z-24721.jsonl",
+      "result": "an in-range bilinear fast path plus scratch-sample reuse reduced the recent mature live Earth.update p95 from 42.01 ms to 33.39 ms on the confirming rerun while lowering sample0Ms p95 from 2.60 ms to 2.30 ms; the remaining worst spikes are now mostly unknown instead of clearly particle-evolve dominated",
+      "before": {
+        "earthUpdateP95Ms": 42.014999996125695,
+        "earthUpdateMaxMs": 386.80000001192093,
+        "sample0P95Ms": 2.5999999940395355,
+        "sample1P95Ms": 1.8050000652670872,
+        "particleSpikeCount": 6,
+        "unknownSpikeCount": 2
+      },
+      "after": {
+        "earthUpdateP95Ms": 33.38999998569487,
+        "earthUpdateMaxMs": 449.40000000596046,
+        "sample0P95Ms": 2.3000000566244125,
+        "sample1P95Ms": 1.6500000357627869,
+        "particleSpikeCount": 2,
+        "unknownSpikeCount": 6,
+        "warnings": [
+          "earth_update_p95_high",
+          "earth_update_max_high",
+          "wind_targets_failing"
+        ]
+      }
+    },
     "runtimeSummary": {
-      "lineCount": 920,
+      "lineCount": 1562,
       "validationSnapshotCount": 0,
       "warnings": [
         "earth_update_p95_high",
@@ -111,13 +140,13 @@
     },
     "browserObservation": {
       "singlePlayerLoaded": true,
-      "note": "The latest fresh solo live run kept both the texture-warning fix and the minimap-panel fix. Sampled wind diagnostics reduced model-diagnostics cost materially, but larger Earth.update spikes still remain."
+      "note": "Both fresh solo reruns stayed single-tab, kept the texture-warning and minimap fixes intact, and advanced cleanly through Day 2 while the WindStreamlineRenderer fast path lowered the repeated Earth.update p95 baseline."
     }
   },
   "defaultNextPriority": [
-    "run a direct src-side smoothness/runtime cycle on the remaining unknown Earth.update spikes and worker/core sync path now that the model-diagnostics payload has been reduced",
-    "rerun live verification on the thetaeCoeff=10.5 baseline after the next runtime fix",
-    "if runtime smoothness stops blocking signoff, return the next physics cycle to northern subtropical dry-belt moisture partitioning and ITCZ-adjacent hydrology",
+    "run one bounded live diagnostic cycle on the remaining unknown Earth.update max spikes before another renderer tweak; the old sample0 bottleneck is materially reduced",
+    "if that diagnostic cycle does not expose a sharper runtime/app target, return the next physics cycle to northern subtropical dry-belt moisture partitioning while keeping the faster particle sampler",
+    "rerun live verification on the thetaeCoeff=10.5 baseline after the next targeted runtime or dry-belt fix",
     "run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through",
     "keep validation on the clean world-class checkout only"
   ],

@@ -5,7 +5,7 @@ import {
   hasParticleEvolvePhaseData,
   mergeParticleEvolvePhaseTotals
 } from './windParticlePerf.js';
-import { bilinear } from './weather/shared/bilinear';
+import { bilinear } from './weather/shared/bilinear.js';
 
 const DEFAULT_WIDTH = 1024;
 const DEFAULT_HEIGHT = 512;
@@ -40,7 +40,25 @@ const computePercentiles = (values, percentiles) => {
   return out;
 };
 
-const sampleFieldBilinear = ({
+const createSampleResult = () => ({ dx: 0, dy: 0, speed: 0, valid: false });
+
+const writeInvalidSampleResult = (out = createSampleResult()) => {
+  out.dx = 0;
+  out.dy = 0;
+  out.speed = 0;
+  out.valid = false;
+  return out;
+};
+
+const writeValidSampleResult = (out = createSampleResult(), dx = 0, dy = 0, speed = 0) => {
+  out.dx = dx;
+  out.dy = dy;
+  out.speed = speed;
+  out.valid = true;
+  return out;
+};
+
+export const sampleFieldBilinearInRange = (
   x,
   y,
   width,
@@ -48,67 +66,106 @@ const sampleFieldBilinear = ({
   fieldDx,
   fieldDy,
   fieldSpeed,
-  fieldValid
-}) => {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    return { dx: 0, dy: 0, speed: 0, valid: false };
-  }
-  if (y < 0 || y >= height) {
-    return { dx: 0, dy: 0, speed: 0, valid: false };
-  }
-  const xWrapped = ((x % width) + width) % width;
-  const x0 = Math.floor(xWrapped);
-  const y0 = Math.floor(y);
-  const x1 = (x0 + 1) % width;
-  const y1 = Math.min(height - 1, y0 + 1);
-  const tx = xWrapped - x0;
+  fieldValid,
+  out = createSampleResult()
+) => {
+  const x0 = x | 0;
+  const y0 = y | 0;
+  const x1 = x0 + 1 < width ? x0 + 1 : 0;
+  const y1 = y0 + 1 < height ? y0 + 1 : y0;
+  const row0 = y0 * width;
+  const row1 = y1 * width;
+  const idx00 = row0 + x0;
+  const idx10 = row0 + x1;
+  const idx01 = row1 + x0;
+  const idx11 = row1 + x1;
+  const tx = x - x0;
   const ty = y - y0;
-  const w00 = (1 - tx) * (1 - ty);
-  const w10 = tx * (1 - ty);
-  const w01 = (1 - tx) * ty;
+  const oneMinusTx = 1 - tx;
+  const oneMinusTy = 1 - ty;
+  const w00 = oneMinusTx * oneMinusTy;
+  const w10 = tx * oneMinusTy;
+  const w01 = oneMinusTx * ty;
   const w11 = tx * ty;
-  const idx00 = y0 * width + x0;
-  const idx10 = y0 * width + x1;
-  const idx01 = y1 * width + x0;
-  const idx11 = y1 * width + x1;
+
+  const valid00 = fieldValid[idx00] !== 0;
+  const valid10 = fieldValid[idx10] !== 0;
+  const valid01 = fieldValid[idx01] !== 0;
+  const valid11 = fieldValid[idx11] !== 0;
+
+  if (valid00 && valid10 && valid01 && valid11) {
+    return writeValidSampleResult(
+      out,
+      (fieldDx[idx00] * w00) + (fieldDx[idx10] * w10) + (fieldDx[idx01] * w01) + (fieldDx[idx11] * w11),
+      (fieldDy[idx00] * w00) + (fieldDy[idx10] * w10) + (fieldDy[idx01] * w01) + (fieldDy[idx11] * w11),
+      (fieldSpeed[idx00] * w00) + (fieldSpeed[idx10] * w10) + (fieldSpeed[idx01] * w01) + (fieldSpeed[idx11] * w11)
+    );
+  }
+
   let wSum = 0;
   let dxSum = 0;
   let dySum = 0;
   let speedSum = 0;
-  if (fieldValid[idx00]) {
+  if (valid00) {
     wSum += w00;
     dxSum += fieldDx[idx00] * w00;
     dySum += fieldDy[idx00] * w00;
     speedSum += fieldSpeed[idx00] * w00;
   }
-  if (fieldValid[idx10]) {
+  if (valid10) {
     wSum += w10;
     dxSum += fieldDx[idx10] * w10;
     dySum += fieldDy[idx10] * w10;
     speedSum += fieldSpeed[idx10] * w10;
   }
-  if (fieldValid[idx01]) {
+  if (valid01) {
     wSum += w01;
     dxSum += fieldDx[idx01] * w01;
     dySum += fieldDy[idx01] * w01;
     speedSum += fieldSpeed[idx01] * w01;
   }
-  if (fieldValid[idx11]) {
+  if (valid11) {
     wSum += w11;
     dxSum += fieldDx[idx11] * w11;
     dySum += fieldDy[idx11] * w11;
     speedSum += fieldSpeed[idx11] * w11;
   }
   if (wSum <= 0) {
-    return { dx: 0, dy: 0, speed: 0, valid: false };
+    return writeInvalidSampleResult(out);
   }
   const inv = 1 / wSum;
-  return {
-    dx: dxSum * inv,
-    dy: dySum * inv,
-    speed: speedSum * inv,
-    valid: true
-  };
+  return writeValidSampleResult(out, dxSum * inv, dySum * inv, speedSum * inv);
+};
+
+export const sampleFieldBilinear = (
+  x,
+  y,
+  width,
+  height,
+  fieldDx,
+  fieldDy,
+  fieldSpeed,
+  fieldValid,
+  out = createSampleResult()
+) => {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return writeInvalidSampleResult(out);
+  }
+  if (y < 0 || y >= height) {
+    return writeInvalidSampleResult(out);
+  }
+  const xWrapped = (x >= 0 && x < width) ? x : ((x % width) + width) % width;
+  return sampleFieldBilinearInRange(
+    xWrapped,
+    y,
+    width,
+    height,
+    fieldDx,
+    fieldDy,
+    fieldSpeed,
+    fieldValid,
+    out
+  );
 };
 
 const windIntensityColorScale = (step, maxWind) => {
@@ -648,6 +705,12 @@ class WindStreamlineRenderer {
     addParticleEvolvePhase(perfPhases, 'clearBucketsMs', nowMs() - phaseStartMs);
     const width = this.width;
     const height = this.height;
+    const fieldDx = this.fieldDx;
+    const fieldDy = this.fieldDy;
+    const fieldSpeed = this.fieldSpeed;
+    const fieldValid = this.fieldValid;
+    const sample0Scratch = createSampleResult();
+    const sample1Scratch = createSampleResult();
     let movedCount = 0;
     let respawnedCount = 0;
     let invalidCount = 0;
@@ -662,16 +725,17 @@ class WindStreamlineRenderer {
         continue;
       }
       phaseStartMs = nowMs();
-      const sample0 = sampleFieldBilinear({
-        x: particle.x,
-        y: particle.y,
+      const sample0 = sampleFieldBilinearInRange(
+        particle.x,
+        particle.y,
         width,
         height,
-        fieldDx: this.fieldDx,
-        fieldDy: this.fieldDy,
-        fieldSpeed: this.fieldSpeed,
-        fieldValid: this.fieldValid
-      });
+        fieldDx,
+        fieldDy,
+        fieldSpeed,
+        fieldValid,
+        sample0Scratch
+      );
       addParticleEvolvePhase(perfPhases, 'sample0Ms', nowMs() - phaseStartMs);
       if (!sample0.valid) {
         particle.age = particle.maxAge;
@@ -681,16 +745,17 @@ class WindStreamlineRenderer {
       const midX = particle.x + sample0.dx * 0.5;
       const midY = particle.y + sample0.dy * 0.5;
       phaseStartMs = nowMs();
-      const sample1 = sampleFieldBilinear({
-        x: midX,
-        y: midY,
+      const sample1 = sampleFieldBilinear(
+        midX,
+        midY,
         width,
         height,
-        fieldDx: this.fieldDx,
-        fieldDy: this.fieldDy,
-        fieldSpeed: this.fieldSpeed,
-        fieldValid: this.fieldValid
-      });
+        fieldDx,
+        fieldDy,
+        fieldSpeed,
+        fieldValid,
+        sample1Scratch
+      );
       addParticleEvolvePhase(perfPhases, 'sample1Ms', nowMs() - phaseStartMs);
       if (!sample1.valid) {
         particle.age = particle.maxAge;
@@ -712,10 +777,10 @@ class WindStreamlineRenderer {
         outOfBoundsCount += 1;
         continue;
       }
-      xt = ((xt % width) + width) % width;
+      xt = (xt >= 0 && xt < width) ? xt : ((xt % width) + width) % width;
       const nextIdx = Math.floor(yt) * width + Math.floor(xt);
       addParticleEvolvePhase(perfPhases, 'projectValidateMs', nowMs() - phaseStartMs);
-      if (!this.fieldValid[nextIdx]) {
+      if (!fieldValid[nextIdx]) {
         particle.age = particle.maxAge;
         invalidCount += 1;
         continue;
