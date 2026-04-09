@@ -3,6 +3,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import WebSocket from 'ws';
 import { parseSimTimeLabel, selectDevtoolsPageTarget } from './browser-utils.mjs';
+import {
+  createProbeProgress,
+  deriveProbeProgressPath,
+  updateProbeProgress
+} from './orographic-probe-progress.mjs';
 
 const [targetArg, outPath, screenshotPath, overridesArg, resetArg] = process.argv.slice(2);
 const targetSeconds = Number(targetArg || 0);
@@ -12,7 +17,11 @@ const devtoolsBase = process.env.SW_DEVTOOLS_BASE || 'http://127.0.0.1:18800';
 const targetUrl = 'http://127.0.0.1:3000/?mode=solo';
 const DEFAULT_FETCH_TIMEOUT_MS = 15000;
 const DEFAULT_COMMAND_TIMEOUT_MS = 30000;
-const DEFAULT_WAIT_TIMEOUT_MS = 240000;
+const parsePositiveInt = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+const DEFAULT_WAIT_TIMEOUT_MS = parsePositiveInt(process.env.SW_OROGRAPHIC_PROBE_WAIT_TIMEOUT_MS, 240000);
 const SIM_PARITY_TOLERANCE_SECONDS = 60;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -53,6 +62,24 @@ const pageTarget = selectDevtoolsPageTarget(targets, { targetUrl, preferredMode:
 if (!pageTarget?.webSocketDebuggerUrl) {
   throw new Error(`No page target found for ${targetUrl}`);
 }
+
+const progressPath = deriveProbeProgressPath(outPath);
+let probeProgress = createProbeProgress({
+  targetSeconds,
+  resetMode,
+  pageTargetId: pageTarget?.id ?? null,
+  outPath,
+  screenshotPath
+});
+
+const persistProgress = async (patch = {}) => {
+  probeProgress = updateProbeProgress(probeProgress, patch);
+  if (progressPath) {
+    await ensureParentDir(progressPath);
+    await fs.writeFile(progressPath, JSON.stringify(probeProgress, null, 2));
+  }
+  return probeProgress;
+};
 
 const ws = new WebSocket(pageTarget.webSocketDebuggerUrl);
 let restoreProbePauseState = null;
@@ -155,11 +182,37 @@ const waitForSimParity = async (requestedTargetSeconds, { exact = false } = {}) 
     const coreAligned = Number.isFinite(coreTime) && Math.abs(coreTime - simTime) <= SIM_PARITY_TOLERANCE_SECONDS;
     const labelAligned = Number.isFinite(labelSeconds) && Math.abs(labelSeconds - simTime) <= SIM_PARITY_TOLERANCE_SECONDS;
     const queueDrained = queueRemaining <= SIM_PARITY_TOLERANCE_SECONDS;
+    await persistProgress({
+      phase: 'wait-for-sim-parity',
+      probeState: lastState,
+      extra: {
+        requestedTargetSeconds,
+        exact,
+        queueRemaining,
+        ready,
+        simReached,
+        coreAligned,
+        labelAligned,
+        queueDrained
+      }
+    });
     if (ready && simReached && coreAligned && labelAligned && queueDrained) {
       return lastState;
     }
     if (Date.now() >= deadline) {
-      throw new Error(`Timed out waiting for sim parity at ${requestedTargetSeconds}s. Last state: ${JSON.stringify(lastState)}`);
+      const error = new Error(`Timed out waiting for sim parity at ${requestedTargetSeconds}s. Last state: ${JSON.stringify(lastState)}`);
+      await persistProgress({
+        status: 'failed',
+        phase: 'wait-for-sim-parity-timeout',
+        probeState: lastState,
+        note: error.message,
+        error,
+        extra: {
+          requestedTargetSeconds,
+          exact
+        }
+      });
+      throw error;
     }
     await sleep(1000);
   }
@@ -168,11 +221,26 @@ const waitForSimParity = async (requestedTargetSeconds, { exact = false } = {}) 
 const advanceProbeInChunks = async (requestedTargetSeconds, initialState) => {
   let lastState = initialState;
   await setProbePaused(true);
+  await persistProgress({
+    phase: 'probe-paused',
+    probeState: lastState,
+    extra: {
+      requestedTargetSeconds
+    }
+  });
   while (Number(lastState?.simTimeSeconds ?? 0) < requestedTargetSeconds - SIM_PARITY_TOLERANCE_SECONDS) {
     const currentSimTime = Number(lastState?.simTimeSeconds ?? 0);
     const remaining = Math.max(0, requestedTargetSeconds - currentSimTime);
     const chunk = remaining > 21600 ? 21600 : remaining > 7200 ? 7200 : remaining;
     if (!(chunk > 0)) break;
+    await persistProgress({
+      phase: 'queue-probe-chunk',
+      probeState: lastState,
+      extra: {
+        chunkSeconds: chunk,
+        chunkTargetSeconds: Math.min(requestedTargetSeconds, currentSimTime + chunk)
+      }
+    });
     await queueProbeAdvance(chunk);
     lastState = await waitForSimParity(Math.min(requestedTargetSeconds, currentSimTime + chunk), { exact: false });
   }
@@ -180,6 +248,7 @@ const advanceProbeInChunks = async (requestedTargetSeconds, initialState) => {
 };
 
 try {
+  await persistProgress({ phase: 'connect-devtools' });
   await send('Page.enable');
   await send('Runtime.enable');
 
@@ -227,6 +296,10 @@ try {
   }
 
   const initialState = await getProbeState();
+  await persistProgress({
+    phase: 'initial-probe-state',
+    probeState: initialState
+  });
   restoreProbePauseState = initialState?.paused;
   const initialSimTime = Number(initialState?.simTimeSeconds ?? 0);
   if (resetMode === 'zero' && Number.isFinite(initialSimTime) && Number.isFinite(targetSeconds) && initialSimTime >= targetSeconds) {
@@ -395,7 +468,38 @@ try {
     const shot = await send('Page.captureScreenshot', { format: 'png' }, DEFAULT_COMMAND_TIMEOUT_MS);
     await fs.writeFile(screenshotPath, Buffer.from(shot.data, 'base64'));
   }
+  await persistProgress({
+    status: 'succeeded',
+    phase: 'complete',
+    probeState: result?.probeState ?? null,
+    extra: {
+      timeUTC: result?.timeUTC ?? null,
+      outputWritten: Boolean(outPath),
+      screenshotWritten: Boolean(screenshotPath)
+    }
+  });
   console.log(payload);
+} catch (error) {
+  await persistProgress({
+    status: 'failed',
+    phase: 'error',
+    note: error.message,
+    error
+  });
+  if (outPath) {
+    const failurePayload = JSON.stringify({
+      schema: 'satellite-wars.orographic-probe-result.v1',
+      status: 'failed',
+      error: {
+        message: error.message
+      },
+      progressPath,
+      progress: probeProgress
+    }, null, 2);
+    await ensureParentDir(outPath);
+    await fs.writeFile(outPath, failurePayload);
+  }
+  throw error;
 } finally {
   if (restoreProbePauseState !== null) {
     try {
