@@ -15,6 +15,7 @@ import { SoundingSensor } from './sensors/weather/SoundingSensor';
 import { AmvSensor } from './sensors/weather/AmvSensor';
 import { paintGridToTexture } from './sensors/weather/paintGridToTexture';
 import { applyTextureAnisotropy } from './textureUtils.js';
+import { createWindDiagnosticsPerfPayload, measureWindDiagnosticsPhase } from './windDiagnosticsPerf.js';
 import WindStreamlineRenderer from './WindStreamlineRenderer';
 import { CLOUD_WATCH_GRID_LON_OFFSET_RAD, WIND_REALISM_TARGETS } from './constants';
 import { takeBoundedAccumulatedStep } from './weather/workerStepBudget';
@@ -1652,33 +1653,51 @@ class Earth {
     if (!Number.isFinite(simTimeSeconds)) return;
     const modelDue = this._lastWindModelDiagSimTimeSeconds == null
       || (simTimeSeconds - this._lastWindModelDiagSimTimeSeconds) >= WIND_MODEL_DIAGNOSTICS_CADENCE_SECONDS;
+    const referenceDue = this._lastWindReferenceDiagSimTimeSeconds == null
+      || (simTimeSeconds - this._lastWindReferenceDiagSimTimeSeconds) >= WIND_MODEL_DIAGNOSTICS_CADENCE_SECONDS;
+    const vizDue = this._lastWindVizDiagSimTimeSeconds == null
+      || (simTimeSeconds - this._lastWindVizDiagSimTimeSeconds) >= WIND_VIZ_DIAGNOSTICS_CADENCE_SECONDS;
+    const perfPayload = createWindDiagnosticsPerfPayload({
+      modelDue,
+      referenceDue,
+      vizDue,
+      windStreamlinesVisible: this.windStreamlinesVisible
+    });
     let updated = false;
+    let measured = false;
     if (modelDue) {
-      if (this._logWindModelDiagnostics(simTimeSeconds)) {
+      measured = true;
+      if (measureWindDiagnosticsPhase(perfPayload, 'model', () => this._logWindModelDiagnostics(simTimeSeconds))) {
         this._lastWindModelDiagSimTimeSeconds = simTimeSeconds;
         updated = true;
       }
     }
-    const referenceDue = this._lastWindReferenceDiagSimTimeSeconds == null
-      || (simTimeSeconds - this._lastWindReferenceDiagSimTimeSeconds) >= WIND_MODEL_DIAGNOSTICS_CADENCE_SECONDS;
     if (referenceDue && this.windReferenceCore?.ready) {
-      if (this._logWindReferenceDiagnostics(simTimeSeconds)) {
+      measured = true;
+      if (measureWindDiagnosticsPhase(perfPayload, 'reference', () => this._logWindReferenceDiagnostics(simTimeSeconds))) {
         this._lastWindReferenceDiagSimTimeSeconds = simTimeSeconds;
         updated = true;
       }
     }
-
-    const vizDue = this._lastWindVizDiagSimTimeSeconds == null
-      || (simTimeSeconds - this._lastWindVizDiagSimTimeSeconds) >= WIND_VIZ_DIAGNOSTICS_CADENCE_SECONDS;
     if (vizDue && this.windStreamlinesVisible) {
-      if (this._logWindVizDiagnostics(simTimeSeconds)) {
+      measured = true;
+      if (measureWindDiagnosticsPhase(perfPayload, 'viz', () => this._logWindVizDiagnostics(simTimeSeconds))) {
         this._lastWindVizDiagSimTimeSeconds = simTimeSeconds;
         updated = true;
       }
     }
     if (updated) {
-      this._logWindTargetsStatus(simTimeSeconds);
-      this._logWindReferenceComparison(simTimeSeconds);
+      measured = true;
+      measureWindDiagnosticsPhase(perfPayload, 'targets', () => this._logWindTargetsStatus(simTimeSeconds));
+      measureWindDiagnosticsPhase(perfPayload, 'referenceComparison', () => this._logWindReferenceComparison(simTimeSeconds));
+    }
+    if (measured) {
+      this._lastWindDiagnosticsPerfPayload = perfPayload;
+      this.logWeatherEvent?.(
+        'windDiagnosticsPerf',
+        perfPayload,
+        { simTimeSeconds, core: this.weatherField?.core ?? null }
+      );
     }
   }
 
