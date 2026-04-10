@@ -30,6 +30,7 @@
     "agent:dev-server": "node scripts/agent/dev-server.mjs",
     "agent:orographic-audit": "node --experimental-default-type=module --loader ./scripts/agent/resolve-js-loader.mjs scripts/agent/orographic-audit.mjs",
     "agent:planetary-realism-audit": "node --experimental-default-type=module --loader ./scripts/agent/resolve-js-loader.mjs scripts/agent/planetary-realism-audit.mjs",
+    "agent:annual-physics-targets": "node scripts/agent/annual-physics-targets.mjs",
     "agent:planetary-candidate-sweep": "node --experimental-default-type=module --loader ./scripts/agent/resolve-js-loader.mjs scripts/agent/planetary-candidate-sweep.mjs",
     "agent:orographic-probe-cdp": "node scripts/agent/orographic-probe-cdp.mjs",
     "agent:reuse-localhost-tab": "node scripts/agent/reuse-localhost-tab.mjs",
@@ -45,6 +46,8 @@
     "weather:planetary:audit:seasonal": "npm run agent:planetary-realism-audit -- --preset seasonal",
     "weather:planetary:audit:annual": "npm run agent:planetary-realism-audit -- --preset annual",
     "weather:planetary:audit:annual:report": "npm run agent:planetary-realism-audit -- --preset annual --report-base weather-validation/output/annual-planetary-realism",
+    "weather:planetary:targets:annual": "npm run agent:annual-physics-targets -- --report-base weather-validation/output/annual-planetary-realism",
+    "weather:planetary:audit:annual:tuning-pack": "npm run weather:planetary:audit:annual:report && npm run weather:planetary:targets:annual",
     "verify:no-v1-weather": "node scripts/no-v1-weather.mjs",
     "wind:targets": "node scripts/wind/extractZonalMeanTargets.mjs"
   },

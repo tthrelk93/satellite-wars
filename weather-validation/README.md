@@ -154,6 +154,28 @@ Those artifacts are meant for follow-on tuning, not just pass/fail:
 
 Live weather logs also now include a `v2.broadClimate` object in every `state` entry so browser-backed runs expose the same ITCZ, subtropical drying, convective organization, and trade/westerly metrics as the headless planetary audit.
 
+Generate the automatic top-5 physics target report from those annual artifacts:
+
+```bash
+npm run weather:planetary:targets:annual
+```
+
+Or run the full overnight pack in one command:
+
+```bash
+npm run weather:planetary:audit:annual:tuning-pack
+```
+
+That post-run target extractor writes:
+- `weather-validation/output/annual-planetary-realism-physics-targets.json`
+- `weather-validation/output/annual-planetary-realism-physics-targets.md`
+
+It turns the annual realism artifacts into a ranked shortlist of physics campaigns, with:
+- the top 5 broad physics targets to attack next
+- why each target is ranked where it is
+- which weather-core files are the best first places to edit
+- the latest and monthly evidence that supports each recommendation
+
 ## How later phases should use this
 
 1. Generate model diagnostics in the same field schema or emit `validationSnapshot` log entries from the live model.
