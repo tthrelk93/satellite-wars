@@ -81,6 +81,11 @@ test('classifySnapshot reports broad convection and subtropical drying diagnosti
       1, 1,
       0, 0
     ],
+    convectivePotentialFrac: [
+      0.1, 0.1,
+      0.95, 0.9,
+      0.1, 0.1
+    ],
     convectiveOrganizationFrac: [
       0.1, 0.1,
       0.9, 0.8,
@@ -123,7 +128,72 @@ test('classifySnapshot reports broad convection and subtropical drying diagnosti
 
   assert.ok(snapshot.metrics.itczWidthDeg > 0);
   assert.ok(snapshot.metrics.tropicalConvectiveFraction > 0.5);
+  assert.ok(snapshot.metrics.tropicalConvectivePotential > 0.5);
   assert.ok(snapshot.metrics.tropicalConvectiveMassFluxKgM2S > 0.01);
   assert.ok(snapshot.metrics.subtropicalSubsidenceNorthMean > 0.05);
   assert.ok(snapshot.metrics.tropicalAnvilPersistenceFrac > 0.6);
+  assert.equal(snapshot.profiles.latitudesDeg.length, 3);
+  assert.equal(snapshot.profiles.series.convectivePotential.length, 3);
+});
+
+test('buildMonthlyClimatology averages metrics and zonal profiles by month', () => {
+  const monthly = planetaryAuditTest.buildMonthlyClimatology([
+    {
+      targetDay: 10,
+      monthIndex: 0,
+      metrics: {
+        itczWidthDeg: 12,
+        subtropicalDryNorthRatio: 0.9
+      },
+      profiles: {
+        latitudesDeg: [-10, 0, 10],
+        series: {
+          precipRateMmHr: [1, 2, 1],
+          convectiveMassFluxKgM2S: [0.01, 0.02, 0.01]
+        }
+      }
+    },
+    {
+      targetDay: 20,
+      monthIndex: 0,
+      metrics: {
+        itczWidthDeg: 14,
+        subtropicalDryNorthRatio: 1.1
+      },
+      profiles: {
+        latitudesDeg: [-10, 0, 10],
+        series: {
+          precipRateMmHr: [2, 3, 2],
+          convectiveMassFluxKgM2S: [0.02, 0.03, 0.02]
+        }
+      }
+    }
+  ]);
+
+  assert.equal(monthly[0].sampleCount, 2);
+  assert.equal(monthly[0].metrics.itczWidthDeg, 13);
+  assert.equal(monthly[0].metrics.subtropicalDryNorthRatio, 1);
+  assert.equal(monthly[0].profiles.series.precipRateMmHr[1], 2.5);
+  assert.equal(monthly[0].profiles.series.convectiveMassFluxKgM2S[1], 0.025);
+});
+
+test('buildRealismGapReport ranks strongest moisture gaps first', () => {
+  const gaps = planetaryAuditTest.buildRealismGapReport([
+    {
+      horizonDays: 30,
+      warnings: [
+        'north_subtropical_dry_belt_too_wet',
+        'trade_winds_missing_north'
+      ],
+      latest: {
+        metrics: {
+          subtropicalDryNorthRatio: 1.35,
+          tropicalTradesNorthU10Ms: 0.05
+        }
+      }
+    }
+  ]);
+
+  assert.equal(gaps[0].code, 'north_subtropical_dry_belt_too_wet');
+  assert.ok(gaps[0].severity > gaps[1].severity);
 });

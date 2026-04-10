@@ -7,6 +7,9 @@ const DEFAULT_CADENCE_SECONDS = 6 * 3600;
 const DEFAULT_WIND_PANIC = 150;
 const SCHEMA_ID = 'satellitewars.weatherlog';
 const SCHEMA_VERSION = 1;
+const DEFAULT_TROPICAL_LAT = 12;
+const DEFAULT_DRY_MIN_LAT = 15;
+const DEFAULT_DRY_MAX_LAT = 35;
 
 const PROBES = [
   { name: 'Caribbean', lat: 15, lon: -60 },
@@ -18,6 +21,100 @@ const PROBES = [
 ];
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+const mean = (values) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+const round = (value, digits = 3) => Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
+const makeRowWeightsFromLat = (latitudesDeg) => latitudesDeg.map((lat) => Math.max(0.05, Math.cos((lat * Math.PI) / 180)));
+const zonalMean = (field, nx, ny) => {
+  const out = new Array(ny).fill(0);
+  for (let j = 0; j < ny; j += 1) {
+    let total = 0;
+    const row = j * nx;
+    for (let i = 0; i < nx; i += 1) total += field[row + i] || 0;
+    out[j] = total / Math.max(1, nx);
+  }
+  return out;
+};
+const weightedBandMean = (series, latitudesDeg, rowWeights, lat0, lat1) => {
+  let total = 0;
+  let weightTotal = 0;
+  for (let j = 0; j < series.length; j += 1) {
+    const lat = latitudesDeg[j];
+    if (lat < lat0 || lat > lat1) continue;
+    const weight = rowWeights[j];
+    total += series[j] * weight;
+    weightTotal += weight;
+  }
+  return weightTotal > 0 ? total / weightTotal : 0;
+};
+const weightedBandCentroid = (series, latitudesDeg, rowWeights, lat0, lat1) => {
+  let numerator = 0;
+  let denominator = 0;
+  for (let j = 0; j < series.length; j += 1) {
+    const lat = latitudesDeg[j];
+    if (lat < lat0 || lat > lat1) continue;
+    const value = Math.max(0, series[j]);
+    const weight = rowWeights[j] * value;
+    numerator += lat * weight;
+    denominator += weight;
+  }
+  return denominator > 0 ? numerator / denominator : 0;
+};
+const weightedBandWidth = (series, latitudesDeg, rowWeights, lat0, lat1, centerLat) => {
+  let numerator = 0;
+  let denominator = 0;
+  for (let j = 0; j < series.length; j += 1) {
+    const lat = latitudesDeg[j];
+    if (lat < lat0 || lat > lat1) continue;
+    const value = Math.max(0, series[j]);
+    const weight = rowWeights[j] * value;
+    numerator += (lat - centerLat) ** 2 * weight;
+    denominator += weight;
+  }
+  return denominator > 0 ? 2 * Math.sqrt(numerator / denominator) : 0;
+};
+const buildBroadClimateStats = (diagnostics) => {
+  const { grid } = diagnostics || {};
+  if (!grid?.nx || !grid?.ny || !Array.isArray(grid.latitudesDeg)) return null;
+  const { nx, ny, latitudesDeg } = grid;
+  const rowWeights = makeRowWeightsFromLat(latitudesDeg);
+  const zonalPrecip = zonalMean(diagnostics.precipRateMmHr || new Array(nx * ny).fill(0), nx, ny);
+  const zonalU10 = zonalMean(diagnostics.wind10mU || new Array(nx * ny).fill(0), nx, ny);
+  const zonalConvectivePotential = zonalMean(diagnostics.convectivePotentialFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalConvectiveFraction = zonalMean(diagnostics.convectiveMaskFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalConvectiveOrganization = zonalMean(diagnostics.convectiveOrganizationFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalConvectiveMassFlux = zonalMean(diagnostics.convectiveMassFluxKgM2S || new Array(nx * ny).fill(0), nx, ny);
+  const zonalMoistureConvergence = zonalMean(diagnostics.lowLevelMoistureConvergenceS_1 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalLowerRh = zonalMean(diagnostics.lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSubsidenceDrying = zonalMean(diagnostics.subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalDetrainment = zonalMean(diagnostics.convectiveDetrainmentMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalAnvil = zonalMean(diagnostics.convectiveAnvilSourceFrac || new Array(nx * ny).fill(0), nx, ny);
+  const itczLat = weightedBandCentroid(zonalPrecip, latitudesDeg, rowWeights, -20, 20);
+  const itczWidth = weightedBandWidth(zonalPrecip, latitudesDeg, rowWeights, -25, 25, itczLat);
+  const equatorialPrecip = weightedBandMean(zonalPrecip, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
+  const subtropicalDryNorth = weightedBandMean(zonalPrecip, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const subtropicalDrySouth = weightedBandMean(zonalPrecip, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  return {
+    itczLatDeg: round(itczLat),
+    itczWidthDeg: round(itczWidth),
+    subtropicalDryNorthRatio: round(subtropicalDryNorth / Math.max(1e-6, equatorialPrecip)),
+    subtropicalDrySouthRatio: round(subtropicalDrySouth / Math.max(1e-6, equatorialPrecip)),
+    tropicalConvectivePotential: round(weightedBandMean(zonalConvectivePotential, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT)),
+    tropicalConvectiveFraction: round(weightedBandMean(zonalConvectiveFraction, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT)),
+    tropicalConvectiveOrganization: round(weightedBandMean(zonalConvectiveOrganization, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT)),
+    tropicalConvectiveMassFluxKgM2S: round(weightedBandMean(zonalConvectiveMassFlux, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT), 5),
+    tropicalMoistureConvergenceS_1: round(weightedBandMean(zonalMoistureConvergence, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT), 6),
+    subtropicalRhNorthMeanFrac: round(weightedBandMean(zonalLowerRh, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),
+    subtropicalRhSouthMeanFrac: round(weightedBandMean(zonalLowerRh, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT)),
+    subtropicalSubsidenceNorthMean: round(weightedBandMean(zonalSubsidenceDrying, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),
+    subtropicalSubsidenceSouthMean: round(weightedBandMean(zonalSubsidenceDrying, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT)),
+    upperDetrainmentTropicalKgM2: round(weightedBandMean(zonalDetrainment, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT), 5),
+    tropicalAnvilPersistenceFrac: round(weightedBandMean(zonalAnvil, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT)),
+    tropicalTradesNorthU10Ms: round(weightedBandMean(zonalU10, latitudesDeg, rowWeights, 5, 25)),
+    tropicalTradesSouthU10Ms: round(weightedBandMean(zonalU10, latitudesDeg, rowWeights, -25, -5)),
+    midlatitudeWesterliesNorthU10Ms: round(weightedBandMean(zonalU10, latitudesDeg, rowWeights, 30, 60)),
+    midlatitudeWesterliesSouthU10Ms: round(weightedBandMean(zonalU10, latitudesDeg, rowWeights, -60, -30))
+  };
+};
 
 class WeatherLogger {
   constructor({ maxEntries = DEFAULT_MAX_ENTRIES, cadenceSeconds = DEFAULT_CADENCE_SECONDS } = {}) {
@@ -561,7 +658,8 @@ class WeatherLogger {
       tauHighMeanPolar: null,
       precipMeanPolar: null,
       RHU_p95Polar: null,
-      omegaUAscentAbs_p95Polar: null
+      omegaUAscentAbs_p95Polar: null,
+      broadClimate: null
     };
 
     const fields = core?.fields;
@@ -831,6 +929,10 @@ class WeatherLogger {
         }
       }
     }
+
+    try {
+      out.broadClimate = buildBroadClimateStats(buildValidationDiagnostics(core));
+    } catch (_) {}
 
     return out;
   }

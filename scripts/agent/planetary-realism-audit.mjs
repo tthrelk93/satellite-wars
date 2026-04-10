@@ -25,21 +25,21 @@ export const PLANETARY_PRESETS = {
     ny: 24,
     dt: 1800,
     horizonsDays: [90],
-    sampleEveryDays: 30
+    sampleEveryDays: 15
   },
   annual: {
     nx: 48,
     ny: 24,
     dt: 3600,
     horizonsDays: [365],
-    sampleEveryDays: 45
+    sampleEveryDays: 15
   },
   full: {
     nx: 48,
     ny: 24,
     dt: 3600,
     horizonsDays: [30, 90, 365],
-    sampleEveryDays: 45
+    sampleEveryDays: 15
   }
 };
 
@@ -108,6 +108,10 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const mean = (values) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 const round = (value, digits = 3) => Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
 const toJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
+const roundSeries = (values, digits = 3) => values.map((value) => round(value, digits));
+const clamp01 = (value) => clamp(value, 0, 1);
+
+const stripKnownExtension = (filePath) => filePath.replace(/\.(json|md)$/i, '');
 
 const dayToMonthIndex = (day) => {
   const normalized = ((day % 365) + 365) % 365;
@@ -136,6 +140,27 @@ const zonalMean = (field, nx, ny) => {
     out[j] = total / Math.max(1, nx);
   }
   return out;
+};
+
+const meanProfiles = (profiles) => {
+  if (!profiles.length) return null;
+  const first = profiles[0];
+  const series = {};
+  for (const key of Object.keys(first.series || {})) {
+    const sampleSeries = profiles.map((profile) => profile.series?.[key]).filter((value) => Array.isArray(value) && value.length === first.latitudesDeg.length);
+    if (!sampleSeries.length) continue;
+    const aggregate = new Array(first.latitudesDeg.length).fill(0);
+    for (const sample of sampleSeries) {
+      for (let index = 0; index < sample.length; index += 1) {
+        aggregate[index] += sample[index];
+      }
+    }
+    series[key] = aggregate.map((value) => round(value / sampleSeries.length, key.includes('KgM2S') || key.includes('S_1') ? 5 : 3));
+  }
+  return {
+    latitudesDeg: first.latitudesDeg.slice(),
+    series
+  };
 };
 
 const weightedBandMean = (series, latitudesDeg, rowWeights, lat0, lat1) => {
@@ -244,10 +269,12 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     totalColumnWaterKgM2,
     cycloneSupportFields,
     convectiveMaskFrac,
+    convectivePotentialFrac,
     convectiveOrganizationFrac,
     convectiveMassFluxKgM2S,
     convectiveDetrainmentMassKgM2,
     convectiveAnvilSourceFrac,
+    lowLevelMoistureConvergenceS_1,
     lowerTroposphericRhFrac,
     subtropicalSubsidenceDryingFrac
   } = diagnostics;
@@ -256,11 +283,14 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalPrecip = zonalMean(precipRateMmHr, nx, ny);
   const zonalCloud = zonalMean(cloudTotalFraction, nx, ny);
   const zonalU10 = zonalMean(wind10mU, nx, ny);
+  const zonalTcw = zonalMean(totalColumnWaterKgM2, nx, ny);
   const zonalConvectiveFraction = zonalMean(convectiveMaskFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalConvectivePotential = zonalMean(convectivePotentialFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalConvectiveOrganization = zonalMean(convectiveOrganizationFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalConvectiveMassFlux = zonalMean(convectiveMassFluxKgM2S || new Array(nx * ny).fill(0), nx, ny);
   const zonalDetrainment = zonalMean(convectiveDetrainmentMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalAnvil = zonalMean(convectiveAnvilSourceFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalMoistureConvergence = zonalMean(lowLevelMoistureConvergenceS_1 || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalStormIndex = zonalMean(
@@ -278,8 +308,10 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const subtropicalDryNorth = weightedBandMean(zonalPrecip, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const subtropicalDrySouth = weightedBandMean(zonalPrecip, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
   const tropicalConvectiveFraction = weightedBandMean(zonalConvectiveFraction, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
+  const tropicalConvectivePotential = weightedBandMean(zonalConvectivePotential, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
   const tropicalConvectiveOrganization = weightedBandMean(zonalConvectiveOrganization, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
   const tropicalConvectiveMassFlux = weightedBandMean(zonalConvectiveMassFlux, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
+  const tropicalMoistureConvergence = weightedBandMean(zonalMoistureConvergence, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
   const subtropicalRhNorth = weightedBandMean(zonalLowerRh, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const subtropicalRhSouth = weightedBandMean(zonalLowerRh, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
   const subtropicalSubsidenceNorth = weightedBandMean(zonalSubsidenceDrying, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
@@ -310,8 +342,10 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       subtropicalDryNorthRatio: round(subtropicalDryNorth / Math.max(1e-6, equatorialPrecip)),
       subtropicalDrySouthRatio: round(subtropicalDrySouth / Math.max(1e-6, equatorialPrecip)),
       tropicalConvectiveFraction: round(tropicalConvectiveFraction),
+      tropicalConvectivePotential: round(tropicalConvectivePotential),
       tropicalConvectiveOrganization: round(tropicalConvectiveOrganization),
       tropicalConvectiveMassFluxKgM2S: round(tropicalConvectiveMassFlux, 5),
+      tropicalMoistureConvergenceS_1: round(tropicalMoistureConvergence, 6),
       subtropicalRhNorthMeanFrac: round(subtropicalRhNorth),
       subtropicalRhSouthMeanFrac: round(subtropicalRhSouth),
       subtropicalSubsidenceNorthMean: round(subtropicalSubsidenceNorth),
@@ -326,6 +360,25 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       stormTrackSouthLatDeg: round(stormTrackSouthLat),
       tropicalCycloneEnvironmentCountNh: tcEnvCounts.nh,
       tropicalCycloneEnvironmentCountSh: tcEnvCounts.sh
+    },
+    profiles: {
+      latitudesDeg: roundSeries(latitudesDeg),
+      series: {
+        precipRateMmHr: roundSeries(zonalPrecip),
+        cloudTotalFraction: roundSeries(zonalCloud),
+        wind10mU: roundSeries(zonalU10),
+        totalColumnWaterKgM2: roundSeries(zonalTcw),
+        stormTrackIndex: roundSeries(zonalStormIndex, 5),
+        convectiveFraction: roundSeries(zonalConvectiveFraction),
+        convectivePotential: roundSeries(zonalConvectivePotential),
+        convectiveOrganization: roundSeries(zonalConvectiveOrganization),
+        convectiveMassFluxKgM2S: roundSeries(zonalConvectiveMassFlux, 5),
+        lowerTroposphericRhFrac: roundSeries(zonalLowerRh),
+        lowerLevelMoistureConvergenceS_1: roundSeries(zonalMoistureConvergence, 6),
+        subtropicalSubsidenceDryingFrac: roundSeries(zonalSubsidenceDrying, 5),
+        upperDetrainmentKgM2: roundSeries(zonalDetrainment, 5),
+        anvilPersistenceFrac: roundSeries(zonalAnvil)
+      }
     }
   };
 };
@@ -361,6 +414,274 @@ export const computeSeasonalityScore = (samples) => {
     nhSeasonalityPass: nhWarm > Math.max(0.1, nhCool * 1.15),
     shSeasonalityPass: shWarm > Math.max(0.1, shCool * 1.15)
   };
+};
+
+export const buildMonthlyClimatology = (samples) => {
+  const months = Array.from({ length: 12 }, (_, monthIndex) => ({
+    monthIndex,
+    month: monthName(monthIndex),
+    sampleDays: [],
+    metrics: {},
+    profiles: null
+  }));
+  const metricAccumulators = months.map(() => new Map());
+  const profileAccumulators = months.map(() => []);
+
+  for (const sample of samples) {
+    const monthIndex = Number.isFinite(sample?.monthIndex) ? sample.monthIndex : dayToMonthIndex(sample?.targetDay || 0);
+    const bucket = months[monthIndex];
+    if (!bucket) continue;
+    bucket.sampleDays.push(sample.targetDay);
+    for (const [key, value] of Object.entries(sample.metrics || {})) {
+      if (!Number.isFinite(value)) continue;
+      const acc = metricAccumulators[monthIndex].get(key) || { sum: 0, count: 0 };
+      acc.sum += value;
+      acc.count += 1;
+      metricAccumulators[monthIndex].set(key, acc);
+    }
+    if (sample.profiles?.latitudesDeg?.length && sample.profiles?.series) {
+      profileAccumulators[monthIndex].push(sample.profiles);
+    }
+  }
+
+  for (let monthIndex = 0; monthIndex < months.length; monthIndex += 1) {
+    const bucket = months[monthIndex];
+    bucket.sampleCount = bucket.sampleDays.length;
+    bucket.sampleDays = bucket.sampleDays.map((value) => round(value, 2));
+    bucket.metrics = Object.fromEntries(
+      [...metricAccumulators[monthIndex].entries()].map(([key, acc]) => [
+        key,
+        round(acc.sum / Math.max(1, acc.count), key.includes('KgM2S') || key.includes('S_1') ? 5 : 3)
+      ])
+    );
+    bucket.profiles = meanProfiles(profileAccumulators[monthIndex]);
+  }
+  return months;
+};
+
+const buildGapEntry = (warning, horizon) => {
+  const metrics = horizon?.latest?.metrics || {};
+  const seasonality = horizon?.seasonality || null;
+  const entry = {
+    code: warning,
+    label: warning.replace(/_/g, ' '),
+    category: 'other',
+    metricKey: null,
+    actual: null,
+    target: null,
+    severity: 0.25,
+    horizonsDays: [horizon?.horizonDays].filter(Number.isFinite)
+  };
+  switch (warning) {
+    case 'trade_winds_missing_north':
+      entry.label = 'North trade winds too weak or reversed';
+      entry.category = 'circulation';
+      entry.metricKey = 'tropicalTradesNorthU10Ms';
+      entry.actual = metrics.tropicalTradesNorthU10Ms;
+      entry.target = '< -0.2 m/s';
+      entry.severity = clamp01((Number(metrics.tropicalTradesNorthU10Ms) + 0.2) / 1.5);
+      break;
+    case 'trade_winds_missing_south':
+      entry.label = 'South trade winds too weak or reversed';
+      entry.category = 'circulation';
+      entry.metricKey = 'tropicalTradesSouthU10Ms';
+      entry.actual = metrics.tropicalTradesSouthU10Ms;
+      entry.target = '< -0.2 m/s';
+      entry.severity = clamp01((Number(metrics.tropicalTradesSouthU10Ms) + 0.2) / 1.5);
+      break;
+    case 'westerlies_missing_north':
+      entry.label = 'North midlatitude westerlies too weak';
+      entry.category = 'circulation';
+      entry.metricKey = 'midlatitudeWesterliesNorthU10Ms';
+      entry.actual = metrics.midlatitudeWesterliesNorthU10Ms;
+      entry.target = '> 0.2 m/s';
+      entry.severity = clamp01((0.2 - Number(metrics.midlatitudeWesterliesNorthU10Ms)) / 1.5);
+      break;
+    case 'westerlies_missing_south':
+      entry.label = 'South midlatitude westerlies too weak';
+      entry.category = 'circulation';
+      entry.metricKey = 'midlatitudeWesterliesSouthU10Ms';
+      entry.actual = metrics.midlatitudeWesterliesSouthU10Ms;
+      entry.target = '> 0.2 m/s';
+      entry.severity = clamp01((0.2 - Number(metrics.midlatitudeWesterliesSouthU10Ms)) / 1.5);
+      break;
+    case 'itcz_out_of_tropical_band':
+      entry.label = 'ITCZ displaced out of tropical core';
+      entry.category = 'moistureBelts';
+      entry.metricKey = 'itczLatDeg';
+      entry.actual = metrics.itczLatDeg;
+      entry.target = '|lat| <= 12 deg';
+      entry.severity = clamp01((Math.abs(Number(metrics.itczLatDeg)) - 12) / 8);
+      break;
+    case 'itcz_width_unrealistic':
+      entry.label = 'ITCZ width unrealistic';
+      entry.category = 'moistureBelts';
+      entry.metricKey = 'itczWidthDeg';
+      entry.actual = metrics.itczWidthDeg;
+      entry.target = '6-24 deg';
+      entry.severity = clamp01(
+        Number(metrics.itczWidthDeg) < 6
+          ? (6 - Number(metrics.itczWidthDeg)) / 6
+          : (Number(metrics.itczWidthDeg) - 24) / 12
+      );
+      break;
+    case 'north_subtropical_dry_belt_too_wet':
+      entry.label = 'North subtropical dry belt too wet';
+      entry.category = 'moistureBelts';
+      entry.metricKey = 'subtropicalDryNorthRatio';
+      entry.actual = metrics.subtropicalDryNorthRatio;
+      entry.target = '< 0.8';
+      entry.severity = clamp01((Number(metrics.subtropicalDryNorthRatio) - 0.8) / 0.5);
+      break;
+    case 'south_subtropical_dry_belt_too_wet':
+      entry.label = 'South subtropical dry belt too wet';
+      entry.category = 'moistureBelts';
+      entry.metricKey = 'subtropicalDrySouthRatio';
+      entry.actual = metrics.subtropicalDrySouthRatio;
+      entry.target = '< 0.8';
+      entry.severity = clamp01((Number(metrics.subtropicalDrySouthRatio) - 0.8) / 0.5);
+      break;
+    case 'north_subtropical_lower_troposphere_too_humid':
+      entry.label = 'North subtropical lower troposphere too humid';
+      entry.category = 'moistureBelts';
+      entry.metricKey = 'subtropicalRhNorthMeanFrac';
+      entry.actual = metrics.subtropicalRhNorthMeanFrac;
+      entry.target = '< 0.82';
+      entry.severity = clamp01((Number(metrics.subtropicalRhNorthMeanFrac) - 0.82) / 0.12);
+      break;
+    case 'south_subtropical_lower_troposphere_too_humid':
+      entry.label = 'South subtropical lower troposphere too humid';
+      entry.category = 'moistureBelts';
+      entry.metricKey = 'subtropicalRhSouthMeanFrac';
+      entry.actual = metrics.subtropicalRhSouthMeanFrac;
+      entry.target = '< 0.82';
+      entry.severity = clamp01((Number(metrics.subtropicalRhSouthMeanFrac) - 0.82) / 0.12);
+      break;
+    case 'north_subtropical_subsidence_too_weak':
+      entry.label = 'North subtropical subsidence drying too weak';
+      entry.category = 'moistureBelts';
+      entry.metricKey = 'subtropicalSubsidenceNorthMean';
+      entry.actual = metrics.subtropicalSubsidenceNorthMean;
+      entry.target = '> 0.03';
+      entry.severity = clamp01((0.03 - Number(metrics.subtropicalSubsidenceNorthMean)) / 0.03);
+      break;
+    case 'south_subtropical_subsidence_too_weak':
+      entry.label = 'South subtropical subsidence drying too weak';
+      entry.category = 'moistureBelts';
+      entry.metricKey = 'subtropicalSubsidenceSouthMean';
+      entry.actual = metrics.subtropicalSubsidenceSouthMean;
+      entry.target = '> 0.03';
+      entry.severity = clamp01((0.03 - Number(metrics.subtropicalSubsidenceSouthMean)) / 0.03);
+      break;
+    case 'north_storm_track_out_of_range':
+      entry.label = 'North storm track misplaced';
+      entry.category = 'stormTracks';
+      entry.metricKey = 'stormTrackNorthLatDeg';
+      entry.actual = metrics.stormTrackNorthLatDeg;
+      entry.target = '30-65 deg';
+      entry.severity = clamp01(
+        Number(metrics.stormTrackNorthLatDeg) < 30
+          ? (30 - Number(metrics.stormTrackNorthLatDeg)) / 20
+          : (Number(metrics.stormTrackNorthLatDeg) - 65) / 20
+      );
+      break;
+    case 'south_storm_track_out_of_range':
+      entry.label = 'South storm track misplaced';
+      entry.category = 'stormTracks';
+      entry.metricKey = 'stormTrackSouthLatDeg';
+      entry.actual = metrics.stormTrackSouthLatDeg;
+      entry.target = '-65 to -30 deg';
+      entry.severity = clamp01(
+        Number(metrics.stormTrackSouthLatDeg) > -30
+          ? (Number(metrics.stormTrackSouthLatDeg) + 30) / 20
+          : (-65 - Number(metrics.stormTrackSouthLatDeg)) / 20
+      );
+      break;
+    case 'cloud_field_unbalanced':
+      entry.label = 'Global cloud field unbalanced';
+      entry.category = 'cloudBalance';
+      entry.metricKey = 'globalCloudMeanFrac';
+      entry.actual = metrics.globalCloudMeanFrac;
+      entry.target = '0.15-0.85';
+      entry.severity = clamp01(
+        Number(metrics.globalCloudMeanFrac) < 0.15
+          ? (0.15 - Number(metrics.globalCloudMeanFrac)) / 0.2
+          : (Number(metrics.globalCloudMeanFrac) - 0.85) / 0.2
+      );
+      break;
+    case 'runaway_surface_winds':
+      entry.label = 'Runaway surface winds';
+      entry.category = 'stability';
+      entry.metricKey = 'maxWind10mMs';
+      entry.actual = metrics.maxWind10mMs;
+      entry.target = '<= 120 m/s';
+      entry.severity = clamp01((Number(metrics.maxWind10mMs) - 120) / 60);
+      break;
+    case 'runaway_global_precip':
+      entry.label = 'Global precipitation runaway';
+      entry.category = 'stability';
+      entry.metricKey = 'globalPrecipMeanMmHr';
+      entry.actual = metrics.globalPrecipMeanMmHr;
+      entry.target = '<= 5 mm/hr';
+      entry.severity = clamp01((Number(metrics.globalPrecipMeanMmHr) - 5) / 3);
+      break;
+    case 'column_water_drift':
+      entry.label = 'Column water drift';
+      entry.category = 'stability';
+      entry.metricKey = 'globalTcwMeanKgM2';
+      entry.actual = metrics.globalTcwMeanKgM2;
+      entry.target = '5-80 kg/m²';
+      entry.severity = clamp01(
+        Number(metrics.globalTcwMeanKgM2) < 5
+          ? (5 - Number(metrics.globalTcwMeanKgM2)) / 10
+          : (Number(metrics.globalTcwMeanKgM2) - 80) / 40
+      );
+      break;
+    case 'north_tropical_cyclone_seasonality_weak':
+      entry.label = 'North tropical cyclone seasonality weak';
+      entry.category = 'seasonality';
+      entry.metricKey = 'nhWarmSeasonMean';
+      entry.actual = seasonality?.nhWarmSeasonMean ?? null;
+      entry.target = '> nhCoolSeasonMean * 1.15';
+      entry.severity = clamp01(
+        (Math.max(0.1, Number(seasonality?.nhCoolSeasonMean || 0) * 1.15) - Number(seasonality?.nhWarmSeasonMean || 0)) / 1.5
+      );
+      break;
+    case 'south_tropical_cyclone_seasonality_weak':
+      entry.label = 'South tropical cyclone seasonality weak';
+      entry.category = 'seasonality';
+      entry.metricKey = 'shWarmSeasonMean';
+      entry.actual = seasonality?.shWarmSeasonMean ?? null;
+      entry.target = '> shCoolSeasonMean * 1.15';
+      entry.severity = clamp01(
+        (Math.max(0.1, Number(seasonality?.shCoolSeasonMean || 0) * 1.15) - Number(seasonality?.shWarmSeasonMean || 0)) / 1.5
+      );
+      break;
+    default:
+      break;
+  }
+  entry.severity = round(entry.severity, 3) ?? 0.25;
+  entry.actual = Number.isFinite(entry.actual) ? round(entry.actual, entry.metricKey?.includes('KgM2S') || entry.metricKey?.includes('S_1') ? 5 : 3) : entry.actual;
+  return entry;
+};
+
+export const buildRealismGapReport = (horizons) => {
+  const aggregated = new Map();
+  for (const horizon of horizons) {
+    for (const warning of horizon.warnings || []) {
+      const next = buildGapEntry(warning, horizon);
+      const current = aggregated.get(warning);
+      if (!current) {
+        aggregated.set(warning, next);
+        continue;
+      }
+      current.horizonsDays = [...new Set([...current.horizonsDays, ...next.horizonsDays])].sort((a, b) => a - b);
+      if ((next.severity || 0) >= (current.severity || 0)) {
+        aggregated.set(warning, { ...current, ...next, horizonsDays: current.horizonsDays });
+      }
+    }
+  }
+  return [...aggregated.values()].sort((a, b) => (b.severity || 0) - (a.severity || 0) || (b.horizonsDays?.[b.horizonsDays.length - 1] || 0) - (a.horizonsDays?.[a.horizonsDays.length - 1] || 0));
 };
 
 export const evaluateHorizons = (samples, horizonDays) => {
@@ -479,6 +800,24 @@ const renderMarkdown = (summary) => {
     lines.push('');
   }
 
+  if (summary.realismGaps?.length) {
+    lines.push('## Top realism gaps');
+    lines.push('');
+    summary.realismGaps.slice(0, 8).forEach((gap) => {
+      lines.push(`- ${gap.label}: actual ${gap.actual} vs target ${gap.target} (severity ${gap.severity}, horizons ${gap.horizonsDays.join(', ')})`);
+    });
+    lines.push('');
+  }
+
+  if (summary.artifacts) {
+    lines.push('## Rich artifacts');
+    lines.push('');
+    lines.push(`- Monthly climatology JSON: ${summary.artifacts.monthlyClimatologyJsonPath}`);
+    lines.push(`- Sample zonal profiles JSON: ${summary.artifacts.sampleProfilesJsonPath}`);
+    lines.push(`- Ranked realism gaps JSON: ${summary.artifacts.realismGapsJsonPath}`);
+    lines.push('');
+  }
+
   lines.push('## Default next priorities');
   lines.push('');
   summary.defaultNextPriorities.forEach((priority, index) => {
@@ -486,6 +825,13 @@ const renderMarkdown = (summary) => {
   });
   lines.push('');
   return `${lines.join('\n')}\n`;
+};
+
+const deriveArtifactBase = () => {
+  if (effectiveReportBase) return effectiveReportBase;
+  if (outPath) return stripKnownExtension(outPath);
+  if (mdOutPath) return stripKnownExtension(mdOutPath);
+  return null;
 };
 
 export async function main() {
@@ -547,6 +893,14 @@ export async function main() {
   if (!defaultNextPriorities.length) {
     defaultNextPriorities.push('Broaden live verification and polished-performance re-audits now that the offline planetary realism gates are healthy.');
   }
+  const monthlyClimatology = buildMonthlyClimatology(samples);
+  const realismGaps = buildRealismGapReport(horizonSummaries);
+  const artifactBase = deriveArtifactBase();
+  const artifacts = artifactBase ? {
+    monthlyClimatologyJsonPath: `${artifactBase}-monthly-climatology.json`,
+    sampleProfilesJsonPath: `${artifactBase}-sample-profiles.json`,
+    realismGapsJsonPath: `${artifactBase}-realism-gaps.json`
+  } : null;
 
   const summary = {
     schema: 'satellite-wars.planetary-realism-audit.v2',
@@ -565,7 +919,10 @@ export async function main() {
     headlessTerrainParity: Boolean(terrainFallback?.after?.terrainSampleCount > 0),
     timings: timingByTarget,
     samples,
+    monthlyClimatology,
     horizons: horizonSummaries,
+    realismGaps,
+    artifacts,
     defaultNextPriorities
   };
 
@@ -583,6 +940,19 @@ export async function main() {
     fs.writeFileSync(`${effectiveReportBase}.json`, toJson(summary));
     fs.writeFileSync(`${effectiveReportBase}.md`, markdown);
   }
+  if (artifacts) {
+    fs.mkdirSync(path.dirname(artifacts.monthlyClimatologyJsonPath), { recursive: true });
+    fs.writeFileSync(artifacts.monthlyClimatologyJsonPath, toJson(monthlyClimatology));
+    fs.writeFileSync(
+      artifacts.sampleProfilesJsonPath,
+      toJson(samples.map((sample) => ({
+        targetDay: sample.targetDay,
+        monthIndex: sample.monthIndex,
+        profiles: sample.profiles
+      })))
+    );
+    fs.writeFileSync(artifacts.realismGapsJsonPath, toJson(realismGaps));
+  }
   process.stdout.write(toJson(summary));
   return summary;
 }
@@ -595,6 +965,8 @@ if (isMain) {
 export const _test = {
   PLANETARY_PRESETS,
   buildSampleTargetsDays,
+  buildMonthlyClimatology,
+  buildRealismGapReport,
   classifySnapshot,
   computeSeasonalityScore,
   dayToMonthIndex,

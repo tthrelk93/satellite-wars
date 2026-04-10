@@ -44,6 +44,7 @@
     "weather:planetary:audit": "npm run agent:planetary-realism-audit -- --preset quick",
     "weather:planetary:audit:seasonal": "npm run agent:planetary-realism-audit -- --preset seasonal",
     "weather:planetary:audit:annual": "npm run agent:planetary-realism-audit -- --preset annual",
+    "weather:planetary:audit:annual:report": "npm run agent:planetary-realism-audit -- --preset annual --report-base weather-validation/output/annual-planetary-realism",
     "verify:no-v1-weather": "node scripts/no-v1-weather.mjs",
     "wind:targets": "node scripts/wind/extractZonalMeanTargets.mjs"
   },
