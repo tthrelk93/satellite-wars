@@ -1063,6 +1063,7 @@ export class WeatherCore5 {
       const dtNudge = this._nudgeAccumSeconds;
       this._nudgeAccumSeconds = 0;
       runWithLog('stepNudging5', () => {
+      Object.assign(this._nudgeParamsRuntime, this.nudgeParams);
       this._nudgeParamsRuntime.psMin = this.massParams?.psMin;
       this._nudgeParamsRuntime.psMax = this.massParams?.psMax;
       stepNudging5({
