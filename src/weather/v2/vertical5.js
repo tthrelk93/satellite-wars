@@ -29,12 +29,21 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'qvTrig',
   'thetaeCoeff',
   'thetaeQvCap',
+  'convPotentialGrowTau',
+  'convPotentialDecayTau',
+  'convOrganizationGrowTau',
+  'convOrganizationDecayTau',
+  'convMinPotential',
+  'convMinOrganization',
   'pblWarmRain',
   'qcAuto0',
   'tauAuto',
   'autoMaxFrac',
   'entrainFrac',
   'detrainTopFrac',
+  'convRainoutBase',
+  'convRainoutOrganizationWeight',
+  'convRainoutHumidityWeight',
   'buoyTrigK',
   'dThetaMaxConvPerStep',
   'enableLargeScaleVerticalAdvection',
@@ -54,6 +63,14 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'terrainLeeOmegaFloorBlend',
   'terrainDeliveryProtectExposure0',
   'terrainDeliveryProtectExposure1',
+  'tropicalOrganizationBandDeg',
+  'subtropicalSubsidenceLat0',
+  'subtropicalSubsidenceLat1',
+  'subtropicalSubsidenceTau',
+  'subtropicalSubsidenceMaxDryFrac',
+  'subtropicalSubsidenceThetaStepK',
+  'subtropicalSubsidenceTopSigma',
+  'subtropicalSubsidenceBottomSigma',
   'eps',
   'debugConservation'
 ]);
@@ -111,6 +128,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     qvTrig = 0.002,
     thetaeCoeff = 10,
     thetaeQvCap = 0.03,
+    convPotentialGrowTau = 90 * 60,
+    convPotentialDecayTau = 8 * 3600,
+    convOrganizationGrowTau = 2 * 3600,
+    convOrganizationDecayTau = 14 * 3600,
+    convMinPotential = 0.15,
+    convMinOrganization = 0.18,
 
     // PBL warm rain
     pblWarmRain = true,
@@ -121,6 +144,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     // Plume/detrainment
     entrainFrac = 0.2,
     detrainTopFrac = 0.7,
+    convRainoutBase = 0.28,
+    convRainoutOrganizationWeight = 0.32,
+    convRainoutHumidityWeight = 0.2,
     buoyTrigK = 0.0,
     dThetaMaxConvPerStep = 2.5,
 
@@ -144,6 +170,14 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     terrainLeeOmegaFloorBlend = 1.0,
     terrainDeliveryProtectExposure0 = 0.5,
     terrainDeliveryProtectExposure1 = 8.0,
+    tropicalOrganizationBandDeg = 15,
+    subtropicalSubsidenceLat0 = 15,
+    subtropicalSubsidenceLat1 = 35,
+    subtropicalSubsidenceTau = 12 * 3600,
+    subtropicalSubsidenceMaxDryFrac = 0.2,
+    subtropicalSubsidenceThetaStepK = 0.6,
+    subtropicalSubsidenceTopSigma = 0.35,
+    subtropicalSubsidenceBottomSigma = 0.85,
 
     // Numerical/heating
     eps = 1e-12
@@ -152,10 +186,41 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const { nx, ny, invDx, invDy, cosLat } = grid;
   const { N, nz, u, v, omega, theta, qv, qc, qi, qr, T, pHalf, pMid, sigmaHalf, dpsDtApplied } = state;
 
-  // Convective column mask (boolean per column) for microphysics overrides
+  // Persistent organized-convection state used by both plume physics and microphysics.
   if (!state.convMask || state.convMask.length !== N) state.convMask = new Uint8Array(N);
+  if (!state.convectivePotential || state.convectivePotential.length !== N) state.convectivePotential = new Float32Array(N);
+  if (!state.convectiveOrganization || state.convectiveOrganization.length !== N) state.convectiveOrganization = new Float32Array(N);
+  if (!state.convectiveMassFlux || state.convectiveMassFlux.length !== N) state.convectiveMassFlux = new Float32Array(N);
+  if (!state.convectiveDetrainmentMass || state.convectiveDetrainmentMass.length !== N) state.convectiveDetrainmentMass = new Float32Array(N);
+  if (!state.convectiveRainoutFraction || state.convectiveRainoutFraction.length !== N) state.convectiveRainoutFraction = new Float32Array(N);
+  if (!state.convectiveAnvilSource || state.convectiveAnvilSource.length !== N) state.convectiveAnvilSource = new Float32Array(N);
+  if (!state.convectiveHeatingProxy || state.convectiveHeatingProxy.length !== N) state.convectiveHeatingProxy = new Float32Array(N);
+  if (!state.convectiveTopLevel || state.convectiveTopLevel.length !== N) state.convectiveTopLevel = new Float32Array(N);
+  if (!state.lowLevelMoistureConvergence || state.lowLevelMoistureConvergence.length !== N) state.lowLevelMoistureConvergence = new Float32Array(N);
+  if (!state.lowLevelOmegaEffective || state.lowLevelOmegaEffective.length !== N) state.lowLevelOmegaEffective = new Float32Array(N);
+  if (!state.subtropicalSubsidenceDrying || state.subtropicalSubsidenceDrying.length !== N) state.subtropicalSubsidenceDrying = new Float32Array(N);
   const convMask = state.convMask;
+  const convectivePotential = state.convectivePotential;
+  const convectiveOrganization = state.convectiveOrganization;
+  const convectiveMassFlux = state.convectiveMassFlux;
+  const convectiveDetrainmentMass = state.convectiveDetrainmentMass;
+  const convectiveRainoutFraction = state.convectiveRainoutFraction;
+  const convectiveAnvilSource = state.convectiveAnvilSource;
+  const convectiveHeatingProxy = state.convectiveHeatingProxy;
+  const convectiveTopLevel = state.convectiveTopLevel;
+  const lowLevelMoistureConvergence = state.lowLevelMoistureConvergence;
+  const lowLevelOmegaEffective = state.lowLevelOmegaEffective;
+  const subtropicalSubsidenceDrying = state.subtropicalSubsidenceDrying;
   convMask.fill(0);
+  convectiveMassFlux.fill(0);
+  convectiveDetrainmentMass.fill(0);
+  convectiveRainoutFraction.fill(0);
+  convectiveAnvilSource.fill(0);
+  convectiveHeatingProxy.fill(0);
+  convectiveTopLevel.fill(nz - 1);
+  lowLevelMoistureConvergence.fill(0);
+  lowLevelOmegaEffective.fill(0);
+  subtropicalSubsidenceDrying.fill(0);
 
   if (!state.terrainFlowForcing || state.terrainFlowForcing.length !== N) {
     state.terrainFlowForcing = new Float32Array(N);
@@ -250,6 +315,34 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
         omega[omegaNext + k] = omega[omegaBase + k] - div * dp;
       }
+    }
+  }
+
+  const levSurface = nz - 1;
+  const surfaceBase = levSurface * N;
+  for (let j = 0; j < ny; j++) {
+    const row = j * nx;
+    const jN = Math.max(0, j - 1);
+    const jS = Math.min(ny - 1, j + 1);
+    const rowN = jN * nx;
+    const rowS = jS * nx;
+    const invDxRow = invDx[j];
+    const invDyRow = invDy[j];
+    const cosC = cosLat[j];
+    const cosN = cosLat[jN];
+    const cosS = cosLat[jS];
+    for (let i = 0; i < nx; i++) {
+      const iE = (i + 1) % nx;
+      const iW = (i - 1 + nx) % nx;
+      const k = row + i;
+      const kE = row + iE;
+      const kW = row + iW;
+      const kN = rowN + i;
+      const kS = rowS + i;
+      const du_dx = (u[surfaceBase + kE] - u[surfaceBase + kW]) * 0.5 * invDxRow;
+      const dvcos_dy = (v[surfaceBase + kN] * cosN - v[surfaceBase + kS] * cosS) * 0.5 * invDyRow;
+      const div = du_dx + dvcos_dy / cosC;
+      lowLevelMoistureConvergence[k] = Math.max(0, -div);
     }
   }
 
@@ -530,41 +623,52 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
 
   // Deep convection with entrainment/detrainment
   if (enableConvection) {
-    // scratch arrays for percentiles (allocated once on state)
     if (!state._omegaPosScratch) state._omegaPosScratch = new Float32Array(N);
     if (!state._instabScratch) state._instabScratch = new Float32Array(N);
+    if (!state._rowConvectiveSource || state._rowConvectiveSource.length !== ny) {
+      state._rowConvectiveSource = new Float32Array(ny);
+    }
     const omegaPos = state._omegaPosScratch;
     const instabArr = state._instabScratch;
+    const rowConvectiveSource = state._rowConvectiveSource;
+    rowConvectiveSource.fill(0);
     nOmegaPos = 0;
     const omegaThreshDynamic = Math.max(omegaTrig, state.vertMetrics?.omegaPosP90 || 0);
     const muMax = clamp01(mu0);
-    const entrain = clamp01(entrainFrac);
     const detrainTop = clamp01(detrainTopFrac);
+    const baseMu = Number.isFinite(tauConv) && tauConv > 0
+      ? clamp(dt / Math.max(tauConv, eps), 0, muMax)
+      : muMax;
+    const latDeg = grid.latDeg || null;
     let convTopLevSum = 0;
     let convPlumeCount = 0;
     let convCondMassSum = 0;
+    let convPotentialWeightedSum = 0;
+    let convOrganizationWeightedSum = 0;
+    let convMassFluxWeightedSum = 0;
+    let lowLevelConvergenceWeightedSum = 0;
     let totalWeightAll = 0;
     for (let j = 0; j < ny; j++) {
       totalWeightAll += cosLat[j] * nx;
     }
 
-    const detrainAt = (k, lev, condMassLev) => {
+    const depositHydrometeor = (field, k, lev, condMassLev, latentHeat = Lv) => {
       if (condMassLev <= 0) return 0;
       const idx = lev * N + k;
       const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
       if (dpLev <= 0) return 0;
       const massLev = dpLev / g;
-      let dqDetrain = condMassLev / massLev;
+      let dq = condMassLev / massLev;
       const pLev = Math.max(100, pMid[idx]);
       const PiLev = Math.pow(pLev / P0, KAPPA);
-      const dTheta = (Lv / Cp * dqDetrain) / PiLev;
+      const dTheta = (latentHeat / Cp * dq) / PiLev;
       if (dThetaMaxConvPerStep > 0 && dTheta > dThetaMaxConvPerStep) {
         const scale = dThetaMaxConvPerStep / dTheta;
-        dqDetrain *= scale;
+        dq *= scale;
       }
-      qc[idx] += dqDetrain;
-      theta[idx] += (Lv / Cp * dqDetrain) / PiLev;
-      return dqDetrain * massLev;
+      field[idx] += dq;
+      theta[idx] += (latentHeat / Cp * dq) / PiLev;
+      return dq * massLev;
     };
 
     for (let k = 0; k < N; k++) {
@@ -573,6 +677,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const convTopLev = 1;
       const idxS = levS * N + k;
       const idxM = levM * N + k;
+      const rowIndex = Math.floor(k / nx);
+      const columnWeight = cosLat[rowIndex];
 
       const p1 = Math.max(100, pHalf[levS * N + k]);
       const p2 = Math.max(100, pHalf[(levS + 1) * N + k]);
@@ -586,15 +692,15 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const leeNoDelivery = terrainLeeNoDeliveryDiag[k];
       const leeOmegaFloorBlend = leeNoDelivery * clamp(terrainLeeOmegaFloorBlend, 0, 1);
       const omegaLowRaw = omega[levS * N + k];
-      let omegaLowEffective = omegaLowRaw;
+      let omegaLowEffectiveCol = omegaLowRaw;
       const terrainOmegaLow = Math.max(0, terrainOmegaSurfaceDiag[k]) * Math.exp(-orographicDecayFrac);
-      if (leeOmegaFloorBlend > 0 && terrainOmegaLow > omegaLowEffective) {
-        omegaLowEffective += (terrainOmegaLow - omegaLowEffective) * leeOmegaFloorBlend;
+      if (leeOmegaFloorBlend > 0 && terrainOmegaLow > omegaLowEffectiveCol) {
+        omegaLowEffectiveCol += (terrainOmegaLow - omegaLowEffectiveCol) * leeOmegaFloorBlend;
       }
       const ascentDamp = 1 - leeNoDelivery * clamp(terrainLeeAscentDamp, 0, 1);
-      const omegaLow = omegaLowEffective < 0 ? omegaLowEffective * ascentDamp : omegaLowEffective;
+      const omegaLow = omegaLowEffectiveCol < 0 ? omegaLowEffectiveCol * ascentDamp : omegaLowEffectiveCol;
+      lowLevelOmegaEffective[k] = omegaLow;
       if (omegaLow < 0) omegaPos[nOmegaPos++] = -omegaLow;
-      const ascent = -omegaLow > omegaThreshDynamic; // ascent based on negative tail
 
       const pMidM = Math.max(100, pMid[idxM]);
       const PiM = Math.pow(pMidM / P0, KAPPA);
@@ -608,39 +714,113 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const instab = thetaeS - thetaeM;
       instabArr[k] = instab;
 
-      if (!(qvS > qvTrig && rhS > rhTrig && rhMid > rhMidMin && ascent && instab > instabTrig)) continue;
+      const qvSupport = smoothstep(qvTrig * 0.5, Math.max(qvTrig * 3, qvTrig + 0.003), qvS);
+      const rhSupport = smoothstep(Math.max(0, rhTrig - 0.15), Math.min(1, rhTrig + 0.08), rhS);
+      const rhMidSupport = smoothstep(Math.max(0, rhMidMin * 0.6), Math.min(1, rhMidMin + 0.35), rhMid);
+      const ascentSupport = smoothstep(Math.max(0.03, omegaThreshDynamic * 0.35), Math.max(0.08, omegaThreshDynamic * 2.2), -omegaLow);
+      const instabSupport = smoothstep(Math.max(0.5, instabTrig * 0.35), Math.max(1.5, instabTrig * 1.8), instab);
+      const moistureConvergenceSupport = clamp01(lowLevelMoistureConvergence[k] * 21600);
+      let potentialTarget = clamp01(
+        (
+          1.15 * qvSupport +
+          1.0 * rhSupport +
+          0.9 * rhMidSupport +
+          1.25 * ascentSupport +
+          1.2 * instabSupport +
+          1.0 * moistureConvergenceSupport
+        ) / 6.5
+      );
+      const latAbs = Math.abs(latDeg?.[rowIndex] ?? 0);
+      const subtropicalSuppression = latDeg
+        ? smoothstep(12, 28, latAbs) * smoothstep(0.02, 0.25, omegaLow) * (0.6 + 0.4 * (1 - rhMidSupport))
+        : 0;
+      potentialTarget *= 1 - 0.3 * subtropicalSuppression;
+      const potentialPrev = convectivePotential[k];
+      const potentialTau = potentialTarget >= potentialPrev ? convPotentialGrowTau : convPotentialDecayTau;
+      const potentialAlpha = 1 - Math.exp(-dt / Math.max(potentialTau, eps));
+      convectivePotential[k] = clamp01(
+        potentialPrev + (potentialTarget - potentialPrev) * potentialAlpha
+      );
 
-      convectiveColumnsCount++;
-      convMask[k] = 1;
+      const organizationPrev = convectiveOrganization[k];
+      const organizationTarget = clamp01(
+        0.55 * convectivePotential[k] +
+        0.25 * moistureConvergenceSupport +
+        0.2 * Math.max(organizationPrev * 0.7, ascentSupport * rhMidSupport)
+      ) * (1 - 0.55 * subtropicalSuppression);
+      const organizationTau = organizationTarget >= organizationPrev
+        ? convOrganizationGrowTau
+        : convOrganizationDecayTau;
+      const organizationAlpha = 1 - Math.exp(-dt / Math.max(organizationTau, eps));
+      convectiveOrganization[k] = clamp01(
+        organizationPrev + (organizationTarget - organizationPrev) * organizationAlpha
+      );
 
-      const mu = Number.isFinite(tauConv) && tauConv > 0
-        ? clamp(dt / Math.max(tauConv, eps), 0, muMax)
-        : muMax;
+      convPotentialWeightedSum += convectivePotential[k] * columnWeight;
+      convOrganizationWeightedSum += convectiveOrganization[k] * columnWeight;
+      lowLevelConvergenceWeightedSum += lowLevelMoistureConvergence[k] * columnWeight;
+
+      const activityPotential = smoothstep(convMinPotential, 0.95, convectivePotential[k]);
+      const activityOrganization = smoothstep(convMinOrganization, 0.95, convectiveOrganization[k]);
+      const activity = clamp01(0.45 * activityPotential + 0.55 * activityOrganization);
+      const hasSupport = activity > 0
+        && (qvSupport > 0.08 || rhSupport > 0.08)
+        && (ascentSupport > 0.05 || moistureConvergenceSupport > 0.05)
+        && instabSupport > 0.05;
+      if (!hasSupport) continue;
+
+      convMask[k] = activity > 0.22 ? 1 : 0;
+      if (convMask[k] === 1) convectiveColumnsCount += 1;
+
+      const dpSurface = pHalf[(levS + 1) * N + k] - pHalf[levS * N + k];
+      const massSurface = dpSurface / g;
+      const mu = baseMu * activity;
+      convectiveMassFlux[k] = massSurface > 0 && dt > 0 ? (mu * massSurface) / dt : 0;
+      convMassFluxWeightedSum += convectiveMassFlux[k] * columnWeight;
+      rowConvectiveSource[rowIndex] += 0.75 * convectiveOrganization[k]
+        + 0.55 * smoothstep(0.0005, 0.02, convectiveMassFlux[k]);
+      if (mu <= 1e-6 || massSurface <= 0) continue;
+
+      const entrainEff = clamp(
+        entrainFrac * (1.25 - 0.55 * convectiveOrganization[k] + 0.35 * (1 - rhMidSupport)),
+        0.04,
+        0.65
+      );
+      const detrainTopEff = clamp(
+        detrainTop + 0.18 * convectiveOrganization[k] + 0.08 * instabSupport - 0.1 * (1 - rhMidSupport),
+        0.45,
+        0.95
+      );
+      const rainoutFrac = clamp(
+        convRainoutBase
+          + convRainoutOrganizationWeight * convectiveOrganization[k]
+          + convRainoutHumidityWeight * rhMidSupport
+          - 0.16 * (1 - rhSupport),
+        0.08,
+        0.9
+      );
+      convectiveRainoutFraction[k] = rainoutFrac;
 
       if (enableConvectiveMixing) {
-        if (mu > 0) {
-          for (let lev = levS; lev > convTopLev; lev--) {
-            const levBelow = lev;
-            const levAbove = lev - 1;
-            const idxB = levBelow * N + k;
-            const idxA = levAbove * N + k;
+        for (let lev = levS; lev > convTopLev; lev--) {
+          const levBelow = lev;
+          const levAbove = lev - 1;
+          const idxB = levBelow * N + k;
+          const idxA = levAbove * N + k;
 
-            const dpB = pHalf[(levBelow + 1) * N + k] - pHalf[levBelow * N + k];
-            const dpA = pHalf[(levAbove + 1) * N + k] - pHalf[levAbove * N + k];
-            const denom = Math.max(1e-6, dpA + dpB);
+          const dpB = pHalf[(levBelow + 1) * N + k] - pHalf[levBelow * N + k];
+          const dpA = pHalf[(levAbove + 1) * N + k] - pHalf[levAbove * N + k];
+          const denom = Math.max(1e-6, dpA + dpB);
 
-            const thetaMean = (theta[idxA] * dpA + theta[idxB] * dpB) / denom;
-            theta[idxA] += mu * (thetaMean - theta[idxA]);
-            theta[idxB] += mu * (thetaMean - theta[idxB]);
+          const thetaMean = (theta[idxA] * dpA + theta[idxB] * dpB) / denom;
+          theta[idxA] += mu * (thetaMean - theta[idxA]);
+          theta[idxB] += mu * (thetaMean - theta[idxB]);
 
-            const qvMean = (qv[idxA] * dpA + qv[idxB] * dpB) / denom;
-            qv[idxA] += mu * (qvMean - qv[idxA]);
-            qv[idxB] += mu * (qvMean - qv[idxB]);
-          }
+          const qvMean = (qv[idxA] * dpA + qv[idxB] * dpB) / denom;
+          qv[idxA] += mu * (qvMean - qv[idxA]);
+          qv[idxB] += mu * (qvMean - qv[idxB]);
         }
-      } else if (mu > 0) {
-        const dpSurface = pHalf[(levS + 1) * N + k] - pHalf[levS * N + k];
-        const massSurface = dpSurface / g;
+      } else {
         let thetaP = theta[idxS];
         let qvP = qv[idxS];
         let qCondTotal = 0;
@@ -650,8 +830,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           const idxEnv = lev * N + k;
           const thetaEnv = theta[idxEnv];
           const qvEnv = qv[idxEnv];
-          thetaP = (1 - entrain) * thetaP + entrain * thetaEnv;
-          qvP = (1 - entrain) * qvP + entrain * qvEnv;
+          thetaP = (1 - entrainEff) * thetaP + entrainEff * thetaEnv;
+          qvP = (1 - entrainEff) * qvP + entrainEff * qvEnv;
 
           const pLev = Math.max(100, pMid[idxEnv]);
           const Pi = Math.pow(pLev / P0, KAPPA);
@@ -672,34 +852,126 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
 
         if (plumeTopLev <= levS - 1) {
           convTopLevSum += plumeTopLev;
-          convPlumeCount++;
+          convPlumeCount += 1;
         }
 
-        if (plumeTopLev <= levS - 1 && qCondTotal > 0 && massSurface > 0) {
+        if (plumeTopLev <= levS - 1 && qCondTotal > 0) {
           const condMass = mu * qCondTotal * massSurface;
           const levTop = plumeTopLev;
           const levBelow = Math.min(levTop + 1, levS);
-          const topFrac = detrainTop;
-          const belowFrac = levBelow === levTop ? 0 : 1 - topFrac;
+          const cloudMass = condMass * (1 - rainoutFrac);
+          const rainMass = Math.max(0, condMass - cloudMass);
+          const cloudBelowFrac = levBelow === levTop ? 0 : 1 - detrainTopEff;
 
-          let usedMass = detrainAt(k, levTop, condMass * topFrac);
-          if (belowFrac > 0) {
-            usedMass += detrainAt(k, levBelow, condMass * belowFrac);
+          let usedCloudMass = depositHydrometeor(qc, k, levTop, cloudMass * detrainTopEff);
+          if (cloudBelowFrac > 0) {
+            usedCloudMass += depositHydrometeor(qc, k, levBelow, cloudMass * cloudBelowFrac);
           }
-          if (usedMass > 0) {
-            const dqSrc = usedMass / massSurface;
-            qv[idxS] = Math.max(0, qv[idxS] - dqSrc);
-            const j = Math.floor(k / nx);
-            convCondMassSum += usedMass * cosLat[j];
-            totalCondensed += usedMass;
-            totalDetrainedQc += usedMass;
+
+          let usedRainMass = 0;
+          if (rainMass > 0) {
+            const levRain = Math.min(
+              levBelow + (convectiveOrganization[k] > 0.6 && levBelow < levS ? 1 : 0),
+              levS
+            );
+            const rainTopFrac = clamp(0.35 + 0.3 * convectiveOrganization[k], 0.2, 0.75);
+            usedRainMass += depositHydrometeor(qr, k, levRain, rainMass * rainTopFrac);
+            const levRain2 = Math.min(levRain + 1, levS);
+            if (levRain2 !== levRain) {
+              usedRainMass += depositHydrometeor(qr, k, levRain2, rainMass * (1 - rainTopFrac));
+            }
           }
+
+          const usedCondMass = usedCloudMass + usedRainMass;
+          if (usedCondMass > 0) {
+            qv[idxS] = Math.max(0, qv[idxS] - usedCondMass / massSurface);
+            convectiveDetrainmentMass[k] = usedCloudMass;
+            convectiveHeatingProxy[k] = usedCondMass / Math.max(dt, eps);
+            convectiveTopLevel[k] = plumeTopLev;
+            const anvilDepth = 1 - plumeTopLev / Math.max(1, nz - 1);
+            convectiveAnvilSource[k] = clamp01(
+              convectiveOrganization[k] * anvilDepth * (1 - rainoutFrac * 0.65)
+            );
+            convCondMassSum += usedCondMass * columnWeight;
+            totalCondensed += usedCondMass;
+            totalDetrainedQc += usedCloudMass;
+            totalRainProduced += usedRainMass;
+          }
+        }
+      }
+    }
+
+    let subsidenceDryingWeightedSum = 0;
+    if (latDeg) {
+      for (let j = 0; j < ny; j++) rowConvectiveSource[j] /= Math.max(1, nx);
+      let nhSource = 0;
+      let nhWeight = 0;
+      let shSource = 0;
+      let shWeight = 0;
+      for (let j = 0; j < ny; j++) {
+        const lat = latDeg[j];
+        const latAbs = Math.abs(lat);
+        if (latAbs > tropicalOrganizationBandDeg) continue;
+        const weight = cosLat[j];
+        if (lat >= 0) {
+          nhSource += rowConvectiveSource[j] * weight;
+          nhWeight += weight;
+        } else {
+          shSource += rowConvectiveSource[j] * weight;
+          shWeight += weight;
+        }
+      }
+      nhSource = nhWeight > 0 ? nhSource / nhWeight : 0;
+      shSource = shWeight > 0 ? shSource / shWeight : 0;
+      const subtropicalAlpha = dt / Math.max(subtropicalSubsidenceTau, eps);
+      const subtropicalMidSigma = 0.5 * (subtropicalSubsidenceTopSigma + subtropicalSubsidenceBottomSigma);
+
+      for (let j = 0; j < ny; j++) {
+        const lat = latDeg[j];
+        const latAbs = Math.abs(lat);
+        if (latAbs < subtropicalSubsidenceLat0 || latAbs > subtropicalSubsidenceLat1) continue;
+        const hemiSource = lat >= 0 ? nhSource : shSource;
+        const latShape = smoothstep(subtropicalSubsidenceLat0, subtropicalSubsidenceLat0 + 6, latAbs)
+          * (1 - smoothstep(subtropicalSubsidenceLat1 - 4, subtropicalSubsidenceLat1, latAbs));
+        const row = j * nx;
+        for (let i = 0; i < nx; i++) {
+          const k = row + i;
+          const descentSupport = smoothstep(0.02, 0.3, lowLevelOmegaEffective[k]);
+          const dryDriver = clamp01(
+            1.4 * hemiSource * latShape * descentSupport * (1 - 0.25 * convectiveOrganization[k])
+          );
+          subtropicalSubsidenceDrying[k] = dryDriver;
+          if (dryDriver <= 0) continue;
+          const dryFracBase = clamp(subtropicalAlpha * dryDriver, 0, subtropicalSubsidenceMaxDryFrac);
+          for (let lev = 0; lev < nz; lev++) {
+            const sigmaMid = sigmaHalf
+              ? clamp01(0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1]))
+              : clamp01((lev + 0.5) / Math.max(1, nz));
+            if (sigmaMid < subtropicalSubsidenceTopSigma || sigmaMid > subtropicalSubsidenceBottomSigma) continue;
+            const lowerRamp = smoothstep(subtropicalSubsidenceTopSigma, subtropicalMidSigma, sigmaMid);
+            const upperRamp = 1 - smoothstep(subtropicalMidSigma, subtropicalSubsidenceBottomSigma, sigmaMid);
+            const layerWeight = clamp01(Math.min(lowerRamp, upperRamp) * 1.8);
+            if (layerWeight <= 0) continue;
+            const idx = lev * N + k;
+            const dryFrac = dryFracBase * layerWeight;
+            const dq = qv[idx] * dryFrac;
+            qv[idx] = Math.max(0, qv[idx] - dq);
+            theta[idx] += subtropicalSubsidenceThetaStepK * dryFrac * (0.5 + 0.5 * layerWeight);
+          }
+          subsidenceDryingWeightedSum += dryDriver * cosLat[j];
         }
       }
     }
 
     convTopLevMean = convPlumeCount > 0 ? convTopLevSum / convPlumeCount : null;
     convCondMassMean = totalWeightAll > 0 ? convCondMassSum / totalWeightAll : 0;
+    state.vertMetricsContinuous = {
+      convectivePotentialMean: totalWeightAll > 0 ? convPotentialWeightedSum / totalWeightAll : 0,
+      convectiveOrganizationMean: totalWeightAll > 0 ? convOrganizationWeightedSum / totalWeightAll : 0,
+      convectiveMassFluxMeanKgM2S: totalWeightAll > 0 ? convMassFluxWeightedSum / totalWeightAll : 0,
+      lowLevelMoistureConvergenceMeanS_1: totalWeightAll > 0 ? lowLevelConvergenceWeightedSum / totalWeightAll : 0,
+      subtropicalSubsidenceDryingMean: totalWeightAll > 0 ? subsidenceDryingWeightedSum / totalWeightAll : 0
+    };
   }
 
   // Positivity guards
@@ -749,6 +1021,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   state.totalCondensed = totalCondensed;
   state.totalDetrainedQc = totalDetrainedQc;
   state.totalRainProduced = totalRainProduced;
+  const continuousMetrics = state.vertMetricsContinuous || {};
   state.vertMetrics = {
     omegaPosP50: omegaP50,
     omegaPosP90: omegaP90,
@@ -759,7 +1032,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     convectiveFraction: convectiveColumnsCount / Math.max(1, N),
     convTopLevMean,
     convCondMassTotalKgM2: convCondMassMean,
-    omegaSurfMinusDpsDtRms
+    omegaSurfMinusDpsDtRms,
+    convectivePotentialMean: continuousMetrics.convectivePotentialMean ?? 0,
+    convectiveOrganizationMean: continuousMetrics.convectiveOrganizationMean ?? 0,
+    convectiveMassFluxMeanKgM2S: continuousMetrics.convectiveMassFluxMeanKgM2S ?? 0,
+    lowLevelMoistureConvergenceMeanS_1: continuousMetrics.lowLevelMoistureConvergenceMeanS_1 ?? 0,
+    subtropicalSubsidenceDryingMean: continuousMetrics.subtropicalSubsidenceDryingMean ?? 0
   };
 
   if (sampleCols > 0 && waterBefore) {

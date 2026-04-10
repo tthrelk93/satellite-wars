@@ -60,6 +60,8 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
   const cloudLowCov = state._cloudLowCov;
   const cloudHighCov = state._cloudHighCov;
   const convMask = state.convMask;
+  const convOrganization = state.convectiveOrganization;
+  const convAnvilSource = state.convectiveAnvilSource;
   const tauCloudLow = Math.max(1e-6, tauCloudLowSeconds);
   const tauCloudHigh = Math.max(1e-6, tauCloudHighSeconds);
   const aLow = 1 - Math.exp(-dtSeconds / tauCloudLow);
@@ -111,7 +113,10 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
       const condFactor = smoothstep(qc0, qc1, condTotal);
       const rhFactor = smoothstep(rh0, rh1, rh);
       const ascFactor = smoothstep(0.01, 0.25, -omegaMid);
-      const convFactor = convMask && convMask[k] === 1 && sigma < 0.55 ? 0.2 : 0;
+      const convStrength = clamp01(
+        (convOrganization?.[k] || 0) * 0.85 + ((convMask && convMask[k] === 1) ? 0.15 : 0)
+      );
+      const convFactor = sigma < 0.55 ? 0.22 * convStrength : 0;
       const frac = clamp01(Math.max(condFactor, rhFactor * (0.55 + 0.45 * ascFactor)) + convFactor);
 
       const tauLayerRaw = (sigma > lowSigmaCut)
@@ -136,8 +141,10 @@ export function updateDiagnostics2D5({ dt, grid, state, outFields, params = {} }
       }
     }
 
-    let anvil = convAnvil[k] * convAnvilDecay;
-    if (convMask && convMask[k] === 1) anvil = 1;
+    const anvilTarget = clamp01(
+      Math.max(convAnvilSource?.[k] || 0, (convOrganization?.[k] || 0) * 0.75)
+    );
+    const anvil = Math.max(convAnvil[k] * convAnvilDecay, anvilTarget);
     convAnvil[k] = anvil;
 
     const cloudLowTarget = cloudLowRaw;

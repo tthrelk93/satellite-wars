@@ -14,7 +14,10 @@ test('WeatherCore5 defaults keep the stronger broad-circulation surface wind res
   assert.equal(core.vertParams.instabTrig, 2.5);
   assert.equal(core.vertParams.qvTrig, 0.0018);
   assert.equal(core.vertParams.thetaeCoeff, 10.5);
+  assert.equal(core.vertParams.convOrganizationGrowTau, 2 * 3600);
+  assert.equal(core.vertParams.subtropicalSubsidenceTau, 12 * 3600);
   assert.equal(core.microParams.precipEffMicro, 0.75);
+  assert.equal(core.nudgeParams.organizedConvectionQvColumnRelief, 0.8);
 });
 
 test('WeatherCore5 refreshes runtime nudge params from current nudgeParams before nudging', async () => {

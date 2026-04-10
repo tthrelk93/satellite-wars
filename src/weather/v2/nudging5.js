@@ -46,6 +46,10 @@ const NUDGE_ALLOWED_PARAMS = new Set([
   'qvCap',
   'landQvNudgeScale',
   'oceanQvNudgeScale',
+  'organizedConvectionQvSurfaceRelief',
+  'organizedConvectionQvColumnRelief',
+  'organizedConvectionThetaColumnRelief',
+  'subtropicalSubsidenceQvRelief',
   'smoothLon',
   'smoothLat',
   'cadenceSeconds',
@@ -188,6 +192,10 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
     qvCap = 0.03,
     landQvNudgeScale = 0.5,
     oceanQvNudgeScale = 1.0,
+    organizedConvectionQvSurfaceRelief = 0.65,
+    organizedConvectionQvColumnRelief = 0.8,
+    organizedConvectionThetaColumnRelief = 0.45,
+    subtropicalSubsidenceQvRelief = 0.85,
     smoothLon = 31,
     smoothLat = 9,
     psMin = 50000,
@@ -200,6 +208,8 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
 
   const { nx, ny, latDeg } = grid;
   const { N, nz, ps, theta, qv, landMask, pMid, sstNow, soilW, soilCap, u, v } = state;
+  const convectiveOrganization = state.convectiveOrganization;
+  const subtropicalSubsidenceDrying = state.subtropicalSubsidenceDrying;
   const climoTargets = buildClimoTargetMaps(climo);
   const analysisTargets = state.analysisTargets || null;
   const slpNow = climoTargets.surfacePressurePa;
@@ -280,7 +290,9 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
       for (let i = 0; i < nx; i++) {
         const k = row + i;
         const land = landMask[k] === 1;
-        const rhTarget = clamp(land ? rhLand : rhOcean, 0.1, 0.95);
+        const dryBeltRelief = smoothstep(15, 35, latAbs)
+          * smoothstep(0.02, 0.25, state.lowLevelOmegaEffective?.[k] || 0);
+        const rhTarget = clamp((land ? rhLand : rhOcean) * (1 - 0.25 * dryBeltRelief), 0.1, 0.95);
         const idxS = levS * N + k;
         const pS = Math.max(100, pMid[idxS]);
         const qs = saturationMixingRatio(tmp2D[k], pS);
@@ -301,12 +313,21 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
     for (let k = 0; k < N; k++) {
       const idxS = levS * N + k;
       const land = landMask[k] === 1;
+      const row = Math.floor(k / nx);
+      const latAbs = Math.abs(latDeg[row]);
       let scale = land ? landQvNudgeScale : oceanQvNudgeScale;
+      const dryBeltRelief = smoothstep(15, 35, latAbs)
+        * smoothstep(0.02, 0.25, state.lowLevelOmegaEffective?.[k] || 0);
+      const convRelief = 1 - clamp01((convectiveOrganization?.[k] || 0) * organizedConvectionQvSurfaceRelief);
+      const subsidenceRelief = 1 - clamp01(
+        Math.max(subtropicalSubsidenceDrying?.[k] || 0, dryBeltRelief) * subtropicalSubsidenceQvRelief
+      );
       if (land) {
         const cap = soilCap ? soilCap[k] : 0;
         const avail = cap > 0 ? clamp01((soilW ? soilW[k] : 0) / cap) : 0;
         scale *= lerp(0.2, 1.0, avail);
       }
+      scale *= Math.min(convRelief, subsidenceRelief);
       qv[idxS] += (tmp2D2[k] - qv[idxS]) * coeff * scale;
       qv[idxS] = clamp(qv[idxS], 0, qvCap);
     }
@@ -327,7 +348,8 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
         const targetValue = interpolatePressureFieldAtCell(thetaTargetMap, pTarget, cell);
         if (!Number.isFinite(targetValue)) continue;
         const thetaTarget = useTemperature ? targetValue / Math.pow(pTarget / P0, KAPPA) : targetValue;
-        theta[idx] += (thetaTarget - theta[idx]) * coeff;
+        const relief = 1 - clamp01((convectiveOrganization?.[cell] || 0) * organizedConvectionThetaColumnRelief);
+        theta[idx] += (thetaTarget - theta[idx]) * coeff * relief;
       }
     }
   }
@@ -340,11 +362,19 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
   if (enableQvColumn && qvTargetMap && pMid) {
     const coeff = clamp(dt / tauQvColumn, 0, 1);
     for (let cell = 0; cell < N; cell += 1) {
+      const row = Math.floor(cell / nx);
+      const latAbs = Math.abs(latDeg[row]);
+      const dryBeltRelief = smoothstep(15, 35, latAbs)
+        * smoothstep(0.02, 0.25, state.lowLevelOmegaEffective?.[cell] || 0);
       for (let lev = 0; lev < nz; lev += 1) {
         const idx = lev * N + cell;
         const targetValue = interpolatePressureFieldAtCell(qvTargetMap, pMid[idx], cell);
         if (!Number.isFinite(targetValue)) continue;
-        qv[idx] += (clamp(targetValue, 0, qvCap) - qv[idx]) * coeff;
+        const convRelief = 1 - clamp01((convectiveOrganization?.[cell] || 0) * organizedConvectionQvColumnRelief);
+        const subsidenceRelief = 1 - clamp01(
+          Math.max(subtropicalSubsidenceDrying?.[cell] || 0, dryBeltRelief) * subtropicalSubsidenceQvRelief
+        );
+        qv[idx] += (clamp(targetValue, 0, qvCap) - qv[idx]) * coeff * Math.min(convRelief, subsidenceRelief);
         qv[idx] = clamp(qv[idx], 0, qvCap);
       }
     }

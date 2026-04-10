@@ -90,3 +90,56 @@ test('stepNudging5 can nudge theta, qv, u, and v through the full column from an
   assert.ok(state.v[0] > 0);
   assert.ok(state.theta[state.theta.length - 1] > 280);
 });
+
+test('stepNudging5 relaxes humidity nudging where organized convection and subtropical drying are already active', () => {
+  const sigmaHalf = createSigmaHalfLevels({ nz: 4 });
+  const state = createState5({ grid: { count: 4 }, nz: 4, sigmaHalf });
+  const grid = makeGrid();
+  state.ps.fill(100000);
+  state.pMid.set(computeModelMidPressurePa({ surfacePressurePa: state.ps, sigmaHalf, pTop: 20000 }));
+  state.qv.fill(0.001);
+  state.landMask.fill(0);
+  state.convectiveOrganization.set([0.9, 0, 0, 0]);
+  state.subtropicalSubsidenceDrying.set([0.7, 0, 0, 0]);
+  state.analysisTargets = {
+    specificHumidityKgKgByPressurePa: new Map([
+      [100000, new Float32Array([0.01, 0.01, 0.01, 0.01])],
+      [50000, new Float32Array([0.006, 0.006, 0.006, 0.006])]
+    ])
+  };
+  const climo = {
+    sstNow: new Float32Array(4),
+    hasSlp: false,
+    hasT2m: false,
+    hasWind: false,
+    hasWind500: false,
+    hasWind250: false,
+    hasQ2m: false,
+    hasQ700: false,
+    hasQ250: false,
+    hasT700: false,
+    hasT250: false
+  };
+  const scratch = { tmp2D: new Float32Array(4), tmp2D2: new Float32Array(4) };
+
+  stepNudging5({
+    dt: 86400,
+    grid,
+    state,
+    climo,
+    scratch,
+    params: {
+      enable: true,
+      enableThetaS: false,
+      enableQvS: false,
+      enablePs: false,
+      enableThetaColumn: false,
+      enableQvColumn: true,
+      enableWindColumn: false,
+      qvSource: 'analysis',
+      tauQvColumn: 86400
+    }
+  });
+
+  assert.ok(state.qv[0] < state.qv[1]);
+});

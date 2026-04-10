@@ -34,6 +34,18 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const surfaceRadiativeFlux = makeArray(N);
   const soilCap = makeArray(N);
   const landMask = new Uint8Array(N);
+  const convMask = new Uint8Array(N);
+  const convectivePotential = makeArray(N);
+  const convectiveOrganization = makeArray(N);
+  const convectiveMassFlux = makeArray(N);
+  const convectiveDetrainmentMass = makeArray(N);
+  const convectiveRainoutFraction = makeArray(N);
+  const convectiveAnvilSource = makeArray(N);
+  const convectiveHeatingProxy = makeArray(N);
+  const convectiveTopLevel = makeArray(N);
+  const lowLevelMoistureConvergence = makeArray(N);
+  const lowLevelOmegaEffective = makeArray(N);
+  const subtropicalSubsidenceDrying = makeArray(N);
   const analysisIauPs = makeArray(N);
   const analysisIauTs = makeArray(N);
   const analysisIauU = makeArray(SZ);
@@ -74,6 +86,18 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
     precipRainRate,
     precipSnowRate,
     landMask,
+    convMask,
+    convectivePotential,
+    convectiveOrganization,
+    convectiveMassFlux,
+    convectiveDetrainmentMass,
+    convectiveRainoutFraction,
+    convectiveAnvilSource,
+    convectiveHeatingProxy,
+    convectiveTopLevel,
+    lowLevelMoistureConvergence,
+    lowLevelOmegaEffective,
+    subtropicalSubsidenceDrying,
     soilCap,
     analysisIauPs,
     analysisIauTs,

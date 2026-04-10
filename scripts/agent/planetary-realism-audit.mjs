@@ -165,6 +165,20 @@ const weightedBandCentroid = (series, latitudesDeg, rowWeights, lat0, lat1) => {
   return denominator > 0 ? numerator / denominator : 0;
 };
 
+const weightedBandWidth = (series, latitudesDeg, rowWeights, lat0, lat1, centerLat) => {
+  let numerator = 0;
+  let denominator = 0;
+  for (let j = 0; j < series.length; j += 1) {
+    const lat = latitudesDeg[j];
+    if (lat < lat0 || lat > lat1) continue;
+    const value = Math.max(0, series[j]);
+    const weight = rowWeights[j] * value;
+    numerator += (lat - centerLat) ** 2 * weight;
+    denominator += weight;
+  }
+  return denominator > 0 ? 2 * Math.sqrt(numerator / denominator) : 0;
+};
+
 const peakLatitude = (series, latitudesDeg, lat0, lat1) => {
   let bestIndex = -1;
   let bestValue = -Infinity;
@@ -221,12 +235,34 @@ const computeTropicalCycloneEnvironment = (diagnostics) => {
 };
 
 export const classifySnapshot = (diagnostics, targetDay) => {
-  const { grid, precipRateMmHr, cloudTotalFraction, wind10mU, wind10mSpeedMs, totalColumnWaterKgM2, cycloneSupportFields } = diagnostics;
+  const {
+    grid,
+    precipRateMmHr,
+    cloudTotalFraction,
+    wind10mU,
+    wind10mSpeedMs,
+    totalColumnWaterKgM2,
+    cycloneSupportFields,
+    convectiveMaskFrac,
+    convectiveOrganizationFrac,
+    convectiveMassFluxKgM2S,
+    convectiveDetrainmentMassKgM2,
+    convectiveAnvilSourceFrac,
+    lowerTroposphericRhFrac,
+    subtropicalSubsidenceDryingFrac
+  } = diagnostics;
   const { nx, ny, latitudesDeg } = grid;
   const rowWeights = makeRowWeights(latitudesDeg);
   const zonalPrecip = zonalMean(precipRateMmHr, nx, ny);
   const zonalCloud = zonalMean(cloudTotalFraction, nx, ny);
   const zonalU10 = zonalMean(wind10mU, nx, ny);
+  const zonalConvectiveFraction = zonalMean(convectiveMaskFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalConvectiveOrganization = zonalMean(convectiveOrganizationFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalConvectiveMassFlux = zonalMean(convectiveMassFluxKgM2S || new Array(nx * ny).fill(0), nx, ny);
+  const zonalDetrainment = zonalMean(convectiveDetrainmentMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalAnvil = zonalMean(convectiveAnvilSourceFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalStormIndex = zonalMean(
     precipRateMmHr.map((precip, idx) => Math.abs(cycloneSupportFields.relativeVorticityS_1[idx] || 0) * Math.max(0, precip || 0) * Math.max(1, wind10mSpeedMs[idx] || 0)),
     nx,
@@ -237,9 +273,19 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const globalTcwMean = areaWeightedMean(totalColumnWaterKgM2, nx, ny, rowWeights);
   const maxWind10m = areaWeightedMax(wind10mSpeedMs);
   const itczLat = weightedBandCentroid(zonalPrecip, latitudesDeg, rowWeights, -20, 20);
+  const itczWidth = weightedBandWidth(zonalPrecip, latitudesDeg, rowWeights, -25, 25, itczLat);
   const equatorialPrecip = weightedBandMean(zonalPrecip, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
   const subtropicalDryNorth = weightedBandMean(zonalPrecip, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const subtropicalDrySouth = weightedBandMean(zonalPrecip, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const tropicalConvectiveFraction = weightedBandMean(zonalConvectiveFraction, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
+  const tropicalConvectiveOrganization = weightedBandMean(zonalConvectiveOrganization, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
+  const tropicalConvectiveMassFlux = weightedBandMean(zonalConvectiveMassFlux, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
+  const subtropicalRhNorth = weightedBandMean(zonalLowerRh, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const subtropicalRhSouth = weightedBandMean(zonalLowerRh, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const subtropicalSubsidenceNorth = weightedBandMean(zonalSubsidenceDrying, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const subtropicalSubsidenceSouth = weightedBandMean(zonalSubsidenceDrying, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const tropicalUpperDetrainment = weightedBandMean(zonalDetrainment, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
+  const tropicalAnvilPersistence = weightedBandMean(zonalAnvil, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
   const tradesNorth = weightedBandMean(zonalU10, latitudesDeg, rowWeights, 5, 25);
   const tradesSouth = weightedBandMean(zonalU10, latitudesDeg, rowWeights, -25, -5);
   const westerliesNorth = weightedBandMean(zonalU10, latitudesDeg, rowWeights, 30, 60);
@@ -257,11 +303,21 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       globalTcwMeanKgM2: round(globalTcwMean),
       maxWind10mMs: round(maxWind10m),
       itczLatDeg: round(itczLat),
+      itczWidthDeg: round(itczWidth),
       equatorialPrecipMeanMmHr: round(equatorialPrecip),
       subtropicalDryNorthMeanMmHr: round(subtropicalDryNorth),
       subtropicalDrySouthMeanMmHr: round(subtropicalDrySouth),
       subtropicalDryNorthRatio: round(subtropicalDryNorth / Math.max(1e-6, equatorialPrecip)),
       subtropicalDrySouthRatio: round(subtropicalDrySouth / Math.max(1e-6, equatorialPrecip)),
+      tropicalConvectiveFraction: round(tropicalConvectiveFraction),
+      tropicalConvectiveOrganization: round(tropicalConvectiveOrganization),
+      tropicalConvectiveMassFluxKgM2S: round(tropicalConvectiveMassFlux, 5),
+      subtropicalRhNorthMeanFrac: round(subtropicalRhNorth),
+      subtropicalRhSouthMeanFrac: round(subtropicalRhSouth),
+      subtropicalSubsidenceNorthMean: round(subtropicalSubsidenceNorth),
+      subtropicalSubsidenceSouthMean: round(subtropicalSubsidenceSouth),
+      upperDetrainmentTropicalKgM2: round(tropicalUpperDetrainment, 5),
+      tropicalAnvilPersistenceFrac: round(tropicalAnvilPersistence),
       tropicalTradesNorthU10Ms: round(tradesNorth),
       tropicalTradesSouthU10Ms: round(tradesSouth),
       midlatitudeWesterliesNorthU10Ms: round(westerliesNorth),
@@ -312,6 +368,7 @@ export const evaluateHorizons = (samples, horizonDays) => {
   const latest = samples.find((sample) => sample.targetDay === horizonDays) || samples[samples.length - 1];
   if (!latest) return { warnings: ['no_samples'], categories: {}, latest: null };
   const { metrics } = latest;
+  const optionalPass = (value, predicate) => !Number.isFinite(value) || predicate(value);
 
   const categories = {
     circulation: metrics.tropicalTradesNorthU10Ms < -0.2
@@ -319,8 +376,13 @@ export const evaluateHorizons = (samples, horizonDays) => {
       && metrics.midlatitudeWesterliesNorthU10Ms > 0.2
       && metrics.midlatitudeWesterliesSouthU10Ms > 0.2,
     moistureBelts: Math.abs(metrics.itczLatDeg) <= 12
+      && optionalPass(metrics.itczWidthDeg, (value) => value >= 6 && value <= 24)
       && metrics.subtropicalDryNorthRatio < 0.8
-      && metrics.subtropicalDrySouthRatio < 0.8,
+      && metrics.subtropicalDrySouthRatio < 0.8
+      && optionalPass(metrics.subtropicalRhNorthMeanFrac, (value) => value < 0.82)
+      && optionalPass(metrics.subtropicalRhSouthMeanFrac, (value) => value < 0.82)
+      && optionalPass(metrics.subtropicalSubsidenceNorthMean, (value) => value > 0.03)
+      && optionalPass(metrics.subtropicalSubsidenceSouthMean, (value) => value > 0.03),
     stormTracks: Number.isFinite(metrics.stormTrackNorthLatDeg)
       && Number.isFinite(metrics.stormTrackSouthLatDeg)
       && metrics.stormTrackNorthLatDeg >= 30
@@ -339,8 +401,13 @@ export const evaluateHorizons = (samples, horizonDays) => {
   if (!(metrics.midlatitudeWesterliesNorthU10Ms > 0.2)) warnings.push('westerlies_missing_north');
   if (!(metrics.midlatitudeWesterliesSouthU10Ms > 0.2)) warnings.push('westerlies_missing_south');
   if (!(Math.abs(metrics.itczLatDeg) <= 12)) warnings.push('itcz_out_of_tropical_band');
+  if (!optionalPass(metrics.itczWidthDeg, (value) => value >= 6 && value <= 24)) warnings.push('itcz_width_unrealistic');
   if (!(metrics.subtropicalDryNorthRatio < 0.8)) warnings.push('north_subtropical_dry_belt_too_wet');
   if (!(metrics.subtropicalDrySouthRatio < 0.8)) warnings.push('south_subtropical_dry_belt_too_wet');
+  if (!optionalPass(metrics.subtropicalRhNorthMeanFrac, (value) => value < 0.82)) warnings.push('north_subtropical_lower_troposphere_too_humid');
+  if (!optionalPass(metrics.subtropicalRhSouthMeanFrac, (value) => value < 0.82)) warnings.push('south_subtropical_lower_troposphere_too_humid');
+  if (!optionalPass(metrics.subtropicalSubsidenceNorthMean, (value) => value > 0.03)) warnings.push('north_subtropical_subsidence_too_weak');
+  if (!optionalPass(metrics.subtropicalSubsidenceSouthMean, (value) => value > 0.03)) warnings.push('south_subtropical_subsidence_too_weak');
   if (!(Number.isFinite(metrics.stormTrackNorthLatDeg) && metrics.stormTrackNorthLatDeg >= 30 && metrics.stormTrackNorthLatDeg <= 65)) warnings.push('north_storm_track_out_of_range');
   if (!(Number.isFinite(metrics.stormTrackSouthLatDeg) && metrics.stormTrackSouthLatDeg <= -30 && metrics.stormTrackSouthLatDeg >= -65)) warnings.push('south_storm_track_out_of_range');
   if (!(metrics.globalCloudMeanFrac >= 0.15 && metrics.globalCloudMeanFrac <= 0.85)) warnings.push('cloud_field_unbalanced');
@@ -388,7 +455,11 @@ const renderMarkdown = (summary) => {
     lines.push(`## ${horizon.horizonDays}-day audit`);
     lines.push('');
     lines.push(`- Pass: **${horizon.overallPass ? 'PASS' : 'FAIL'}**`);
-    lines.push(`- ITCZ latitude: ${latest.metrics.itczLatDeg} deg`);
+    lines.push(`- ITCZ latitude/width: ${latest.metrics.itczLatDeg} / ${latest.metrics.itczWidthDeg} deg`);
+    lines.push(`- Tropical convective fraction/org/mass flux: ${latest.metrics.tropicalConvectiveFraction} / ${latest.metrics.tropicalConvectiveOrganization} / ${latest.metrics.tropicalConvectiveMassFluxKgM2S}`);
+    lines.push(`- Subtropical RH (N/S): ${latest.metrics.subtropicalRhNorthMeanFrac} / ${latest.metrics.subtropicalRhSouthMeanFrac}`);
+    lines.push(`- Subtropical subsidence drying (N/S): ${latest.metrics.subtropicalSubsidenceNorthMean} / ${latest.metrics.subtropicalSubsidenceSouthMean}`);
+    lines.push(`- Tropical detrainment/anvil: ${latest.metrics.upperDetrainmentTropicalKgM2} kg/m² / ${latest.metrics.tropicalAnvilPersistenceFrac}`);
     lines.push(`- Tropical trades (N/S): ${latest.metrics.tropicalTradesNorthU10Ms} / ${latest.metrics.tropicalTradesSouthU10Ms} m/s`);
     lines.push(`- Midlatitude westerlies (N/S): ${latest.metrics.midlatitudeWesterliesNorthU10Ms} / ${latest.metrics.midlatitudeWesterliesSouthU10Ms} m/s`);
     lines.push(`- Storm-track peaks (N/S): ${latest.metrics.stormTrackNorthLatDeg} / ${latest.metrics.stormTrackSouthLatDeg} deg`);
@@ -478,7 +549,7 @@ export async function main() {
   }
 
   const summary = {
-    schema: 'satellite-wars.planetary-realism-audit.v1',
+    schema: 'satellite-wars.planetary-realism-audit.v2',
     generatedAt: new Date().toISOString(),
     overallPass,
     config: {

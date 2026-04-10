@@ -53,3 +53,77 @@ test('evaluateHorizons flags missing trades and storm tracks', () => {
   assert.ok(evaluation.warnings.includes('north_storm_track_out_of_range'));
   assert.ok(evaluation.warnings.includes('runaway_surface_winds'));
 });
+
+test('classifySnapshot reports broad convection and subtropical drying diagnostics', () => {
+  const nx = 2;
+  const ny = 3;
+  const diagnostics = {
+    grid: {
+      nx,
+      ny,
+      latitudesDeg: [20, 0, -20]
+    },
+    precipRateMmHr: [
+      0.4, 0.4,
+      2.0, 1.8,
+      0.5, 0.5
+    ],
+    cloudTotalFraction: new Array(nx * ny).fill(0.5),
+    wind10mU: [
+      -0.8, -0.7,
+      -0.3, -0.2,
+      -0.7, -0.8
+    ],
+    wind10mSpeedMs: new Array(nx * ny).fill(10),
+    totalColumnWaterKgM2: new Array(nx * ny).fill(30),
+    convectiveMaskFrac: [
+      0, 0,
+      1, 1,
+      0, 0
+    ],
+    convectiveOrganizationFrac: [
+      0.1, 0.1,
+      0.9, 0.8,
+      0.1, 0.1
+    ],
+    convectiveMassFluxKgM2S: [
+      0.001, 0.001,
+      0.02, 0.018,
+      0.001, 0.001
+    ],
+    convectiveDetrainmentMassKgM2: [
+      0.01, 0.01,
+      0.12, 0.11,
+      0.01, 0.01
+    ],
+    convectiveAnvilSourceFrac: [
+      0.1, 0.1,
+      0.7, 0.75,
+      0.1, 0.1
+    ],
+    lowerTroposphericRhFrac: [
+      0.6, 0.62,
+      0.85, 0.84,
+      0.58, 0.57
+    ],
+    subtropicalSubsidenceDryingFrac: [
+      0.08, 0.09,
+      0.01, 0.01,
+      0.08, 0.09
+    ],
+    cycloneSupportFields: {
+      relativeVorticityS_1: new Array(nx * ny).fill(3e-5)
+    },
+    seaLevelPressurePa: new Array(nx * ny).fill(100000),
+    sstK: new Array(nx * ny).fill(300),
+    seaIceFraction: new Array(nx * ny).fill(0)
+  };
+
+  const snapshot = planetaryAuditTest.classifySnapshot(diagnostics, 30);
+
+  assert.ok(snapshot.metrics.itczWidthDeg > 0);
+  assert.ok(snapshot.metrics.tropicalConvectiveFraction > 0.5);
+  assert.ok(snapshot.metrics.tropicalConvectiveMassFluxKgM2S > 0.01);
+  assert.ok(snapshot.metrics.subtropicalSubsidenceNorthMean > 0.05);
+  assert.ok(snapshot.metrics.tropicalAnvilPersistenceFrac > 0.6);
+});

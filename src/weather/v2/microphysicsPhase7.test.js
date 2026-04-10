@@ -76,3 +76,29 @@ test('terrain-coupled lee columns evaporate and convert warm rain less when deli
   assert.ok(leeNoDelivery.precipRainRate[0] <= leeWithDelivery.precipRainRate[0]);
   assert.ok(leeNoDelivery.qv[lowIdx] >= leeWithDelivery.qv[lowIdx]);
 });
+
+test('microphysics scales convective autoconversion continuously with organized mass flux', () => {
+  const weak = setupState(281);
+  const strong = setupState(281);
+  const lowIdx = (weak.nz - 1) * weak.N;
+
+  for (const state of [weak, strong]) {
+    state.qv.fill(0.010);
+    state.qc.fill(0);
+    state.qr.fill(0);
+    state.qc[lowIdx] = 0.0020;
+    state.convMask[0] = 0;
+    state.convectiveOrganization[0] = 0;
+    state.convectiveMassFlux[0] = 0;
+  }
+
+  strong.convectiveOrganization[0] = 0.85;
+  strong.convectiveMassFlux[0] = 0.02;
+
+  stepMicrophysics5({ dt: 900, state: weak, params: { enableConvectiveOutcome: true } });
+  stepMicrophysics5({ dt: 900, state: strong, params: { enableConvectiveOutcome: true } });
+
+  assert.ok(strong.precipRainRate[0] > weak.precipRainRate[0]);
+  assert.ok(strong.precipRate[0] >= weak.precipRate[0]);
+  assert.ok(strong.qr[lowIdx] >= weak.qr[lowIdx]);
+});

@@ -1,7 +1,19 @@
-import { g, Rd } from '../constants.js';
+import { g, Rd, Cp } from '../constants.js';
 import { computeGeopotentialHeightByPressure, DEFAULT_PRESSURE_LEVELS_PA } from '../v2/verticalGrid.js';
 
 const EPS = 1e-6;
+const P0 = 100000;
+const KAPPA = Rd / Cp;
+
+const saturationMixingRatio = (T, p) => {
+  const Tuse = Math.max(180, Math.min(330, T));
+  const Tc = Tuse - 273.15;
+  const es = 610.94 * Math.exp((17.625 * Tc) / (Tc + 243.04));
+  const esClamped = Math.min(es, 0.95 * p);
+  const eps = 0.622;
+  const qs = (eps * esClamped) / Math.max(1, p - esClamped);
+  return Math.min(qs, 0.2);
+};
 
 const computeSeaLevelPressurePa = (core) => {
   const ps = core?.state?.ps;
@@ -36,6 +48,33 @@ const computeTotalColumnWaterKgM2 = (state) => {
   return computeColumnIntegralKgM2(state, (idx) => qv[idx] + qc[idx] + (qi?.[idx] || 0) + (qr?.[idx] || 0) + (qs?.[idx] || 0));
 };
 
+const computeLayerMeanRelativeHumidity = (state, minSigma, maxSigma) => {
+  const { N, nz, sigmaHalf, pHalf, pMid, qv, theta, T } = state;
+  const out = new Array(N).fill(0);
+  for (let cell = 0; cell < N; cell += 1) {
+    let total = 0;
+    let weightTotal = 0;
+    for (let lev = 0; lev < nz; lev += 1) {
+      const sigmaMid = sigmaHalf && sigmaHalf.length > lev + 1
+        ? 0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1])
+        : (lev + 0.5) / Math.max(1, nz);
+      if (sigmaMid < minSigma || sigmaMid > maxSigma) continue;
+      const idx = lev * N + cell;
+      const dp = pHalf[(lev + 1) * N + cell] - pHalf[lev * N + cell];
+      const p = Math.max(100, pMid[idx]);
+      const Pi = Math.pow(p / P0, KAPPA);
+      const tempK = Number.isFinite(T?.[idx]) ? T[idx] : theta[idx] * Pi;
+      const qsat = saturationMixingRatio(tempK, p);
+      total += Math.max(0, Math.min(2, qv[idx] / Math.max(EPS, qsat))) * dp;
+      weightTotal += dp;
+    }
+    out[cell] = weightTotal > 0 ? total / weightTotal : 0;
+  }
+  return out;
+};
+
+const arrayOrZeros = (arrLike, length) => Array.from(arrLike || new Float32Array(length));
+
 export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PRESSURE_LEVELS_PA } = {}) {
   const grid = core?.grid;
   const state = core?.state;
@@ -50,7 +89,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
   const seaLevelPressurePa = computeSeaLevelPressurePa(core);
 
   return {
-    schema: 'satellite-wars.weather-validation.snapshot.v1',
+    schema: 'satellite-wars.weather-validation.snapshot.v2',
     simTimeSeconds: core.timeUTC,
     grid: {
       nx: grid.nx,
@@ -83,6 +122,19 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     cloudLowFraction: Array.from(fields.cloudLow || []),
     cloudHighFraction: Array.from(fields.cloudHigh || []),
     cloudTotalFraction: Array.from(fields.cloud || []),
+    lowerTroposphericRhFrac: computeLayerMeanRelativeHumidity(state, 0.45, 0.85),
+    convectiveMaskFrac: arrayOrZeros(state.convMask, state.N),
+    convectivePotentialFrac: arrayOrZeros(state.convectivePotential, state.N),
+    convectiveOrganizationFrac: arrayOrZeros(state.convectiveOrganization, state.N),
+    convectiveMassFluxKgM2S: arrayOrZeros(state.convectiveMassFlux, state.N),
+    convectiveDetrainmentMassKgM2: arrayOrZeros(state.convectiveDetrainmentMass, state.N),
+    convectiveRainoutFraction: arrayOrZeros(state.convectiveRainoutFraction, state.N),
+    convectiveAnvilSourceFrac: arrayOrZeros(state.convectiveAnvilSource, state.N),
+    convectiveHeatingProxyKgM2S: arrayOrZeros(state.convectiveHeatingProxy, state.N),
+    convectiveTopLevelIndex: arrayOrZeros(state.convectiveTopLevel, state.N),
+    lowLevelMoistureConvergenceS_1: arrayOrZeros(state.lowLevelMoistureConvergence, state.N),
+    lowLevelOmegaEffectivePaS: arrayOrZeros(state.lowLevelOmegaEffective, state.N),
+    subtropicalSubsidenceDryingFrac: arrayOrZeros(state.subtropicalSubsidenceDrying, state.N),
     cycloneSupportFields: {
       relativeVorticityS_1: Array.from(fields.vort || []),
       wind10mSpeedMs,
