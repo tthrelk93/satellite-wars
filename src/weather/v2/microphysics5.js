@@ -102,6 +102,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
       const subtropicalDrying = enableConvectiveOutcome && state.subtropicalSubsidenceDrying
         ? state.subtropicalSubsidenceDrying[k]
         : 0;
+      const subtropicalDryingStrength = smoothstep(0.01, 0.08, subtropicalDrying);
       const anvilSource = enableConvectiveOutcome && state.convectiveAnvilSource
         ? state.convectiveAnvilSource[k]
         : 0;
@@ -114,7 +115,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         ? clamp(0.55 * convOrganization + 0.2 * convMassFluxStrength + 0.25 * anvilSource, 0, 1)
         : 0;
       const marginalSubsiding = enableConvectiveOutcome
-        ? clamp(0.65 * subtropicalDrying + 0.2 * (1 - convOrganization) + 0.15 * (1 - convMassFluxStrength), 0, 1)
+        ? clamp(0.75 * subtropicalDryingStrength + 0.15 * (1 - convOrganization) + 0.1 * (1 - convMassFluxStrength), 0, 1)
         : 0;
       const terrainOmegaSurface = Number.isFinite(state.terrainOmegaSurface?.[k]) ? state.terrainOmegaSurface[k] : 0;
       const deliveryExposure = Number.isFinite(state.orographicDeliveryExposureAccum?.[k])
@@ -132,7 +133,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         ? clamp(
             1
               + organizedOutflow * Math.max(0, 1 / Math.max(convTauEvapCloudScale, 1e-3) - 1)
-              - 0.55 * marginalSubsiding,
+              - 0.7 * marginalSubsiding,
             0.35,
             2.5
           )
@@ -143,9 +144,11 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
       const tauEvapCloudMaxEff = Math.max(1, tauEvapCloudMaxEffBase / evapScale);
       const tauEvapRainMinEff = Math.max(1, tauEvapRainMin / evapScale);
       const tauEvapRainMaxEff = Math.max(1, tauEvapRainMax / evapScale);
+      const tauSubSnowMinEff = tauSubSnowMin;
+      const tauSubSnowMaxEff = tauSubSnowMax;
       const leeWarmRainSuppress = 1 - leeNoDelivery * clamp(terrainLeeWarmRainSuppress, 0, 1);
       const organizedWarmRainSuppress = 1 - 0.2 * organizedOutflow;
-      const subtropicalDrizzleSuppress = 1 - 0.55 * marginalSubsiding;
+      const subtropicalDrizzleSuppress = 1 - 0.68 * marginalSubsiding;
       const warmRainSuppress = clamp(
         leeWarmRainSuppress * organizedWarmRainSuppress * subtropicalDrizzleSuppress,
         0.1,
@@ -158,7 +161,8 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
           basePrecipEff
           + 0.45 * convPrecipEffBoost * convMassFluxStrength
           + 0.35 * convPrecipEffBoost * organizedOutflow
-          - 1.0 * convPrecipEffBoost * marginalSubsiding
+          - 1.15 * convPrecipEffBoost * marginalSubsiding
+          - 0.1 * subtropicalDryingStrength
         ) * warmRainSuppress,
         0.05,
         1
@@ -197,7 +201,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         const RH = clamp(qvVal / Math.max(1e-8, qsat), 0, 2);
         const tauEvapCloud = tauEvapCloudMinEff + (tauEvapCloudMaxEff - tauEvapCloudMinEff) * RH;
         const tauEvapRain = tauEvapRainMinEff + (tauEvapRainMaxEff - tauEvapRainMinEff) * RH;
-        const tauSubSnow = tauSubSnowMin + (tauSubSnowMax - tauSubSnowMin) * RH;
+        const tauSubSnow = tauSubSnowMinEff + (tauSubSnowMaxEff - tauSubSnowMinEff) * RH;
         let deficit = qsat - qvVal;
 
         const evaporate = (storeVal, tau, latentHeat) => {

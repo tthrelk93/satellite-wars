@@ -71,6 +71,8 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'subtropicalSubsidenceThetaStepK',
   'subtropicalSubsidenceTopSigma',
   'subtropicalSubsidenceBottomSigma',
+  'subtropicalSubsidenceCrossHemiFloorFrac',
+  'subtropicalSubsidenceWeakHemiBoost',
   'eps',
   'debugConservation'
 ]);
@@ -178,6 +180,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     subtropicalSubsidenceThetaStepK = 0.6,
     subtropicalSubsidenceTopSigma = 0.35,
     subtropicalSubsidenceBottomSigma = 0.85,
+    subtropicalSubsidenceCrossHemiFloorFrac = 0.45,
+    subtropicalSubsidenceWeakHemiBoost = 0.0,
 
     // Numerical/heating
     eps = 1e-12
@@ -993,7 +997,16 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         const latAbs = Math.abs(lat);
         if (latAbs < subtropicalSubsidenceLat0 || latAbs > subtropicalSubsidenceLat1) continue;
         const hemiSource = lat >= 0 ? nhSource : shSource;
-        const sourceDriver = Math.max(hemiSource, meanTropicalSource * 0.45);
+        const weakHemiFrac = meanTropicalSource > eps
+          ? clamp01((meanTropicalSource - hemiSource) / Math.max(meanTropicalSource, eps))
+          : 0;
+        const sourceDriverFloor = Math.max(
+          hemiSource,
+          meanTropicalSource * clamp(subtropicalSubsidenceCrossHemiFloorFrac, 0, 1)
+        );
+        const sourceDriver = sourceDriverFloor * (
+          1 + clamp(subtropicalSubsidenceWeakHemiBoost, 0, 1.5) * weakHemiFrac
+        );
         const latShape = smoothstep(subtropicalSubsidenceLat0 - 2, subtropicalSubsidenceLat0 + 4, latAbs)
           * (1 - smoothstep(subtropicalSubsidenceLat1 - 3, subtropicalSubsidenceLat1 + 2, latAbs));
         const row = j * nx;
@@ -1001,19 +1014,19 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           const k = row + i;
           const descentSupport = smoothstep(-0.01, 0.24, lowLevelOmegaEffective[k]);
           const localOrganizationRelief = 1 - 0.45 * convectiveOrganization[k];
-          const localMoistureExportSupport = 0.7 + 0.3 * (1 - clamp01(lowLevelMoistureConvergence[k] * 21600));
+          const localMoistureExportSupport = 0.62 + 0.38 * (1 - clamp01(lowLevelMoistureConvergence[k] * 21600));
           const dryDriver = clamp01(
-            1.9 * sourceDriver
+            2.05 * sourceDriver
               * latShape
               * descentSupport
               * localOrganizationRelief
               * localMoistureExportSupport
-              * (1 - 0.2 * convectivePotential[k])
+              * (1 - 0.24 * convectivePotential[k])
           );
           subtropicalSubsidenceDrying[k] = dryDriver;
           if (dryDriver <= 0) continue;
           const dryFracBase = clamp(
-            subtropicalAlpha * dryDriver * (1.05 + 0.35 * latShape),
+            subtropicalAlpha * dryDriver * (1.12 + 0.42 * latShape),
             0,
             subtropicalSubsidenceMaxDryFrac
           );

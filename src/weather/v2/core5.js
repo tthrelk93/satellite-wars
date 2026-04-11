@@ -171,7 +171,7 @@ export class WeatherCore5 {
       organizedConvectionQvSurfaceRelief: 0.85,
       organizedConvectionQvColumnRelief: 1.05,
       organizedConvectionThetaColumnRelief: 0.55,
-      subtropicalSubsidenceQvRelief: 1.2,
+      subtropicalSubsidenceQvRelief: 1.65,
       smoothLon: 61,
       smoothLat: 13,
       enablePs: true,
@@ -302,6 +302,8 @@ export class WeatherCore5 {
       subtropicalSubsidenceThetaStepK: 0.85,
       subtropicalSubsidenceTopSigma: 0.35,
       subtropicalSubsidenceBottomSigma: 0.85,
+      subtropicalSubsidenceCrossHemiFloorFrac: 0.58,
+      subtropicalSubsidenceWeakHemiBoost: 0.35,
       eps: 1e-12,
       debugConservation: false
     };
