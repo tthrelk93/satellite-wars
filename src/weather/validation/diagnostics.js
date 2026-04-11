@@ -1,5 +1,6 @@
 import { g, Rd, Cp } from '../constants.js';
 import { computeGeopotentialHeightByPressure, DEFAULT_PRESSURE_LEVELS_PA } from '../v2/verticalGrid.js';
+import { SURFACE_MOISTURE_SOURCE_TRACERS } from '../v2/sourceTracing5.js';
 
 const EPS = 1e-6;
 const P0 = 100000;
@@ -67,6 +68,26 @@ const computeLayerCondensatePathKgM2 = (state, minSigma, maxSigma) => {
   return out;
 };
 
+const computeLayerFieldPathKgM2 = (state, field, minSigma, maxSigma) => {
+  const { N, nz, sigmaHalf, pHalf } = state;
+  const out = new Array(N).fill(0);
+  if (!field || field.length !== state.SZ) return out;
+  for (let cell = 0; cell < N; cell += 1) {
+    let total = 0;
+    for (let lev = 0; lev < nz; lev += 1) {
+      const sigmaMid = sigmaHalf && sigmaHalf.length > lev + 1
+        ? 0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1])
+        : (lev + 0.5) / Math.max(1, nz);
+      if (sigmaMid < minSigma || sigmaMid > maxSigma) continue;
+      const idx = lev * N + cell;
+      const dp = pHalf[(lev + 1) * N + cell] - pHalf[lev * N + cell];
+      total += (field[idx] || 0) * (dp / g);
+    }
+    out[cell] = total;
+  }
+  return out;
+};
+
 const computeLayerMeanRelativeHumidity = (state, minSigma, maxSigma) => {
   const { N, nz, sigmaHalf, pHalf, pMid, qv, theta, T } = state;
   const out = new Array(N).fill(0);
@@ -121,6 +142,15 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
   const wind10mV = Array.from(fields.v || []);
   const wind10mSpeedMs = wind10mU.map((u, index) => Math.hypot(u, wind10mV[index] || 0));
   const seaLevelPressurePa = computeSeaLevelPressurePa(core);
+  const lowLevelSourceTracers = Object.fromEntries(
+    SURFACE_MOISTURE_SOURCE_TRACERS.map(({ key, field }) => [key, computeLayerFieldPathKgM2(state, state[field], 0.65, 1.0)])
+  );
+  const lowLevelVaporPath = computeLayerFieldPathKgM2(state, state.qv, 0.65, 1.0);
+  const lowLevelSourceResidual = lowLevelVaporPath.map((value, index) => {
+    let attributed = 0;
+    for (const tracer of Object.values(lowLevelSourceTracers)) attributed += tracer[index] || 0;
+    return Math.max(0, value - attributed);
+  });
 
   return {
     schema: 'satellite-wars.weather-validation.snapshot.v2',
@@ -147,6 +177,17 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     precipSnowRateMmHr: Array.from(state.precipSnowRate || []),
     precipAccumMm: Array.from(state.precipAccum || []),
     surfaceEvapRateMmHr: Array.from(state.surfaceEvapRate || []),
+    surfaceEvapPotentialRateMmHr: Array.from(state.surfaceEvapPotentialRate || []),
+    surfaceEvapTransferCoeff: Array.from(state.surfaceEvapTransferCoeff || []),
+    surfaceEvapWindSpeedMs: Array.from(state.surfaceEvapWindSpeed || []),
+    surfaceEvapHumidityGradientKgKg: Array.from(state.surfaceEvapHumidityGradient || []),
+    surfaceEvapSurfaceTempK: Array.from(state.surfaceEvapSurfaceTemp || []),
+    surfaceEvapAirTempK: Array.from(state.surfaceEvapAirTemp || []),
+    surfaceEvapSoilGateFrac: Array.from(state.surfaceEvapSoilGate || []),
+    surfaceEvapRunoffLossRateMmHr: Array.from(state.surfaceEvapRunoffLossRate || []),
+    surfaceEvapSeaIceSuppressionFrac: Array.from(state.surfaceEvapSeaIceSuppression || []),
+    surfaceEvapSurfaceSaturationMixingRatioKgKg: Array.from(state.surfaceEvapSurfaceSaturationMixingRatio || []),
+    surfaceEvapAirMixingRatioKgKg: Array.from(state.surfaceEvapAirMixingRatio || []),
     surfaceLatentFluxWm2: Array.from(state.surfaceLatentFlux || []),
     surfaceSensibleFluxWm2: Array.from(state.surfaceSensibleFlux || []),
     cloudWaterPathKgM2: computeColumnIntegralKgM2(state, (idx) => (state.qc?.[idx] || 0) + (state.qr?.[idx] || 0)),
@@ -187,8 +228,18 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     importedAnvilPersistenceMassKgM2: arrayOrZeros(state.importedAnvilPersistenceMass, state.N),
     carriedOverUpperCloudMassKgM2: arrayOrZeros(state.carriedOverUpperCloudMass, state.N),
     weakErosionCloudSurvivalMassKgM2: arrayOrZeros(state.weakErosionCloudSurvivalMass, state.N),
+    lowLevelMoistureSourceTracersKgM2: {
+      ...lowLevelSourceTracers,
+      unattributedResidual: lowLevelSourceResidual
+    },
     processMoistureBudget: typeof core?.getClimateProcessBudgetSummary === 'function'
       ? core.getClimateProcessBudgetSummary()
+      : null,
+    conservationBudget: typeof core?.getConservationSummary === 'function'
+      ? core.getConservationSummary()
+      : null,
+    moduleTiming: typeof core?.getModuleTimingSummary === 'function'
+      ? core.getModuleTimingSummary()
       : null,
     cycloneSupportFields: {
       relativeVorticityS_1: Array.from(fields.vort || []),

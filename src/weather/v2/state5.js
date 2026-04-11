@@ -1,3 +1,5 @@
+import { SURFACE_MOISTURE_SOURCE_TRACERS } from './sourceTracing5.js';
+
 const makeArray = (size, value = 0) => {
   const arr = new Float32Array(size);
   if (value !== 0) arr.fill(value);
@@ -57,6 +59,20 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const importedAnvilPersistenceMass = makeArray(N);
   const carriedOverUpperCloudMass = makeArray(N);
   const weakErosionCloudSurvivalMass = makeArray(N);
+  const sourceTracer3D = Object.fromEntries(
+    SURFACE_MOISTURE_SOURCE_TRACERS.map(({ field }) => [field, makeArray(SZ)])
+  );
+  const surfaceEvapPotentialRate = makeArray(N);
+  const surfaceEvapTransferCoeff = makeArray(N);
+  const surfaceEvapWindSpeed = makeArray(N);
+  const surfaceEvapHumidityGradient = makeArray(N);
+  const surfaceEvapSurfaceTemp = makeArray(N);
+  const surfaceEvapAirTemp = makeArray(N);
+  const surfaceEvapSoilGate = makeArray(N, 1);
+  const surfaceEvapRunoffLossRate = makeArray(N);
+  const surfaceEvapSeaIceSuppression = makeArray(N);
+  const surfaceEvapSurfaceSaturationMixingRatio = makeArray(N);
+  const surfaceEvapAirMixingRatio = makeArray(N);
   const analysisIauPs = makeArray(N);
   const analysisIauTs = makeArray(N);
   const analysisIauU = makeArray(SZ);
@@ -120,6 +136,18 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
     importedAnvilPersistenceMass,
     carriedOverUpperCloudMass,
     weakErosionCloudSurvivalMass,
+    ...sourceTracer3D,
+    surfaceEvapPotentialRate,
+    surfaceEvapTransferCoeff,
+    surfaceEvapWindSpeed,
+    surfaceEvapHumidityGradient,
+    surfaceEvapSurfaceTemp,
+    surfaceEvapAirTemp,
+    surfaceEvapSoilGate,
+    surfaceEvapRunoffLossRate,
+    surfaceEvapSeaIceSuppression,
+    surfaceEvapSurfaceSaturationMixingRatio,
+    surfaceEvapAirMixingRatio,
     soilCap,
     analysisIauPs,
     analysisIauTs,

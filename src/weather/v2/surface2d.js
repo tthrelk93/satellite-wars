@@ -1,4 +1,5 @@
 import { g, Cp, Lv, Rd } from '../constants.js';
+import { classifySurfaceMoistureSource, SURFACE_MOISTURE_SOURCE_TRACERS } from './sourceTracing5.js';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
@@ -58,12 +59,17 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     seaIceEvapSuppression = 0.95,
     rhoIce = 917,
     latentFusion = 3.34e5,
-    enableThetaClosure = true
+    enableThetaClosure = true,
+    maxSurfaceAirTempApproachFracPerStep = 0.5,
+    maxSurfaceAirTempDeltaPerStepK = 25
   } = params;
   if (!enable) return;
 
-  const { N, nz, theta, T, u, v, qv, Ts, soilW, soilCap, landMask, sstNow, seaIceFrac, seaIceThicknessM, surfaceRadiativeFlux, precipRate, pHalf, pMid, surfaceEvapRate, surfaceLatentFlux, surfaceSensibleFlux } = state;
+  const { N, nz, theta, T, u, v, qv, Ts, soilW, soilCap, landMask, sstNow, seaIceFrac, seaIceThicknessM, surfaceRadiativeFlux, precipRate, pHalf, pMid, surfaceEvapRate, surfaceLatentFlux, surfaceSensibleFlux, surfaceEvapPotentialRate, surfaceEvapTransferCoeff, surfaceEvapWindSpeed, surfaceEvapHumidityGradient, surfaceEvapSurfaceTemp, surfaceEvapAirTemp, surfaceEvapSoilGate, surfaceEvapRunoffLossRate, surfaceEvapSeaIceSuppression, surfaceEvapSurfaceSaturationMixingRatio, surfaceEvapAirMixingRatio } = state;
   const { nx, ny, latDeg, invDx, invDy } = grid;
+  const sourceTracerByKey = Object.fromEntries(
+    SURFACE_MOISTURE_SOURCE_TRACERS.map(({ key, field }) => [key, state[field]])
+  );
   const elevField = geo?.elev && geo.elev.length === N ? geo.elev : null;
   const levS = nz - 1;
   const t2mNow = enableLandClimoTs && landTsUseT2m && climo?.hasT2m && climo?.t2mNow?.length === N
@@ -85,7 +91,6 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     let iceFrac = seaIceFrac ? clamp01(seaIceFrac[k]) : 0;
     let iceThickness = seaIceThicknessM ? Math.max(0, seaIceThicknessM[k]) : 0;
     const idxS = levS * N + k;
-    const Tair = T[idxS];
     const qvAir = qv[idxS];
     const uS = u[idxS];
     const vS = v[idxS];
@@ -110,25 +115,40 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     const U = Math.max(windFloor, Math.hypot(uS, vS));
     const pSurf = pMid[idxS];
     const PiS = Math.pow(Math.max(1e-6, pSurf) / P0, KAPPA);
+    const airTempK = theta[idxS] * PiS;
     const qsTs = saturationMixingRatio(TsVal, pSurf);
     const dq = Math.max(0, qsTs - qvAir);
-    let E = rhoAir * CeLocal * U * dq;
+    const seaIceSuppressionFactor = land ? 1 : (1 - seaIceEvapSuppression * iceFrac);
+    const potentialE = rhoAir * CeLocal * U * dq;
+    let E = potentialE;
     if (!land) {
-      E *= (1 - seaIceEvapSuppression * iceFrac);
+      E *= seaIceSuppressionFactor;
     }
     if (E > evapMax) E = evapMax;
 
+    let soilGate = 1;
     if (land) {
       const cap = Math.max(1e-6, soilCap[k]);
       const avail = clamp01(soilW[k] / cap);
-      const limit = Math.pow(avail, soilEvapExponent) * (1 + terrainEvapBoost * terrainFactor);
-      E *= limit;
+      soilGate = Math.pow(avail, soilEvapExponent) * (1 + terrainEvapBoost * terrainFactor);
+      E *= soilGate;
     }
 
-    const H = rhoAir * CpAir * ChLocal * U * (TsVal - Tair);
+    const H = rhoAir * CpAir * ChLocal * U * (TsVal - airTempK);
     if (surfaceEvapRate) surfaceEvapRate[k] = E * 3600;
     if (surfaceLatentFlux) surfaceLatentFlux[k] = LvAir * E;
     if (surfaceSensibleFlux) surfaceSensibleFlux[k] = H;
+    if (surfaceEvapPotentialRate) surfaceEvapPotentialRate[k] = potentialE * 3600;
+    if (surfaceEvapTransferCoeff) surfaceEvapTransferCoeff[k] = CeLocal;
+    if (surfaceEvapWindSpeed) surfaceEvapWindSpeed[k] = U;
+    if (surfaceEvapHumidityGradient) surfaceEvapHumidityGradient[k] = dq;
+    if (surfaceEvapSurfaceTemp) surfaceEvapSurfaceTemp[k] = TsVal;
+    if (surfaceEvapAirTemp) surfaceEvapAirTemp[k] = airTempK;
+    if (surfaceEvapSoilGate) surfaceEvapSoilGate[k] = soilGate;
+    if (surfaceEvapSeaIceSuppression) surfaceEvapSeaIceSuppression[k] = seaIceSuppressionFactor;
+    if (surfaceEvapSurfaceSaturationMixingRatio) surfaceEvapSurfaceSaturationMixingRatio[k] = qsTs;
+    if (surfaceEvapAirMixingRatio) surfaceEvapAirMixingRatio[k] = qvAir;
+    if (surfaceEvapRunoffLossRate) surfaceEvapRunoffLossRate[k] = 0;
 
     if (!land) {
       const skinTarget = iceFrac > 0
@@ -189,24 +209,54 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     const m0 = Math.max(1e-6, dp0 / g);
     const dqv = (E * dt) / m0;
     qv[idxS] += dqv;
+    if (dqv > 0) {
+      const sourceKey = classifySurfaceMoistureSource({
+        latDeg: latDeg[row],
+        isLand: land
+      });
+      const tracer = sourceTracerByKey[sourceKey];
+      if (tracer) tracer[idxS] += dqv;
+    }
     if (enableThetaClosure) {
       // Close the latent and sensible flux loop at least approximately by applying
       // surface flux tendencies to the lowest-layer potential temperature.
-      theta[idxS] += (H * dt) / (CpAir * m0 * Math.max(1e-6, PiS));
-      theta[idxS] -= (LvAir / CpAir) * (dqv / Math.max(1e-6, PiS));
+      // In steep, windy terrain cells the bulk exchange closure can otherwise
+      // cool or warm the shallow surface layer by hundreds of kelvin in a
+      // single step, which is not physically credible and destabilizes audits.
+      const sensibleAirTempDelta = (H * dt) / (CpAir * m0);
+      const latentAirTempDelta = -(LvAir / CpAir) * dqv;
+      const targetApproachDelta = (TsVal - airTempK) * maxSurfaceAirTempApproachFracPerStep;
+      const limitedSensibleAirTempDelta = clamp(
+        sensibleAirTempDelta,
+        Math.min(0, targetApproachDelta),
+        Math.max(0, targetApproachDelta)
+      );
+      const totalAirTempDelta = clamp(
+        limitedSensibleAirTempDelta + latentAirTempDelta,
+        -maxSurfaceAirTempDeltaPerStepK,
+        maxSurfaceAirTempDeltaPerStepK
+      );
+      theta[idxS] += totalAirTempDelta / Math.max(1e-6, PiS);
     }
 
     if (land) {
       const P = precipRate ? (precipRate[k] / 3600) : 0;
+      const beforeSoil = soilW[k];
       soilW[k] += (P - E) * dt;
       if (soilW[k] < 0) soilW[k] = 0;
       const cap = soilCap[k];
       if (cap > 0 && soilW[k] > cap) {
+        const overflow = soilW[k] - cap;
+        if (surfaceEvapRunoffLossRate) surfaceEvapRunoffLossRate[k] = Math.max(0, overflow) * 3600 / Math.max(dt, 1e-6);
         if (runoffEnabled) {
           soilW[k] = cap;
         } else {
           soilW[k] = cap;
         }
+      }
+      if (surfaceEvapRunoffLossRate && soilW[k] <= cap) surfaceEvapRunoffLossRate[k] = 0;
+      if (surfaceEvapSoilGate && beforeSoil <= 0 && soilW[k] > 0 && soilEvapExponent !== 1) {
+        surfaceEvapSoilGate[k] = soilGate;
       }
     }
   }

@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import fs from 'fs';
 import path from 'path';
+import { execSync } from 'child_process';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { WeatherCore5 } from '../../src/weather/v2/core5.js';
 import { buildValidationDiagnostics } from '../../src/weather/validation/diagnostics.js';
+import { NH_DRY_BELT_SOURCE_SECTOR_KEYS, SURFACE_MOISTURE_SOURCE_TRACERS, classifyNhDryBeltSector } from '../../src/weather/v2/sourceTracing5.js';
 import { applyHeadlessTerrainFixture } from './headless-terrain-fixture.mjs';
 import { ensureCyclePlanReady } from './plan-guard.mjs';
 
@@ -54,6 +56,7 @@ let horizonsDays = null;
 let outPath = null;
 let mdOutPath = null;
 let reportBase = null;
+let reproCheck = null;
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -83,6 +86,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--md-out=')) mdOutPath = path.resolve(arg.slice('--md-out='.length));
   else if (arg === '--report-base' && argv[i + 1]) reportBase = path.resolve(argv[++i]);
   else if (arg.startsWith('--report-base=')) reportBase = path.resolve(arg.slice('--report-base='.length));
+  else if (arg === '--repro-check') reproCheck = true;
+  else if (arg === '--no-repro-check') reproCheck = false;
 }
 
 const presetConfig = PLANETARY_PRESETS[preset] || PLANETARY_PRESETS.quick;
@@ -94,6 +99,7 @@ horizonsDays = Array.isArray(horizonsDays) && horizonsDays.length
   ? [...new Set(horizonsDays.filter((value) => Number.isFinite(value) && value > 0))].sort((a, b) => a - b)
   : presetConfig.horizonsDays.slice();
 if (!Number.isFinite(seed)) seed = 12345;
+if (reproCheck == null) reproCheck = preset === 'quick';
 
 const effectiveReportBase = outPath || mdOutPath ? null : (reportBase || defaultReportBase);
 
@@ -254,6 +260,117 @@ const weightedFieldBandMean = (field, nx, ny, latitudesDeg, rowWeights, lat0, la
   return weightTotal > 0 ? total / weightTotal : 0;
 };
 
+const weightedFieldBandMeanWithFilter = (field, nx, ny, latitudesDeg, longitudesDeg, rowWeights, lat0, lat1, predicate = null) => {
+  let total = 0;
+  let weightTotal = 0;
+  for (let j = 0; j < ny; j += 1) {
+    const lat = latitudesDeg[j];
+    if (lat < lat0 || lat > lat1) continue;
+    const rowWeight = rowWeights[j];
+    const row = j * nx;
+    for (let i = 0; i < nx; i += 1) {
+      const idx = row + i;
+      if (predicate && !predicate({ idx, latDeg: lat, lonDeg: longitudesDeg[i] })) continue;
+      total += (field[idx] || 0) * rowWeight;
+      weightTotal += rowWeight;
+    }
+  }
+  return weightTotal > 0 ? total / weightTotal : 0;
+};
+
+const getRepoCommitSha = () => {
+  try {
+    return execSync('git rev-parse HEAD', { cwd: repoRoot, encoding: 'utf8' }).trim();
+  } catch {
+    return null;
+  }
+};
+
+const cloneConfigSnapshot = (core) => ({
+  surfaceParams: { ...core.surfaceParams },
+  advectParams: { ...core.advectParams },
+  vertParams: { ...core.vertParams },
+  microParams: { ...core.microParams },
+  nudgeParams: { ...core.nudgeParams },
+  windNudgeParams: { ...core.windNudgeParams },
+  windEddyParams: { ...core.windEddyParams },
+  windNudgeSpinupParams: { ...core.windNudgeSpinupParams },
+  dynParams: { ...core.dynParams },
+  massParams: { ...core.massParams },
+  analysisIncrementParams: { ...core.analysisIncrementParams },
+  radParams: { ...core.radParams },
+  diagParams: { ...core.diagParams },
+  lodParams: { ...core.lodParams }
+});
+
+const applyCoreConfigSnapshot = (core, snapshot) => {
+  if (!snapshot) return;
+  Object.assign(core.surfaceParams, snapshot.surfaceParams || {});
+  Object.assign(core.advectParams, snapshot.advectParams || {});
+  Object.assign(core.vertParams, snapshot.vertParams || {});
+  Object.assign(core.microParams, snapshot.microParams || {});
+  Object.assign(core.nudgeParams, snapshot.nudgeParams || {});
+  Object.assign(core.windNudgeParams, snapshot.windNudgeParams || {});
+  Object.assign(core.windEddyParams, snapshot.windEddyParams || {});
+  Object.assign(core.windNudgeSpinupParams, snapshot.windNudgeSpinupParams || {});
+  Object.assign(core.dynParams, snapshot.dynParams || {});
+  Object.assign(core.massParams, snapshot.massParams || {});
+  Object.assign(core.analysisIncrementParams, snapshot.analysisIncrementParams || {});
+  Object.assign(core.radParams, snapshot.radParams || {});
+  Object.assign(core.diagParams, snapshot.diagParams || {});
+  Object.assign(core.lodParams, snapshot.lodParams || {});
+};
+
+const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSeconds }) => ({
+  schema: 'satellite-wars.run-manifest.v1',
+  generatedAt: new Date().toISOString(),
+  gitCommit: getRepoCommitSha(),
+  config: {
+    preset,
+    nx,
+    ny,
+    dtSeconds: dt,
+    seed,
+    sampleEveryDays,
+    horizonsDays,
+    sampleTargetsDays,
+    targetSeconds: targetsSeconds,
+    reproCheckEnabled: Boolean(reproCheck)
+  },
+  runtime: {
+    modelDtSeconds: core.modelDt,
+    moduleOrder: [
+      'updateHydrostatic',
+      'stepSurface2D5',
+      'updateHydrostatic',
+      'stepRadiation2D5',
+      'updateHydrostatic',
+      'stepWinds5',
+      'stepWindNudge5',
+      'stepWindEddyNudge5',
+      'stepSurfacePressure5',
+      'stepAdvection5',
+      'stepVertical5',
+      'updateHydrostatic',
+      'stepMicrophysics5',
+      'updateHydrostatic',
+      'stepNudging5',
+      'stepAnalysisIncrement5',
+      'updateDiagnostics2D5'
+    ],
+    moduleTiming: core.getModuleTimingSummary ? core.getModuleTimingSummary() : null
+  },
+  terrain: terrainFallback || null,
+  params: cloneConfigSnapshot(core)
+});
+
+const buildConservationSummary = ({ core }) => ({
+  schema: 'satellite-wars.conservation-summary.v1',
+  generatedAt: new Date().toISOString(),
+  gitCommit: getRepoCommitSha(),
+  conservationBudget: core.getConservationSummary ? core.getConservationSummary() : null
+});
+
 const areaWeightedMax = (field) => field.reduce((best, value) => Math.max(best, Number.isFinite(value) ? value : -Infinity), -Infinity);
 
 const computeTropicalCycloneEnvironment = (diagnostics) => {
@@ -308,12 +425,27 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     carriedOverUpperCloudMassKgM2,
     weakErosionCloudSurvivalMassKgM2,
     upperCloudPathKgM2,
+    lowLevelMoistureSourceTracersKgM2,
     lowLevelMoistureConvergenceS_1,
     lowerTroposphericRhFrac,
     subtropicalSubsidenceDryingFrac,
+    surfaceEvapPotentialRateMmHr,
+    surfaceEvapTransferCoeff,
+    surfaceEvapWindSpeedMs,
+    surfaceEvapHumidityGradientKgKg,
+    surfaceEvapSurfaceTempK,
+    surfaceEvapAirTempK,
+    surfaceEvapSoilGateFrac,
+    surfaceEvapRunoffLossRateMmHr,
+    surfaceEvapSeaIceSuppressionFrac,
+    surfaceEvapSurfaceSaturationMixingRatioKgKg,
+    surfaceEvapAirMixingRatioKgKg,
     processMoistureBudget
   } = diagnostics;
   const { nx, ny, latitudesDeg } = grid;
+  const longitudesDeg = Array.isArray(grid.longitudesDeg)
+    ? grid.longitudesDeg
+    : Array.from({ length: nx }, (_, index) => -180 + ((index + 0.5) * 360) / Math.max(1, nx));
   const rowWeights = makeRowWeights(latitudesDeg);
   const zonalPrecip = zonalMean(precipRateMmHr, nx, ny);
   const zonalCloud = zonalMean(cloudTotalFraction, nx, ny);
@@ -337,8 +469,12 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSurfaceEvap = zonalMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSurfaceEvapPotential = zonalMean(surfaceEvapPotentialRateMmHr || new Array(nx * ny).fill(0), nx, ny);
   const zonalVaporFluxNorth = zonalMean(verticallyIntegratedVaporFluxNorthKgM_1S || new Array(nx * ny).fill(0), nx, ny);
   const zonalTotalWaterFluxNorth = zonalMean(verticallyIntegratedTotalWaterFluxNorthKgM_1S || new Array(nx * ny).fill(0), nx, ny);
+  const sourceTracerZonal = Object.fromEntries(
+    Object.entries(lowLevelMoistureSourceTracersKgM2 || {}).map(([key, field]) => [key, zonalMean(field || new Array(nx * ny).fill(0), nx, ny)])
+  );
   const zonalStormIndex = zonalMean(
     precipRateMmHr.map((precip, idx) => Math.abs(cycloneSupportFields.relativeVorticityS_1[idx] || 0) * Math.max(0, precip || 0) * Math.max(1, wind10mSpeedMs[idx] || 0)),
     nx,
@@ -379,6 +515,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const northDryBeltOceanRh = weightedFieldBandMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
   const northDryBeltLandEvap = weightedFieldBandMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
   const northDryBeltOceanEvap = weightedFieldBandMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
+  const northDryBeltEvapPotential = weightedBandMean(zonalSurfaceEvapPotential, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const northDryBeltLandLargeScaleCondensation = weightedFieldBandMean(largeScaleCondensationSourceKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
   const northDryBeltOceanLargeScaleCondensation = weightedFieldBandMean(largeScaleCondensationSourceKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
   const northDryBeltLandResolvedAscentCloudBirthPotential = weightedFieldBandMean(resolvedAscentCloudBirthPotentialKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
@@ -394,6 +531,71 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const northDryBeltVaporFlux = weightedBandMean(zonalVaporFluxNorth, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const southDryBeltVaporFlux = weightedBandMean(zonalVaporFluxNorth, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
   const northTransitionTotalWaterFlux = weightedBandMean(zonalTotalWaterFluxNorth, latitudesDeg, rowWeights, 12, 22);
+  const northDryBeltSourceMeans = Object.fromEntries(
+    SURFACE_MOISTURE_SOURCE_TRACERS.map(({ key }) => [
+      key,
+      round(weightedBandMean(sourceTracerZonal[key] || new Array(ny).fill(0), latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5)
+    ])
+  );
+  northDryBeltSourceMeans.unattributedResidual = round(
+    weightedBandMean(sourceTracerZonal.unattributedResidual || new Array(ny).fill(0), latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT),
+    5
+  );
+  const northDryBeltSourceTotal = Object.values(northDryBeltSourceMeans)
+    .reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+  const northDryBeltAttributed = northDryBeltSourceTotal - Math.max(0, northDryBeltSourceMeans.unattributedResidual || 0);
+  const northDryBeltSourceCoverage = northDryBeltSourceTotal > 0
+    ? clamp01(northDryBeltAttributed / northDryBeltSourceTotal)
+    : 0;
+  const nhDryBeltSectorSummary = Object.fromEntries(
+    NH_DRY_BELT_SOURCE_SECTOR_KEYS.map((sectorKey) => [
+      sectorKey,
+      {
+        totalLowLevelSourceMeanKgM2: round(
+          weightedFieldBandMeanWithFilter(
+            Object.values(lowLevelMoistureSourceTracersKgM2 || {}).reduce((acc, field) => acc.map((value, index) => value + (field?.[index] || 0)), new Array(nx * ny).fill(0)),
+            nx,
+            ny,
+            latitudesDeg,
+            longitudesDeg,
+            rowWeights,
+            DEFAULT_DRY_MIN_LAT,
+            DEFAULT_DRY_MAX_LAT,
+            ({ idx, lonDeg }) => classifyNhDryBeltSector({ lonDeg, isLand: landMask[idx] === 1 }) === sectorKey
+          ),
+          5
+        ),
+        largeScaleCondensationMeanKgM2: round(
+          weightedFieldBandMeanWithFilter(
+            largeScaleCondensationSourceKgM2 || new Array(nx * ny).fill(0),
+            nx,
+            ny,
+            latitudesDeg,
+            longitudesDeg,
+            rowWeights,
+            DEFAULT_DRY_MIN_LAT,
+            DEFAULT_DRY_MAX_LAT,
+            ({ idx, lonDeg }) => classifyNhDryBeltSector({ lonDeg, isLand: landMask[idx] === 1 }) === sectorKey
+          ),
+          5
+        )
+      }
+    ])
+  );
+  const surfaceFluxDecomposition = {
+    northDryBeltEvapMeanMmHr: round(weightedBandMean(zonalSurfaceEvap, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),
+    northDryBeltEvapPotentialMeanMmHr: round(northDryBeltEvapPotential),
+    northDryBeltTransferCoeffMean: round(weightedFieldBandMean(surfaceEvapTransferCoeff || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 6),
+    northDryBeltWindSpeedMeanMs: round(weightedFieldBandMean(surfaceEvapWindSpeedMs || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),
+    northDryBeltHumidityGradientMeanKgKg: round(weightedFieldBandMean(surfaceEvapHumidityGradientKgKg || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 6),
+    northDryBeltSurfaceTempMeanK: round(weightedFieldBandMean(surfaceEvapSurfaceTempK || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),
+    northDryBeltAirTempMeanK: round(weightedFieldBandMean(surfaceEvapAirTempK || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),
+    northDryBeltSoilGateMeanFrac: round(weightedFieldBandMean(surfaceEvapSoilGateFrac || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),
+    northDryBeltRunoffLossMeanMmHr: round(weightedFieldBandMean(surfaceEvapRunoffLossRateMmHr || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),
+    northDryBeltSeaIceSuppressionMeanFrac: round(weightedFieldBandMean(surfaceEvapSeaIceSuppressionFrac || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),
+    northDryBeltSurfaceQsMeanKgKg: round(weightedFieldBandMean(surfaceEvapSurfaceSaturationMixingRatioKgKg || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 6),
+    northDryBeltSurfaceQaMeanKgKg: round(weightedFieldBandMean(surfaceEvapAirMixingRatioKgKg || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 6)
+  };
   const tradesNorth = weightedBandMean(zonalU10, latitudesDeg, rowWeights, 5, 25);
   const tradesSouth = weightedBandMean(zonalU10, latitudesDeg, rowWeights, -25, -5);
   const westerliesNorth = weightedBandMean(zonalU10, latitudesDeg, rowWeights, 30, 60);
@@ -430,6 +632,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       northDryBeltOceanRhMeanFrac: round(northDryBeltOceanRh),
       northDryBeltLandEvapMeanMmHr: round(northDryBeltLandEvap),
       northDryBeltOceanEvapMeanMmHr: round(northDryBeltOceanEvap),
+      northDryBeltEvapPotentialMeanMmHr: round(northDryBeltEvapPotential),
       northDryBeltResolvedAscentCloudBirthPotentialMeanKgM2: round(northDryBeltResolvedAscentCloudBirthPotential, 5),
       northDryBeltLandResolvedAscentCloudBirthPotentialMeanKgM2: round(northDryBeltLandResolvedAscentCloudBirthPotential, 5),
       northDryBeltOceanResolvedAscentCloudBirthPotentialMeanKgM2: round(northDryBeltOceanResolvedAscentCloudBirthPotential, 5),
@@ -454,6 +657,18 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       northDryBeltVaporFluxNorthKgM_1S: round(northDryBeltVaporFlux, 5),
       southDryBeltVaporFluxNorthKgM_1S: round(southDryBeltVaporFlux, 5),
       northTransitionTotalWaterFluxNorthKgM_1S: round(northTransitionTotalWaterFlux, 5),
+      northDryBeltSourceNorthDryBeltOceanMeanKgM2: northDryBeltSourceMeans.northDryBeltOcean,
+      northDryBeltSourceTropicalOceanNorthMeanKgM2: northDryBeltSourceMeans.tropicalOceanNorth,
+      northDryBeltSourceTropicalOceanSouthMeanKgM2: northDryBeltSourceMeans.tropicalOceanSouth,
+      northDryBeltSourceNorthExtratropicalOceanMeanKgM2: northDryBeltSourceMeans.northExtratropicalOcean,
+      northDryBeltSourceLandRecyclingMeanKgM2: northDryBeltSourceMeans.landRecycling,
+      northDryBeltSourceOtherOceanMeanKgM2: northDryBeltSourceMeans.otherOcean,
+      northDryBeltSourceInitializationMemoryMeanKgM2: northDryBeltSourceMeans.initializationMemory,
+      northDryBeltSourceAtmosphericCarryoverMeanKgM2: northDryBeltSourceMeans.atmosphericCarryover,
+      northDryBeltSourceNudgingInjectionMeanKgM2: northDryBeltSourceMeans.nudgingInjection,
+      northDryBeltSourceAnalysisInjectionMeanKgM2: northDryBeltSourceMeans.analysisInjection,
+      northDryBeltSourceUnattributedResidualMeanKgM2: northDryBeltSourceMeans.unattributedResidual,
+      northDryBeltSourceAttributionCoverageFrac: round(northDryBeltSourceCoverage, 5),
       subtropicalSubsidenceNorthMean: round(subtropicalSubsidenceNorth),
       subtropicalSubsidenceSouthMean: round(subtropicalSubsidenceSouth),
       upperDetrainmentTropicalKgM2: round(tropicalUpperDetrainment, 5),
@@ -467,6 +682,12 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       tropicalCycloneEnvironmentCountNh: tcEnvCounts.nh,
       tropicalCycloneEnvironmentCountSh: tcEnvCounts.sh
     },
+    sourceAttribution: {
+      northDryBeltLowLevelMeanKgM2: northDryBeltSourceMeans,
+      northDryBeltAttributionCoverageFrac: round(northDryBeltSourceCoverage, 5),
+      nhDryBeltSectorSummary
+    },
+    surfaceFluxDecomposition,
     profiles: {
       latitudesDeg: roundSeries(latitudesDeg),
       series: {
@@ -483,6 +704,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         lowerLevelMoistureConvergenceS_1: roundSeries(zonalMoistureConvergence, 6),
         subtropicalSubsidenceDryingFrac: roundSeries(zonalSubsidenceDrying, 5),
         surfaceEvapRateMmHr: roundSeries(zonalSurfaceEvap),
+        surfaceEvapPotentialRateMmHr: roundSeries(zonalSurfaceEvapPotential),
         resolvedAscentCloudBirthPotentialKgM2: roundSeries(zonalResolvedAscentCloudBirthPotential, 5),
         largeScaleCondensationSourceKgM2: roundSeries(zonalLargeScaleCondensation, 5),
         cloudReevaporationMassKgM2: roundSeries(zonalCloudReevaporation, 5),
@@ -491,6 +713,14 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         carriedOverUpperCloudMassKgM2: roundSeries(zonalCarriedOverUpperCloud, 5),
         weakErosionCloudSurvivalMassKgM2: roundSeries(zonalWeakErosionCloudSurvival, 5),
         upperCloudPathKgM2: roundSeries(zonalUpperCloudPath, 5),
+        sourceNorthDryBeltOceanKgM2: roundSeries(sourceTracerZonal.northDryBeltOcean || new Array(ny).fill(0), 5),
+        sourceTropicalOceanNorthKgM2: roundSeries(sourceTracerZonal.tropicalOceanNorth || new Array(ny).fill(0), 5),
+        sourceTropicalOceanSouthKgM2: roundSeries(sourceTracerZonal.tropicalOceanSouth || new Array(ny).fill(0), 5),
+        sourceNorthExtratropicalOceanKgM2: roundSeries(sourceTracerZonal.northExtratropicalOcean || new Array(ny).fill(0), 5),
+        sourceLandRecyclingKgM2: roundSeries(sourceTracerZonal.landRecycling || new Array(ny).fill(0), 5),
+        sourceOtherOceanKgM2: roundSeries(sourceTracerZonal.otherOcean || new Array(ny).fill(0), 5),
+        sourceInitializationMemoryKgM2: roundSeries(sourceTracerZonal.initializationMemory || new Array(ny).fill(0), 5),
+        sourceUnattributedResidualKgM2: roundSeries(sourceTracerZonal.unattributedResidual || new Array(ny).fill(0), 5),
         verticallyIntegratedVaporFluxNorthKgM_1S: roundSeries(zonalVaporFluxNorth, 5),
         verticallyIntegratedTotalWaterFluxNorthKgM_1S: roundSeries(zonalTotalWaterFluxNorth, 5),
         upperDetrainmentKgM2: roundSeries(zonalDetrainment, 5),
@@ -591,6 +821,114 @@ export const buildMoistureAttributionReport = (processMoistureBudget, latestMetr
     strongestNorthDryBeltPrecipSinks: strongestNorthDryPrecipSinks.slice(0, 8),
     precipitationRegimes: processMoistureBudget?.precipitationRegimes || {}
   };
+};
+
+export const buildSurfaceSourceAttributionReport = (latestSample = null) => ({
+  schema: 'satellite-wars.surface-source-attribution.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  latestMetrics: {
+    subtropicalDryNorthRatio: latestSample?.metrics?.subtropicalDryNorthRatio ?? null,
+    northDryBeltSourceAttributionCoverageFrac: latestSample?.metrics?.northDryBeltSourceAttributionCoverageFrac ?? null
+  },
+  sourceAttribution: latestSample?.sourceAttribution || null
+});
+
+export const buildSurfaceFluxDecompositionReport = (latestSample = null) => ({
+  schema: 'satellite-wars.surface-flux-decomposition.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  surfaceFluxDecomposition: latestSample?.surfaceFluxDecomposition || null
+});
+
+export const buildNhDryBeltSourceSectorReport = (latestSample = null) => ({
+  schema: 'satellite-wars.nh-dry-belt-source-sector-summary.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  nhDryBeltSectorSummary: latestSample?.sourceAttribution?.nhDryBeltSectorSummary || null
+});
+
+export const buildRestartParityReport = ({ checkpointDay = null, referenceSamples = [], resumedSamples = [] } = {}) => {
+  const compareKeys = [
+    'subtropicalDryNorthRatio',
+    'subtropicalDrySouthRatio',
+    'itczWidthDeg',
+    'subtropicalSubsidenceNorthMean',
+    'subtropicalSubsidenceSouthMean',
+    'tropicalTradesNorthU10Ms',
+    'midlatitudeWesterliesNorthU10Ms'
+  ];
+  const byDay = new Map(referenceSamples.map((sample) => [sample.targetDay, sample]));
+  const comparisons = [];
+  let maxAbsMetricDelta = 0;
+  for (const sample of resumedSamples) {
+    const reference = byDay.get(sample.targetDay);
+    if (!reference) continue;
+    const metricDelta = {};
+    for (const key of compareKeys) {
+      const delta = (sample.metrics?.[key] || 0) - (reference.metrics?.[key] || 0);
+      metricDelta[key] = round(delta, key.includes('KgM2S') ? 5 : 6);
+      maxAbsMetricDelta = Math.max(maxAbsMetricDelta, Math.abs(delta));
+    }
+    comparisons.push({
+      targetDay: sample.targetDay,
+      metricDelta
+    });
+  }
+  return {
+    schema: 'satellite-wars.restart-parity.v1',
+    generatedAt: new Date().toISOString(),
+    checkpointDay,
+    sampleCount: comparisons.length,
+    maxAbsMetricDelta: round(maxAbsMetricDelta, 6),
+    pass: maxAbsMetricDelta <= 1e-6,
+    comparisons
+  };
+};
+
+const runRestartParityCheck = async ({ configSnapshot, checkpointDay, sampleTargetsDays }) => {
+  if (!(checkpointDay > 0)) return null;
+  const checkpointSeconds = checkpointDay * SECONDS_PER_DAY;
+  const remainingTargets = sampleTargetsDays.filter((day) => day >= checkpointDay);
+  if (!remainingTargets.length) return null;
+
+  const parityCore = new WeatherCore5({ nx, ny, dt, seed });
+  await parityCore._initPromise;
+  applyCoreConfigSnapshot(parityCore, configSnapshot);
+  applyHeadlessTerrainFixture(parityCore);
+  parityCore.advanceModelSeconds(checkpointSeconds);
+  const checkpointSnapshot = parityCore.getStateSnapshot({ mode: 'full' });
+
+  const uninterruptedSamples = [];
+  let previousSeconds = checkpointSeconds;
+  for (const targetDay of remainingTargets) {
+    const targetSeconds = targetDay * SECONDS_PER_DAY;
+    const deltaSeconds = Math.max(0, targetSeconds - previousSeconds);
+    if (deltaSeconds > 0) parityCore.advanceModelSeconds(deltaSeconds);
+    previousSeconds = targetSeconds;
+    uninterruptedSamples.push(classifySnapshot(buildValidationDiagnostics(parityCore), targetDay));
+  }
+
+  const resumedCore = new WeatherCore5({ nx, ny, dt, seed });
+  await resumedCore._initPromise;
+  applyCoreConfigSnapshot(resumedCore, configSnapshot);
+  applyHeadlessTerrainFixture(resumedCore);
+  resumedCore.loadStateSnapshot(checkpointSnapshot);
+  const resumedSamples = [];
+  previousSeconds = checkpointSeconds;
+  for (const targetDay of remainingTargets) {
+    const targetSeconds = targetDay * SECONDS_PER_DAY;
+    const deltaSeconds = Math.max(0, targetSeconds - previousSeconds);
+    if (deltaSeconds > 0) resumedCore.advanceModelSeconds(deltaSeconds);
+    previousSeconds = targetSeconds;
+    resumedSamples.push(classifySnapshot(buildValidationDiagnostics(resumedCore), targetDay));
+  }
+
+  return buildRestartParityReport({
+    checkpointDay,
+    referenceSamples: uninterruptedSamples,
+    resumedSamples
+  });
 };
 
 export const computeSeasonalityScore = (samples) => {
@@ -1031,6 +1369,24 @@ const renderMarkdown = (summary) => {
     if (summary.artifacts.moistureAttributionJsonPath) {
       lines.push(`- Moisture attribution JSON: ${summary.artifacts.moistureAttributionJsonPath}`);
     }
+    if (summary.artifacts.runManifestJsonPath) {
+      lines.push(`- Run manifest JSON: ${summary.artifacts.runManifestJsonPath}`);
+    }
+    if (summary.artifacts.conservationSummaryJsonPath) {
+      lines.push(`- Conservation summary JSON: ${summary.artifacts.conservationSummaryJsonPath}`);
+    }
+    if (summary.artifacts.restartParityJsonPath) {
+      lines.push(`- Restart parity JSON: ${summary.artifacts.restartParityJsonPath}`);
+    }
+    if (summary.artifacts.surfaceSourceAttributionJsonPath) {
+      lines.push(`- Surface source attribution JSON: ${summary.artifacts.surfaceSourceAttributionJsonPath}`);
+    }
+    if (summary.artifacts.surfaceFluxDecompositionJsonPath) {
+      lines.push(`- Surface flux decomposition JSON: ${summary.artifacts.surfaceFluxDecompositionJsonPath}`);
+    }
+    if (summary.artifacts.nhDryBeltSourceSectorSummaryJsonPath) {
+      lines.push(`- NH dry-belt source sector JSON: ${summary.artifacts.nhDryBeltSourceSectorSummaryJsonPath}`);
+    }
     lines.push('');
   }
 
@@ -1066,6 +1422,7 @@ export async function main() {
   const core = new WeatherCore5({ nx, ny, dt, seed });
   await core._initPromise;
   const terrainFallback = applyHeadlessTerrainFixture(core);
+  const configSnapshot = cloneConfigSnapshot(core);
 
   const samples = [];
   const timingByTarget = [];
@@ -1113,12 +1470,28 @@ export async function main() {
   const realismGaps = buildRealismGapReport(horizonSummaries);
   const latestSample = horizonSummaries[horizonSummaries.length - 1]?.latest || samples[samples.length - 1] || null;
   const moistureAttribution = buildMoistureAttributionReport(latestSample?.processMoistureBudget, latestSample?.metrics);
+  const runManifest = buildRunManifest({ core, terrainFallback, sampleTargetsDays, targetsSeconds });
+  const conservationSummary = buildConservationSummary({ core });
+  const surfaceSourceAttribution = buildSurfaceSourceAttributionReport(latestSample);
+  const surfaceFluxDecomposition = buildSurfaceFluxDecompositionReport(latestSample);
+  const nhDryBeltSourceSectorSummary = buildNhDryBeltSourceSectorReport(latestSample);
+  const checkpointDay = sampleTargetsDays.find((day) => day > 0 && day < sampleTargetsDays[sampleTargetsDays.length - 1])
+    || sampleTargetsDays[Math.max(0, Math.floor(sampleTargetsDays.length / 2))] || null;
+  const restartParity = reproCheck
+    ? await runRestartParityCheck({ configSnapshot, checkpointDay, sampleTargetsDays })
+    : null;
   const artifactBase = deriveArtifactBase();
   const artifacts = artifactBase ? {
     monthlyClimatologyJsonPath: `${artifactBase}-monthly-climatology.json`,
     sampleProfilesJsonPath: `${artifactBase}-sample-profiles.json`,
     realismGapsJsonPath: `${artifactBase}-realism-gaps.json`,
-    moistureAttributionJsonPath: `${artifactBase}-moisture-attribution.json`
+    moistureAttributionJsonPath: `${artifactBase}-moisture-attribution.json`,
+    runManifestJsonPath: `${artifactBase}-run-manifest.json`,
+    conservationSummaryJsonPath: `${artifactBase}-conservation-summary.json`,
+    restartParityJsonPath: `${artifactBase}-restart-parity.json`,
+    surfaceSourceAttributionJsonPath: `${artifactBase}-surface-source-tracers.json`,
+    surfaceFluxDecompositionJsonPath: `${artifactBase}-surface-flux-decomposition.json`,
+    nhDryBeltSourceSectorSummaryJsonPath: `${artifactBase}-nh-dry-belt-source-sector-summary.json`
   } : null;
 
   const summary = {
@@ -1142,6 +1515,12 @@ export async function main() {
     horizons: horizonSummaries,
     realismGaps,
     moistureAttribution,
+    runManifest,
+    conservationSummary,
+    restartParity,
+    surfaceSourceAttribution,
+    surfaceFluxDecomposition,
+    nhDryBeltSourceSectorSummary,
     artifacts,
     defaultNextPriorities
   };
@@ -1173,6 +1552,12 @@ export async function main() {
     );
     fs.writeFileSync(artifacts.realismGapsJsonPath, toJson(realismGaps));
     fs.writeFileSync(artifacts.moistureAttributionJsonPath, toJson(moistureAttribution));
+    fs.writeFileSync(artifacts.runManifestJsonPath, toJson(runManifest));
+    fs.writeFileSync(artifacts.conservationSummaryJsonPath, toJson(conservationSummary));
+    fs.writeFileSync(artifacts.restartParityJsonPath, toJson(restartParity));
+    fs.writeFileSync(artifacts.surfaceSourceAttributionJsonPath, toJson(surfaceSourceAttribution));
+    fs.writeFileSync(artifacts.surfaceFluxDecompositionJsonPath, toJson(surfaceFluxDecomposition));
+    fs.writeFileSync(artifacts.nhDryBeltSourceSectorSummaryJsonPath, toJson(nhDryBeltSourceSectorSummary));
   }
   process.stdout.write(toJson(summary));
   return summary;
@@ -1184,11 +1569,17 @@ if (isMain) {
 }
 
 export const _test = {
+  buildConservationSummary,
   PLANETARY_PRESETS,
   buildMoistureAttributionReport,
+  buildNhDryBeltSourceSectorReport,
+  buildRestartParityReport,
   buildSampleTargetsDays,
+  buildRunManifest,
   buildMonthlyClimatology,
   buildRealismGapReport,
+  buildSurfaceFluxDecompositionReport,
+  buildSurfaceSourceAttributionReport,
   classifySnapshot,
   computeSeasonalityScore,
   dayToMonthIndex,

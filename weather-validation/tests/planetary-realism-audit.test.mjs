@@ -338,3 +338,44 @@ test('buildRealismGapReport ranks strongest moisture gaps first', () => {
   assert.equal(gaps[0].code, 'north_subtropical_dry_belt_too_wet');
   assert.ok(gaps[0].severity > gaps[1].severity);
 });
+
+test('surface-source and restart-parity reports preserve the new phase-0/1 sidecars', () => {
+  const sample = {
+    targetDay: 30,
+    metrics: {
+      subtropicalDryNorthRatio: 1.1,
+      northDryBeltSourceAttributionCoverageFrac: 0.98
+    },
+    sourceAttribution: {
+      northDryBeltLowLevelMeanKgM2: {
+        northDryBeltOcean: 0.12,
+        atmosphericCarryover: 0.2,
+        unattributedResidual: 0.01
+      },
+      northDryBeltAttributionCoverageFrac: 0.98,
+      nhDryBeltSectorSummary: {
+        atlantic: {
+          totalLowLevelSourceMeanKgM2: 0.1
+        }
+      }
+    },
+    surfaceFluxDecomposition: {
+      northDryBeltEvapMeanMmHr: 0.2,
+      northDryBeltHumidityGradientMeanKgKg: 0.01
+    }
+  };
+  const sourceReport = planetaryAuditTest.buildSurfaceSourceAttributionReport(sample);
+  const fluxReport = planetaryAuditTest.buildSurfaceFluxDecompositionReport(sample);
+  const sectorReport = planetaryAuditTest.buildNhDryBeltSourceSectorReport(sample);
+  const parityReport = planetaryAuditTest.buildRestartParityReport({
+    checkpointDay: 15,
+    referenceSamples: [{ targetDay: 30, metrics: { subtropicalDryNorthRatio: 1.1, itczWidthDeg: 23, subtropicalDrySouthRatio: 0.5, subtropicalSubsidenceNorthMean: 0.06, subtropicalSubsidenceSouthMean: 0.04, tropicalTradesNorthU10Ms: -0.8, midlatitudeWesterliesNorthU10Ms: 1.2 } }],
+    resumedSamples: [{ targetDay: 30, metrics: { subtropicalDryNorthRatio: 1.1, itczWidthDeg: 23, subtropicalDrySouthRatio: 0.5, subtropicalSubsidenceNorthMean: 0.06, subtropicalSubsidenceSouthMean: 0.04, tropicalTradesNorthU10Ms: -0.8, midlatitudeWesterliesNorthU10Ms: 1.2 } }]
+  });
+
+  assert.equal(sourceReport.latestMetrics.northDryBeltSourceAttributionCoverageFrac, 0.98);
+  assert.equal(sourceReport.sourceAttribution.northDryBeltLowLevelMeanKgM2.atmosphericCarryover, 0.2);
+  assert.equal(fluxReport.surfaceFluxDecomposition.northDryBeltEvapMeanMmHr, 0.2);
+  assert.equal(sectorReport.nhDryBeltSectorSummary.atlantic.totalLowLevelSourceMeanKgM2, 0.1);
+  assert.equal(parityReport.pass, true);
+});

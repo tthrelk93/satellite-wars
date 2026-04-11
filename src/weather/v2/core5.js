@@ -24,6 +24,7 @@ import {
   DEFAULT_PRESSURE_LEVELS_PA,
   levelSubarray
 } from './verticalGrid.js';
+import { SURFACE_MOISTURE_SOURCE_FIELDS } from './sourceTracing5.js';
 import WeatherLogger from '../WeatherLogger.js';
 
 const P_TOP = 20000;
@@ -75,6 +76,14 @@ const PRECIP_REGIME_KEYS = [
   'marginal_subtropical',
   'large_scale_other'
 ];
+const CONSERVATION_SAMPLE_MODULES = new Set([
+  'stepSurface2D5',
+  'stepAdvection5',
+  'stepVertical5',
+  'stepMicrophysics5',
+  'stepNudging5',
+  'stepAnalysisIncrement5'
+]);
 
 const createBandDeltaAccumulator = () => ({
   surfaceVaporDeltaKgKg: 0,
@@ -112,6 +121,38 @@ const createModuleBudgetAccumulator = (moduleName) => ({
   callCount: 0,
   sampledModelSeconds: 0,
   bands: Object.fromEntries(PROCESS_BUDGET_BANDS.map((band) => [band.key, createBandDeltaAccumulator()]))
+});
+
+const createModuleTimingAccumulator = () => ({
+  schema: 'satellite-wars.module-timing.v1',
+  modules: {},
+  order: []
+});
+
+const createConservationBudgetAccumulator = () => ({
+  schema: 'satellite-wars.conservation-budget.v1',
+  sampleCount: 0,
+  sampledModelSeconds: 0,
+  modules: {},
+  notes: {
+    interpretation: 'Global means are area-weighted. Water proxies are atmospheric column means plus accumulated surface precipitation.'
+  }
+});
+
+const createConservationModuleAccumulator = (moduleName) => ({
+  module: moduleName,
+  callCount: 0,
+  sampledModelSeconds: 0,
+  delta: {
+    globalColumnWaterMeanKgM2: 0,
+    globalVaporMeanKgM2: 0,
+    globalCondensateMeanKgM2: 0,
+    globalPrecipAccumMeanMm: 0,
+    globalSurfaceTempMeanK: 0,
+    globalSurfaceThetaMeanK: 0,
+    globalUpperThetaMeanK: 0,
+    globalSurfacePressureMeanPa: 0
+  }
 });
 
 export class WeatherCore5 {
@@ -253,6 +294,8 @@ export class WeatherCore5 {
       enableUpper: false
     };
     this._nudgeParamsRuntime = { ...this.nudgeParams };
+    this._moduleTiming = createModuleTimingAccumulator();
+    this._conservationBudget = createConservationBudgetAccumulator();
     this.windNudgeParams = {
       enable: true,
       tauSurfaceSeconds: 8 * 3600,
@@ -554,6 +597,8 @@ export class WeatherCore5 {
 
     this._updateHydrostatic();
     this.resetClimateProcessDiagnostics();
+    this.resetConservationDiagnostics();
+    this.resetModuleTimingDiagnostics();
 
     debugStdErr(`[V2] seed=${this.seed} version=v2 nz=${this.nz}`);
     this._initPromise = this._init();
@@ -608,6 +653,8 @@ export class WeatherCore5 {
     this._updateClimoNow(0, true);
     this._updateHydrostatic();
     this.resetClimateProcessDiagnostics();
+    this.resetConservationDiagnostics();
+    this.resetModuleTimingDiagnostics();
   }
 
   resetClimateProcessDiagnostics() {
@@ -680,6 +727,78 @@ export class WeatherCore5 {
     return field;
   }
 
+  _serializePressureLevelFieldMap(map) {
+    if (!(map instanceof Map)) return null;
+    return Array.from(map.entries()).map(([pressurePa, field]) => ([
+      Number(pressurePa),
+      this._copySnapshotField(field)
+    ]));
+  }
+
+  _restorePressureLevelFieldMap(entries) {
+    if (!Array.isArray(entries)) return null;
+    const restored = new Map();
+    for (const [pressurePa, field] of entries) {
+      if (!(field instanceof Float32Array || field instanceof Uint8Array || field instanceof Uint16Array)) continue;
+      restored.set(Number(pressurePa), this._copySnapshotField(field));
+    }
+    return restored;
+  }
+
+  _serializeAnalysisTargets() {
+    const analysisTargets = this.state?.analysisTargets;
+    if (!analysisTargets || typeof analysisTargets !== 'object') return null;
+    return {
+      source: analysisTargets.source ?? null,
+      surfacePressurePa: this._copySnapshotField(analysisTargets.surfacePressurePa),
+      surfaceTemperatureK: this._copySnapshotField(analysisTargets.surfaceTemperatureK),
+      uByPressurePa: this._serializePressureLevelFieldMap(analysisTargets.uByPressurePa),
+      vByPressurePa: this._serializePressureLevelFieldMap(analysisTargets.vByPressurePa),
+      temperatureKByPressurePa: this._serializePressureLevelFieldMap(analysisTargets.temperatureKByPressurePa),
+      thetaKByPressurePa: this._serializePressureLevelFieldMap(analysisTargets.thetaKByPressurePa),
+      specificHumidityKgKgByPressurePa: this._serializePressureLevelFieldMap(analysisTargets.specificHumidityKgKgByPressurePa)
+    };
+  }
+
+  _restoreAnalysisTargets(snapshot) {
+    const analysisTargets = snapshot?.analysisTargets;
+    if (!analysisTargets) {
+      this.state.analysisTargets = null;
+      return;
+    }
+    this.state.analysisTargets = {
+      source: analysisTargets.source ?? null,
+      surfacePressurePa: analysisTargets.surfacePressurePa instanceof Float32Array
+        ? new Float32Array(analysisTargets.surfacePressurePa)
+        : null,
+      surfaceTemperatureK: analysisTargets.surfaceTemperatureK instanceof Float32Array
+        ? new Float32Array(analysisTargets.surfaceTemperatureK)
+        : null,
+      uByPressurePa: this._restorePressureLevelFieldMap(analysisTargets.uByPressurePa),
+      vByPressurePa: this._restorePressureLevelFieldMap(analysisTargets.vByPressurePa),
+      temperatureKByPressurePa: this._restorePressureLevelFieldMap(analysisTargets.temperatureKByPressurePa),
+      thetaKByPressurePa: this._restorePressureLevelFieldMap(analysisTargets.thetaKByPressurePa),
+      specificHumidityKgKgByPressurePa: this._restorePressureLevelFieldMap(analysisTargets.specificHumidityKgKgByPressurePa)
+    };
+  }
+
+  _serializeDiagnosticState() {
+    return {
+      vertMetrics: this.state?.vertMetrics ? { ...this.state.vertMetrics } : null,
+      vertMetricsContinuous: this.state?.vertMetricsContinuous ? { ...this.state.vertMetricsContinuous } : null
+    };
+  }
+
+  _restoreDiagnosticState(snapshot) {
+    const diagnosticState = snapshot?.diagnosticState || null;
+    this.state.vertMetrics = diagnosticState?.vertMetrics
+      ? { ...diagnosticState.vertMetrics }
+      : null;
+    this.state.vertMetricsContinuous = diagnosticState?.vertMetricsContinuous
+      ? { ...diagnosticState.vertMetricsContinuous }
+      : null;
+  }
+
   getStateSnapshot({ mode = 'compact' } = {}) {
     const compactFields = {
       ps: this.fields.ps,
@@ -716,6 +835,56 @@ export class WeatherCore5 {
         sigmaHalf: new Float32Array(this.sigmaHalf),
         layout: { ...this.verticalLayout }
       },
+      climo: {
+        fields: Object.fromEntries(
+          Object.entries(this.climo)
+            .filter(([, value]) => value instanceof Float32Array || value instanceof Uint8Array || value instanceof Uint16Array)
+            .map(([key, value]) => [key, this._copySnapshotField(value)])
+        ),
+        flags: {
+          hasSlp: Boolean(this.climo.hasSlp),
+          hasT2m: Boolean(this.climo.hasT2m),
+          hasWind: Boolean(this.climo.hasWind),
+          hasWind500: Boolean(this.climo.hasWind500),
+          hasWind250: Boolean(this.climo.hasWind250),
+          hasQ2m: Boolean(this.climo.hasQ2m),
+          hasQ700: Boolean(this.climo.hasQ700),
+          hasQ250: Boolean(this.climo.hasQ250),
+          hasT700: Boolean(this.climo.hasT700),
+          hasT250: Boolean(this.climo.hasT250)
+        }
+      },
+      runtime: {
+        timeUTC: this.timeUTC,
+        modelDt: this.modelDt,
+        accumSeconds: this._accum,
+        dynStepIndex: this._dynStepIndex,
+        nudgeAccumSeconds: this._nudgeAccumSeconds,
+        climoAccumSeconds: this._climoAccumSeconds,
+        windNudgeSpinupSeconds: this._windNudgeSpinupSeconds,
+        metricsCounter: this._metricsCounter,
+        nextModuleLogSimTime: this._nextModuleLogSimTime,
+        simSpeed: this.simSpeed,
+        windNudgeMaxAbsCorrection: this._windNudgeMaxAbsCorrection
+      },
+      params: {
+        surfaceParams: { ...this.surfaceParams },
+        advectParams: { ...this.advectParams },
+        vertParams: { ...this.vertParams },
+        microParams: { ...this.microParams },
+        nudgeParams: { ...this.nudgeParams },
+        windNudgeParams: { ...this.windNudgeParams },
+        windEddyParams: { ...this.windEddyParams },
+        windNudgeSpinupParams: { ...this.windNudgeSpinupParams },
+        dynParams: { ...this.dynParams },
+        massParams: { ...this.massParams },
+        analysisIncrementParams: { ...this.analysisIncrementParams },
+        radParams: { ...this.radParams },
+        diagParams: { ...this.diagParams },
+        lodParams: { ...this.lodParams }
+      },
+      analysisTargets: this._serializeAnalysisTargets(),
+      diagnosticState: this._serializeDiagnosticState(),
       fields: Object.fromEntries(
         Object.entries(compactFields).map(([key, field]) => [key, this._copySnapshotField(field)])
       )
@@ -730,6 +899,94 @@ export class WeatherCore5 {
     }
 
     return snapshot;
+  }
+
+  loadStateSnapshot(snapshot) {
+    if (!snapshot || !snapshot.state) {
+      throw new Error('A full state snapshot is required to restore WeatherCore5.');
+    }
+    if (snapshot?.grid?.nx !== this.grid.nx || snapshot?.grid?.ny !== this.grid.ny) {
+      throw new Error('Snapshot grid does not match WeatherCore5 grid.');
+    }
+    if (snapshot?.vertical?.nz !== this.nz) {
+      throw new Error('Snapshot vertical layout does not match WeatherCore5 vertical resolution.');
+    }
+
+    for (const [key, value] of Object.entries(snapshot?.climo?.fields || {})) {
+      const target = this.climo[key] || this.geo[key];
+      if (target instanceof Float32Array || target instanceof Uint8Array || target instanceof Uint16Array) {
+        if (!value || value.length !== target.length) continue;
+        target.set(value);
+      }
+    }
+    Object.assign(this.climo, snapshot?.climo?.flags || {});
+
+    for (const [key, value] of Object.entries(snapshot.state)) {
+      const target = this.state[key];
+      if (target instanceof Float32Array || target instanceof Uint8Array || target instanceof Uint16Array) {
+        if (!value || value.length !== target.length) continue;
+        target.set(value);
+        continue;
+      }
+      if (value instanceof Float32Array) {
+        this.state[key] = new Float32Array(value);
+      } else if (value instanceof Uint8Array) {
+        this.state[key] = new Uint8Array(value);
+      } else if (value instanceof Uint16Array) {
+        this.state[key] = new Uint16Array(value);
+      }
+    }
+    this._restoreAnalysisTargets(snapshot);
+    this._restoreDiagnosticState(snapshot);
+
+    Object.assign(this.surfaceParams, snapshot?.params?.surfaceParams || {});
+    Object.assign(this.advectParams, snapshot?.params?.advectParams || {});
+    Object.assign(this.vertParams, snapshot?.params?.vertParams || {});
+    Object.assign(this.microParams, snapshot?.params?.microParams || {});
+    Object.assign(this.nudgeParams, snapshot?.params?.nudgeParams || {});
+    Object.assign(this.windNudgeParams, snapshot?.params?.windNudgeParams || {});
+    Object.assign(this.windEddyParams, snapshot?.params?.windEddyParams || {});
+    Object.assign(this.windNudgeSpinupParams, snapshot?.params?.windNudgeSpinupParams || {});
+    Object.assign(this.dynParams, snapshot?.params?.dynParams || {});
+    Object.assign(this.massParams, snapshot?.params?.massParams || {});
+    Object.assign(this.analysisIncrementParams, snapshot?.params?.analysisIncrementParams || {});
+    Object.assign(this.radParams, snapshot?.params?.radParams || {});
+    Object.assign(this.diagParams, snapshot?.params?.diagParams || {});
+    Object.assign(this.lodParams, snapshot?.params?.lodParams || {});
+
+    this.timeUTC = Number(snapshot?.runtime?.timeUTC) || 0;
+    this.modelDt = Number(snapshot?.runtime?.modelDt) || this.modelDt;
+    this._accum = Number(snapshot?.runtime?.accumSeconds) || 0;
+    this._dynStepIndex = Number(snapshot?.runtime?.dynStepIndex) || 0;
+    this._nudgeAccumSeconds = Number(snapshot?.runtime?.nudgeAccumSeconds) || 0;
+    this._climoAccumSeconds = Number(snapshot?.runtime?.climoAccumSeconds) || 0;
+    this._windNudgeSpinupSeconds = Number(snapshot?.runtime?.windNudgeSpinupSeconds) || 0;
+    this._metricsCounter = Number(snapshot?.runtime?.metricsCounter) || 0;
+    this._nextModuleLogSimTime = Number.isFinite(snapshot?.runtime?.nextModuleLogSimTime)
+      ? snapshot.runtime.nextModuleLogSimTime
+      : null;
+    this.simSpeed = Number(snapshot?.runtime?.simSpeed) || 1;
+    this._windNudgeMaxAbsCorrection = Number(snapshot?.runtime?.windNudgeMaxAbsCorrection) || 0;
+    Object.assign(this._nudgeParamsRuntime, this.nudgeParams);
+    if (this._climoUpdateArgs) {
+      this._climoUpdateArgs.timeUTC = this.timeUTC;
+    }
+  }
+
+  resetModuleTimingDiagnostics() {
+    this._moduleTiming = createModuleTimingAccumulator();
+  }
+
+  getModuleTimingSummary() {
+    return JSON.parse(JSON.stringify(this._moduleTiming));
+  }
+
+  resetConservationDiagnostics() {
+    this._conservationBudget = createConservationBudgetAccumulator();
+  }
+
+  getConservationSummary() {
+    return JSON.parse(JSON.stringify(this._conservationBudget));
   }
 
   _bindFieldViews() {
@@ -802,11 +1059,138 @@ export class WeatherCore5 {
     this._updateStandardPressureDiagnostics();
   }
 
+  _seedInitializationMoistureTracer() {
+    const initField = this.state.qvSourceInitializationMemory;
+    if (!(initField instanceof Float32Array) || initField.length !== this.state.qv.length) return;
+    initField.set(this.state.qv);
+    for (const fieldName of SURFACE_MOISTURE_SOURCE_FIELDS) {
+      if (fieldName === 'qvSourceInitializationMemory') continue;
+      const field = this.state[fieldName];
+      if (field?.fill) field.fill(0);
+    }
+  }
+
+  _closeSurfaceSourceTracerBudget(fallbackFieldName = null) {
+    const { qv } = this.state;
+    if (!(qv instanceof Float32Array)) return;
+    const tracerFields = SURFACE_MOISTURE_SOURCE_FIELDS
+      .map((fieldName) => this.state[fieldName])
+      .filter((field) => field instanceof Float32Array && field.length === qv.length);
+    if (!tracerFields.length) return;
+    const fallbackField = fallbackFieldName
+      ? this.state[fallbackFieldName]
+      : null;
+
+    for (let idx = 0; idx < qv.length; idx += 1) {
+      const vapor = Math.max(0, qv[idx] || 0);
+      if (!(vapor > 0)) {
+        for (const field of tracerFields) field[idx] = 0;
+        continue;
+      }
+      let tagged = 0;
+      for (const field of tracerFields) tagged += Math.max(0, field[idx] || 0);
+      if (tagged > vapor) {
+        const scale = vapor / Math.max(tagged, 1e-12);
+        for (const field of tracerFields) field[idx] = Math.max(0, field[idx] || 0) * scale;
+        continue;
+      }
+      if (fallbackField instanceof Float32Array && fallbackField.length === qv.length && tagged < vapor) {
+        fallbackField[idx] += vapor - tagged;
+      }
+    }
+  }
+
+  _recordModuleTiming(moduleName, elapsedMs) {
+    const entry = this._moduleTiming.modules[moduleName] || (this._moduleTiming.modules[moduleName] = {
+      module: moduleName,
+      callCount: 0,
+      totalWallMs: 0,
+      maxWallMs: 0
+    });
+    entry.callCount += 1;
+    entry.totalWallMs += elapsedMs;
+    entry.maxWallMs = Math.max(entry.maxWallMs, elapsedMs);
+    if (!this._moduleTiming.order.includes(moduleName)) this._moduleTiming.order.push(moduleName);
+  }
+
+  _captureConservationSnapshot() {
+    const { grid, state } = this;
+    const { nx, ny, cosLat } = grid;
+    const { N, nz, qv, qc, qi, qr, qs, pHalf, ps, Ts, theta } = state;
+    let weightTotal = 0;
+    let waterTotal = 0;
+    let vaporTotal = 0;
+    let condensateTotal = 0;
+    let precipAccumTotal = 0;
+    let surfaceTempTotal = 0;
+    let surfaceThetaTotal = 0;
+    let upperThetaTotal = 0;
+    let psTotal = 0;
+    const surfaceBase = (nz - 1) * N;
+    const upperBase = (this.verticalLayout?.upperTroposphere || 0) * N;
+    for (let cell = 0; cell < N; cell += 1) {
+      const row = Math.floor(cell / nx);
+      const weight = Math.max(0.05, cosLat[row] || 0);
+      weightTotal += weight;
+      psTotal += (ps[cell] || 0) * weight;
+      precipAccumTotal += (state.precipAccum?.[cell] || 0) * weight;
+      surfaceTempTotal += (Ts[cell] || 0) * weight;
+      surfaceThetaTotal += (theta[surfaceBase + cell] || 0) * weight;
+      upperThetaTotal += (theta[upperBase + cell] || 0) * weight;
+      let vaporColumn = 0;
+      let condensateColumn = 0;
+      for (let lev = 0; lev < nz; lev += 1) {
+        const idx = lev * N + cell;
+        const dp = pHalf[(lev + 1) * N + cell] - pHalf[lev * N + cell];
+        const layerMass = dp / 9.80665;
+        const vapor = Math.max(0, qv[idx] || 0) * layerMass;
+        const condensate = (
+          Math.max(0, qc?.[idx] || 0)
+          + Math.max(0, qi?.[idx] || 0)
+          + Math.max(0, qr?.[idx] || 0)
+          + Math.max(0, qs?.[idx] || 0)
+        ) * layerMass;
+        vaporColumn += vapor;
+        condensateColumn += condensate;
+      }
+      vaporTotal += vaporColumn * weight;
+      condensateTotal += condensateColumn * weight;
+      waterTotal += (vaporColumn + condensateColumn) * weight;
+    }
+    const mean = (value) => weightTotal > 0 ? value / weightTotal : 0;
+    return {
+      globalColumnWaterMeanKgM2: mean(waterTotal),
+      globalVaporMeanKgM2: mean(vaporTotal),
+      globalCondensateMeanKgM2: mean(condensateTotal),
+      globalPrecipAccumMeanMm: mean(precipAccumTotal),
+      globalSurfaceTempMeanK: mean(surfaceTempTotal),
+      globalSurfaceThetaMeanK: mean(surfaceThetaTotal),
+      globalUpperThetaMeanK: mean(upperThetaTotal),
+      globalSurfacePressureMeanPa: mean(psTotal)
+    };
+  }
+
+  _accumulateConservationBudget(moduleName, beforeSnapshot, sampledDtSeconds) {
+    if (!this._conservationBudget || !beforeSnapshot || !CONSERVATION_SAMPLE_MODULES.has(moduleName)) return;
+    const afterSnapshot = this._captureConservationSnapshot();
+    const moduleBudget = this._conservationBudget.modules[moduleName]
+      || (this._conservationBudget.modules[moduleName] = createConservationModuleAccumulator(moduleName));
+    moduleBudget.callCount += 1;
+    moduleBudget.sampledModelSeconds += sampledDtSeconds;
+    for (const key of Object.keys(moduleBudget.delta)) {
+      moduleBudget.delta[key] += (afterSnapshot[key] || 0) - (beforeSnapshot[key] || 0);
+    }
+  }
+
   _shouldSampleClimateProcessBudget() {
     if (!this._climateProcessBudget) {
       this.resetClimateProcessDiagnostics();
     }
     this._climateProcessBudget.sampleCount += 1;
+    if (!this._conservationBudget) {
+      this.resetConservationDiagnostics();
+    }
+    this._conservationBudget.sampleCount += 1;
     return true;
   }
 
@@ -1049,6 +1433,7 @@ export class WeatherCore5 {
       }
 
       this._updateHydrostatic();
+      this._seedInitializationMoistureTracer();
       this.ready = true;
     } catch (err) {
       console.warn('[WeatherCore5] Climo init failed; using defaults.', err);
@@ -1056,6 +1441,7 @@ export class WeatherCore5 {
         source: 'error',
         reason: err?.message || String(err)
       };
+      this._seedInitializationMoistureTracer();
       this.ready = true;
     }
   }
@@ -1137,17 +1523,28 @@ export class WeatherCore5 {
     if (shouldSampleClimateBudget && this._climateProcessBudget) {
       this._climateProcessBudget.sampledModelSeconds += dt;
     }
+    if (shouldSampleClimateBudget && this._conservationBudget) {
+      this._conservationBudget.sampledModelSeconds += dt;
+    }
     const runWithDiagnostics = (name, fn, { sampledDtSeconds = dt } = {}) => {
       const collectBudget = shouldSampleClimateBudget && PROCESS_BUDGET_MODULES.has(name);
+      const collectConservation = shouldSampleClimateBudget && CONSERVATION_SAMPLE_MODULES.has(name);
       const beforeLog = shouldLogModules ? logger.buildProcessSnapshot(this) : null;
       const beforeBudget = collectBudget ? this._captureClimateProcessBudgetSnapshot(name === 'stepMicrophysics5') : null;
+      const beforeConservation = collectConservation ? this._captureConservationSnapshot() : null;
+      const startedAt = Date.now();
       fn();
+      const elapsedMs = Date.now() - startedAt;
+      this._recordModuleTiming(name, elapsedMs);
       if (shouldLogModules) {
         const after = logger.buildProcessSnapshot(this);
         logger.logProcessDelta(logContext, this, name, beforeLog, after);
       }
       if (collectBudget) {
         this._accumulateClimateProcessBudget(name, beforeBudget, sampledDtSeconds);
+      }
+      if (collectConservation) {
+        this._accumulateConservationBudget(name, beforeConservation, sampledDtSeconds);
       }
     };
     const lodActive = this.lodParams?.enable && this.simSpeed > this.lodParams.simSpeedThreshold;
@@ -1317,13 +1714,17 @@ export class WeatherCore5 {
         params: this.vertParams,
         scratch: this._dynScratch
       });
+      this._closeSurfaceSourceTracerBudget('qvSourceAtmosphericCarryover');
     });
     runWithDiagnostics('updateHydrostatic', () => this._updateHydrostatic());
     if (typeof this.vertParams?.enableConvectiveOutcome === 'boolean') {
       this.microParams.enableConvectiveOutcome = this.vertParams.enableConvectiveOutcome;
     }
     if (doMicrophysics) {
-      runWithDiagnostics('stepMicrophysics5', () => stepMicrophysics5({ dt, state: this.state, params: this.microParams }));
+      runWithDiagnostics('stepMicrophysics5', () => {
+        stepMicrophysics5({ dt, state: this.state, params: this.microParams });
+        this._closeSurfaceSourceTracerBudget('qvSourceAtmosphericCarryover');
+      });
     }
     runWithDiagnostics('updateHydrostatic', () => this._updateHydrostatic());
     this._nudgeAccumSeconds += dt;
@@ -1342,16 +1743,23 @@ export class WeatherCore5 {
         params: this._nudgeParamsRuntime,
         scratch: this._nudgeScratch
       });
+      this._closeSurfaceSourceTracerBudget('qvSourceNudgingInjection');
       }, { sampledDtSeconds: dtNudge });
       runWithDiagnostics('updateHydrostatic', () => this._updateHydrostatic());
     }
-    const analysisIncrementResult = stepAnalysisIncrement5({
-      dt,
-      state: this.state,
-      params: {
-        ...this.analysisIncrementParams,
-        psMin: this.massParams?.psMin,
-        psMax: this.massParams?.psMax
+    let analysisIncrementResult = null;
+    runWithDiagnostics('stepAnalysisIncrement5', () => {
+      analysisIncrementResult = stepAnalysisIncrement5({
+        dt,
+        state: this.state,
+        params: {
+          ...this.analysisIncrementParams,
+          psMin: this.massParams?.psMin,
+          psMax: this.massParams?.psMax
+        }
+      });
+      if (analysisIncrementResult?.didApply) {
+        this._closeSurfaceSourceTracerBudget('qvSourceAnalysisInjection');
       }
     });
     if (analysisIncrementResult?.didApply) {

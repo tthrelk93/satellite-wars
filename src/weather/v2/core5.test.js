@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WeatherCore5 } from './core5.js';
+import { applyHeadlessTerrainFixture } from '../../../scripts/agent/headless-terrain-fixture.mjs';
 
 test('WeatherCore5 defaults keep the stronger broad-circulation surface wind restore enabled', async () => {
   const core = new WeatherCore5({ nx: 16, ny: 8, seed: 12345 });
@@ -53,4 +54,84 @@ test('WeatherCore5 accumulates causal climate process budgets for later audits',
   assert.ok(summary.modules.stepMicrophysics5);
   assert.ok(summary.modules.stepSurface2D5.bands.north_dry_belt);
   assert.ok('deep_core_tropical' in summary.precipitationRegimes);
+});
+
+test('WeatherCore5 seeds initialization vapor tracers and restores full snapshots with parity-critical runtime state', async () => {
+  const core = new WeatherCore5({ nx: 12, ny: 6, seed: 12345 });
+  await core._initPromise;
+  core.simSpeed = 12;
+  core.lodParams.microphysicsEvery = 4;
+  core.radParams.kSw = 0.18;
+  core.state.analysisTargets = {
+    source: 'analysis',
+    surfacePressurePa: new Float32Array(core.state.N).fill(101000),
+    surfaceTemperatureK: new Float32Array(core.state.N).fill(288),
+    uByPressurePa: new Map([[100000, new Float32Array(core.state.N).fill(3)]]),
+    vByPressurePa: new Map([[100000, new Float32Array(core.state.N).fill(-1)]]),
+    temperatureKByPressurePa: new Map([[70000, new Float32Array(core.state.N).fill(270)]]),
+    thetaKByPressurePa: new Map([[70000, new Float32Array(core.state.N).fill(295)]]),
+    specificHumidityKgKgByPressurePa: new Map([[70000, new Float32Array(core.state.N).fill(0.004)]])
+  };
+  core.state.vertMetrics = {
+    omegaPosP90: 0.42,
+    convectiveFraction: 0.25
+  };
+  core.state.vertMetricsContinuous = {
+    convectivePotentialMean: 0.33,
+    subtropicalSubsidenceDryingMean: 0.07
+  };
+  core.advanceModelSeconds(core.modelDt * 3);
+  const snapshot = core.getStateSnapshot({ mode: 'full' });
+
+  const restored = new WeatherCore5({ nx: 12, ny: 6, seed: 12345 });
+  await restored._initPromise;
+  restored.loadStateSnapshot(snapshot);
+
+  assert.equal(restored.timeUTC, core.timeUTC);
+  assert.equal(restored._dynStepIndex, core._dynStepIndex);
+  assert.equal(restored.simSpeed, core.simSpeed);
+  assert.equal(restored.lodParams.microphysicsEvery, core.lodParams.microphysicsEvery);
+  assert.equal(restored.radParams.kSw, core.radParams.kSw);
+  assert.equal(restored.state.ps[0], core.state.ps[0]);
+  assert.equal(restored.state.qv[0], core.state.qv[0]);
+  assert.equal(restored.state.sstNow[0], core.state.sstNow[0]);
+  assert.equal(restored.state.qvSourceInitializationMemory[0], core.state.qvSourceInitializationMemory[0]);
+  assert.equal(restored.state.analysisTargets?.source, 'analysis');
+  assert.equal(restored.state.analysisTargets?.surfacePressurePa?.[0], 101000);
+  assert.equal(restored.state.analysisTargets?.uByPressurePa?.get(100000)?.[0], 3);
+  assert.ok(Math.abs(restored.state.analysisTargets?.specificHumidityKgKgByPressurePa?.get(70000)?.[0] - 0.004) < 1e-6);
+  assert.equal(restored.state.vertMetrics?.omegaPosP90, core.state.vertMetrics?.omegaPosP90);
+  assert.equal(restored.state.vertMetricsContinuous?.convectivePotentialMean, core.state.vertMetricsContinuous?.convectivePotentialMean);
+});
+
+test('WeatherCore5 records module timings and conservation summaries during stepping', async () => {
+  const core = new WeatherCore5({ nx: 12, ny: 6, seed: 12345 });
+  await core._initPromise;
+  core.advanceModelSeconds(core.modelDt * 2);
+
+  const timing = core.getModuleTimingSummary();
+  const conservation = core.getConservationSummary();
+  assert.ok(timing.modules.stepSurface2D5.callCount >= 1);
+  assert.ok(timing.modules.stepVertical5.totalWallMs >= 0);
+  assert.ok(conservation.modules.stepSurface2D5.callCount >= 1);
+  assert.ok(Number.isFinite(conservation.modules.stepSurface2D5.delta.globalColumnWaterMeanKgM2));
+});
+
+test('WeatherCore5 keeps terrain-fixture surface theta bounded during early stepping', async () => {
+  const core = new WeatherCore5({ nx: 48, ny: 24, seed: 12345 });
+  await core._initPromise;
+  applyHeadlessTerrainFixture(core);
+  core.advanceModelSeconds(core.modelDt * 8);
+
+  const { N, nz, theta } = core.state;
+  let minTheta = Infinity;
+  let maxTheta = -Infinity;
+  for (let k = 0; k < N; k += 1) {
+    const value = theta[(nz - 1) * N + k];
+    minTheta = Math.min(minTheta, value);
+    maxTheta = Math.max(maxTheta, value);
+  }
+
+  assert.ok(minTheta >= 150, `expected bounded terrain-fixture surface theta, got ${minTheta}`);
+  assert.ok(maxTheta <= 400, `expected bounded terrain-fixture surface theta, got ${maxTheta}`);
 });

@@ -1,3 +1,5 @@
+import { SURFACE_MOISTURE_SOURCE_FIELDS } from './sourceTracing5.js';
+
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
 const smoothstep01 = (t) => t * t * (3 - 2 * t);
@@ -118,6 +120,11 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
   advectScalar(qc);
   advectScalar(qi);
   advectScalar(qr);
+  for (const fieldName of SURFACE_MOISTURE_SOURCE_FIELDS) {
+    if (state[fieldName] instanceof Float32Array && state[fieldName].length === qv.length) {
+      advectScalar(state[fieldName]);
+    }
+  }
 
   u.set(tmpU);
   v.set(tmpV);
