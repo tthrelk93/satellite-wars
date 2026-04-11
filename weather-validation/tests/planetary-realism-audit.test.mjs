@@ -379,3 +379,111 @@ test('surface-source and restart-parity reports preserve the new phase-0/1 sidec
   assert.equal(sectorReport.nhDryBeltSectorSummary.atlantic.totalLowLevelSourceMeanKgM2, 0.1);
   assert.equal(parityReport.pass, true);
 });
+
+test('transport phase reports rank NH dry-belt import pathways and return-branch structure', () => {
+  const sample = {
+    targetDay: 30,
+    metrics: {
+      northDryBeltSourceNorthDryBeltOceanMeanKgM2: 0.2,
+      northDryBeltSourceLandRecyclingMeanKgM2: 0.05,
+      northDryBeltSourceTropicalOceanNorthMeanKgM2: 0.25,
+      northDryBeltSourceTropicalOceanSouthMeanKgM2: 0.1,
+      northDryBeltSourceNorthExtratropicalOceanMeanKgM2: 0.03,
+      northDryBeltSourceOtherOceanMeanKgM2: 0.02,
+      northDryBeltSourceInitializationMemoryMeanKgM2: 0.01,
+      northDryBeltSourceAtmosphericCarryoverMeanKgM2: 0.34,
+      northDryBeltSourceNudgingInjectionMeanKgM2: 0.01,
+      northDryBeltSourceAnalysisInjectionMeanKgM2: 0.0
+    },
+    transportTracing: {
+      levelBands: [
+        { key: 'boundaryLayer', label: 'Boundary layer' },
+        { key: 'lowerTroposphere', label: 'Lower troposphere' },
+        { key: 'upperTroposphere', label: 'Upper troposphere' }
+      ],
+      interfaces: [
+        {
+          targetLatDeg: -12,
+          modelLevels: [
+            { sigmaMid: 0.22, vaporFluxNorthKgM_1S: -0.02, cloudFluxNorthKgM_1S: -0.03 },
+            { sigmaMid: 0.74, vaporFluxNorthKgM_1S: -0.05, cloudFluxNorthKgM_1S: -0.01 }
+          ],
+          levelBands: {
+            upperTroposphere: { label: 'Upper troposphere', vaporFluxNorthKgM_1S: -0.02, cloudFluxNorthKgM_1S: -0.03 },
+            lowerTroposphere: { label: 'Lower troposphere', vaporFluxNorthKgM_1S: -0.05, cloudFluxNorthKgM_1S: -0.01 }
+          }
+        },
+        {
+          targetLatDeg: 12,
+          modelLevels: [
+            { sigmaMid: 0.22, vaporFluxNorthKgM_1S: 0.03, cloudFluxNorthKgM_1S: 0.04 },
+            { sigmaMid: 0.74, vaporFluxNorthKgM_1S: 0.06, cloudFluxNorthKgM_1S: 0.01 }
+          ],
+          levelBands: {
+            upperTroposphere: { label: 'Upper troposphere', vaporFluxNorthKgM_1S: 0.03, cloudFluxNorthKgM_1S: 0.04 },
+            lowerTroposphere: { label: 'Lower troposphere', vaporFluxNorthKgM_1S: 0.06, cloudFluxNorthKgM_1S: 0.01 }
+          }
+        },
+        {
+          targetLatDeg: 22,
+          modelLevels: [
+            { sigmaMid: 0.22, vaporFluxNorthKgM_1S: 0.02, cloudFluxNorthKgM_1S: 0.05 },
+            { sigmaMid: 0.74, vaporFluxNorthKgM_1S: 0.11, cloudFluxNorthKgM_1S: 0.01 }
+          ],
+          levelBands: {
+            upperTroposphere: { label: 'Upper troposphere', vaporFluxNorthKgM_1S: 0.02, cloudFluxNorthKgM_1S: 0.05 },
+            boundaryLayer: { label: 'Boundary layer', vaporFluxNorthKgM_1S: 0.11, cloudFluxNorthKgM_1S: 0.01 }
+          }
+        },
+        {
+          targetLatDeg: 35,
+          modelLevels: [
+            { sigmaMid: 0.22, vaporFluxNorthKgM_1S: -0.01, cloudFluxNorthKgM_1S: -0.02 },
+            { sigmaMid: 0.74, vaporFluxNorthKgM_1S: -0.03, cloudFluxNorthKgM_1S: -0.01 }
+          ],
+          levelBands: {
+            upperTroposphere: { label: 'Upper troposphere', vaporFluxNorthKgM_1S: -0.01, cloudFluxNorthKgM_1S: -0.02 },
+            boundaryLayer: { label: 'Boundary layer', vaporFluxNorthKgM_1S: -0.03, cloudFluxNorthKgM_1S: -0.01 }
+          }
+        }
+      ],
+      bandLevelMatrix: [
+        {
+          key: 'northDryBelt',
+          levelBands: {
+            boundaryLayer: { massFluxNorthKgM_1S: -0.08 },
+            lowerTroposphere: { massFluxNorthKgM_1S: -0.05 }
+          }
+        },
+        {
+          key: 'southDryBelt',
+          levelBands: {
+            boundaryLayer: { massFluxNorthKgM_1S: 0.06 },
+            lowerTroposphere: { massFluxNorthKgM_1S: 0.04 }
+          }
+        }
+      ],
+      streamfunctionProxy: {
+        latitudesDeg: [-20, 0, 20],
+        sigmaMid: [0.22, 0.74],
+        massStreamfunctionProxyKgS: [
+          [1, 2, 3],
+          [4, 5, 6]
+        ]
+      }
+    }
+  };
+
+  const budgetReport = planetaryAuditTest.buildTransportInterfaceBudgetReport(sample);
+  const hadleyReport = planetaryAuditTest.buildHadleyPartitionSummaryReport(sample);
+  const matrixReport = planetaryAuditTest.buildBandLevelFluxMatrixReport(sample);
+
+  assert.equal(budgetReport.dominantNhDryBeltVaporImport.interfaceTargetLatDeg, 22);
+  assert.equal(budgetReport.dominantNhDryBeltVaporImport.levelBandKey, 'boundaryLayer');
+  assert.equal(hadleyReport.tropicalExportLevels.northVaporExportSigma, 0.56667);
+  assert.equal(hadleyReport.returnBranchIntensity.northDryBeltEquatorwardMassFluxKgM_1S, 0.08);
+  assert.equal(hadleyReport.lowLevelSourcePartition.importedSourceProxyFrac, 0.75248);
+  assert.ok(hadleyReport.rootCauseAssessment.ruledIn.some((line) => line.includes('22')));
+  assert.equal(matrixReport.latitudeBands[0].key, 'northDryBelt');
+  assert.deepEqual(hadleyReport.streamfunctionProxy.massStreamfunctionProxyKgS[1], [4, 5, 6]);
+});

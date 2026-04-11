@@ -440,7 +440,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     surfaceEvapSeaIceSuppressionFrac,
     surfaceEvapSurfaceSaturationMixingRatioKgKg,
     surfaceEvapAirMixingRatioKgKg,
-    processMoistureBudget
+    processMoistureBudget,
+    transportTracing
   } = diagnostics;
   const { nx, ny, latitudesDeg } = grid;
   const longitudesDeg = Array.isArray(grid.longitudesDeg)
@@ -688,6 +689,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       nhDryBeltSectorSummary
     },
     surfaceFluxDecomposition,
+    transportTracing: transportTracing || null,
     profiles: {
       latitudesDeg: roundSeries(latitudesDeg),
       series: {
@@ -847,6 +849,202 @@ export const buildNhDryBeltSourceSectorReport = (latestSample = null) => ({
   targetDay: latestSample?.targetDay ?? null,
   nhDryBeltSectorSummary: latestSample?.sourceAttribution?.nhDryBeltSectorSummary || null
 });
+
+const transportInterfaceByTarget = (transportTracing, targetLatDeg) => (
+  (transportTracing?.interfaces || []).find((entry) => Number(entry?.targetLatDeg) === Number(targetLatDeg)) || null
+);
+
+const sumInterfaceLevelBandField = (interfaceSummary, fieldName) => Object.values(interfaceSummary?.levelBands || {})
+  .reduce((sum, levelBand) => sum + (Number(levelBand?.[fieldName]) || 0), 0);
+
+const findDominantNhDryBeltImport = (transportTracing, fieldName) => {
+  const candidates = [];
+  for (const targetLatDeg of [22, 35]) {
+    const interfaceSummary = transportInterfaceByTarget(transportTracing, targetLatDeg);
+    if (!interfaceSummary) continue;
+    for (const [levelBandKey, levelBand] of Object.entries(interfaceSummary.levelBands || {})) {
+      const signedFlux = Number(levelBand?.[fieldName]) || 0;
+      const importMagnitude = targetLatDeg === 35 ? Math.max(0, -signedFlux) : Math.max(0, signedFlux);
+      candidates.push({
+        interfaceTargetLatDeg: targetLatDeg,
+        levelBandKey,
+        label: levelBand?.label || levelBandKey,
+        signedFluxNorthKgM_1S: round(signedFlux, 5),
+        importMagnitudeKgM_1S: round(importMagnitude, 5)
+      });
+    }
+  }
+  return candidates.sort((a, b) => (b.importMagnitudeKgM_1S || 0) - (a.importMagnitudeKgM_1S || 0))[0] || null;
+};
+
+const computeDirectionalExportSigma = (interfaceSummary, fieldName, direction = 'northward') => {
+  let numerator = 0;
+  let denominator = 0;
+  for (const level of interfaceSummary?.modelLevels || []) {
+    const signedFlux = Number(level?.[fieldName]) || 0;
+    const magnitude = direction === 'northward'
+      ? Math.max(0, signedFlux)
+      : Math.max(0, -signedFlux);
+    numerator += (Number(level?.sigmaMid) || 0) * magnitude;
+    denominator += magnitude;
+  }
+  return denominator > 0 ? numerator / denominator : null;
+};
+
+const computeRecirculationProxy = (transportTracing, fieldName) => {
+  const southBoundaryFlux = sumInterfaceLevelBandField(transportInterfaceByTarget(transportTracing, 22), fieldName);
+  const northBoundaryFlux = sumInterfaceLevelBandField(transportInterfaceByTarget(transportTracing, 35), fieldName);
+  return Math.max(0, Math.abs(southBoundaryFlux) + Math.abs(northBoundaryFlux) - Math.abs(southBoundaryFlux + northBoundaryFlux));
+};
+
+const computeReturnBranchIntensity = (transportTracing, bandKey, direction = 'equatorward') => {
+  const band = (transportTracing?.bandLevelMatrix || []).find((entry) => entry?.key === bandKey);
+  if (!band) return null;
+  const levelBandKeys = ['boundaryLayer', 'lowerTroposphere'];
+  const signedFluxes = levelBandKeys
+    .map((key) => Number(band?.levelBands?.[key]?.massFluxNorthKgM_1S) || 0);
+  if (direction === 'equatorward_nh') {
+    return Math.max(...signedFluxes.map((value) => Math.max(0, -value)), 0);
+  }
+  if (direction === 'equatorward_sh') {
+    return Math.max(...signedFluxes.map((value) => Math.max(0, value)), 0);
+  }
+  return Math.max(...signedFluxes.map((value) => Math.abs(value)), 0);
+};
+
+const buildTransportRootCauseAssessment = (latestSample = null) => {
+  const transportTracing = latestSample?.transportTracing;
+  const metrics = latestSample?.metrics || {};
+  const north22 = transportInterfaceByTarget(transportTracing, 22);
+  const north35 = transportInterfaceByTarget(transportTracing, 35);
+  const southImportVapor = north22 ? Math.max(0, sumInterfaceLevelBandField(north22, 'vaporFluxNorthKgM_1S')) : 0;
+  const northImportVapor = north35 ? Math.max(0, -sumInterfaceLevelBandField(north35, 'vaporFluxNorthKgM_1S')) : 0;
+  const southImportCloud = north22 ? Math.max(0, sumInterfaceLevelBandField(north22, 'cloudFluxNorthKgM_1S')) : 0;
+  const northImportCloud = north35 ? Math.max(0, -sumInterfaceLevelBandField(north35, 'cloudFluxNorthKgM_1S')) : 0;
+  const localSourceProxy = (Number(metrics.northDryBeltSourceNorthDryBeltOceanMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceLandRecyclingMeanKgM2) || 0);
+  const totalAttributed = localSourceProxy
+    + (Number(metrics.northDryBeltSourceTropicalOceanNorthMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceTropicalOceanSouthMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceNorthExtratropicalOceanMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceOtherOceanMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceInitializationMemoryMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceAtmosphericCarryoverMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceNudgingInjectionMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceAnalysisInjectionMeanKgM2) || 0);
+  const importedSourceProxy = Math.max(0, totalAttributed - localSourceProxy);
+  const ruledIn = [];
+  const ruledOut = [];
+  const ambiguous = [];
+
+  if (southImportVapor > northImportVapor * 1.25) {
+    ruledIn.push('South-boundary transport across 22° dominates NH dry-belt vapor import.');
+    ruledOut.push('NH dry-belt wet bias is not primarily driven by extratropical vapor import across 35°.');
+  } else if (northImportVapor > southImportVapor * 1.25) {
+    ruledIn.push('North-boundary transport across 35° materially contributes to NH dry-belt vapor import.');
+  } else {
+    ambiguous.push('North and south boundary vapor imports remain comparable in magnitude.');
+  }
+
+  if (southImportCloud > northImportCloud * 1.25) {
+    ruledIn.push('Upper-cloud and condensate import from the tropical side is stronger than extratropical cloud import.');
+  } else if (northImportCloud > southImportCloud * 1.25) {
+    ambiguous.push('Extratropical cloud import remains competitive with tropical-side cloud transport.');
+  } else {
+    ambiguous.push('Cloud import is split across both NH dry-belt boundaries.');
+  }
+
+  if (totalAttributed > 0 && importedSourceProxy / totalAttributed >= 0.6) {
+    ruledIn.push('Imported transport clearly outweighs local-source moisture in the NH dry-belt reservoir.');
+    ruledOut.push('Local NH subtropical surface source alone cannot explain the wet bias.');
+  } else {
+    ambiguous.push('Local versus imported low-level source share is not yet decisively one-sided.');
+  }
+
+  return { ruledIn, ruledOut, ambiguous };
+};
+
+export const buildTransportInterfaceBudgetReport = (latestSample = null) => ({
+  schema: 'satellite-wars.transport-interface-budget.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  dominantNhDryBeltVaporImport: findDominantNhDryBeltImport(latestSample?.transportTracing, 'vaporFluxNorthKgM_1S'),
+  dominantNhDryBeltCloudImport: findDominantNhDryBeltImport(latestSample?.transportTracing, 'cloudFluxNorthKgM_1S'),
+  interfaces: latestSample?.transportTracing?.interfaces || null
+});
+
+export const buildBandLevelFluxMatrixReport = (latestSample = null) => ({
+  schema: 'satellite-wars.band-level-flux-matrix.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  levelBands: latestSample?.transportTracing?.levelBands || null,
+  latitudeBands: latestSample?.transportTracing?.bandLevelMatrix || null
+});
+
+export const buildHadleyPartitionSummaryReport = (latestSample = null) => {
+  const transportTracing = latestSample?.transportTracing;
+  const metrics = latestSample?.metrics || {};
+  const north12 = transportInterfaceByTarget(transportTracing, 12);
+  const south12 = transportInterfaceByTarget(transportTracing, -12);
+  const localSourceProxyKgM2 = (Number(metrics.northDryBeltSourceNorthDryBeltOceanMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceLandRecyclingMeanKgM2) || 0);
+  const attributedTotalKgM2 = localSourceProxyKgM2
+    + (Number(metrics.northDryBeltSourceTropicalOceanNorthMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceTropicalOceanSouthMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceNorthExtratropicalOceanMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceOtherOceanMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceInitializationMemoryMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceAtmosphericCarryoverMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceNudgingInjectionMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceAnalysisInjectionMeanKgM2) || 0);
+  const importedSourceProxyKgM2 = Math.max(0, attributedTotalKgM2 - localSourceProxyKgM2);
+  return {
+    schema: 'satellite-wars.hadley-partition-summary.v1',
+    generatedAt: new Date().toISOString(),
+    targetDay: latestSample?.targetDay ?? null,
+    lowLevelSourcePartition: {
+      localSourceProxyKgM2: round(localSourceProxyKgM2, 5),
+      importedSourceProxyKgM2: round(importedSourceProxyKgM2, 5),
+      localSourceProxyFrac: attributedTotalKgM2 > 0 ? round(localSourceProxyKgM2 / attributedTotalKgM2, 5) : null,
+      importedSourceProxyFrac: attributedTotalKgM2 > 0 ? round(importedSourceProxyKgM2 / attributedTotalKgM2, 5) : null
+    },
+    tropicalExportLevels: {
+      northVaporExportSigma: round(computeDirectionalExportSigma(north12, 'vaporFluxNorthKgM_1S', 'northward'), 5),
+      northCloudExportSigma: round(computeDirectionalExportSigma(north12, 'cloudFluxNorthKgM_1S', 'northward'), 5),
+      southVaporExportSigma: round(computeDirectionalExportSigma(south12, 'vaporFluxNorthKgM_1S', 'southward'), 5),
+      southCloudExportSigma: round(computeDirectionalExportSigma(south12, 'cloudFluxNorthKgM_1S', 'southward'), 5)
+    },
+    returnBranchIntensity: {
+      northDryBeltEquatorwardMassFluxKgM_1S: round(computeReturnBranchIntensity(transportTracing, 'northDryBelt', 'equatorward_nh'), 5),
+      southDryBeltEquatorwardMassFluxKgM_1S: round(computeReturnBranchIntensity(transportTracing, 'southDryBelt', 'equatorward_sh'), 5)
+    },
+    northDryBeltTransport: {
+      dominantVaporImport: findDominantNhDryBeltImport(transportTracing, 'vaporFluxNorthKgM_1S'),
+      dominantCloudImport: findDominantNhDryBeltImport(transportTracing, 'cloudFluxNorthKgM_1S'),
+      vaporRecirculationProxyKgM_1S: round(computeRecirculationProxy(transportTracing, 'vaporFluxNorthKgM_1S'), 5),
+      cloudRecirculationProxyKgM_1S: round(computeRecirculationProxy(transportTracing, 'cloudFluxNorthKgM_1S'), 5)
+    },
+    streamfunctionProxy: transportTracing?.streamfunctionProxy || null,
+    rootCauseAssessment: buildTransportRootCauseAssessment(latestSample)
+  };
+};
+
+const compactTransportSummary = (sample = null) => {
+  if (!sample?.transportTracing) return null;
+  return {
+    dominantNhDryBeltVaporImport: findDominantNhDryBeltImport(sample.transportTracing, 'vaporFluxNorthKgM_1S'),
+    dominantNhDryBeltCloudImport: findDominantNhDryBeltImport(sample.transportTracing, 'cloudFluxNorthKgM_1S')
+  };
+};
+
+const compactSampleForSummary = (sample = null) => {
+  if (!sample) return sample;
+  const { transportTracing, ...rest } = sample;
+  return {
+    ...rest,
+    transportTracingSummary: compactTransportSummary(sample)
+  };
+};
 
 export const buildRestartParityReport = ({ checkpointDay = null, referenceSamples = [], resumedSamples = [] } = {}) => {
   const compareKeys = [
@@ -1475,6 +1673,9 @@ export async function main() {
   const surfaceSourceAttribution = buildSurfaceSourceAttributionReport(latestSample);
   const surfaceFluxDecomposition = buildSurfaceFluxDecompositionReport(latestSample);
   const nhDryBeltSourceSectorSummary = buildNhDryBeltSourceSectorReport(latestSample);
+  const transportInterfaceBudget = buildTransportInterfaceBudgetReport(latestSample);
+  const hadleyPartitionSummary = buildHadleyPartitionSummaryReport(latestSample);
+  const bandLevelFluxMatrix = buildBandLevelFluxMatrixReport(latestSample);
   const checkpointDay = sampleTargetsDays.find((day) => day > 0 && day < sampleTargetsDays[sampleTargetsDays.length - 1])
     || sampleTargetsDays[Math.max(0, Math.floor(sampleTargetsDays.length / 2))] || null;
   const restartParity = reproCheck
@@ -1491,8 +1692,16 @@ export async function main() {
     restartParityJsonPath: `${artifactBase}-restart-parity.json`,
     surfaceSourceAttributionJsonPath: `${artifactBase}-surface-source-tracers.json`,
     surfaceFluxDecompositionJsonPath: `${artifactBase}-surface-flux-decomposition.json`,
-    nhDryBeltSourceSectorSummaryJsonPath: `${artifactBase}-nh-dry-belt-source-sector-summary.json`
+    nhDryBeltSourceSectorSummaryJsonPath: `${artifactBase}-nh-dry-belt-source-sector-summary.json`,
+    transportInterfaceBudgetJsonPath: `${artifactBase}-transport-interface-budget.json`,
+    hadleyPartitionSummaryJsonPath: `${artifactBase}-hadley-partition-summary.json`,
+    bandLevelFluxMatrixJsonPath: `${artifactBase}-band-level-flux-matrix.json`
   } : null;
+  const summarySamples = samples.map((sample) => compactSampleForSummary(sample));
+  const summaryHorizons = horizonSummaries.map((horizon) => ({
+    ...horizon,
+    latest: compactSampleForSummary(horizon.latest)
+  }));
 
   const summary = {
     schema: 'satellite-wars.planetary-realism-audit.v2',
@@ -1510,9 +1719,9 @@ export async function main() {
     headlessTerrain: terrainFallback,
     headlessTerrainParity: Boolean(terrainFallback?.after?.terrainSampleCount > 0),
     timings: timingByTarget,
-    samples,
+    samples: summarySamples,
     monthlyClimatology,
-    horizons: horizonSummaries,
+    horizons: summaryHorizons,
     realismGaps,
     moistureAttribution,
     runManifest,
@@ -1521,6 +1730,9 @@ export async function main() {
     surfaceSourceAttribution,
     surfaceFluxDecomposition,
     nhDryBeltSourceSectorSummary,
+    transportInterfaceBudget,
+    hadleyPartitionSummary,
+    bandLevelFluxMatrix,
     artifacts,
     defaultNextPriorities
   };
@@ -1558,6 +1770,9 @@ export async function main() {
     fs.writeFileSync(artifacts.surfaceSourceAttributionJsonPath, toJson(surfaceSourceAttribution));
     fs.writeFileSync(artifacts.surfaceFluxDecompositionJsonPath, toJson(surfaceFluxDecomposition));
     fs.writeFileSync(artifacts.nhDryBeltSourceSectorSummaryJsonPath, toJson(nhDryBeltSourceSectorSummary));
+    fs.writeFileSync(artifacts.transportInterfaceBudgetJsonPath, toJson(transportInterfaceBudget));
+    fs.writeFileSync(artifacts.hadleyPartitionSummaryJsonPath, toJson(hadleyPartitionSummary));
+    fs.writeFileSync(artifacts.bandLevelFluxMatrixJsonPath, toJson(bandLevelFluxMatrix));
   }
   process.stdout.write(toJson(summary));
   return summary;
@@ -1578,6 +1793,9 @@ export const _test = {
   buildRunManifest,
   buildMonthlyClimatology,
   buildRealismGapReport,
+  buildTransportInterfaceBudgetReport,
+  buildHadleyPartitionSummaryReport,
+  buildBandLevelFluxMatrixReport,
   buildSurfaceFluxDecompositionReport,
   buildSurfaceSourceAttributionReport,
   classifySnapshot,
