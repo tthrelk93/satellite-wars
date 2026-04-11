@@ -6,6 +6,28 @@ Use this roadmap whenever `worker-brief.md` reports `climatePhysicsDue = true` o
 
 Land climate-model improvements that materially change the planet-scale weather, not just the browser/runtime harness around it.
 
+## Current campaign reality
+
+The original phase plan was directionally right, but the latest verified Phase-1 baseline clarified that the boundary between moisture partitioning and organized tropical export is not clean.
+
+Current kept quick-baseline truth from `weather-validation/output/phase1-hadley-second-pass-restore-v4.json`:
+- `itczWidthDeg = 23.646`
+- `subtropicalDryNorthRatio = 1.100`
+- `subtropicalDrySouthRatio = 0.519`
+- `subtropicalSubsidenceNorthMean = 0.065`
+- `subtropicalSubsidenceSouthMean = 0.038`
+- `tropicalConvectiveOrganization = 0.331`
+- `tropicalConvectiveMassFluxKgM2S = 0.00090`
+- `upperDetrainmentTropicalKgM2 = 0.00371`
+- `tropicalAnvilPersistenceFrac = 0.016`
+
+Interpretation:
+- broad Phase-1 Hadley moisture partitioning is mostly working
+- the remaining blocker is narrow: the north subtropical dry belt is still too wet
+- a standalone local dry-belt cleanup package was attempted and rejected because it could not beat the kept baseline
+- the next valid lane is not “more local dry-belt cleanup”
+- the next valid lane is `Phase 2A`: strengthen organized tropical convection and upper-level outflow specifically to finish the last unresolved Phase-1 blocker
+
 ## Current annual diagnosis
 
 The latest 365-day audit says the model is stable enough to learn from, but still fails the broad Earth-like climate bar.
@@ -48,7 +70,7 @@ Attack the remaining realism gap in this order:
 
 ## Campaign phases
 
-### Phase 1: Tighten Hadley Moisture Partitioning
+### Phase 1A: Tighten Hadley Moisture Partitioning
 
 Objective:
 - get the dry-belt ratios below `0.8`
@@ -87,35 +109,86 @@ Phase-1 acceptance gates:
   - midlatitude westerlies
   - global stability metrics
 
-### Phase 2: Strengthen Organized Tropical Convection And Upper-Level Outflow
+Status:
+- materially complete as a broad baseline
+- keep the verified Phase-1 baseline unless a new package clearly beats it
+
+### Phase 1B: Local North Dry-Belt Cleanup
+
+Objective:
+- try to finish the remaining north dry-belt miss with local subtropical cleanup alone
+
+Status:
+- attempted and rejected
+- standalone virga / marginal warm-rain / cloud-bleed packages did not beat the kept Phase-1 baseline
+- do not treat this as the main lane anymore unless a future export-focused package leaves only a tiny residual local cleanup
+
+### Phase 2A: Strengthen Organized Tropical Convection And Upper-Level Outflow To Finish Phase 1
 
 Objective:
 - increase organized convection strength without simply inflating rainfall everywhere
 - raise upper-level detrainment and anvil persistence enough that the tropics export moisture and energy more like Earth
+- specifically dry the remaining north subtropical belt by improving tropical export structure, not by punishing subtropical cloud locally
 
 Primary files:
+- `src/weather/v2/core5.js`
 - `src/weather/v2/vertical5.js`
 - `src/weather/v2/microphysics5.js`
 
 What to change:
+- in `core5.js`
+  - tune organized export defaults rather than broad threshold sweeps
+  - keep trades/westerlies guardrails intact while strengthening export structure
 - in `vertical5.js`
   - make organized convection persistence accumulate more strongly when low-level moisture convergence and instability stay co-located
-  - make entrainment/detrainment more nonlinear with organization so true ITCZ columns deepen while marginal subtropical columns stay shallow
-  - allow organized mass flux to maintain upper-level outflow longer instead of collapsing too quickly between steps
+  - make entrainment/detrainment and rainout more nonlinear with organization so true ITCZ columns deepen and export more condensate aloft
+  - couple subtropical descent more strongly to genuine organized tropical export rather than broad local cleanup terms
 - in `microphysics5.js`
-  - let organized convection produce a clearer stratiform/anvil tail aloft
-  - reduce premature warm-rain conversion in columns that should be exporting condensate upward
-  - tie evaporation and rainout penalties more strongly to environmental dryness and weak organization
+  - let organized convection hold more condensate in stratiform/anvil export instead of converting it prematurely into low-level local rain
+  - keep marginal subtropical convection weak without broadening the ITCZ
 
-Phase-2 acceptance gates:
+Phase-2A acceptance gates:
+- quick 30-day audit must beat the kept Phase-1 baseline on:
+  - `subtropicalDryNorthRatio`
+  - at least one of:
+    - `tropicalConvectiveOrganization`
+    - `tropicalConvectiveMassFluxKgM2S`
+    - `upperDetrainmentTropicalKgM2`
+    - `tropicalAnvilPersistenceFrac`
+- while preserving:
+  - `subtropicalDrySouthRatio <= 0.56`
+  - `subtropicalSubsidenceSouthMean >= 0.03`
+  - `itczWidthDeg <= 23.8`
+  - healthy trades and westerlies
+
+### Phase 2B: Re-check Phase-1 Moisture Gates After Export Fixes
+
+Objective:
+- verify whether the improved export/outflow package finishes the remaining north dry-belt miss
+
+Acceptance gates:
+- `subtropicalDryNorthRatio` moves below the next credible threshold and no longer dominates the realism gap report
+- if it still misses slightly, only then consider a very small local cleanup pass
+
+### Phase 3: Strengthen Organized Tropical Convection And Upper-Level Outflow
+
+Objective:
+- continue improving organized convection and export after the last Phase-1 blocker is no longer dominant
+- promote tropical structure from “good enough to finish dry belts” to “strong enough to support seasonal storm realism”
+
+Primary files:
+- `src/weather/v2/core5.js`
+- `src/weather/v2/vertical5.js`
+- `src/weather/v2/microphysics5.js`
+
+Phase-3 acceptance gates:
 - quick or seasonal audit:
-  - tropical convective organization above the current `0.289`
-  - tropical convective mass flux above the current `0.00026`
-  - upper detrainment above the current `0.00218 kg/m²`
-  - anvil persistence above the current `0.012`
-- the dry belts continue improving or at least do not regress
+  - tropical convective organization stays above the current kept baseline
+  - tropical convective mass flux stays above the current kept baseline
+  - upper detrainment and anvil persistence keep improving
+  - dry belts do not regress
 
-### Phase 3: Seasonal Storm Structure And Cyclone-Support Follow-Through
+### Phase 4: Seasonal Storm Structure And Cyclone-Support Follow-Through
 
 Objective:
 - once tropical/subtropical climate is healthier, improve storm-track asymmetry and seasonal cyclone-support realism
@@ -130,13 +203,13 @@ What to change:
 - strengthen hemisphere-appropriate warm-season cyclone-support contrast
 - improve baroclinic organization and seasonal background state only after the annual moisture partition is credible
 
-Phase-3 acceptance gates:
+Phase-4 acceptance gates:
 - seasonal or annual audit:
   - NH warm-season cyclone-support stronger than NH cool season
   - SH warm-season cyclone-support stronger than SH cool season
   - storm-track peaks remain in believable bands while seasonal asymmetry improves
 
-### Phase 4: Annual Signoff
+### Phase 5: Annual Signoff
 
 Only claim near-Earth climate behavior when:
 - annual ITCZ width is inside the target band for most months
@@ -148,31 +221,17 @@ Only claim near-Earth climate behavior when:
 
 ## Campaign ordering
 
-1. `ITCZ placement and subtropical dry-belt moisture partitioning`
-   - Current blocker because the annual audit still shows wet subtropics and weak subtropical descent even though circulation survives.
-   - Primary modules to inspect first:
+1. `Phase 2A: organized tropical export/outflow that finishes the last Phase-1 blocker`
+   - This is the active lane now.
+   - The remaining north dry-belt miss is no longer behaving like a standalone local cleanup problem.
+   - Primary modules:
      - `src/weather/v2/core5.js`
      - `src/weather/v2/vertical5.js`
      - `src/weather/v2/microphysics5.js`
-     - `src/weather/v2/nudging5.js`
-   - Most relevant levers already proven sensitive:
-     - continuous convective state persistence and decay
-     - organized mass-flux scaling
-     - detrainment and rainout coupling
-     - latitude-aware subtropical drying
-     - nudging relief against broad moisture-belt bias
    - Goal:
-     - reduce dry-belt wet bias without killing trades, westerlies, or equatorial precipitation
+     - improve tropical moisture export and compensating subtropical drying without re-broadening the ITCZ
 
-2. `Organized tropical convection and upper-level outflow`
-   - Use immediately after or alongside dry-belt work when the ITCZ is still too broad or too weakly organized.
-   - Primary modules:
-     - `src/weather/v2/vertical5.js`
-     - `src/weather/v2/microphysics5.js`
-   - Goal:
-     - raise mass flux, detrainment, and anvil persistence so the tropics export moisture and energy more realistically
-
-3. `Large-scale circulation and jet placement`
+2. `Large-scale circulation and jet placement`
    - Use after any dry-belt or convection change that degrades trade winds, westerlies, or storm-track placement.
    - Primary modules:
      - `src/weather/v2/core5.js`
@@ -182,7 +241,7 @@ Only claim near-Earth climate behavior when:
    - Goal:
      - preserve realistic Hadley/Ferrel structure while the moisture and convection fixes land
 
-4. `Storm evolution and cyclone structure`
+3. `Storm evolution and cyclone structure`
    - Use once the broad circulation and moisture belts are stable enough that storms are worth trusting.
    - Primary modules:
      - `src/weather/v2/vertical5.js`
@@ -191,7 +250,7 @@ Only claim near-Earth climate behavior when:
    - Goal:
      - improve frontal precipitation organization, cyclogenesis, comma-head structure, and storm lifetimes
 
-5. `Tropical cyclone / hurricane seasonality`
+4. `Tropical cyclone / hurricane seasonality`
    - Only elevate this after the annual moisture and circulation structure are healthy enough to support a year-scale claim.
    - Primary modules:
      - `src/weather/v2/core5.js`
@@ -201,7 +260,7 @@ Only claim near-Earth climate behavior when:
    - Goal:
      - get tropical cyclone environments and seasonality into believable geographic/seasonal windows
 
-6. `Multi-day or seasonal stability`
+5. `Multi-day or seasonal stability`
    - Promote to the top once quick, seasonal, and annual moisture-belt behavior are all close enough that the remaining question is persistence.
    - Required evidence:
      - `quick` 30-day planetary audit
