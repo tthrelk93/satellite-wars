@@ -203,8 +203,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.lowLevelMoistureConvergence || state.lowLevelMoistureConvergence.length !== N) state.lowLevelMoistureConvergence = new Float32Array(N);
   if (!state.lowLevelOmegaEffective || state.lowLevelOmegaEffective.length !== N) state.lowLevelOmegaEffective = new Float32Array(N);
   if (!state.subtropicalSubsidenceDrying || state.subtropicalSubsidenceDrying.length !== N) state.subtropicalSubsidenceDrying = new Float32Array(N);
+  if (!state.resolvedAscentCloudBirthPotential || state.resolvedAscentCloudBirthPotential.length !== N) state.resolvedAscentCloudBirthPotential = new Float32Array(N);
   if (!state.upperCloudPath || state.upperCloudPath.length !== N) state.upperCloudPath = new Float32Array(N);
   if (!state.importedAnvilPersistenceMass || state.importedAnvilPersistenceMass.length !== N) state.importedAnvilPersistenceMass = new Float32Array(N);
+  if (!state.carriedOverUpperCloudMass || state.carriedOverUpperCloudMass.length !== N) state.carriedOverUpperCloudMass = new Float32Array(N);
+  if (!state.weakErosionCloudSurvivalMass || state.weakErosionCloudSurvivalMass.length !== N) state.weakErosionCloudSurvivalMass = new Float32Array(N);
   const convMask = state.convMask;
   const convectivePotential = state.convectivePotential;
   const convectiveOrganization = state.convectiveOrganization;
@@ -217,8 +220,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const lowLevelMoistureConvergence = state.lowLevelMoistureConvergence;
   const lowLevelOmegaEffective = state.lowLevelOmegaEffective;
   const subtropicalSubsidenceDrying = state.subtropicalSubsidenceDrying;
+  const resolvedAscentCloudBirthPotential = state.resolvedAscentCloudBirthPotential;
   const upperCloudPath = state.upperCloudPath;
   const importedAnvilPersistenceMass = state.importedAnvilPersistenceMass;
+  const carriedOverUpperCloudMass = state.carriedOverUpperCloudMass;
+  const weakErosionCloudSurvivalMass = state.weakErosionCloudSurvivalMass;
   convMask.fill(0);
   convectiveMassFlux.fill(0);
   convectiveDetrainmentMass.fill(0);
@@ -229,8 +235,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   lowLevelMoistureConvergence.fill(0);
   lowLevelOmegaEffective.fill(0);
   subtropicalSubsidenceDrying.fill(0);
+  resolvedAscentCloudBirthPotential.fill(0);
   upperCloudPath.fill(0);
   importedAnvilPersistenceMass.fill(0);
+  carriedOverUpperCloudMass.fill(0);
+  weakErosionCloudSurvivalMass.fill(0);
 
   if (!state.terrainFlowForcing || state.terrainFlowForcing.length !== N) {
     state.terrainFlowForcing = new Float32Array(N);
@@ -496,6 +505,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
               const qvDelta = frac * (qv[idxBelow] - qv[idx]);
               qvUpdated += qvDelta;
               thetaUpdated += frac * (theta[idxBelow] - theta[idx]);
+              if (qvDelta > 0 && sigmaMid <= 0.55) {
+                const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+                if (dpLev > 0) {
+                  resolvedAscentCloudBirthPotential[k] += qvDelta * (dpLev / g);
+                }
+              }
               if (terrainFlowForcing > 0 && lev >= lowLevelStart) {
                 columnExposure += (-omegaMid) * dt;
                 if (qvDelta > 0) {
@@ -1085,10 +1100,21 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     }
     upperCloudPath[k] = upperCloudMass;
     const overlap = Math.min(prevUpperCloudPath[k] || 0, upperCloudMass);
+    carriedOverUpperCloudMass[k] = overlap;
     const weakLocalOrganization = 1 - smoothstep(0.12, 0.42, convectiveOrganization[k]);
     const weakLocalMassFlux = 1 - smoothstep(5e-4, 0.004, convectiveMassFlux[k]);
     const weakLocalDetrainment = 1 - smoothstep(0.001, 0.02, convectiveDetrainmentMass[k]);
     const weakLocalAnvilSource = 1 - smoothstep(0.05, 0.35, convectiveAnvilSource[k]);
+    const weakSubsidenceErosion = 1 - smoothstep(0.01, 0.08, subtropicalSubsidenceDrying[k]);
+    const weakDescentVent = 1 - smoothstep(0.02, 0.18, Math.max(0, lowLevelOmegaEffective[k]));
+    const weakErosionSupport = clamp01(
+      0.4 * weakSubsidenceErosion +
+      0.25 * weakDescentVent +
+      0.2 * weakLocalOrganization +
+      0.1 * weakLocalMassFlux +
+      0.05 * weakLocalAnvilSource
+    );
+    weakErosionCloudSurvivalMass[k] = overlap * weakErosionSupport;
     const persistenceSupport = clamp01(
       0.35 * weakLocalOrganization +
       0.25 * weakLocalMassFlux +

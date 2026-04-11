@@ -170,4 +170,6 @@ test('stepVertical5 tracks imported upper-cloud persistence when cloud lingers w
 
   assert.ok(state.upperCloudPath[0] > 0);
   assert.ok(state.importedAnvilPersistenceMass[0] > 0);
+  assert.ok(state.carriedOverUpperCloudMass[0] > 0);
+  assert.ok(state.weakErosionCloudSurvivalMass[0] > 0);
 });

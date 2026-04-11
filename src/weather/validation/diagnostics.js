@@ -180,10 +180,13 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     lowLevelMoistureConvergenceS_1: arrayOrZeros(state.lowLevelMoistureConvergence, state.N),
     lowLevelOmegaEffectivePaS: arrayOrZeros(state.lowLevelOmegaEffective, state.N),
     subtropicalSubsidenceDryingFrac: arrayOrZeros(state.subtropicalSubsidenceDrying, state.N),
+    resolvedAscentCloudBirthPotentialKgM2: arrayOrZeros(state.resolvedAscentCloudBirthPotential, state.N),
     largeScaleCondensationSourceKgM2: arrayOrZeros(state.largeScaleCondensationSource, state.N),
     cloudReevaporationMassKgM2: arrayOrZeros(state.cloudReevaporationMass, state.N),
     precipReevaporationMassKgM2: arrayOrZeros(state.precipReevaporationMass, state.N),
     importedAnvilPersistenceMassKgM2: arrayOrZeros(state.importedAnvilPersistenceMass, state.N),
+    carriedOverUpperCloudMassKgM2: arrayOrZeros(state.carriedOverUpperCloudMass, state.N),
+    weakErosionCloudSurvivalMassKgM2: arrayOrZeros(state.weakErosionCloudSurvivalMass, state.N),
     processMoistureBudget: typeof core?.getClimateProcessBudgetSummary === 'function'
       ? core.getClimateProcessBudgetSummary()
       : null,

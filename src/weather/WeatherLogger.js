@@ -88,10 +88,13 @@ const buildBroadClimateStats = (diagnostics) => {
   const zonalSubsidenceDrying = zonalMean(diagnostics.subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalDetrainment = zonalMean(diagnostics.convectiveDetrainmentMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalAnvil = zonalMean(diagnostics.convectiveAnvilSourceFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalResolvedAscentCloudBirthPotential = zonalMean(diagnostics.resolvedAscentCloudBirthPotentialKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalLargeScaleCondensation = zonalMean(diagnostics.largeScaleCondensationSourceKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalCloudReevaporation = zonalMean(diagnostics.cloudReevaporationMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalPrecipReevaporation = zonalMean(diagnostics.precipReevaporationMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalImportedAnvilPersistence = zonalMean(diagnostics.importedAnvilPersistenceMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalCarriedOverUpperCloud = zonalMean(diagnostics.carriedOverUpperCloudMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalWeakErosionCloudSurvival = zonalMean(diagnostics.weakErosionCloudSurvivalMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalUpperCloudPath = zonalMean(diagnostics.upperCloudPathKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalSurfaceEvap = zonalMean(diagnostics.surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny);
   const zonalVaporFluxNorth = zonalMean(diagnostics.verticallyIntegratedVaporFluxNorthKgM_1S || new Array(nx * ny).fill(0), nx, ny);
@@ -114,10 +117,13 @@ const buildBroadClimateStats = (diagnostics) => {
     northTransitionVaporFluxNorthKgM_1S: round(weightedBandMean(zonalVaporFluxNorth, latitudesDeg, rowWeights, 12, 22), 5),
     northDryBeltVaporFluxNorthKgM_1S: round(weightedBandMean(zonalVaporFluxNorth, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
     northDryBeltEvapMeanMmHr: round(weightedBandMean(zonalSurfaceEvap, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),
+    northDryBeltResolvedAscentCloudBirthPotentialMeanKgM2: round(weightedBandMean(zonalResolvedAscentCloudBirthPotential, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
     northDryBeltLargeScaleCondensationMeanKgM2: round(weightedBandMean(zonalLargeScaleCondensation, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
     northDryBeltCloudReevaporationMeanKgM2: round(weightedBandMean(zonalCloudReevaporation, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
     northDryBeltPrecipReevaporationMeanKgM2: round(weightedBandMean(zonalPrecipReevaporation, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
     northDryBeltImportedAnvilPersistenceMeanKgM2: round(weightedBandMean(zonalImportedAnvilPersistence, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+    northDryBeltCarriedOverUpperCloudMeanKgM2: round(weightedBandMean(zonalCarriedOverUpperCloud, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+    northDryBeltWeakErosionCloudSurvivalMeanKgM2: round(weightedBandMean(zonalWeakErosionCloudSurvival, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
     northDryBeltUpperCloudPathMeanKgM2: round(weightedBandMean(zonalUpperCloudPath, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
     southDryBeltEvapMeanMmHr: round(weightedBandMean(zonalSurfaceEvap, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT)),
     subtropicalRhNorthMeanFrac: round(weightedBandMean(zonalLowerRh, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),

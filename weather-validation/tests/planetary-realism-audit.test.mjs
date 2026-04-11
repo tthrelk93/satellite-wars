@@ -126,6 +126,11 @@ test('classifySnapshot reports broad convection and subtropical drying diagnosti
       0.7, 0.75,
       0.1, 0.1
     ],
+    resolvedAscentCloudBirthPotentialKgM2: [
+      0.04, 0.05,
+      0.03, 0.03,
+      0.06, 0.07
+    ],
     largeScaleCondensationSourceKgM2: [
       0.08, 0.06,
       0.04, 0.05,
@@ -145,6 +150,16 @@ test('classifySnapshot reports broad convection and subtropical drying diagnosti
       0.03, 0.04,
       0.02, 0.02,
       0.05, 0.05
+    ],
+    carriedOverUpperCloudMassKgM2: [
+      0.06, 0.07,
+      0.03, 0.03,
+      0.08, 0.09
+    ],
+    weakErosionCloudSurvivalMassKgM2: [
+      0.04, 0.04,
+      0.01, 0.01,
+      0.05, 0.06
     ],
     upperCloudPathKgM2: [
       0.1, 0.12,
@@ -179,13 +194,19 @@ test('classifySnapshot reports broad convection and subtropical drying diagnosti
   assert.ok(snapshot.metrics.tropicalAnvilPersistenceFrac > 0.6);
   assert.ok(snapshot.metrics.crossEquatorialVaporFluxNorthKgM_1S > 0);
   assert.ok(snapshot.metrics.northDryBeltLandPrecipMeanMmHr > 0);
+  assert.ok(snapshot.metrics.northDryBeltResolvedAscentCloudBirthPotentialMeanKgM2 > 0);
   assert.ok(snapshot.metrics.northDryBeltLargeScaleCondensationMeanKgM2 > 0);
   assert.ok(snapshot.metrics.northDryBeltImportedAnvilPersistenceMeanKgM2 > 0);
+  assert.ok(snapshot.metrics.northDryBeltCarriedOverUpperCloudMeanKgM2 > 0);
+  assert.ok(snapshot.metrics.northDryBeltWeakErosionCloudSurvivalMeanKgM2 > 0);
   assert.ok(snapshot.metrics.northDryBeltUpperCloudPathMeanKgM2 > 0);
   assert.equal(snapshot.profiles.latitudesDeg.length, 3);
   assert.equal(snapshot.profiles.series.convectivePotential.length, 3);
   assert.equal(snapshot.profiles.series.surfaceEvapRateMmHr.length, 3);
+  assert.equal(snapshot.profiles.series.resolvedAscentCloudBirthPotentialKgM2.length, 3);
   assert.equal(snapshot.profiles.series.largeScaleCondensationSourceKgM2.length, 3);
+  assert.equal(snapshot.profiles.series.carriedOverUpperCloudMassKgM2.length, 3);
+  assert.equal(snapshot.profiles.series.weakErosionCloudSurvivalMassKgM2.length, 3);
 });
 
 test('buildMoistureAttributionReport ranks moistening drivers and keeps regime totals', () => {
@@ -227,10 +248,19 @@ test('buildMoistureAttributionReport ranks moistening drivers and keeps regime t
     },
     {
       subtropicalDryNorthRatio: 1.2,
+      northDryBeltResolvedAscentCloudBirthPotentialMeanKgM2: 0.05,
+      northDryBeltLandResolvedAscentCloudBirthPotentialMeanKgM2: 0.01,
+      northDryBeltOceanResolvedAscentCloudBirthPotentialMeanKgM2: 0.04,
       northDryBeltLargeScaleCondensationMeanKgM2: 0.08,
       northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.07,
       northDryBeltLandLargeScaleCondensationMeanKgM2: 0.01,
       northDryBeltImportedAnvilPersistenceMeanKgM2: 0.03,
+      northDryBeltCarriedOverUpperCloudMeanKgM2: 0.04,
+      northDryBeltLandCarriedOverUpperCloudMeanKgM2: 0.01,
+      northDryBeltOceanCarriedOverUpperCloudMeanKgM2: 0.03,
+      northDryBeltWeakErosionCloudSurvivalMeanKgM2: 0.025,
+      northDryBeltLandWeakErosionCloudSurvivalMeanKgM2: 0.006,
+      northDryBeltOceanWeakErosionCloudSurvivalMeanKgM2: 0.019,
       northDryBeltCloudReevaporationMeanKgM2: 0.02,
       northDryBeltPrecipReevaporationMeanKgM2: 0.01,
       northDryBeltUpperCloudPathMeanKgM2: 0.12,
@@ -242,7 +272,9 @@ test('buildMoistureAttributionReport ranks moistening drivers and keeps regime t
   assert.equal(report.positiveNorthDryBeltMoisteningDrivers[0].module, 'stepAdvection5');
   assert.equal(report.strongestNorthDryBeltPrecipSinks[0].module, 'stepMicrophysics5');
   assert.equal(report.precipitationRegimes.deep_core_tropical.surfacePrecipDeltaMm, 8);
+  assert.equal(report.northDryBeltGenerationAttribution.resolvedAscentCloudBirthPotentialMeanKgM2, 0.05);
   assert.equal(report.northDryBeltGenerationAttribution.oceanLargeScaleCondensationMeanKgM2, 0.07);
+  assert.equal(report.northDryBeltGenerationAttribution.oceanCarriedOverUpperCloudMeanKgM2, 0.03);
 });
 
 test('buildMonthlyClimatology averages metrics and zonal profiles by month', () => {
