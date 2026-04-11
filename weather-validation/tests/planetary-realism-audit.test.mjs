@@ -389,6 +389,64 @@ test('buildPhase6ThermodynamicReports surface stability and radiative maintenanc
   assert.equal(profiles.radiativeSeries.upperCloudNetCloudRadiativeEffectWm2[2], 15);
 });
 
+test('buildPhase8StormSpilloverReports expose regime coverage and transient leakage', () => {
+  const sample = {
+    targetDay: 30,
+    stormSpilloverTracing: {
+      overall: {
+        assignedCombinedContributionFrac: 1,
+        dominantCombinedRegime: 'persistent_zonal_background',
+        regimes: {
+          persistent_zonal_background: { combinedContributionFrac: 0.56 },
+          tropical_spillover: { combinedContributionFrac: 0.14 },
+          subtropical_marine_deck_drizzle: { combinedContributionFrac: 0.1 },
+          synoptic_storm_leakage: { combinedContributionFrac: 0.2 }
+        }
+      },
+      sectoralRegimes: {
+        eastPacific: {
+          dominantCombinedRegime: 'synoptic_storm_leakage',
+          regimes: {
+            synoptic_storm_leakage: { combinedContributionFrac: 0.48 }
+          }
+        }
+      },
+      eventCatalog: {
+        precipThresholdMmHr: 0.15,
+        topEvents: [
+          {
+            regimeKey: 'synoptic_storm_leakage',
+            sectorKey: 'eastPacific',
+            severityScore: 0.91
+          }
+        ]
+      },
+      transientEddyLeakage: {
+        dominantCloudEddyImport: {
+          targetLatDeg: 35,
+          sectorKey: 'eastPacific',
+          levelBandKey: 'upperTroposphere',
+          cloudFluxEddyComponentKgM_1S: 3.21
+        }
+      },
+      rootCauseAssessment: {
+        ruledIn: ['Leakage matters.'],
+        ruledOut: [],
+        ambiguous: []
+      }
+    }
+  };
+
+  const catalog = planetaryAuditTest.buildStormSpilloverCatalogReport(sample);
+  const regimes = planetaryAuditTest.buildSectoralDryBeltRegimesReport(sample);
+  const leakage = planetaryAuditTest.buildTransientEddyLeakageSummaryReport(sample);
+
+  assert.equal(catalog.eventCatalog.topEvents[0].sectorKey, 'eastPacific');
+  assert.equal(regimes.overall.dominantCombinedRegime, 'persistent_zonal_background');
+  assert.equal(regimes.sectoralRegimes.eastPacific.dominantCombinedRegime, 'synoptic_storm_leakage');
+  assert.equal(leakage.transientEddyLeakage.dominantCloudEddyImport.levelBandKey, 'upperTroposphere');
+});
+
 test('buildMonthlyClimatology averages metrics and zonal profiles by month', () => {
   const monthly = planetaryAuditTest.buildMonthlyClimatology([
     {

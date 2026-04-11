@@ -479,6 +479,30 @@ Rules out / confirms:
 Exit criteria:
 - at least 80% of NH dry-belt precipitation/cloud can be assigned to one of the regime families above
 
+Status:
+- completed on the current branch as the Phase 8 sectoral spillover instrumentation pass
+
+Findings from the Phase 8 smoke audit:
+- assignment coverage closed cleanly:
+  - `assignedCombinedContributionFrac = 1.0`
+- NH dry-belt cloud/precip is dominated by `persistent_zonal_background`, not synoptic leakage:
+  - `persistent_zonal_background combinedContributionFrac = 0.86456`
+  - `synoptic_storm_leakage combinedContributionFrac = 0.00932`
+  - `tropical_spillover combinedContributionFrac = 0`
+  - `subtropical_marine_deck_drizzle combinedContributionFrac = 0.12612`
+- the strongest transient-eddy imports are still upper-tropospheric, but they are not showing up as the dominant classified dry-belt regime:
+  - dominant vapor eddy import: `22°N / eastPacific / upperTroposphere`
+  - dominant cloud eddy import: `35°N / continentalSubtropics / upperTroposphere`
+- top cataloged events are still mostly classified as `persistent_zonal_background`, which means the wet bias is behaving more like persistent imported cloud plus large-scale maintenance than discrete storm spillover.
+
+Root-cause effect on the plan:
+- Phase 8 materially rules out `sectoral storm leakage` as the primary bug.
+- The leading explanation remains:
+  - imported upper cloud persists into the NH dry belt
+  - weak effective erosion keeps it there
+  - large-scale condensation reinforces the background cloud after import
+- This means the next highest-value falsification phases are now `Phase 7` and `Phase 9`, not a storm-track leakage patch.
+
 ## Phase 9: Numerical Integrity And Sensitivity Diagnostics
 
 Objective:

@@ -458,7 +458,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     transportTracing,
     verticalCloudBirthTracing,
     upperCloudResidenceTracing,
-    thermodynamicSupportTracing
+    thermodynamicSupportTracing,
+    stormSpilloverTracing
   } = diagnostics;
   const { nx, ny, latitudesDeg } = grid;
   const longitudesDeg = Array.isArray(grid.longitudesDeg)
@@ -726,7 +727,12 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       stormTrackNorthLatDeg: round(stormTrackNorthLat),
       stormTrackSouthLatDeg: round(stormTrackSouthLat),
       tropicalCycloneEnvironmentCountNh: tcEnvCounts.nh,
-      tropicalCycloneEnvironmentCountSh: tcEnvCounts.sh
+      tropicalCycloneEnvironmentCountSh: tcEnvCounts.sh,
+      northDryBeltAssignedSpilloverRegimeCoverageFrac: round(stormSpilloverTracing?.overall?.assignedCombinedContributionFrac || 0, 5),
+      northDryBeltPersistentBackgroundCombinedFrac: round(stormSpilloverTracing?.overall?.regimes?.persistent_zonal_background?.combinedContributionFrac || 0, 5),
+      northDryBeltTropicalSpilloverCombinedFrac: round(stormSpilloverTracing?.overall?.regimes?.tropical_spillover?.combinedContributionFrac || 0, 5),
+      northDryBeltMarineDeckCombinedFrac: round(stormSpilloverTracing?.overall?.regimes?.subtropical_marine_deck_drizzle?.combinedContributionFrac || 0, 5),
+      northDryBeltSynopticLeakageCombinedFrac: round(stormSpilloverTracing?.overall?.regimes?.synoptic_storm_leakage?.combinedContributionFrac || 0, 5)
     },
     sourceAttribution: {
       northDryBeltLowLevelMeanKgM2: northDryBeltSourceMeans,
@@ -738,6 +744,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     verticalCloudBirthTracing: verticalCloudBirthTracing || null,
     upperCloudResidenceTracing: upperCloudResidenceTracing || null,
     thermodynamicSupportTracing: thermodynamicSupportTracing || null,
+    stormSpilloverTracing: stormSpilloverTracing || null,
     profiles: {
       latitudesDeg: roundSeries(latitudesDeg),
       series: {
@@ -1224,6 +1231,33 @@ export const buildBoundaryLayerStabilityProfilesReport = (latestSample = null) =
   } : null
 });
 
+export const buildStormSpilloverCatalogReport = (latestSample = null) => ({
+  schema: 'satellite-wars.storm-spillover-catalog.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  overall: latestSample?.stormSpilloverTracing?.overall || null,
+  eventCatalog: latestSample?.stormSpilloverTracing?.eventCatalog || null,
+  rootCauseAssessment: latestSample?.stormSpilloverTracing?.rootCauseAssessment || null
+});
+
+export const buildSectoralDryBeltRegimesReport = (latestSample = null) => ({
+  schema: 'satellite-wars.sectoral-dry-belt-regimes.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  regimeDefinitions: latestSample?.stormSpilloverTracing?.regimeDefinitions || null,
+  overall: latestSample?.stormSpilloverTracing?.overall || null,
+  sectoralRegimes: latestSample?.stormSpilloverTracing?.sectoralRegimes || null,
+  rootCauseAssessment: latestSample?.stormSpilloverTracing?.rootCauseAssessment || null
+});
+
+export const buildTransientEddyLeakageSummaryReport = (latestSample = null) => ({
+  schema: 'satellite-wars.transient-eddy-leakage-summary.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  transientEddyLeakage: latestSample?.stormSpilloverTracing?.transientEddyLeakage || null,
+  rootCauseAssessment: latestSample?.stormSpilloverTracing?.rootCauseAssessment || null
+});
+
 const compactThermodynamicSupportSummary = (sample = null) => {
   if (!sample?.thermodynamicSupportTracing) return null;
   return {
@@ -1236,15 +1270,35 @@ const compactThermodynamicSupportSummary = (sample = null) => {
   };
 };
 
+const compactStormSpilloverSummary = (sample = null) => {
+  if (!sample?.stormSpilloverTracing) return null;
+  return {
+    dominantCombinedRegime: sample.stormSpilloverTracing?.overall?.dominantCombinedRegime ?? null,
+    assignedCombinedContributionFrac: sample.stormSpilloverTracing?.overall?.assignedCombinedContributionFrac ?? null,
+    synopticCombinedFrac: sample.stormSpilloverTracing?.overall?.regimes?.synoptic_storm_leakage?.combinedContributionFrac ?? null,
+    persistentBackgroundCombinedFrac: sample.stormSpilloverTracing?.overall?.regimes?.persistent_zonal_background?.combinedContributionFrac ?? null,
+    dominantCloudEddyImport: sample.stormSpilloverTracing?.transientEddyLeakage?.dominantCloudEddyImport || null,
+    rootCauseAssessment: sample.stormSpilloverTracing?.rootCauseAssessment || null
+  };
+};
+
 const compactSampleForSummary = (sample = null) => {
   if (!sample) return sample;
-  const { transportTracing, verticalCloudBirthTracing, upperCloudResidenceTracing, thermodynamicSupportTracing, ...rest } = sample;
+  const {
+    transportTracing,
+    verticalCloudBirthTracing,
+    upperCloudResidenceTracing,
+    thermodynamicSupportTracing,
+    stormSpilloverTracing,
+    ...rest
+  } = sample;
   return {
     ...rest,
     transportTracingSummary: compactTransportSummary(sample),
     verticalCloudBirthTracingSummary: compactVerticalCloudBirthSummary(sample),
     upperCloudResidenceTracingSummary: compactUpperCloudResidenceSummary(sample),
-    thermodynamicSupportTracingSummary: compactThermodynamicSupportSummary(sample)
+    thermodynamicSupportTracingSummary: compactThermodynamicSupportSummary(sample),
+    stormSpilloverTracingSummary: compactStormSpilloverSummary(sample)
   };
 };
 
@@ -1796,6 +1850,15 @@ const renderMarkdown = (summary) => {
     if (summary.artifacts.boundaryLayerStabilityProfilesJsonPath) {
       lines.push(`- Boundary-layer stability profiles JSON: ${summary.artifacts.boundaryLayerStabilityProfilesJsonPath}`);
     }
+    if (summary.artifacts.stormSpilloverCatalogJsonPath) {
+      lines.push(`- Storm spillover catalog JSON: ${summary.artifacts.stormSpilloverCatalogJsonPath}`);
+    }
+    if (summary.artifacts.sectoralDryBeltRegimesJsonPath) {
+      lines.push(`- Sectoral dry-belt regimes JSON: ${summary.artifacts.sectoralDryBeltRegimesJsonPath}`);
+    }
+    if (summary.artifacts.transientEddyLeakageSummaryJsonPath) {
+      lines.push(`- Transient eddy leakage summary JSON: ${summary.artifacts.transientEddyLeakageSummaryJsonPath}`);
+    }
     lines.push('');
   }
 
@@ -1896,6 +1959,9 @@ export async function main() {
   const thermodynamicSupportSummary = buildThermodynamicSupportSummaryReport(latestSample);
   const radiativeCloudMaintenance = buildRadiativeCloudMaintenanceReport(latestSample);
   const boundaryLayerStabilityProfiles = buildBoundaryLayerStabilityProfilesReport(latestSample);
+  const stormSpilloverCatalog = buildStormSpilloverCatalogReport(latestSample);
+  const sectoralDryBeltRegimes = buildSectoralDryBeltRegimesReport(latestSample);
+  const transientEddyLeakageSummary = buildTransientEddyLeakageSummaryReport(latestSample);
   const checkpointDay = sampleTargetsDays.find((day) => day > 0 && day < sampleTargetsDays[sampleTargetsDays.length - 1])
     || sampleTargetsDays[Math.max(0, Math.floor(sampleTargetsDays.length / 2))] || null;
   const restartParity = reproCheck
@@ -1924,7 +1990,10 @@ export async function main() {
     upperCloudVentilationSummaryJsonPath: `${artifactBase}-upper-cloud-ventilation-summary.json`,
     thermodynamicSupportSummaryJsonPath: `${artifactBase}-thermodynamic-support-summary.json`,
     radiativeCloudMaintenanceJsonPath: `${artifactBase}-radiative-cloud-maintenance.json`,
-    boundaryLayerStabilityProfilesJsonPath: `${artifactBase}-boundary-layer-stability-profiles.json`
+    boundaryLayerStabilityProfilesJsonPath: `${artifactBase}-boundary-layer-stability-profiles.json`,
+    stormSpilloverCatalogJsonPath: `${artifactBase}-storm-spillover-catalog.json`,
+    sectoralDryBeltRegimesJsonPath: `${artifactBase}-sectoral-dry-belt-regimes.json`,
+    transientEddyLeakageSummaryJsonPath: `${artifactBase}-transient-eddy-leakage-summary.json`
   } : null;
   const summarySamples = samples.map((sample) => compactSampleForSummary(sample));
   const summaryHorizons = horizonSummaries.map((horizon) => ({
@@ -1971,6 +2040,9 @@ export async function main() {
     thermodynamicSupportSummary,
     radiativeCloudMaintenance,
     boundaryLayerStabilityProfiles,
+    stormSpilloverCatalog,
+    sectoralDryBeltRegimes,
+    transientEddyLeakageSummary,
     artifacts,
     defaultNextPriorities
   };
@@ -2020,6 +2092,9 @@ export async function main() {
     fs.writeFileSync(artifacts.thermodynamicSupportSummaryJsonPath, toJson(thermodynamicSupportSummary));
     fs.writeFileSync(artifacts.radiativeCloudMaintenanceJsonPath, toJson(radiativeCloudMaintenance));
     fs.writeFileSync(artifacts.boundaryLayerStabilityProfilesJsonPath, toJson(boundaryLayerStabilityProfiles));
+    fs.writeFileSync(artifacts.stormSpilloverCatalogJsonPath, toJson(stormSpilloverCatalog));
+    fs.writeFileSync(artifacts.sectoralDryBeltRegimesJsonPath, toJson(sectoralDryBeltRegimes));
+    fs.writeFileSync(artifacts.transientEddyLeakageSummaryJsonPath, toJson(transientEddyLeakageSummary));
   }
   process.stdout.write(toJson(summary));
   return summary;
@@ -2052,6 +2127,9 @@ export const _test = {
   buildThermodynamicSupportSummaryReport,
   buildRadiativeCloudMaintenanceReport,
   buildBoundaryLayerStabilityProfilesReport,
+  buildStormSpilloverCatalogReport,
+  buildSectoralDryBeltRegimesReport,
+  buildTransientEddyLeakageSummaryReport,
   buildSurfaceFluxDecompositionReport,
   buildSurfaceSourceAttributionReport,
   classifySnapshot,

@@ -50,6 +50,18 @@ const CLOUD_BIRTH_ASCENT_BINS = [
   { key: 'strong', label: '0.18-0.35 Pa/s', min: 0.18, max: 0.35 },
   { key: 'extreme', label: '>0.35 Pa/s', min: 0.35, max: Infinity }
 ];
+const STORM_SPILLOVER_REGIMES = [
+  { key: 'persistent_zonal_background', label: 'Persistent zonal background' },
+  { key: 'tropical_spillover', label: 'Tropical spillover' },
+  { key: 'subtropical_marine_deck_drizzle', label: 'Subtropical marine deck / drizzle' },
+  { key: 'synoptic_storm_leakage', label: 'Synoptic storm leakage' }
+];
+const STORM_SPILLOVER_INTERFACE_TARGETS_DEG = [22, 35];
+const STORM_SPILLOVER_LEVEL_BANDS = [
+  { key: 'lowerTroposphere', label: 'Lower troposphere', minSigma: 0.65, maxSigma: 0.85 },
+  { key: 'midTroposphere', label: 'Mid troposphere', minSigma: 0.35, maxSigma: 0.65 },
+  { key: 'upperTroposphere', label: 'Upper troposphere', minSigma: 0.0, maxSigma: 0.35 }
+];
 
 const saturationMixingRatio = (T, p) => {
   const Tuse = Math.max(180, Math.min(330, T));
@@ -299,6 +311,20 @@ const resolveLatitudeInterface = (latitudesDeg, targetLatDeg) => {
     }
   }
   return best;
+};
+
+const findClosestLatitudeRow = (latitudesDeg, targetLatDeg) => {
+  if (!Array.isArray(latitudesDeg) || !latitudesDeg.length) return -1;
+  let bestIndex = 0;
+  let bestDistance = Infinity;
+  for (let row = 0; row < latitudesDeg.length; row += 1) {
+    const distance = Math.abs((latitudesDeg[row] || 0) - targetLatDeg);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = row;
+    }
+  }
+  return bestIndex;
 };
 
 const createFluxAccumulator = () => ({
@@ -1126,6 +1152,495 @@ const buildThermodynamicSupportTracing = (state, grid, upperCloudResidenceTracin
   };
 };
 
+const buildStormSpilloverTracing = ({
+  state,
+  grid,
+  landMask,
+  precipRateMmHr,
+  cloudTotalFraction,
+  cloudLowFraction,
+  cloudHighFraction,
+  upperCloudPathKgM2,
+  convectiveAnvilSourceFrac,
+  convectiveOrganizationFrac,
+  convectiveMassFluxKgM2S,
+  carriedOverUpperCloudMassKgM2,
+  importedAnvilPersistenceMassKgM2,
+  weakErosionCloudSurvivalMassKgM2,
+  largeScaleCondensationSourceKgM2,
+  subtropicalSubsidenceDryingFrac,
+  surfaceCloudShortwaveShieldingWm2,
+  lowLevelMoistureConvergenceS_1,
+  lowerTroposphericRhFrac,
+  cycloneSupportFields
+} = {}) => {
+  if (!state || !grid || !cycloneSupportFields) return null;
+
+  const { nx, ny } = grid;
+  const latitudesDeg = Array.from(grid.latDeg || []);
+  const longitudesDeg = Array.from(grid.lonDeg || []);
+  const rowWeights = makeRowWeights(latitudesDeg);
+  const stateLandMask = Array.from(landMask || state.landMask || new Uint8Array(state.N));
+  const slp = Array.from(cycloneSupportFields.seaLevelPressurePa || new Float32Array(state.N));
+  const vort = Array.from(cycloneSupportFields.relativeVorticityS_1 || new Float32Array(state.N));
+  const wind10m = Array.from(cycloneSupportFields.wind10mSpeedMs || new Float32Array(state.N));
+  const omegaLower = Array.from(cycloneSupportFields.omegaLowerPaS || new Float32Array(state.N));
+  const omegaUpper = Array.from(cycloneSupportFields.omegaUpperPaS || new Float32Array(state.N));
+  const zonalSlp = new Array(ny).fill(0);
+
+  for (let row = 0; row < ny; row += 1) {
+    let sum = 0;
+    for (let i = 0; i < nx; i += 1) sum += slp[row * nx + i] || 0;
+    zonalSlp[row] = sum / Math.max(1, nx);
+  }
+
+  const makeRegimeAccumulator = () => ({
+    cellCount: 0,
+    precipContributionWeighted: 0,
+    cloudContributionWeighted: 0,
+    combinedContributionWeighted: 0,
+    synopticScoreWeighted: 0,
+    tropicalScoreWeighted: 0,
+    marineScoreWeighted: 0,
+    backgroundScoreWeighted: 0,
+    meanPrecipRateMmHrWeighted: 0,
+    meanUpperCloudPathKgM2Weighted: 0,
+    meanAbsVorticityS_1Weighted: 0,
+    meanSlpAnomalyPaWeighted: 0,
+    meanOmegaUpperPaSWeighted: 0,
+    meanCloudHighFracWeighted: 0,
+    meanCloudLowFracWeighted: 0
+  });
+
+  const makeRegimeSummaryMap = () => Object.fromEntries(
+    STORM_SPILLOVER_REGIMES.map(({ key, label }) => [key, { label, ...makeRegimeAccumulator() }])
+  );
+
+  const overallRegimes = makeRegimeSummaryMap();
+  const sectorRegimes = Object.fromEntries(
+    NH_DRY_BELT_SOURCE_SECTORS.map(({ key, label }) => [key, { label, regimes: makeRegimeSummaryMap() }])
+  );
+  const sectorEvents = Object.fromEntries(
+    NH_DRY_BELT_SOURCE_SECTORS.map(({ key, label }) => [key, { label, eventCount: 0, topEvents: [] }])
+  );
+  const topEvents = [];
+  let totalPrecipWeighted = 0;
+  let totalCloudWeighted = 0;
+  let totalCombinedWeighted = 0;
+
+  const pushTopEvent = (collection, event, limit = 8) => {
+    collection.push(event);
+    collection.sort((a, b) => (b.severityScore || 0) - (a.severityScore || 0));
+    if (collection.length > limit) collection.length = limit;
+  };
+
+  const accumulateRegime = (accumulator, regimeKey, {
+    precipWeighted,
+    cloudWeighted,
+    combinedWeighted,
+    synopticScore,
+    tropicalScore,
+    marineScore,
+    backgroundScore,
+    precip,
+    upperCloud,
+    absVorticity,
+    slpAnomaly,
+    omegaUpperPaS,
+    cloudHighFracValue,
+    cloudLowFracValue
+  }) => {
+    const regime = accumulator[regimeKey];
+    if (!regime) return;
+    regime.cellCount += 1;
+    regime.precipContributionWeighted += precipWeighted;
+    regime.cloudContributionWeighted += cloudWeighted;
+    regime.combinedContributionWeighted += combinedWeighted;
+    regime.synopticScoreWeighted += synopticScore * combinedWeighted;
+    regime.tropicalScoreWeighted += tropicalScore * combinedWeighted;
+    regime.marineScoreWeighted += marineScore * combinedWeighted;
+    regime.backgroundScoreWeighted += backgroundScore * combinedWeighted;
+    regime.meanPrecipRateMmHrWeighted += precip * combinedWeighted;
+    regime.meanUpperCloudPathKgM2Weighted += upperCloud * combinedWeighted;
+    regime.meanAbsVorticityS_1Weighted += absVorticity * combinedWeighted;
+    regime.meanSlpAnomalyPaWeighted += slpAnomaly * combinedWeighted;
+    regime.meanOmegaUpperPaSWeighted += omegaUpperPaS * combinedWeighted;
+    regime.meanCloudHighFracWeighted += cloudHighFracValue * combinedWeighted;
+    regime.meanCloudLowFracWeighted += cloudLowFracValue * combinedWeighted;
+  };
+
+  for (let row = 0; row < ny; row += 1) {
+    const latDeg = latitudesDeg[row];
+    if (latDeg < 15 || latDeg > 35) continue;
+    const rowWeight = rowWeights[row];
+    for (let i = 0; i < nx; i += 1) {
+      const idx = row * nx + i;
+      const precip = Math.max(0, precipRateMmHr?.[idx] || 0);
+      const upperCloud = Math.max(0, upperCloudPathKgM2?.[idx] || 0);
+      if (precip <= EPS && upperCloud <= EPS) continue;
+      const isLand = stateLandMask[idx] === 1;
+      const sectorKey = classifyNhDryBeltSector({ lonDeg: longitudesDeg[i], isLand });
+      const cloudHigh = Math.max(0, cloudHighFraction?.[idx] || 0);
+      const cloudLow = Math.max(0, cloudLowFraction?.[idx] || 0);
+      const cloudTotal = Math.max(0, cloudTotalFraction?.[idx] || 0);
+      const convAnvil = Math.max(0, convectiveAnvilSourceFrac?.[idx] || 0);
+      const convOrg = Math.max(0, convectiveOrganizationFrac?.[idx] || 0);
+      const convMassFlux = Math.max(0, convectiveMassFluxKgM2S?.[idx] || 0);
+      const importedUpperCloud = Math.max(0,
+        (importedAnvilPersistenceMassKgM2?.[idx] || 0)
+        + (carriedOverUpperCloudMassKgM2?.[idx] || 0)
+        + (weakErosionCloudSurvivalMassKgM2?.[idx] || 0)
+      );
+      const largeScaleCondensation = Math.max(0, largeScaleCondensationSourceKgM2?.[idx] || 0);
+      const subsidenceDrying = Math.max(0, subtropicalSubsidenceDryingFrac?.[idx] || 0);
+      const surfaceShielding = Math.max(0, surfaceCloudShortwaveShieldingWm2?.[idx] || 0);
+      const lowerRh = Math.max(0, lowerTroposphericRhFrac?.[idx] || 0);
+      const moistureConvergence = Math.max(0, lowLevelMoistureConvergenceS_1?.[idx] || 0);
+      const absVorticity = Math.abs(vort[idx] || 0);
+      const slpAnomaly = Math.max(0, (zonalSlp[row] || 0) - (slp[idx] || 0));
+      const ascentSignal = Math.max(0, -(0.65 * (omegaUpper[idx] || 0) + 0.35 * (omegaLower[idx] || 0)));
+      const latEdgeFactor = scaleToUnit(22 - latDeg, 0, 10);
+      const oceanFactor = isLand ? 0 : 1;
+
+      const synopticScore = clamp01(
+        0.24 * scaleToUnit(absVorticity, 1e-5, 7e-5)
+        + 0.22 * scaleToUnit(slpAnomaly, 100, 1800)
+        + 0.16 * scaleToUnit(ascentSignal, 0.01, 0.18)
+        + 0.14 * scaleToUnit(wind10m[idx] || 0, 6, 22)
+        + 0.12 * scaleToUnit(precip, 0.1, 2.0)
+        + 0.12 * scaleToUnit(cloudHigh, 0.15, 0.85)
+      );
+      const tropicalScore = clamp01(
+        0.24 * scaleToUnit(convAnvil, 0.05, 0.4)
+        + 0.18 * scaleToUnit(convOrg, 0.12, 0.55)
+        + 0.14 * scaleToUnit(convMassFlux, 0.0005, 0.0055)
+        + 0.16 * latEdgeFactor
+        + 0.12 * scaleToUnit(moistureConvergence, 0, 3e-5)
+        + 0.16 * scaleToUnit(importedUpperCloud, 0.05, 0.6)
+      );
+      const marineScore = clamp01(
+        0.26 * oceanFactor
+        + 0.22 * scaleToUnit(cloudLow, 0.2, 0.9)
+        + 0.16 * scaleToUnit(surfaceShielding, 20, 180)
+        + 0.12 * (1 - scaleToUnit(upperCloud, 0.1, 0.45))
+        + 0.12 * (1 - scaleToUnit(precip, 0.05, 0.8))
+        + 0.12 * (1 - synopticScore)
+      );
+      const backgroundScore = clamp01(
+        0.28 * scaleToUnit(importedUpperCloud, 0.08, 0.8)
+        + 0.24 * scaleToUnit(largeScaleCondensation, 0.03, 0.2)
+        + 0.14 * scaleToUnit(cloudHigh, 0.15, 0.85)
+        + 0.12 * scaleToUnit(lowerRh, 0.35, 0.75)
+        + 0.12 * (1 - synopticScore)
+        + 0.1 * (1 - tropicalScore)
+      );
+
+      let regimeKey = 'persistent_zonal_background';
+      if (synopticScore >= Math.max(tropicalScore, marineScore, backgroundScore) && (precip >= 0.1 || cloudHigh >= 0.2)) {
+        regimeKey = 'synoptic_storm_leakage';
+      } else if (
+        tropicalScore >= Math.max(synopticScore, marineScore, backgroundScore)
+        && latDeg <= 24
+        && (convAnvil >= 0.08 || convOrg >= 0.15 || convMassFlux >= 0.0008)
+      ) {
+        regimeKey = 'tropical_spillover';
+      } else if (
+        marineScore >= Math.max(synopticScore, tropicalScore, backgroundScore)
+        && !isLand
+        && cloudLow >= 0.2
+      ) {
+        regimeKey = 'subtropical_marine_deck_drizzle';
+      }
+
+      const precipWeighted = precip * rowWeight;
+      const cloudWeighted = upperCloud * rowWeight;
+      const combinedWeighted = precipWeighted + cloudWeighted;
+      totalPrecipWeighted += precipWeighted;
+      totalCloudWeighted += cloudWeighted;
+      totalCombinedWeighted += combinedWeighted;
+      accumulateRegime(overallRegimes, regimeKey, {
+        precipWeighted,
+        cloudWeighted,
+        combinedWeighted,
+        synopticScore,
+        tropicalScore,
+        marineScore,
+        backgroundScore,
+        precip,
+        upperCloud,
+        absVorticity,
+        slpAnomaly,
+        omegaUpperPaS: omegaUpper[idx] || 0,
+        cloudHighFracValue: cloudHigh,
+        cloudLowFracValue: cloudLow
+      });
+      accumulateRegime(sectorRegimes[sectorKey].regimes, regimeKey, {
+        precipWeighted,
+        cloudWeighted,
+        combinedWeighted,
+        synopticScore,
+        tropicalScore,
+        marineScore,
+        backgroundScore,
+        precip,
+        upperCloud,
+        absVorticity,
+        slpAnomaly,
+        omegaUpperPaS: omegaUpper[idx] || 0,
+        cloudHighFracValue: cloudHigh,
+        cloudLowFracValue: cloudLow
+      });
+
+      const severityScore = Number((
+        (regimeKey === 'synoptic_storm_leakage' ? synopticScore : 0.5 * Math.max(synopticScore, tropicalScore, backgroundScore, marineScore))
+        * (Math.max(precip, 0.25 * upperCloud) + 0.25 * scaleToUnit(absVorticity, 1e-5, 7e-5))
+      ).toFixed(5));
+      if (precip >= 0.15 || (regimeKey === 'synoptic_storm_leakage' && upperCloud >= 0.2)) {
+        const event = {
+          regimeKey,
+          sectorKey,
+          latDeg: Number(latDeg.toFixed(3)),
+          lonDeg: Number(longitudesDeg[i].toFixed(3)),
+          isLand,
+          precipRateMmHr: Number(precip.toFixed(5)),
+          upperCloudPathKgM2: Number(upperCloud.toFixed(5)),
+          relativeVorticityS_1: Number((vort[idx] || 0).toFixed(8)),
+          slpAnomalyPa: Number(slpAnomaly.toFixed(3)),
+          omegaUpperPaS: Number((omegaUpper[idx] || 0).toFixed(5)),
+          omegaLowerPaS: Number((omegaLower[idx] || 0).toFixed(5)),
+          cloudHighFrac: Number(cloudHigh.toFixed(5)),
+          cloudLowFrac: Number(cloudLow.toFixed(5)),
+          convectiveAnvilFrac: Number(convAnvil.toFixed(5)),
+          convectiveOrganizationFrac: Number(convOrg.toFixed(5)),
+          largeScaleCondensationKgM2: Number(largeScaleCondensation.toFixed(5)),
+          importedUpperCloudProxyKgM2: Number(importedUpperCloud.toFixed(5)),
+          severityScore
+        };
+        sectorEvents[sectorKey].eventCount += 1;
+        pushTopEvent(sectorEvents[sectorKey].topEvents, event, 6);
+        pushTopEvent(topEvents, event, 20);
+      }
+    }
+  }
+
+  const computeRegimeTotals = (regimeMap) => Object.values(regimeMap).reduce((totals, regime) => ({
+    precip: totals.precip + (regime.precipContributionWeighted || 0),
+    cloud: totals.cloud + (regime.cloudContributionWeighted || 0),
+    combined: totals.combined + (regime.combinedContributionWeighted || 0)
+  }), { precip: 0, cloud: 0, combined: 0 });
+
+  const finalizeRegimeMap = (regimeMap, totals = computeRegimeTotals(regimeMap)) => Object.fromEntries(
+    Object.entries(regimeMap).map(([key, value]) => {
+      const denom = Math.max(EPS, value.combinedContributionWeighted);
+      return [
+        key,
+        {
+          label: value.label,
+          cellCount: value.cellCount,
+          precipContributionWeighted: Number(value.precipContributionWeighted.toFixed(5)),
+          cloudContributionWeighted: Number(value.cloudContributionWeighted.toFixed(5)),
+          combinedContributionWeighted: Number(value.combinedContributionWeighted.toFixed(5)),
+          precipContributionFrac: Number((value.precipContributionWeighted / Math.max(EPS, totals.precip)).toFixed(5)),
+          cloudContributionFrac: Number((value.cloudContributionWeighted / Math.max(EPS, totals.cloud)).toFixed(5)),
+          combinedContributionFrac: Number((value.combinedContributionWeighted / Math.max(EPS, totals.combined)).toFixed(5)),
+          meanSynopticScore: Number((value.synopticScoreWeighted / denom).toFixed(5)),
+          meanTropicalScore: Number((value.tropicalScoreWeighted / denom).toFixed(5)),
+          meanMarineScore: Number((value.marineScoreWeighted / denom).toFixed(5)),
+          meanBackgroundScore: Number((value.backgroundScoreWeighted / denom).toFixed(5)),
+          meanPrecipRateMmHr: Number((value.meanPrecipRateMmHrWeighted / denom).toFixed(5)),
+          meanUpperCloudPathKgM2: Number((value.meanUpperCloudPathKgM2Weighted / denom).toFixed(5)),
+          meanAbsVorticityS_1: Number((value.meanAbsVorticityS_1Weighted / denom).toFixed(8)),
+          meanSlpAnomalyPa: Number((value.meanSlpAnomalyPaWeighted / denom).toFixed(5)),
+          meanOmegaUpperPaS: Number((value.meanOmegaUpperPaSWeighted / denom).toFixed(5)),
+          meanCloudHighFrac: Number((value.meanCloudHighFracWeighted / denom).toFixed(5)),
+          meanCloudLowFrac: Number((value.meanCloudLowFracWeighted / denom).toFixed(5))
+        }
+      ];
+    })
+  );
+
+  const overallSummary = finalizeRegimeMap(overallRegimes, {
+    precip: totalPrecipWeighted,
+    cloud: totalCloudWeighted,
+    combined: totalCombinedWeighted
+  });
+  const sectoralSummary = Object.fromEntries(
+    Object.entries(sectorRegimes).map(([sectorKey, sectorValue]) => {
+      const finalizedRegimes = finalizeRegimeMap(sectorValue.regimes);
+      const dominantCombined = Object.entries(finalizedRegimes).sort(
+        (a, b) => (Number(b[1].combinedContributionFrac) || 0) - (Number(a[1].combinedContributionFrac) || 0)
+      )[0]?.[0] || null;
+      return [
+        sectorKey,
+        {
+          label: sectorValue.label,
+          dominantCombinedRegime: dominantCombined,
+          regimes: finalizedRegimes
+        }
+      ];
+    })
+  );
+
+  const interfaceLeakage = STORM_SPILLOVER_INTERFACE_TARGETS_DEG.map((targetLatDeg) => {
+    const interfaceInfo = resolveLatitudeInterface(latitudesDeg, targetLatDeg);
+    if (!interfaceInfo) return null;
+    const sectorReferenceRow = findClosestLatitudeRow(latitudesDeg, clamp(targetLatDeg, 18, 28));
+    const sectorBandAccumulators = Object.fromEntries(
+      NH_DRY_BELT_SOURCE_SECTORS.map(({ key }) => [
+        key,
+        Object.fromEntries(STORM_SPILLOVER_LEVEL_BANDS.map((band) => [band.key, createFluxAccumulator()]))
+      ])
+    );
+    for (let lev = 0; lev < state.nz; lev += 1) {
+      const sigmaMid = sigmaMidAtLevel(state.sigmaHalf, lev, state.nz);
+      const levelBand = STORM_SPILLOVER_LEVEL_BANDS.find((band) => sigmaMid >= band.minSigma && sigmaMid < band.maxSigma)
+        || STORM_SPILLOVER_LEVEL_BANDS[STORM_SPILLOVER_LEVEL_BANDS.length - 1];
+      for (let i = 0; i < nx; i += 1) {
+        const northCell = interfaceInfo.rowNorth * nx + i;
+        const southCell = interfaceInfo.rowSouth * nx + i;
+        const northIdx = lev * state.N + northCell;
+        const southIdx = lev * state.N + southCell;
+        const layerMassKgM2 = Math.max(
+          0,
+          0.5 * (
+            (state.pHalf[(lev + 1) * state.N + northCell] - state.pHalf[lev * state.N + northCell])
+            + (state.pHalf[(lev + 1) * state.N + southCell] - state.pHalf[lev * state.N + southCell])
+          ) / g
+        );
+        const sourceMixingRatiosKgKg = Object.fromEntries(
+          SURFACE_MOISTURE_SOURCE_TRACERS.map(({ key, field }) => [
+            key,
+            state[field] instanceof Float32Array && state[field].length === state.qv.length
+              ? 0.5 * ((state[field][northIdx] || 0) + (state[field][southIdx] || 0))
+              : 0
+          ])
+        );
+        const sectorKey = classifyNhDryBeltSector({
+          lonDeg: longitudesDeg[i],
+          isLand: stateLandMask[sectorReferenceRow * nx + i] === 1
+        });
+        accumulateFluxAccumulator(sectorBandAccumulators[sectorKey][levelBand.key], {
+          velocityMs: 0.5 * ((state.v[northIdx] || 0) + (state.v[southIdx] || 0)),
+          layerMassKgM2,
+          pressurePa: 0.5 * ((state.pMid[northIdx] || 0) + (state.pMid[southIdx] || 0)),
+          vaporMixingRatioKgKg: 0.5 * ((state.qv[northIdx] || 0) + (state.qv[southIdx] || 0)),
+          cloudMixingRatioKgKg: 0.5 * (
+            (state.qc[northIdx] || 0) + (state.qi[northIdx] || 0) + (state.qr[northIdx] || 0) + (state.qs[northIdx] || 0)
+            + (state.qc[southIdx] || 0) + (state.qi[southIdx] || 0) + (state.qr[southIdx] || 0) + (state.qs[southIdx] || 0)
+          ),
+          sourceMixingRatiosKgKg
+        });
+      }
+    }
+    return {
+      targetLatDeg,
+      latMidDeg: Number(interfaceInfo.latMidDeg.toFixed(3)),
+      sectors: Object.fromEntries(
+        NH_DRY_BELT_SOURCE_SECTORS.map(({ key, label }) => [
+          key,
+          {
+            label,
+            levelBands: Object.fromEntries(
+              STORM_SPILLOVER_LEVEL_BANDS.map((band) => [
+                band.key,
+                {
+                  label: band.label,
+                  minSigma: band.minSigma,
+                  maxSigma: band.maxSigma,
+                  ...finalizeFluxAccumulator(sectorBandAccumulators[key][band.key])
+                }
+              ])
+            )
+          }
+        ])
+      )
+    };
+  }).filter(Boolean);
+
+  const dominantEddyFlux = (fieldKey) => {
+    const candidates = [];
+    for (const interfaceSummary of interfaceLeakage) {
+      for (const { key: sectorKey, label: sectorLabel } of NH_DRY_BELT_SOURCE_SECTORS) {
+        for (const band of STORM_SPILLOVER_LEVEL_BANDS) {
+          const summary = interfaceSummary.sectors?.[sectorKey]?.levelBands?.[band.key];
+          const value = Number(summary?.[fieldKey]) || 0;
+          if (value <= 0) continue;
+          candidates.push({
+            targetLatDeg: interfaceSummary.targetLatDeg,
+            sectorKey,
+            sectorLabel,
+            levelBandKey: band.key,
+            levelBandLabel: band.label,
+            [fieldKey]: Number(value.toFixed(5))
+          });
+        }
+      }
+    }
+    candidates.sort((a, b) => (b[fieldKey] || 0) - (a[fieldKey] || 0));
+    return candidates[0] || null;
+  };
+
+  const dominantPrecipRegime = Object.entries(overallSummary)
+    .sort((a, b) => (Number(b[1].precipContributionFrac) || 0) - (Number(a[1].precipContributionFrac) || 0))[0]?.[0] || null;
+  const dominantCloudRegime = Object.entries(overallSummary)
+    .sort((a, b) => (Number(b[1].cloudContributionFrac) || 0) - (Number(a[1].cloudContributionFrac) || 0))[0]?.[0] || null;
+  const dominantCombinedRegime = Object.entries(overallSummary)
+    .sort((a, b) => (Number(b[1].combinedContributionFrac) || 0) - (Number(a[1].combinedContributionFrac) || 0))[0]?.[0] || null;
+  const assignedPrecipFrac = totalPrecipWeighted > EPS ? 1 : 0;
+  const assignedCloudFrac = totalCloudWeighted > EPS ? 1 : 0;
+  const assignedCombinedFrac = totalCombinedWeighted > EPS ? 1 : 0;
+
+  const rootCauseAssessment = { ruledIn: [], ruledOut: [], ambiguous: [] };
+  const synopticCombinedFrac = overallSummary.synoptic_storm_leakage?.combinedContributionFrac || 0;
+  const backgroundCombinedFrac = overallSummary.persistent_zonal_background?.combinedContributionFrac || 0;
+  const dominantCloudLeakage = dominantEddyFlux('cloudFluxEddyComponentKgM_1S');
+  if (
+    synopticCombinedFrac >= 0.35
+    && dominantCloudLeakage?.targetLatDeg === 35
+    && dominantCloudLeakage?.levelBandKey === 'upperTroposphere'
+  ) {
+    rootCauseAssessment.ruledIn.push('Sectoral synoptic storm leakage appears to be a primary NH dry-belt cloud/precip source.');
+  } else if (backgroundCombinedFrac >= 0.45 && synopticCombinedFrac < 0.25) {
+    rootCauseAssessment.ruledOut.push('Sectoral storm leakage does not look like the primary NH dry-belt regime; persistent background cloud dominates.');
+  } else {
+    rootCauseAssessment.ambiguous.push('Sectoral synoptic leakage contributes meaningfully but is not yet isolated as the dominant dry-belt regime.');
+  }
+  if ((overallSummary.tropical_spillover?.combinedContributionFrac || 0) >= 0.25) {
+    rootCauseAssessment.ruledIn.push('Tropical spillover remains a secondary contributor at the equatorward edge of the NH dry belt.');
+  }
+  if ((overallSummary.subtropical_marine_deck_drizzle?.combinedContributionFrac || 0) >= 0.25) {
+    rootCauseAssessment.ruledIn.push('Subtropical marine-deck / drizzle conditions remain a meaningful ocean-side contributor.');
+  }
+
+  return {
+    schema: 'satellite-wars.storm-spillover-tracing.v1',
+    regimeDefinitions: STORM_SPILLOVER_REGIMES.map((entry) => ({ ...entry })),
+    interfaceTargetsDeg: STORM_SPILLOVER_INTERFACE_TARGETS_DEG.slice(),
+    levelBands: STORM_SPILLOVER_LEVEL_BANDS.map((entry) => ({ ...entry })),
+    overall: {
+      assignedPrecipContributionFrac: Number(assignedPrecipFrac.toFixed(5)),
+      assignedCloudContributionFrac: Number(assignedCloudFrac.toFixed(5)),
+      assignedCombinedContributionFrac: Number(assignedCombinedFrac.toFixed(5)),
+      dominantPrecipRegime,
+      dominantCloudRegime,
+      dominantCombinedRegime,
+      regimes: overallSummary
+    },
+    sectoralRegimes: sectoralSummary,
+    eventCatalog: {
+      precipThresholdMmHr: 0.15,
+      topEvents,
+      sectors: sectorEvents
+    },
+    transientEddyLeakage: {
+      interfaces: interfaceLeakage,
+      dominantVaporEddyImport: dominantEddyFlux('vaporFluxEddyComponentKgM_1S'),
+      dominantCloudEddyImport: dominantCloudLeakage
+    },
+    rootCauseAssessment
+  };
+};
+
 export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PRESSURE_LEVELS_PA } = {}) {
   const grid = core?.grid;
   const state = core?.state;
@@ -1176,6 +1691,35 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     lowerTroposphericInversionStrengthK,
     thetaeGradientBoundaryMinusLowerK,
     mseGradientBoundaryMinusLowerJkg
+  });
+  const cycloneSupportFields = {
+    relativeVorticityS_1: Array.from(fields.vort || []),
+    omegaLowerPaS: Array.from(fields.omegaL || []),
+    omegaUpperPaS: Array.from(fields.omegaU || []),
+    wind10mSpeedMs,
+    seaLevelPressurePa
+  };
+  const stormSpilloverTracing = buildStormSpilloverTracing({
+    state,
+    grid,
+    landMask: state.landMask,
+    precipRateMmHr: Array.from(fields.precipRate || state.precipRate || []),
+    cloudTotalFraction: Array.from(fields.cloud || []),
+    cloudLowFraction: Array.from(fields.cloudLow || []),
+    cloudHighFraction: Array.from(fields.cloudHigh || []),
+    upperCloudPathKgM2: computeLayerCondensatePathKgM2(state, 0, 0.55),
+    convectiveAnvilSourceFrac: arrayOrZeros(state.convectiveAnvilSource, state.N),
+    convectiveOrganizationFrac: arrayOrZeros(state.convectiveOrganization, state.N),
+    convectiveMassFluxKgM2S: arrayOrZeros(state.convectiveMassFlux, state.N),
+    carriedOverUpperCloudMassKgM2: arrayOrZeros(state.carriedOverUpperCloudMass, state.N),
+    importedAnvilPersistenceMassKgM2: arrayOrZeros(state.importedAnvilPersistenceMass, state.N),
+    weakErosionCloudSurvivalMassKgM2: arrayOrZeros(state.weakErosionCloudSurvivalMass, state.N),
+    largeScaleCondensationSourceKgM2: arrayOrZeros(state.largeScaleCondensationSource, state.N),
+    subtropicalSubsidenceDryingFrac: arrayOrZeros(state.subtropicalSubsidenceDrying, state.N),
+    surfaceCloudShortwaveShieldingWm2: arrayOrZeros(state.surfaceCloudShortwaveShieldingWm2, state.N),
+    lowLevelMoistureConvergenceS_1: arrayOrZeros(state.lowLevelMoistureConvergence, state.N),
+    lowerTroposphericRhFrac,
+    cycloneSupportFields
   });
   const lowLevelSourceResidual = lowLevelVaporPath.map((value, index) => {
     let attributed = 0;
@@ -1279,6 +1823,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     verticalCloudBirthTracing,
     upperCloudResidenceTracing,
     thermodynamicSupportTracing,
+    stormSpilloverTracing,
     lowLevelMoistureSourceTracersKgM2: {
       ...lowLevelSourceTracers,
       unattributedResidual: lowLevelSourceResidual
@@ -1292,11 +1837,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     moduleTiming: typeof core?.getModuleTimingSummary === 'function'
       ? core.getModuleTimingSummary()
       : null,
-    cycloneSupportFields: {
-      relativeVorticityS_1: Array.from(fields.vort || []),
-      wind10mSpeedMs,
-      seaLevelPressurePa
-    }
+    cycloneSupportFields
   };
 }
 
