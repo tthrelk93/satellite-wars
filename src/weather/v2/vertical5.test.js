@@ -53,6 +53,8 @@ test('stepVertical5 keeps thin upper layers bounded during strong ascent-driven 
   assert.ok(state.qv[0] <= 0.02);
   assert.ok(state.theta[1] >= 260);
   assert.ok(state.theta[1] <= 320);
+  assert.ok(state.resolvedAscentCloudBirthAccumMass[0] > 0);
+  assert.ok(Array.from(state.resolvedAscentCloudBirthByBandMass).some((value) => value > 0));
 });
 
 test('stepVertical5 builds a persistent continuous convective state from moist ascent', () => {
@@ -172,4 +174,8 @@ test('stepVertical5 tracks imported upper-cloud persistence when cloud lingers w
   assert.ok(state.importedAnvilPersistenceMass[0] > 0);
   assert.ok(state.carriedOverUpperCloudMass[0] > 0);
   assert.ok(state.weakErosionCloudSurvivalMass[0] > 0);
+  assert.ok(state.carryOverUpperCloudEnteringAccumMass[0] > 0);
+  assert.ok(state.carryOverUpperCloudSurvivingAccumMass[0] > 0);
+  assert.ok(Array.from(state.carryOverUpperCloudEnteringByBandMass).some((value) => value > 0));
+  assert.ok(Array.from(state.carryOverUpperCloudSurvivingByBandMass).some((value) => value > 0));
 });

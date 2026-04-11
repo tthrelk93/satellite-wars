@@ -34,6 +34,43 @@ Interpretation:
 - the remaining bug is upstream of simple drizzle suppression
 - the remaining bug is likely in a chain that starts with source moisture and transport partitioning, passes through large-scale cloud birth, and ends with weak upper-cloud ventilation / erosion
 
+Latest transport-phase evidence from `/tmp/planetary-phase3-transport-smoke-hadley-partition-summary.json`:
+- imported source proxy dominates local source proxy:
+  - `localSourceProxyFrac = 0.10478`
+  - `importedSourceProxyFrac = 0.89522`
+- dominant NH dry-belt vapor import:
+  - `35° interface`
+  - `upperTroposphere`
+  - `importMagnitudeKgM_1S = 6.308`
+- dominant NH dry-belt cloud import also arrives through the same `35° upperTroposphere` corridor
+
+Interpretation update:
+- the wet NH dry belt is now clearly an imported-pathway problem, not a primarily local source problem
+- the dominant corridor is known, but the exact mechanism inside that corridor is not yet closed
+
+## Status And Execution-Order Update
+
+Completed phases:
+- `Phase 1`: reproducibility and closure harness
+- `Phase 2`: surface moisture source attribution
+- `Phase 3`: transport and circulation partition tracing
+
+Current active phase:
+- `Phase 4`: large-scale cloud birth attribution inside the vertical path
+
+Revised execution order from this point forward:
+1. Complete `Phase 4` to distinguish local cloud birth from imported carried-over cloud within the NH dry belt.
+2. Run `Phase 5` immediately after `Phase 4` to determine whether imported upper cloud is repeatedly regenerated or simply not being ventilated / eroded.
+3. Promote `Phase 8` earlier than originally planned if `Phases 4-5` still point at the `35°N upper-tropospheric` import corridor, because sectoral storm spillover is now a first-class candidate rather than a late cleanup check.
+4. Run `Phases 6-7` only if `Phases 4-5-8` leave real ambiguity about thermodynamic, radiative, or forcing interference.
+5. Run `Phases 9-10` after the main causal corridor is stable, to make sure the result is not a numerical or seasonal-memory artifact.
+6. Finish with `Phase 11` counterfactual ablations and `Phase 12` root-cause closure before writing the next real physics patch.
+
+What this means:
+- we are not abandoning any of the remaining phases
+- we are changing the campaign from a rigid linear checklist into an evidence-gated decision tree
+- later phases still matter, but the next best information comes from cloud-birth attribution, upper-cloud residency, and promoted storm-spillover tracing
+
 ## Campaign design principles
 
 1. Instrument the causal chain in physical order.
@@ -87,7 +124,7 @@ Every phase should emit:
 - one artifact that is a reduced attribution summary
 - one artifact that explicitly says which root-cause families are ruled in, ruled out, or still ambiguous
 
-## Phase 0: Reproducibility And Closure Harness
+## Phase 1: Reproducibility And Closure Harness
 
 Objective:
 - make sure later findings are trustworthy and comparable
@@ -127,7 +164,7 @@ Exit criteria:
 - repeated baseline runs match within a narrow tolerance on all top-level climate metrics
 - conservation drift is bounded and attributable
 
-## Phase 1: Surface Moisture Source Attribution
+## Phase 2: Surface Moisture Source Attribution
 
 Objective:
 - prove exactly where NH dry-belt moisture enters the system and in what form
@@ -175,7 +212,7 @@ Exit criteria:
 - at least 90% of NH dry-belt low-level vapor can be attributed to tagged source families
 - one or more source families can be ranked by contribution
 
-## Phase 2: Transport And Circulation Partition Tracing
+## Phase 3: Transport And Circulation Partition Tracing
 
 Objective:
 - determine whether the bug is caused by transport into the band rather than source injection itself
@@ -224,7 +261,7 @@ Exit criteria:
 - the model can say what fraction of NH dry-belt vapor and cloud arrived by local source versus imported transport
 - the dominant transport level and interface are identified
 
-## Phase 3: Large-Scale Cloud Birth Attribution Inside The Vertical Path
+## Phase 4: Large-Scale Cloud Birth Attribution Inside The Vertical Path
 
 Objective:
 - separate cloud born locally in the dry belt from cloud that merely arrives there
@@ -265,7 +302,7 @@ Exit criteria:
 - the dominant birth pathway for NH `large_scale_other` cloud is known
 - local generation versus imported carry-over can be ranked quantitatively
 
-## Phase 4: Upper-Cloud Residency, Ventilation, And Erosion Diagnostics
+## Phase 5: Upper-Cloud Residency, Ventilation, And Erosion Diagnostics
 
 Objective:
 - determine whether the problem is not cloud birth, but failure to remove or ventilate upper cloud after arrival
@@ -310,7 +347,7 @@ Exit criteria:
   - recently imported
   - long-lived stale cloud
 
-## Phase 5: Thermodynamic And Radiative Support Diagnostics
+## Phase 6: Thermodynamic And Radiative Support Diagnostics
 
 Objective:
 - determine whether the dry belt is thermodynamically too hospitable to cloud and weak precipitation
@@ -349,7 +386,7 @@ Rules out / confirms:
 Exit criteria:
 - we can say whether radiative / thermodynamic support is primary, secondary, or negligible
 
-## Phase 6: External Forcing, Nudging, Climatology, And Initialization Interference
+## Phase 7: External Forcing, Nudging, Climatology, And Initialization Interference
 
 Objective:
 - prove whether “helper” terms are fighting the physical solution
@@ -386,7 +423,7 @@ Rules out / confirms:
 Exit criteria:
 - helper terms are either exonerated or quantitatively implicated
 
-## Phase 7: Sectoral Storm Spillover And Synoptic Leakage
+## Phase 8: Sectoral Storm Spillover And Synoptic Leakage
 
 Objective:
 - determine whether the NH dry-belt wet bias is actually caused by transient systems leaking cloud and precipitation equatorward / poleward into the band
@@ -420,7 +457,7 @@ Rules out / confirms:
 Exit criteria:
 - at least 80% of NH dry-belt precipitation/cloud can be assigned to one of the regime families above
 
-## Phase 8: Numerical Integrity And Sensitivity Diagnostics
+## Phase 9: Numerical Integrity And Sensitivity Diagnostics
 
 Objective:
 - make sure the remaining bias is not being manufactured by numerics
@@ -454,7 +491,7 @@ Rules out / confirms:
 Exit criteria:
 - dominant attribution story survives reasonable `dt` and grid perturbations
 
-## Phase 9: Seasonal Memory And Hysteresis Diagnostics
+## Phase 10: Seasonal Memory And Hysteresis Diagnostics
 
 Objective:
 - verify that the identified cause is not just a startup artifact or one-month transient
@@ -484,7 +521,7 @@ Rules out / confirms:
 Exit criteria:
 - the leading root-cause family is stable across `30`, `90`, and `365` day horizons
 
-## Phase 10: Controlled Ablation And Counterfactual Harness
+## Phase 11: Controlled Ablation And Counterfactual Harness
 
 Objective:
 - move from observation to causal proof
@@ -516,7 +553,7 @@ Rules out / confirms:
 Exit criteria:
 - one or two pathway families produce the dominant directional improvement when perturbed
 
-## Phase 11: Root-Cause Closure And Patch Readiness
+## Phase 12: Root-Cause Closure And Patch Readiness
 
 Objective:
 - decide when we know enough to stop instrumenting and start patching
@@ -544,26 +581,27 @@ That report must answer:
 5. Which helper or numerical terms matter, if any?
 6. Which single module family should the next physics patch target first?
 
-If the campaign reaches Phase 11 successfully, the next patch should no longer be exploratory. It should be a direct intervention against the identified dominant causal chain.
+If the campaign reaches Phase 12 successfully, the next patch should no longer be exploratory. It should be a direct intervention against the identified dominant causal chain.
 
 ## Recommended order of implementation
 
 Build in this order:
-1. `Phase 0` reproducibility harness
-2. `Phase 1` surface source tracing
-3. `Phase 2` transport / circulation tracing
-4. `Phase 3` vertical cloud-birth tracing
-5. `Phase 4` upper-cloud residence / erosion tracing
-6. `Phase 6` helper-term interference tracing
-7. `Phase 5` thermodynamic / radiative support tracing
-8. `Phase 7` sectoral storm spillover tracing
-9. `Phase 8` numerical sensitivity tracing
-10. `Phase 9` seasonal memory tracing
-11. `Phase 10` controlled ablations
-12. `Phase 11` closure report
+1. `Phase 1` reproducibility harness
+2. `Phase 2` surface source tracing
+3. `Phase 3` transport / circulation tracing
+4. `Phase 4` vertical cloud-birth tracing
+5. `Phase 5` upper-cloud residence / erosion tracing
+6. `Phase 8` sectoral storm spillover tracing
+7. `Phase 6` thermodynamic / radiative support tracing if `Phases 4-5-8` remain ambiguous
+8. `Phase 7` forcing / nudging / climatology interference tracing if still needed
+9. `Phase 9` numerical sensitivity tracing
+10. `Phase 10` seasonal memory tracing
+11. `Phase 11` controlled ablations
+12. `Phase 12` closure report
 
 Why this order:
 - it follows the causal chain from source to persistence
+- it promotes the newly implicated `35°N upper-tropospheric` corridor checks before slower helper-term sweeps
 - it delays the most expensive long-horizon work until the faster attribution layers are already informative
 - it ensures we do not confuse a downstream symptom with an upstream cause again
 

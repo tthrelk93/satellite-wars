@@ -441,7 +441,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     surfaceEvapSurfaceSaturationMixingRatioKgKg,
     surfaceEvapAirMixingRatioKgKg,
     processMoistureBudget,
-    transportTracing
+    transportTracing,
+    verticalCloudBirthTracing
   } = diagnostics;
   const { nx, ny, latitudesDeg } = grid;
   const longitudesDeg = Array.isArray(grid.longitudesDeg)
@@ -690,6 +691,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     },
     surfaceFluxDecomposition,
     transportTracing: transportTracing || null,
+    verticalCloudBirthTracing: verticalCloudBirthTracing || null,
     profiles: {
       latitudesDeg: roundSeries(latitudesDeg),
       series: {
@@ -1037,12 +1039,54 @@ const compactTransportSummary = (sample = null) => {
   };
 };
 
+const dominantVerticalCloudBirthChannel = (verticalCloudBirthTracing = null) => {
+  const channels = verticalCloudBirthTracing?.attribution?.northDryBeltChannelMeansKgM2 || null;
+  if (!channels) return null;
+  const [key, value] = Object.entries(channels)
+    .sort((a, b) => (Number(b[1]) || 0) - (Number(a[1]) || 0))[0] || [];
+  return key ? { key, meanKgM2: round(value, 5) } : null;
+};
+
+export const buildVerticalCloudBirthAttributionReport = (latestSample = null) => ({
+  schema: 'satellite-wars.vertical-cloud-birth-attribution.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  dominantNhDryBeltChannel: dominantVerticalCloudBirthChannel(latestSample?.verticalCloudBirthTracing),
+  attribution: latestSample?.verticalCloudBirthTracing?.attribution || null,
+  rootCauseAssessment: latestSample?.verticalCloudBirthTracing?.rootCauseAssessment || null
+});
+
+export const buildVerticalCloudBirthHistogramsReport = (latestSample = null) => ({
+  schema: 'satellite-wars.vertical-cloud-birth-histograms.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  histograms: latestSample?.verticalCloudBirthTracing?.histograms || null
+});
+
+export const buildDryBeltCloudOriginMatrixReport = (latestSample = null) => ({
+  schema: 'satellite-wars.dry-belt-cloud-origin-matrix.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  dominantNhDryBeltChannel: dominantVerticalCloudBirthChannel(latestSample?.verticalCloudBirthTracing),
+  originMatrix: latestSample?.verticalCloudBirthTracing?.originMatrix || null
+});
+
+const compactVerticalCloudBirthSummary = (sample = null) => {
+  if (!sample?.verticalCloudBirthTracing) return null;
+  return {
+    dominantNhDryBeltChannel: dominantVerticalCloudBirthChannel(sample.verticalCloudBirthTracing),
+    northDryBeltCarryOverSurvivalFrac: sample.verticalCloudBirthTracing?.attribution?.northDryBeltCarryOverSurvivalFrac ?? null,
+    rootCauseAssessment: sample.verticalCloudBirthTracing?.rootCauseAssessment || null
+  };
+};
+
 const compactSampleForSummary = (sample = null) => {
   if (!sample) return sample;
-  const { transportTracing, ...rest } = sample;
+  const { transportTracing, verticalCloudBirthTracing, ...rest } = sample;
   return {
     ...rest,
-    transportTracingSummary: compactTransportSummary(sample)
+    transportTracingSummary: compactTransportSummary(sample),
+    verticalCloudBirthTracingSummary: compactVerticalCloudBirthSummary(sample)
   };
 };
 
@@ -1676,6 +1720,9 @@ export async function main() {
   const transportInterfaceBudget = buildTransportInterfaceBudgetReport(latestSample);
   const hadleyPartitionSummary = buildHadleyPartitionSummaryReport(latestSample);
   const bandLevelFluxMatrix = buildBandLevelFluxMatrixReport(latestSample);
+  const verticalCloudBirthAttribution = buildVerticalCloudBirthAttributionReport(latestSample);
+  const verticalCloudBirthHistograms = buildVerticalCloudBirthHistogramsReport(latestSample);
+  const dryBeltCloudOriginMatrix = buildDryBeltCloudOriginMatrixReport(latestSample);
   const checkpointDay = sampleTargetsDays.find((day) => day > 0 && day < sampleTargetsDays[sampleTargetsDays.length - 1])
     || sampleTargetsDays[Math.max(0, Math.floor(sampleTargetsDays.length / 2))] || null;
   const restartParity = reproCheck
@@ -1695,7 +1742,10 @@ export async function main() {
     nhDryBeltSourceSectorSummaryJsonPath: `${artifactBase}-nh-dry-belt-source-sector-summary.json`,
     transportInterfaceBudgetJsonPath: `${artifactBase}-transport-interface-budget.json`,
     hadleyPartitionSummaryJsonPath: `${artifactBase}-hadley-partition-summary.json`,
-    bandLevelFluxMatrixJsonPath: `${artifactBase}-band-level-flux-matrix.json`
+    bandLevelFluxMatrixJsonPath: `${artifactBase}-band-level-flux-matrix.json`,
+    verticalCloudBirthAttributionJsonPath: `${artifactBase}-vertical-cloud-birth-attribution.json`,
+    verticalCloudBirthHistogramsJsonPath: `${artifactBase}-vertical-cloud-birth-histograms.json`,
+    dryBeltCloudOriginMatrixJsonPath: `${artifactBase}-dry-belt-cloud-origin-matrix.json`
   } : null;
   const summarySamples = samples.map((sample) => compactSampleForSummary(sample));
   const summaryHorizons = horizonSummaries.map((horizon) => ({
@@ -1733,6 +1783,9 @@ export async function main() {
     transportInterfaceBudget,
     hadleyPartitionSummary,
     bandLevelFluxMatrix,
+    verticalCloudBirthAttribution,
+    verticalCloudBirthHistograms,
+    dryBeltCloudOriginMatrix,
     artifacts,
     defaultNextPriorities
   };
@@ -1773,6 +1826,9 @@ export async function main() {
     fs.writeFileSync(artifacts.transportInterfaceBudgetJsonPath, toJson(transportInterfaceBudget));
     fs.writeFileSync(artifacts.hadleyPartitionSummaryJsonPath, toJson(hadleyPartitionSummary));
     fs.writeFileSync(artifacts.bandLevelFluxMatrixJsonPath, toJson(bandLevelFluxMatrix));
+    fs.writeFileSync(artifacts.verticalCloudBirthAttributionJsonPath, toJson(verticalCloudBirthAttribution));
+    fs.writeFileSync(artifacts.verticalCloudBirthHistogramsJsonPath, toJson(verticalCloudBirthHistograms));
+    fs.writeFileSync(artifacts.dryBeltCloudOriginMatrixJsonPath, toJson(dryBeltCloudOriginMatrix));
   }
   process.stdout.write(toJson(summary));
   return summary;
@@ -1796,6 +1852,9 @@ export const _test = {
   buildTransportInterfaceBudgetReport,
   buildHadleyPartitionSummaryReport,
   buildBandLevelFluxMatrixReport,
+  buildVerticalCloudBirthAttributionReport,
+  buildVerticalCloudBirthHistogramsReport,
+  buildDryBeltCloudOriginMatrixReport,
   buildSurfaceFluxDecompositionReport,
   buildSurfaceSourceAttributionReport,
   classifySnapshot,

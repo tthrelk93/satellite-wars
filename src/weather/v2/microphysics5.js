@@ -1,4 +1,10 @@
 import { g, Rd, Cp, Lv, Lf } from '../constants.js';
+import {
+  CLOUD_BIRTH_LEVEL_BAND_COUNT,
+  cloudBirthBandOffset,
+  findCloudBirthLevelBandIndex,
+  sigmaMidAtLevel
+} from './cloudBirthTracing5.js';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const smoothstep = (edge0, edge1, x) => {
@@ -67,7 +73,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   } = params;
   if (!enable) return;
 
-  const { N, nz, theta, qv, qc, qi, qr, qs, precipRate, precipRainRate, precipSnowRate, precipAccum, pHalf, pMid, T: Tstate } = state;
+  const { N, nz, theta, qv, qc, qi, qr, qs, precipRate, precipRainRate, precipSnowRate, precipAccum, pHalf, pMid, omega, T: Tstate, sigmaHalf } = state;
   if (!state.largeScaleCondensationSource || state.largeScaleCondensationSource.length !== N) {
     state.largeScaleCondensationSource = new Float32Array(N);
   }
@@ -76,6 +82,27 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   }
   if (!state.precipReevaporationMass || state.precipReevaporationMass.length !== N) {
     state.precipReevaporationMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentCloudBirthAccumMass || state.saturationAdjustmentCloudBirthAccumMass.length !== N) {
+    state.saturationAdjustmentCloudBirthAccumMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentEventCount || state.saturationAdjustmentEventCount.length !== N) {
+    state.saturationAdjustmentEventCount = new Uint32Array(N);
+  }
+  if (!state.saturationAdjustmentSupersaturationMassWeighted || state.saturationAdjustmentSupersaturationMassWeighted.length !== N) {
+    state.saturationAdjustmentSupersaturationMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentOmegaMassWeighted || state.saturationAdjustmentOmegaMassWeighted.length !== N) {
+    state.saturationAdjustmentOmegaMassWeighted = new Float32Array(N);
+  }
+  if (!state.weakAscentCloudBirthAccumMass || state.weakAscentCloudBirthAccumMass.length !== N) {
+    state.weakAscentCloudBirthAccumMass = new Float32Array(N);
+  }
+  if (!state.strongAscentCloudBirthAccumMass || state.strongAscentCloudBirthAccumMass.length !== N) {
+    state.strongAscentCloudBirthAccumMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentCloudBirthByBandMass || state.saturationAdjustmentCloudBirthByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.saturationAdjustmentCloudBirthByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   }
   state.largeScaleCondensationSource.fill(0);
   state.cloudReevaporationMass.fill(0);
@@ -200,10 +227,25 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
       };
 
       if (qvVal > qsat) {
+        const supersaturationFrac = Math.max(0, (qvVal - qsat) / Math.max(1e-8, qsat));
         let dq = applyLatentCap(qvVal - qsat, iceFrac > 0.5 ? Ls : Lv);
         if (dq > 0) {
           qvVal -= dq;
-          if (massCell > 0) state.largeScaleCondensationSource[k] += dq * massCell;
+          if (massCell > 0) {
+            const condMass = dq * massCell;
+            state.largeScaleCondensationSource[k] += condMass;
+            state.saturationAdjustmentCloudBirthAccumMass[k] += condMass;
+            state.saturationAdjustmentEventCount[k] += 1;
+            state.saturationAdjustmentSupersaturationMassWeighted[k] += supersaturationFrac * condMass;
+            const omegaTop = Number.isFinite(omega?.[lev * N + k]) ? omega[lev * N + k] : 0;
+            const omegaBot = Number.isFinite(omega?.[(lev + 1) * N + k]) ? omega[(lev + 1) * N + k] : 0;
+            const ascentMagnitudePaS = Math.max(0, -0.5 * (omegaTop + omegaBot));
+            state.saturationAdjustmentOmegaMassWeighted[k] += ascentMagnitudePaS * condMass;
+            if (ascentMagnitudePaS <= 0.08) state.weakAscentCloudBirthAccumMass[k] += condMass;
+            if (ascentMagnitudePaS >= 0.18) state.strongAscentCloudBirthAccumMass[k] += condMass;
+            const bandIndex = findCloudBirthLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));
+            state.saturationAdjustmentCloudBirthByBandMass[cloudBirthBandOffset(bandIndex, k, N)] += condMass;
+          }
           if (iceFrac > 0.5) {
             qiVal += dq;
             thetaVal = applyThetaLatent(thetaVal, dq, Ls, Pi);

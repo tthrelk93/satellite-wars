@@ -110,10 +110,16 @@ test('microphysics records large-scale condensation and re-evaporation diagnosti
   state.qc.fill(0);
   state.qr.fill(0.0012);
   state.qc[lowIdx] = 0.0016;
+  state.omega.fill(-0.2);
 
   stepMicrophysics5({ dt: 900, state, params: { enableConvectiveOutcome: false } });
 
   assert.ok(state.largeScaleCondensationSource[0] > 0);
   assert.ok(state.cloudReevaporationMass[0] >= 0);
   assert.ok(state.precipReevaporationMass[0] >= 0);
+  assert.ok(state.saturationAdjustmentCloudBirthAccumMass[0] > 0);
+  assert.ok(state.saturationAdjustmentEventCount[0] > 0);
+  assert.ok(state.saturationAdjustmentSupersaturationMassWeighted[0] > 0);
+  assert.ok(state.saturationAdjustmentOmegaMassWeighted[0] > 0);
+  assert.ok(Array.from(state.saturationAdjustmentCloudBirthByBandMass).some((value) => value > 0));
 });

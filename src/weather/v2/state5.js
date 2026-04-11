@@ -1,4 +1,5 @@
 import { SURFACE_MOISTURE_SOURCE_TRACERS } from './sourceTracing5.js';
+import { CLOUD_BIRTH_LEVEL_BAND_COUNT } from './cloudBirthTracing5.js';
 
 const makeArray = (size, value = 0) => {
   const arr = new Float32Array(size);
@@ -59,6 +60,22 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const importedAnvilPersistenceMass = makeArray(N);
   const carriedOverUpperCloudMass = makeArray(N);
   const weakErosionCloudSurvivalMass = makeArray(N);
+  const resolvedAscentCloudBirthAccumMass = makeArray(N);
+  const saturationAdjustmentCloudBirthAccumMass = makeArray(N);
+  const convectiveDetrainmentCloudBirthAccumMass = makeArray(N);
+  const carryOverUpperCloudEnteringAccumMass = makeArray(N);
+  const carryOverUpperCloudSurvivingAccumMass = makeArray(N);
+  const saturationAdjustmentEventCount = new Uint32Array(N);
+  const saturationAdjustmentSupersaturationMassWeighted = makeArray(N);
+  const saturationAdjustmentOmegaMassWeighted = makeArray(N);
+  const weakAscentCloudBirthAccumMass = makeArray(N);
+  const strongAscentCloudBirthAccumMass = makeArray(N);
+  const resolvedAscentCloudBirthByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const saturationAdjustmentCloudBirthByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const convectiveDetrainmentCloudBirthByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const carryOverUpperCloudEnteringByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const carryOverUpperCloudSurvivingByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const prevUpperCloudBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const sourceTracer3D = Object.fromEntries(
     SURFACE_MOISTURE_SOURCE_TRACERS.map(({ field }) => [field, makeArray(SZ)])
   );
@@ -136,6 +153,22 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
     importedAnvilPersistenceMass,
     carriedOverUpperCloudMass,
     weakErosionCloudSurvivalMass,
+    resolvedAscentCloudBirthAccumMass,
+    saturationAdjustmentCloudBirthAccumMass,
+    convectiveDetrainmentCloudBirthAccumMass,
+    carryOverUpperCloudEnteringAccumMass,
+    carryOverUpperCloudSurvivingAccumMass,
+    saturationAdjustmentEventCount,
+    saturationAdjustmentSupersaturationMassWeighted,
+    saturationAdjustmentOmegaMassWeighted,
+    weakAscentCloudBirthAccumMass,
+    strongAscentCloudBirthAccumMass,
+    resolvedAscentCloudBirthByBandMass,
+    saturationAdjustmentCloudBirthByBandMass,
+    convectiveDetrainmentCloudBirthByBandMass,
+    carryOverUpperCloudEnteringByBandMass,
+    carryOverUpperCloudSurvivingByBandMass,
+    prevUpperCloudBandMass,
     ...sourceTracer3D,
     surfaceEvapPotentialRate,
     surfaceEvapTransferCoeff,

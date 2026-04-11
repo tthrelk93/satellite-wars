@@ -1,4 +1,10 @@
 import { Cp, Rd, g, Lv } from '../constants.js';
+import {
+  CLOUD_BIRTH_LEVEL_BAND_COUNT,
+  cloudBirthBandOffset,
+  findCloudBirthLevelBandIndex,
+  sigmaMidAtLevel
+} from './cloudBirthTracing5.js';
 
 const P0 = 100000;
 const KAPPA = Rd / Cp;
@@ -208,6 +214,25 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.importedAnvilPersistenceMass || state.importedAnvilPersistenceMass.length !== N) state.importedAnvilPersistenceMass = new Float32Array(N);
   if (!state.carriedOverUpperCloudMass || state.carriedOverUpperCloudMass.length !== N) state.carriedOverUpperCloudMass = new Float32Array(N);
   if (!state.weakErosionCloudSurvivalMass || state.weakErosionCloudSurvivalMass.length !== N) state.weakErosionCloudSurvivalMass = new Float32Array(N);
+  if (!state.resolvedAscentCloudBirthAccumMass || state.resolvedAscentCloudBirthAccumMass.length !== N) state.resolvedAscentCloudBirthAccumMass = new Float32Array(N);
+  if (!state.convectiveDetrainmentCloudBirthAccumMass || state.convectiveDetrainmentCloudBirthAccumMass.length !== N) state.convectiveDetrainmentCloudBirthAccumMass = new Float32Array(N);
+  if (!state.carryOverUpperCloudEnteringAccumMass || state.carryOverUpperCloudEnteringAccumMass.length !== N) state.carryOverUpperCloudEnteringAccumMass = new Float32Array(N);
+  if (!state.carryOverUpperCloudSurvivingAccumMass || state.carryOverUpperCloudSurvivingAccumMass.length !== N) state.carryOverUpperCloudSurvivingAccumMass = new Float32Array(N);
+  if (!state.resolvedAscentCloudBirthByBandMass || state.resolvedAscentCloudBirthByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.resolvedAscentCloudBirthByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
+  if (!state.convectiveDetrainmentCloudBirthByBandMass || state.convectiveDetrainmentCloudBirthByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.convectiveDetrainmentCloudBirthByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
+  if (!state.carryOverUpperCloudEnteringByBandMass || state.carryOverUpperCloudEnteringByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.carryOverUpperCloudEnteringByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
+  if (!state.carryOverUpperCloudSurvivingByBandMass || state.carryOverUpperCloudSurvivingByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.carryOverUpperCloudSurvivingByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
+  if (!state.prevUpperCloudBandMass || state.prevUpperCloudBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.prevUpperCloudBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
   const convMask = state.convMask;
   const convectivePotential = state.convectivePotential;
   const convectiveOrganization = state.convectiveOrganization;
@@ -225,6 +250,15 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const importedAnvilPersistenceMass = state.importedAnvilPersistenceMass;
   const carriedOverUpperCloudMass = state.carriedOverUpperCloudMass;
   const weakErosionCloudSurvivalMass = state.weakErosionCloudSurvivalMass;
+  const resolvedAscentCloudBirthAccumMass = state.resolvedAscentCloudBirthAccumMass;
+  const convectiveDetrainmentCloudBirthAccumMass = state.convectiveDetrainmentCloudBirthAccumMass;
+  const carryOverUpperCloudEnteringAccumMass = state.carryOverUpperCloudEnteringAccumMass;
+  const carryOverUpperCloudSurvivingAccumMass = state.carryOverUpperCloudSurvivingAccumMass;
+  const resolvedAscentCloudBirthByBandMass = state.resolvedAscentCloudBirthByBandMass;
+  const convectiveDetrainmentCloudBirthByBandMass = state.convectiveDetrainmentCloudBirthByBandMass;
+  const carryOverUpperCloudEnteringByBandMass = state.carryOverUpperCloudEnteringByBandMass;
+  const carryOverUpperCloudSurvivingByBandMass = state.carryOverUpperCloudSurvivingByBandMass;
+  const prevUpperCloudBandMass = state.prevUpperCloudBandMass;
   convMask.fill(0);
   convectiveMassFlux.fill(0);
   convectiveDetrainmentMass.fill(0);
@@ -508,7 +542,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
               if (qvDelta > 0 && sigmaMid <= 0.55) {
                 const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
                 if (dpLev > 0) {
-                  resolvedAscentCloudBirthPotential[k] += qvDelta * (dpLev / g);
+                  const cloudBirthMass = qvDelta * (dpLev / g);
+                  resolvedAscentCloudBirthPotential[k] += cloudBirthMass;
+                  resolvedAscentCloudBirthAccumMass[k] += cloudBirthMass;
+                  const bandIndex = findCloudBirthLevelBandIndex(sigmaMid);
+                  resolvedAscentCloudBirthByBandMass[cloudBirthBandOffset(bandIndex, k, N)] += cloudBirthMass;
                 }
               }
               if (terrainFlowForcing > 0 && lev >= lowLevelStart) {
@@ -946,9 +984,19 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           const rainMass = Math.max(0, condMass - cloudMass);
           const cloudBelowFrac = levBelow === levTop ? 0 : 1 - detrainTopEff;
 
-          let usedCloudMass = depositHydrometeor(qc, k, levTop, cloudMass * detrainTopEff);
+          const usedCloudMassTop = depositHydrometeor(qc, k, levTop, cloudMass * detrainTopEff);
+          let usedCloudMass = usedCloudMassTop;
           if (cloudBelowFrac > 0) {
-            usedCloudMass += depositHydrometeor(qc, k, levBelow, cloudMass * cloudBelowFrac);
+            const usedCloudMassBelow = depositHydrometeor(qc, k, levBelow, cloudMass * cloudBelowFrac);
+            usedCloudMass += usedCloudMassBelow;
+            if (usedCloudMassBelow > 0) {
+              const bandIndexBelow = findCloudBirthLevelBandIndex(sigmaMidAtLevel(sigmaHalf, levBelow, nz));
+              convectiveDetrainmentCloudBirthByBandMass[cloudBirthBandOffset(bandIndexBelow, k, N)] += usedCloudMassBelow;
+            }
+          }
+          if (usedCloudMassTop > 0) {
+            const bandIndexTop = findCloudBirthLevelBandIndex(sigmaMidAtLevel(sigmaHalf, levTop, nz));
+            convectiveDetrainmentCloudBirthByBandMass[cloudBirthBandOffset(bandIndexTop, k, N)] += usedCloudMassTop;
           }
 
           let usedRainMass = 0;
@@ -969,6 +1017,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           if (usedCondMass > 0) {
             qv[idxS] = Math.max(0, qv[idxS] - usedCondMass / massSurface);
             convectiveDetrainmentMass[k] = usedCloudMass;
+            convectiveDetrainmentCloudBirthAccumMass[k] += usedCloudMass;
             convectiveHeatingProxy[k] = usedCondMass / Math.max(dt, eps);
             convectiveTopLevel[k] = plumeTopLev;
             const anvilDepth = 1 - plumeTopLev / Math.max(1, nz - 1);
@@ -1088,6 +1137,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const prevUpperCloudPath = state._prevUpperCloudPath;
   for (let k = 0; k < N; k++) {
     let upperCloudMass = 0;
+    const upperCloudBandMass = new Float32Array(CLOUD_BIRTH_LEVEL_BAND_COUNT);
     for (let lev = 0; lev < nz; lev++) {
       const sigmaMid = sigmaHalf
         ? clamp01(0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1]))
@@ -1096,7 +1146,10 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const idx = lev * N + k;
       const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
       if (dp <= 0) continue;
-      upperCloudMass += ((qc[idx] || 0) + (qi[idx] || 0) + (qr[idx] || 0) + (qs[idx] || 0)) * (dp / g);
+      const layerCloudMass = ((qc[idx] || 0) + (qi[idx] || 0) + (qr[idx] || 0) + (qs[idx] || 0)) * (dp / g);
+      upperCloudMass += layerCloudMass;
+      const bandIndex = findCloudBirthLevelBandIndex(sigmaMid);
+      upperCloudBandMass[bandIndex] += layerCloudMass;
     }
     upperCloudPath[k] = upperCloudMass;
     const overlap = Math.min(prevUpperCloudPath[k] || 0, upperCloudMass);
@@ -1122,6 +1175,25 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       0.2 * weakLocalAnvilSource
     );
     importedAnvilPersistenceMass[k] = overlap * persistenceSupport;
+    let enteringMass = 0;
+    let survivingMass = 0;
+    for (let bandIndex = 0; bandIndex < CLOUD_BIRTH_LEVEL_BAND_COUNT; bandIndex += 1) {
+      const offset = cloudBirthBandOffset(bandIndex, k, N);
+      const previousMass = prevUpperCloudBandMass[offset] || 0;
+      const currentMass = upperCloudBandMass[bandIndex] || 0;
+      const bandOverlap = Math.min(previousMass, currentMass);
+      if (previousMass > 0) {
+        carryOverUpperCloudEnteringByBandMass[offset] += previousMass;
+        enteringMass += previousMass;
+      }
+      if (bandOverlap > 0) {
+        carryOverUpperCloudSurvivingByBandMass[offset] += bandOverlap;
+        survivingMass += bandOverlap;
+      }
+      prevUpperCloudBandMass[offset] = currentMass;
+    }
+    carryOverUpperCloudEnteringAccumMass[k] += enteringMass;
+    carryOverUpperCloudSurvivingAccumMass[k] += survivingMass;
     prevUpperCloudPath[k] = upperCloudMass;
   }
 

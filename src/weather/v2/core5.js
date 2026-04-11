@@ -155,6 +155,25 @@ const createConservationModuleAccumulator = (moduleName) => ({
   }
 });
 
+const VERTICAL_CLOUD_BIRTH_TRACE_FIELDS = [
+  'resolvedAscentCloudBirthAccumMass',
+  'saturationAdjustmentCloudBirthAccumMass',
+  'convectiveDetrainmentCloudBirthAccumMass',
+  'carryOverUpperCloudEnteringAccumMass',
+  'carryOverUpperCloudSurvivingAccumMass',
+  'saturationAdjustmentEventCount',
+  'saturationAdjustmentSupersaturationMassWeighted',
+  'saturationAdjustmentOmegaMassWeighted',
+  'weakAscentCloudBirthAccumMass',
+  'strongAscentCloudBirthAccumMass',
+  'resolvedAscentCloudBirthByBandMass',
+  'saturationAdjustmentCloudBirthByBandMass',
+  'convectiveDetrainmentCloudBirthByBandMass',
+  'carryOverUpperCloudEnteringByBandMass',
+  'carryOverUpperCloudSurvivingByBandMass',
+  'prevUpperCloudBandMass'
+];
+
 export class WeatherCore5 {
   constructor({
     nx = 180,
@@ -596,6 +615,7 @@ export class WeatherCore5 {
     }
 
     this._updateHydrostatic();
+    this.resetVerticalCloudBirthTracingDiagnostics();
     this.resetClimateProcessDiagnostics();
     this.resetConservationDiagnostics();
     this.resetModuleTimingDiagnostics();
@@ -652,9 +672,19 @@ export class WeatherCore5 {
     this._windNudgeSpinupSeconds = 0;
     this._updateClimoNow(0, true);
     this._updateHydrostatic();
+    this.resetVerticalCloudBirthTracingDiagnostics();
     this.resetClimateProcessDiagnostics();
     this.resetConservationDiagnostics();
     this.resetModuleTimingDiagnostics();
+  }
+
+  resetVerticalCloudBirthTracingDiagnostics() {
+    for (const fieldName of VERTICAL_CLOUD_BIRTH_TRACE_FIELDS) {
+      const field = this.state?.[fieldName];
+      if (field instanceof Float32Array || field instanceof Uint32Array || field instanceof Uint16Array || field instanceof Uint8Array) {
+        field.fill(0);
+      }
+    }
   }
 
   resetClimateProcessDiagnostics() {

@@ -487,3 +487,60 @@ test('transport phase reports rank NH dry-belt import pathways and return-branch
   assert.equal(matrixReport.latitudeBands[0].key, 'northDryBelt');
   assert.deepEqual(hadleyReport.streamfunctionProxy.massStreamfunctionProxyKgS[1], [4, 5, 6]);
 });
+
+test('vertical cloud-birth reports surface the dominant NH dry-belt channel and histograms', () => {
+  const sample = {
+    targetDay: 30,
+    verticalCloudBirthTracing: {
+      attribution: {
+        northDryBeltChannelMeansKgM2: {
+          resolvedAscentCloudBirth: 0.04,
+          saturationAdjustmentCloudBirth: 0.11,
+          convectiveDetrainmentCloudBirth: 0.001,
+          carryOverUpperCloudEntering: 0.35,
+          carryOverUpperCloudSurviving: 0.29
+        },
+        northDryBeltCarryOverSurvivalFrac: 0.82857
+      },
+      histograms: {
+        supersaturation: [
+          { key: 'pct1to3', sampleCount: 3, eventCount: 11, cloudBirthMassKgM2: 0.08 }
+        ],
+        ascentMagnitudePaS: [
+          { key: 'organized', sampleCount: 2, eventCount: 9, cloudBirthMassKgM2: 0.06 }
+        ]
+      },
+      originMatrix: {
+        sectors: [{ key: 'atlantic', label: 'Atlantic' }],
+        levelBands: [{ key: 'upperTroposphere', label: 'Upper troposphere' }],
+        channels: [{ key: 'carryOverUpperCloudSurviving', label: 'Carry-over upper cloud surviving step' }],
+        matrixBySector: {
+          atlantic: {
+            label: 'Atlantic',
+            carryOverUpperCloudSurviving: 0.31,
+            levelBands: {
+              upperTroposphere: {
+                label: 'Upper troposphere',
+                carryOverUpperCloudSurviving: 0.28
+              }
+            }
+          }
+        }
+      },
+      rootCauseAssessment: {
+        ruledIn: ['Persistent carried-over upper cloud outweighs local NH dry-belt cloud birth channels.'],
+        ruledOut: ['Local convective detrainment is not the main NH dry-belt cloud-birth source.'],
+        ambiguous: []
+      }
+    }
+  };
+
+  const attributionReport = planetaryAuditTest.buildVerticalCloudBirthAttributionReport(sample);
+  const histogramsReport = planetaryAuditTest.buildVerticalCloudBirthHistogramsReport(sample);
+  const matrixReport = planetaryAuditTest.buildDryBeltCloudOriginMatrixReport(sample);
+
+  assert.equal(attributionReport.dominantNhDryBeltChannel.key, 'carryOverUpperCloudEntering');
+  assert.equal(attributionReport.attribution.northDryBeltCarryOverSurvivalFrac, 0.82857);
+  assert.equal(histogramsReport.histograms.supersaturation[0].eventCount, 11);
+  assert.equal(matrixReport.originMatrix.matrixBySector.atlantic.levelBands.upperTroposphere.carryOverUpperCloudSurviving, 0.28);
+});
