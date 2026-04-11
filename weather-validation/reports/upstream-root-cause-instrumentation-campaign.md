@@ -360,6 +360,11 @@ Observed Phase 5 result:
 
 ## Phase 6: Thermodynamic And Radiative Support Diagnostics
 
+Status:
+- complete with the Phase 6 thermodynamic / radiative instrumentation pass
+- current evidence says dynamics remain primary, with radiative support and boundary-layer thermodynamic support both secondary
+- radiative support is real, but not large enough to overturn the blocked-erosion / imported-cloud diagnosis from Phase 5
+
 Objective:
 - determine whether the dry belt is thermodynamically too hospitable to cloud and weak precipitation
 
@@ -396,6 +401,12 @@ Rules out / confirms:
 
 Exit criteria:
 - we can say whether radiative / thermodynamic support is primary, secondary, or negligible
+
+Observed Phase 6 result:
+- radiative support is secondary, not primary
+- thermodynamic support is secondary, not primary
+- the NH dry belt still looks too hospitable once cloud arrives, but that hospitability reinforces a transport/erosion problem rather than replacing it
+- the strongest next informational phase remains promoted `Phase 8`, with `Phase 7` and later falsification phases still available if needed
 
 ## Phase 7: External Forcing, Nudging, Climatology, And Initialization Interference
 

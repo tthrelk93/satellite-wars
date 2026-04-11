@@ -1,4 +1,4 @@
-import { g, Rd, Cp, Re } from '../constants.js';
+import { g, Rd, Cp, Re, Lv } from '../constants.js';
 import { computeGeopotentialHeightByPressure, DEFAULT_PRESSURE_LEVELS_PA } from '../v2/verticalGrid.js';
 import {
   NH_DRY_BELT_SOURCE_SECTORS,
@@ -10,6 +10,9 @@ import { CLOUD_BIRTH_LEVEL_BANDS } from '../v2/cloudBirthTracing5.js';
 const EPS = 1e-6;
 const P0 = 100000;
 const KAPPA = Rd / Cp;
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const clamp01 = (value) => clamp(value, 0, 1);
+const scaleToUnit = (value, min, max) => clamp01((value - min) / Math.max(EPS, max - min));
 const TRANSPORT_INTERFACE_TARGETS_DEG = [-35, -22, -12, 0, 12, 22, 35];
 const TRANSPORT_LEVEL_BANDS = [
   { key: 'boundaryLayer', label: 'Boundary layer', minSigma: 0.85, maxSigma: 1.01 },
@@ -154,6 +157,48 @@ const computeLayerMeanRelativeHumidity = (state, minSigma, maxSigma) => {
   }
   return out;
 };
+
+const computeLayerMeanDerived = (state, minSigma, maxSigma, selector) => {
+  const { N, nz, sigmaHalf, pHalf } = state;
+  const out = new Array(N).fill(0);
+  for (let cell = 0; cell < N; cell += 1) {
+    let total = 0;
+    let weightTotal = 0;
+    for (let lev = 0; lev < nz; lev += 1) {
+      const sigmaMid = sigmaHalf && sigmaHalf.length > lev + 1
+        ? 0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1])
+        : (lev + 0.5) / Math.max(1, nz);
+      if (sigmaMid < minSigma || sigmaMid > maxSigma) continue;
+      const idx = lev * N + cell;
+      const dp = pHalf[(lev + 1) * N + cell] - pHalf[lev * N + cell];
+      total += selector(idx, lev, cell) * dp;
+      weightTotal += dp;
+    }
+    out[cell] = weightTotal > 0 ? total / weightTotal : 0;
+  }
+  return out;
+};
+
+const computeLayerMeanPotentialTemperature = (state, minSigma, maxSigma) => (
+  computeLayerMeanDerived(state, minSigma, maxSigma, (idx) => state.theta[idx] || 0)
+);
+
+const computeLayerMeanThetaeK = (state, minSigma, maxSigma, { thetaeCoeff = 10, thetaeQvCap = 0.03 } = {}) => (
+  computeLayerMeanDerived(state, minSigma, maxSigma, (idx) => {
+    const thetaK = state.theta[idx] || 0;
+    const qv = Math.min(state.qv[idx] || 0, thetaeQvCap);
+    return thetaK * (1 + thetaeCoeff * qv);
+  })
+);
+
+const computeLayerMeanMseJkg = (state, minSigma, maxSigma) => (
+  computeLayerMeanDerived(state, minSigma, maxSigma, (idx) => {
+    const p = Math.max(100, state.pMid[idx]);
+    const Pi = Math.pow(p / P0, KAPPA);
+    const tempK = Number.isFinite(state.T?.[idx]) ? state.T[idx] : (state.theta[idx] || 0) * Pi;
+    return Cp * tempK + (state.phiMid?.[idx] || 0) + Lv * (state.qv[idx] || 0);
+  })
+);
 
 const computeVerticallyIntegratedFlux = (state, componentField, tracerSelector) => {
   const { N, nz, pHalf } = state;
@@ -922,6 +967,165 @@ const buildUpperCloudResidenceTracing = (state, grid, transportTracing = null) =
   };
 };
 
+const buildThermodynamicSupportTracing = (state, grid, upperCloudResidenceTracing = null, derived = {}) => {
+  if (!state || !grid) return null;
+  const { nx, ny } = grid;
+  const latitudesDeg = Array.from(grid.latDeg || []);
+  const rowWeights = makeRowWeights(latitudesDeg);
+  const stateLandMask = Array.from(state.landMask || new Uint8Array(state.N));
+
+  const boundaryLayerRh = derived.boundaryLayerRhFrac || computeLayerMeanRelativeHumidity(state, 0.85, 1.0);
+  const lowerTroposphereRh = derived.lowerTroposphericRhFrac || computeLayerMeanRelativeHumidity(state, 0.45, 0.85);
+  const midTroposphereRh = derived.midTroposphericRhFrac || computeLayerMeanRelativeHumidity(state, 0.25, 0.55);
+  const boundaryLayerTheta = derived.boundaryLayerPotentialTemperatureK || computeLayerMeanPotentialTemperature(state, 0.85, 1.0);
+  const lowerTroposphereTheta = derived.lowerTropospherePotentialTemperatureK || computeLayerMeanPotentialTemperature(state, 0.65, 0.85);
+  const boundaryLayerThetae = derived.boundaryLayerThetaeK || computeLayerMeanThetaeK(state, 0.85, 1.0);
+  const lowerTroposphereThetae = derived.lowerTroposphereThetaeK || computeLayerMeanThetaeK(state, 0.65, 0.85);
+  const boundaryLayerMse = derived.boundaryLayerMseJkg || computeLayerMeanMseJkg(state, 0.85, 1.0);
+  const lowerTroposphereMse = derived.lowerTroposphereMseJkg || computeLayerMeanMseJkg(state, 0.65, 0.85);
+  const inversionStrength = derived.lowerTroposphericInversionStrengthK
+    || lowerTroposphereTheta.map((value, index) => Math.max(0, value - (boundaryLayerTheta[index] || 0)));
+  const thetaeGradient = derived.thetaeGradientBoundaryMinusLowerK
+    || boundaryLayerThetae.map((value, index) => (value || 0) - (lowerTroposphereThetae[index] || 0));
+  const mseGradient = derived.mseGradientBoundaryMinusLowerJkg
+    || boundaryLayerMse.map((value, index) => (value || 0) - (lowerTroposphereMse[index] || 0));
+
+  const upperCloudClearSkyLwCooling = arrayOrZeros(state.upperCloudClearSkyLwCoolingWm2, state.N);
+  const upperCloudCloudyLwCooling = arrayOrZeros(state.upperCloudCloudyLwCoolingWm2, state.N);
+  const upperCloudLwCloudEffect = arrayOrZeros(state.upperCloudLwCloudEffectWm2, state.N);
+  const upperCloudNetCloudRadiativeEffect = arrayOrZeros(state.upperCloudNetCloudRadiativeEffectWm2, state.N);
+  const surfaceCloudShortwaveShielding = arrayOrZeros(state.surfaceCloudShortwaveShieldingWm2, state.N);
+  const largeScaleCondensation = arrayOrZeros(state.largeScaleCondensationSource, state.N);
+  const upperCloudPath = arrayOrZeros(state.upperCloudPath, state.N);
+
+  const northBoundaryLayerRhMean = weightedFieldBandMean(boundaryLayerRh, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northLowerRhMean = weightedFieldBandMean(lowerTroposphereRh, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northMidRhMean = weightedFieldBandMean(midTroposphereRh, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northBoundaryThetaeMean = weightedFieldBandMean(boundaryLayerThetae, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northLowerThetaeMean = weightedFieldBandMean(lowerTroposphereThetae, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northBoundaryMseMean = weightedFieldBandMean(boundaryLayerMse, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northLowerMseMean = weightedFieldBandMean(lowerTroposphereMse, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northThetaeGradientMean = weightedFieldBandMean(thetaeGradient, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northMseGradientMean = weightedFieldBandMean(mseGradient, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northInversionStrengthMean = weightedFieldBandMean(inversionStrength, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northSurfaceCloudShieldingMean = weightedFieldBandMean(surfaceCloudShortwaveShielding, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northUpperClearSkyLwCoolingMean = weightedFieldBandMean(upperCloudClearSkyLwCooling, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northUpperCloudyLwCoolingMean = weightedFieldBandMean(upperCloudCloudyLwCooling, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northUpperLwCloudEffectMean = weightedFieldBandMean(upperCloudLwCloudEffect, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northUpperNetCloudRadiativeEffectMean = weightedFieldBandMean(upperCloudNetCloudRadiativeEffect, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northLargeScaleCondensationMean = weightedFieldBandMean(largeScaleCondensation, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northUpperCloudPathMean = weightedFieldBandMean(upperCloudPath, nx, ny, latitudesDeg, rowWeights, 15, 35);
+
+  const staleFrac = Number(upperCloudResidenceTracing?.ageAttribution?.northDryBeltStaleFrac) || 0;
+  const blockedErosionFrac = Number(upperCloudResidenceTracing?.erosionBudget?.northDryBeltBlockedErosionFrac) || 0;
+  const importMagnitude = Number(upperCloudResidenceTracing?.ventilation?.north35UpperTroposphereImportMagnitudeKgM_1S) || 0;
+
+  const moistureSupportScore = clamp01(
+    0.25 * scaleToUnit(northBoundaryLayerRhMean, 0.35, 0.8) +
+    0.2 * scaleToUnit(northLowerRhMean, 0.3, 0.75) +
+    0.1 * scaleToUnit(northMidRhMean, 0.2, 0.6) +
+    0.2 * scaleToUnit(northThetaeGradientMean, 0, 12) +
+    0.1 * scaleToUnit(northMseGradientMean, 0, 25000) +
+    0.15 * scaleToUnit(
+      northLargeScaleCondensationMean / Math.max(EPS, northUpperCloudPathMean),
+      0.1,
+      0.9
+    )
+  );
+  const radiationSupportScore = clamp01(
+    0.35 * scaleToUnit(northUpperNetCloudRadiativeEffectMean, 0, 60) +
+    0.25 * scaleToUnit(northSurfaceCloudShieldingMean, 10, 120) +
+    0.2 * scaleToUnit(weightedFieldBandMean(arrayOrZeros(state.upperCloudShortwaveAbsorptionWm2, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 5, 80) +
+    0.2 * scaleToUnit(northUpperLwCloudEffectMean, 0, 20)
+  );
+  const dynamicsSupportScore = clamp01(
+    0.45 * staleFrac +
+    0.35 * blockedErosionFrac +
+    0.2 * scaleToUnit(importMagnitude, 0.02, 0.2)
+  );
+
+  const regimeScores = [
+    { key: 'moistureSupported', score: Number(moistureSupportScore.toFixed(5)) },
+    { key: 'radiationSupported', score: Number(radiationSupportScore.toFixed(5)) },
+    { key: 'dynamicsSupported', score: Number(dynamicsSupportScore.toFixed(5)) }
+  ].sort((a, b) => b.score - a.score);
+  const primaryRegime = regimeScores[0]?.score - (regimeScores[1]?.score || 0) <= 0.08 ? 'mixed' : regimeScores[0]?.key || 'mixed';
+  const secondaryRegime = primaryRegime === 'mixed' ? regimeScores[0]?.key || null : regimeScores[1]?.key || null;
+  const radiativeRole = radiationSupportScore >= Math.max(moistureSupportScore, dynamicsSupportScore) + 0.08
+    ? 'primary'
+    : radiationSupportScore >= 0.35
+      ? 'secondary'
+      : 'negligible';
+  const thermodynamicRole = moistureSupportScore >= Math.max(radiationSupportScore, dynamicsSupportScore) + 0.08
+    ? 'primary'
+    : moistureSupportScore >= 0.35
+      ? 'secondary'
+      : 'negligible';
+  const dynamicRole = dynamicsSupportScore >= Math.max(radiationSupportScore, moistureSupportScore) + 0.08
+    ? 'primary'
+    : dynamicsSupportScore >= 0.35
+      ? 'secondary'
+      : 'negligible';
+
+  const rootCauseAssessment = { ruledIn: [], ruledOut: [], ambiguous: [] };
+  if (dynamicRole === 'primary') {
+    rootCauseAssessment.ruledIn.push('Transport/erosion dynamics remain the primary maintenance pathway for NH dry-belt upper cloud.');
+  } else if (primaryRegime === 'mixed') {
+    rootCauseAssessment.ambiguous.push('Thermodynamic and dynamical support remain mixed enough that neither is yet a clean primary driver.');
+  }
+  if (radiativeRole === 'primary') {
+    rootCauseAssessment.ruledIn.push('Radiative support is strong enough to be a primary upper-cloud maintenance mechanism.');
+  } else if (radiativeRole === 'secondary') {
+    rootCauseAssessment.ruledIn.push('Radiative support looks secondary rather than primary for NH dry-belt cloud persistence.');
+  } else {
+    rootCauseAssessment.ruledOut.push('Radiative support does not look like the primary cause of NH dry-belt cloud persistence.');
+  }
+  if (thermodynamicRole === 'primary') {
+    rootCauseAssessment.ruledIn.push('The NH dry belt is thermodynamically hospitable enough to be a primary cloud-maintenance environment.');
+  } else if (thermodynamicRole === 'secondary') {
+    rootCauseAssessment.ruledIn.push('Boundary-layer humidity and stability likely reinforce persistence as a secondary factor.');
+  } else {
+    rootCauseAssessment.ruledOut.push('Boundary-layer thermodynamic support does not look primary on the current quick audit.');
+  }
+
+  return {
+    schema: 'satellite-wars.thermodynamic-support-tracing.v1',
+    stability: {
+      northDryBeltBoundaryLayerRhMeanFrac: Number(northBoundaryLayerRhMean.toFixed(5)),
+      northDryBeltLowerTroposphereRhMeanFrac: Number(northLowerRhMean.toFixed(5)),
+      northDryBeltMidTroposphereRhMeanFrac: Number(northMidRhMean.toFixed(5)),
+      northDryBeltBoundaryLayerThetaeMeanK: Number(northBoundaryThetaeMean.toFixed(5)),
+      northDryBeltLowerTroposphereThetaeMeanK: Number(northLowerThetaeMean.toFixed(5)),
+      northDryBeltThetaeGradientBoundaryMinusLowerK: Number(northThetaeGradientMean.toFixed(5)),
+      northDryBeltBoundaryLayerMseMeanJkg: Number(northBoundaryMseMean.toFixed(3)),
+      northDryBeltLowerTroposphereMseMeanJkg: Number(northLowerMseMean.toFixed(3)),
+      northDryBeltMseGradientBoundaryMinusLowerJkg: Number(northMseGradientMean.toFixed(3)),
+      northDryBeltInversionStrengthMeanK: Number(northInversionStrengthMean.toFixed(5)),
+      northDryBeltLandInversionStrengthMeanK: Number(weightedFieldBandMean(inversionStrength, nx, ny, latitudesDeg, rowWeights, 15, 35, stateLandMask, 'land').toFixed(5)),
+      northDryBeltOceanInversionStrengthMeanK: Number(weightedFieldBandMean(inversionStrength, nx, ny, latitudesDeg, rowWeights, 15, 35, stateLandMask, 'ocean').toFixed(5))
+    },
+    radiation: {
+      northDryBeltSurfaceCloudShieldingMeanWm2: Number(northSurfaceCloudShieldingMean.toFixed(5)),
+      northDryBeltUpperCloudClearSkyLwCoolingMeanWm2: Number(northUpperClearSkyLwCoolingMean.toFixed(5)),
+      northDryBeltUpperCloudCloudyLwCoolingMeanWm2: Number(northUpperCloudyLwCoolingMean.toFixed(5)),
+      northDryBeltUpperCloudLwCloudEffectMeanWm2: Number(northUpperLwCloudEffectMean.toFixed(5)),
+      northDryBeltUpperCloudNetCloudRadiativeEffectMeanWm2: Number(northUpperNetCloudRadiativeEffectMean.toFixed(5)),
+      northDryBeltUpperCloudRadiativePersistenceSupportMeanWm2: Number(weightedFieldBandMean(arrayOrZeros(state.upperCloudRadiativePersistenceSupportWm2, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35).toFixed(5))
+    },
+    classification: {
+      moistureSupportScore: Number(moistureSupportScore.toFixed(5)),
+      radiationSupportScore: Number(radiationSupportScore.toFixed(5)),
+      dynamicsSupportScore: Number(dynamicsSupportScore.toFixed(5)),
+      primaryRegime,
+      secondaryRegime,
+      radiativeRole,
+      thermodynamicRole,
+      dynamicRole
+    },
+    rootCauseAssessment
+  };
+};
+
 export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PRESSURE_LEVELS_PA } = {}) {
   const grid = core?.grid;
   const state = core?.state;
@@ -938,9 +1142,41 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     SURFACE_MOISTURE_SOURCE_TRACERS.map(({ key, field }) => [key, computeLayerFieldPathKgM2(state, state[field], 0.65, 1.0)])
   );
   const lowLevelVaporPath = computeLayerFieldPathKgM2(state, state.qv, 0.65, 1.0);
+  const boundaryLayerRhFrac = computeLayerMeanRelativeHumidity(state, 0.85, 1.0);
+  const lowerTroposphericRhFrac = computeLayerMeanRelativeHumidity(state, 0.45, 0.85);
+  const midTroposphericRhFrac = computeLayerMeanRelativeHumidity(state, 0.25, 0.55);
+  const boundaryLayerPotentialTemperatureK = computeLayerMeanPotentialTemperature(state, 0.85, 1.0);
+  const lowerTropospherePotentialTemperatureK = computeLayerMeanPotentialTemperature(state, 0.65, 0.85);
+  const boundaryLayerThetaeK = computeLayerMeanThetaeK(state, 0.85, 1.0);
+  const lowerTroposphereThetaeK = computeLayerMeanThetaeK(state, 0.65, 0.85);
+  const boundaryLayerMseJkg = computeLayerMeanMseJkg(state, 0.85, 1.0);
+  const lowerTroposphereMseJkg = computeLayerMeanMseJkg(state, 0.65, 0.85);
+  const lowerTroposphericInversionStrengthK = lowerTropospherePotentialTemperatureK.map((value, index) => (
+    Math.max(0, value - (boundaryLayerPotentialTemperatureK[index] || 0))
+  ));
+  const thetaeGradientBoundaryMinusLowerK = boundaryLayerThetaeK.map((value, index) => (
+    (value || 0) - (lowerTroposphereThetaeK[index] || 0)
+  ));
+  const mseGradientBoundaryMinusLowerJkg = boundaryLayerMseJkg.map((value, index) => (
+    (value || 0) - (lowerTroposphereMseJkg[index] || 0)
+  ));
   const transportTracing = buildTransportTracing(state, grid);
   const verticalCloudBirthTracing = buildVerticalCloudBirthTracing(state, grid);
   const upperCloudResidenceTracing = buildUpperCloudResidenceTracing(state, grid, transportTracing);
+  const thermodynamicSupportTracing = buildThermodynamicSupportTracing(state, grid, upperCloudResidenceTracing, {
+    boundaryLayerRhFrac,
+    lowerTroposphericRhFrac,
+    midTroposphericRhFrac,
+    boundaryLayerPotentialTemperatureK,
+    lowerTropospherePotentialTemperatureK,
+    boundaryLayerThetaeK,
+    lowerTroposphereThetaeK,
+    boundaryLayerMseJkg,
+    lowerTroposphereMseJkg,
+    lowerTroposphericInversionStrengthK,
+    thetaeGradientBoundaryMinusLowerK,
+    mseGradientBoundaryMinusLowerJkg
+  });
   const lowLevelSourceResidual = lowLevelVaporPath.map((value, index) => {
     let attributed = 0;
     for (const tracer of Object.values(lowLevelSourceTracers)) attributed += tracer[index] || 0;
@@ -1003,7 +1239,18 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     cloudLowFraction: Array.from(fields.cloudLow || []),
     cloudHighFraction: Array.from(fields.cloudHigh || []),
     cloudTotalFraction: Array.from(fields.cloud || []),
-    lowerTroposphericRhFrac: computeLayerMeanRelativeHumidity(state, 0.45, 0.85),
+    boundaryLayerRhFrac,
+    lowerTroposphericRhFrac,
+    midTroposphericRhFrac,
+    boundaryLayerPotentialTemperatureK,
+    lowerTropospherePotentialTemperatureK,
+    boundaryLayerThetaeK,
+    lowerTroposphereThetaeK,
+    boundaryLayerMseJkg,
+    lowerTroposphereMseJkg,
+    lowerTroposphericInversionStrengthK,
+    thetaeGradientBoundaryMinusLowerK,
+    mseGradientBoundaryMinusLowerJkg,
     convectiveMaskFrac: arrayOrZeros(state.convMask, state.N),
     convectivePotentialFrac: arrayOrZeros(state.convectivePotential, state.N),
     convectiveOrganizationFrac: arrayOrZeros(state.convectiveOrganization, state.N),
@@ -1023,9 +1270,15 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     importedAnvilPersistenceMassKgM2: arrayOrZeros(state.importedAnvilPersistenceMass, state.N),
     carriedOverUpperCloudMassKgM2: arrayOrZeros(state.carriedOverUpperCloudMass, state.N),
     weakErosionCloudSurvivalMassKgM2: arrayOrZeros(state.weakErosionCloudSurvivalMass, state.N),
+    upperCloudClearSkyLwCoolingWm2: arrayOrZeros(state.upperCloudClearSkyLwCoolingWm2, state.N),
+    upperCloudCloudyLwCoolingWm2: arrayOrZeros(state.upperCloudCloudyLwCoolingWm2, state.N),
+    upperCloudLwCloudEffectWm2: arrayOrZeros(state.upperCloudLwCloudEffectWm2, state.N),
+    upperCloudNetCloudRadiativeEffectWm2: arrayOrZeros(state.upperCloudNetCloudRadiativeEffectWm2, state.N),
+    surfaceCloudShortwaveShieldingWm2: arrayOrZeros(state.surfaceCloudShortwaveShieldingWm2, state.N),
     transportTracing,
     verticalCloudBirthTracing,
     upperCloudResidenceTracing,
+    thermodynamicSupportTracing,
     lowLevelMoistureSourceTracersKgM2: {
       ...lowLevelSourceTracers,
       unattributedResidual: lowLevelSourceResidual

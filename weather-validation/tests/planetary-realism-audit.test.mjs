@@ -329,6 +329,66 @@ test('buildUpperCloudPhase5Reports surfaces residence, erosion, and ventilation 
   assert.equal(ventilation.rootCauseAssessment.ruledIn[0], 'Passive survival dominates.');
 });
 
+test('buildPhase6ThermodynamicReports surface stability and radiative maintenance evidence', () => {
+  const sample = {
+    targetDay: 30,
+    profiles: {
+      latitudesDeg: [-20, 0, 20],
+      series: {
+        boundaryLayerRhFrac: [0.4, 0.6, 0.5],
+        lowerTroposphericRhFrac: [0.35, 0.55, 0.45],
+        midTroposphericRhFrac: [0.2, 0.4, 0.3],
+        boundaryLayerThetaeK: [300, 320, 310],
+        lowerTroposphereThetaeK: [295, 315, 304],
+        thetaeGradientBoundaryMinusLowerK: [5, 5, 6],
+        boundaryLayerMseJkg: [305000, 325000, 315000],
+        lowerTroposphereMseJkg: [295000, 315000, 305000],
+        mseGradientBoundaryMinusLowerJkg: [10000, 10000, 10000],
+        lowerTroposphericInversionStrengthK: [1, 0.5, 0.8],
+        surfaceCloudShortwaveShieldingWm2: [30, 60, 45],
+        upperCloudClearSkyLwCoolingWm2: [5, 8, 6],
+        upperCloudCloudyLwCoolingWm2: [7, 10, 8],
+        upperCloudLwCloudEffectWm2: [2, 3, 2],
+        upperCloudNetCloudRadiativeEffectWm2: [12, 18, 15]
+      }
+    },
+    thermodynamicSupportTracing: {
+      stability: {
+        northDryBeltBoundaryLayerRhMeanFrac: 0.51,
+        northDryBeltInversionStrengthMeanK: 0.84
+      },
+      radiation: {
+        northDryBeltSurfaceCloudShieldingMeanWm2: 44.5,
+        northDryBeltUpperCloudNetCloudRadiativeEffectMeanWm2: 15.4
+      },
+      classification: {
+        moistureSupportScore: 0.41,
+        radiationSupportScore: 0.28,
+        dynamicsSupportScore: 0.77,
+        primaryRegime: 'dynamicsSupported',
+        secondaryRegime: 'moistureSupported',
+        radiativeRole: 'negligible',
+        thermodynamicRole: 'secondary',
+        dynamicRole: 'primary'
+      },
+      rootCauseAssessment: {
+        ruledIn: ['Dynamics remain primary.'],
+        ruledOut: ['Radiative support is not primary.'],
+        ambiguous: []
+      }
+    }
+  };
+
+  const support = planetaryAuditTest.buildThermodynamicSupportSummaryReport(sample);
+  const radiative = planetaryAuditTest.buildRadiativeCloudMaintenanceReport(sample);
+  const profiles = planetaryAuditTest.buildBoundaryLayerStabilityProfilesReport(sample);
+
+  assert.equal(support.classification.primaryRegime, 'dynamicsSupported');
+  assert.equal(radiative.radiation.northDryBeltUpperCloudNetCloudRadiativeEffectMeanWm2, 15.4);
+  assert.equal(profiles.stabilitySeries.boundaryLayerRhFrac[1], 0.6);
+  assert.equal(profiles.radiativeSeries.upperCloudNetCloudRadiativeEffectWm2[2], 15);
+});
+
 test('buildMonthlyClimatology averages metrics and zonal profiles by month', () => {
   const monthly = planetaryAuditTest.buildMonthlyClimatology([
     {

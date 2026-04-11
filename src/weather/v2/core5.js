@@ -207,7 +207,12 @@ const VERTICAL_CLOUD_BIRTH_TRACE_FIELDS = [
   'upperCloudBlockedErosionByBandMass',
   'upperCloudShortwaveAbsorptionWm2',
   'upperCloudLongwaveRelaxationBoost',
-  'upperCloudRadiativePersistenceSupportWm2'
+  'upperCloudRadiativePersistenceSupportWm2',
+  'upperCloudClearSkyLwCoolingWm2',
+  'upperCloudCloudyLwCoolingWm2',
+  'upperCloudLwCloudEffectWm2',
+  'upperCloudNetCloudRadiativeEffectWm2',
+  'surfaceCloudShortwaveShieldingWm2'
 ];
 
 export class WeatherCore5 {

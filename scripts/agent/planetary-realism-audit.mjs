@@ -425,6 +425,20 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     carriedOverUpperCloudMassKgM2,
     weakErosionCloudSurvivalMassKgM2,
     upperCloudPathKgM2,
+    boundaryLayerRhFrac,
+    midTroposphericRhFrac,
+    boundaryLayerThetaeK,
+    lowerTroposphereThetaeK,
+    boundaryLayerMseJkg,
+    lowerTroposphereMseJkg,
+    lowerTroposphericInversionStrengthK,
+    thetaeGradientBoundaryMinusLowerK,
+    mseGradientBoundaryMinusLowerJkg,
+    upperCloudClearSkyLwCoolingWm2,
+    upperCloudCloudyLwCoolingWm2,
+    upperCloudLwCloudEffectWm2,
+    upperCloudNetCloudRadiativeEffectWm2,
+    surfaceCloudShortwaveShieldingWm2,
     lowLevelMoistureSourceTracersKgM2,
     lowLevelMoistureConvergenceS_1,
     lowerTroposphericRhFrac,
@@ -443,7 +457,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     processMoistureBudget,
     transportTracing,
     verticalCloudBirthTracing,
-    upperCloudResidenceTracing
+    upperCloudResidenceTracing,
+    thermodynamicSupportTracing
   } = diagnostics;
   const { nx, ny, latitudesDeg } = grid;
   const longitudesDeg = Array.isArray(grid.longitudesDeg)
@@ -468,6 +483,20 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalCarriedOverUpperCloud = zonalMean(carriedOverUpperCloudMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalWeakErosionCloudSurvival = zonalMean(weakErosionCloudSurvivalMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalUpperCloudPath = zonalMean(upperCloudPathKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalBoundaryLayerRh = zonalMean(boundaryLayerRhFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalMidTroposphereRh = zonalMean(midTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalBoundaryLayerThetae = zonalMean(boundaryLayerThetaeK || new Array(nx * ny).fill(0), nx, ny);
+  const zonalLowerTroposphereThetae = zonalMean(lowerTroposphereThetaeK || new Array(nx * ny).fill(0), nx, ny);
+  const zonalBoundaryLayerMse = zonalMean(boundaryLayerMseJkg || new Array(nx * ny).fill(0), nx, ny);
+  const zonalLowerTroposphereMse = zonalMean(lowerTroposphereMseJkg || new Array(nx * ny).fill(0), nx, ny);
+  const zonalInversionStrength = zonalMean(lowerTroposphericInversionStrengthK || new Array(nx * ny).fill(0), nx, ny);
+  const zonalThetaeGradient = zonalMean(thetaeGradientBoundaryMinusLowerK || new Array(nx * ny).fill(0), nx, ny);
+  const zonalMseGradient = zonalMean(mseGradientBoundaryMinusLowerJkg || new Array(nx * ny).fill(0), nx, ny);
+  const zonalUpperCloudClearSkyLwCooling = zonalMean(upperCloudClearSkyLwCoolingWm2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalUpperCloudCloudyLwCooling = zonalMean(upperCloudCloudyLwCoolingWm2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalUpperCloudLwCloudEffect = zonalMean(upperCloudLwCloudEffectWm2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalUpperCloudNetCloudRadiativeEffect = zonalMean(upperCloudNetCloudRadiativeEffectWm2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSurfaceCloudShielding = zonalMean(surfaceCloudShortwaveShieldingWm2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalMoistureConvergence = zonalMean(lowLevelMoistureConvergenceS_1 || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
@@ -655,6 +684,20 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       northDryBeltCloudReevaporationMeanKgM2: round(northDryBeltCloudReevaporation, 5),
       northDryBeltPrecipReevaporationMeanKgM2: round(northDryBeltPrecipReevaporation, 5),
       northDryBeltUpperCloudPathMeanKgM2: round(northDryBeltUpperCloudPath, 5),
+      northDryBeltBoundaryLayerRhMeanFrac: round(weightedBandMean(zonalBoundaryLayerRh, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+      northDryBeltMidTroposphereRhMeanFrac: round(weightedBandMean(zonalMidTroposphereRh, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+      northDryBeltBoundaryLayerThetaeMeanK: round(weightedBandMean(zonalBoundaryLayerThetae, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+      northDryBeltLowerTroposphereThetaeMeanK: round(weightedBandMean(zonalLowerTroposphereThetae, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+      northDryBeltThetaeGradientBoundaryMinusLowerK: round(weightedBandMean(zonalThetaeGradient, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+      northDryBeltBoundaryLayerMseMeanJkg: round(weightedBandMean(zonalBoundaryLayerMse, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 3),
+      northDryBeltLowerTroposphereMseMeanJkg: round(weightedBandMean(zonalLowerTroposphereMse, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 3),
+      northDryBeltMseGradientBoundaryMinusLowerJkg: round(weightedBandMean(zonalMseGradient, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 3),
+      northDryBeltInversionStrengthMeanK: round(weightedBandMean(zonalInversionStrength, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+      northDryBeltSurfaceCloudShieldingMeanWm2: round(weightedBandMean(zonalSurfaceCloudShielding, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+      northDryBeltUpperCloudClearSkyLwCoolingMeanWm2: round(weightedBandMean(zonalUpperCloudClearSkyLwCooling, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+      northDryBeltUpperCloudCloudyLwCoolingMeanWm2: round(weightedBandMean(zonalUpperCloudCloudyLwCooling, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+      northDryBeltUpperCloudLwCloudEffectMeanWm2: round(weightedBandMean(zonalUpperCloudLwCloudEffect, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+      northDryBeltUpperCloudNetCloudRadiativeEffectMeanWm2: round(weightedBandMean(zonalUpperCloudNetCloudRadiativeEffect, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
       crossEquatorialVaporFluxNorthKgM_1S: round(crossEquatorialVaporFlux, 5),
       northTransitionVaporFluxNorthKgM_1S: round(northTransitionVaporFlux, 5),
       northDryBeltVaporFluxNorthKgM_1S: round(northDryBeltVaporFlux, 5),
@@ -694,6 +737,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     transportTracing: transportTracing || null,
     verticalCloudBirthTracing: verticalCloudBirthTracing || null,
     upperCloudResidenceTracing: upperCloudResidenceTracing || null,
+    thermodynamicSupportTracing: thermodynamicSupportTracing || null,
     profiles: {
       latitudesDeg: roundSeries(latitudesDeg),
       series: {
@@ -706,11 +750,21 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         convectivePotential: roundSeries(zonalConvectivePotential),
         convectiveOrganization: roundSeries(zonalConvectiveOrganization),
         convectiveMassFluxKgM2S: roundSeries(zonalConvectiveMassFlux, 5),
+        boundaryLayerRhFrac: roundSeries(zonalBoundaryLayerRh),
         lowerTroposphericRhFrac: roundSeries(zonalLowerRh),
+        midTroposphericRhFrac: roundSeries(zonalMidTroposphereRh),
+        boundaryLayerThetaeK: roundSeries(zonalBoundaryLayerThetae, 5),
+        lowerTroposphereThetaeK: roundSeries(zonalLowerTroposphereThetae, 5),
+        thetaeGradientBoundaryMinusLowerK: roundSeries(zonalThetaeGradient, 5),
+        boundaryLayerMseJkg: roundSeries(zonalBoundaryLayerMse, 3),
+        lowerTroposphereMseJkg: roundSeries(zonalLowerTroposphereMse, 3),
+        mseGradientBoundaryMinusLowerJkg: roundSeries(zonalMseGradient, 3),
+        lowerTroposphericInversionStrengthK: roundSeries(zonalInversionStrength, 5),
         lowerLevelMoistureConvergenceS_1: roundSeries(zonalMoistureConvergence, 6),
         subtropicalSubsidenceDryingFrac: roundSeries(zonalSubsidenceDrying, 5),
         surfaceEvapRateMmHr: roundSeries(zonalSurfaceEvap),
         surfaceEvapPotentialRateMmHr: roundSeries(zonalSurfaceEvapPotential),
+        surfaceCloudShortwaveShieldingWm2: roundSeries(zonalSurfaceCloudShielding, 5),
         resolvedAscentCloudBirthPotentialKgM2: roundSeries(zonalResolvedAscentCloudBirthPotential, 5),
         largeScaleCondensationSourceKgM2: roundSeries(zonalLargeScaleCondensation, 5),
         cloudReevaporationMassKgM2: roundSeries(zonalCloudReevaporation, 5),
@@ -719,6 +773,10 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         carriedOverUpperCloudMassKgM2: roundSeries(zonalCarriedOverUpperCloud, 5),
         weakErosionCloudSurvivalMassKgM2: roundSeries(zonalWeakErosionCloudSurvival, 5),
         upperCloudPathKgM2: roundSeries(zonalUpperCloudPath, 5),
+        upperCloudClearSkyLwCoolingWm2: roundSeries(zonalUpperCloudClearSkyLwCooling, 5),
+        upperCloudCloudyLwCoolingWm2: roundSeries(zonalUpperCloudCloudyLwCooling, 5),
+        upperCloudLwCloudEffectWm2: roundSeries(zonalUpperCloudLwCloudEffect, 5),
+        upperCloudNetCloudRadiativeEffectWm2: roundSeries(zonalUpperCloudNetCloudRadiativeEffect, 5),
         sourceNorthDryBeltOceanKgM2: roundSeries(sourceTracerZonal.northDryBeltOcean || new Array(ny).fill(0), 5),
         sourceTropicalOceanNorthKgM2: roundSeries(sourceTracerZonal.tropicalOceanNorth || new Array(ny).fill(0), 5),
         sourceTropicalOceanSouthKgM2: roundSeries(sourceTracerZonal.tropicalOceanSouth || new Array(ny).fill(0), 5),
@@ -1122,14 +1180,71 @@ const compactUpperCloudResidenceSummary = (sample = null) => {
   };
 };
 
+export const buildThermodynamicSupportSummaryReport = (latestSample = null) => ({
+  schema: 'satellite-wars.thermodynamic-support-summary.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  stability: latestSample?.thermodynamicSupportTracing?.stability || null,
+  classification: latestSample?.thermodynamicSupportTracing?.classification || null,
+  rootCauseAssessment: latestSample?.thermodynamicSupportTracing?.rootCauseAssessment || null
+});
+
+export const buildRadiativeCloudMaintenanceReport = (latestSample = null) => ({
+  schema: 'satellite-wars.radiative-cloud-maintenance.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  radiation: latestSample?.thermodynamicSupportTracing?.radiation || null,
+  classification: latestSample?.thermodynamicSupportTracing?.classification || null,
+  rootCauseAssessment: latestSample?.thermodynamicSupportTracing?.rootCauseAssessment || null
+});
+
+export const buildBoundaryLayerStabilityProfilesReport = (latestSample = null) => ({
+  schema: 'satellite-wars.boundary-layer-stability-profiles.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  latitudesDeg: latestSample?.profiles?.latitudesDeg || null,
+  stabilitySeries: latestSample?.profiles?.series ? {
+    boundaryLayerRhFrac: latestSample.profiles.series.boundaryLayerRhFrac || null,
+    lowerTroposphericRhFrac: latestSample.profiles.series.lowerTroposphericRhFrac || null,
+    midTroposphericRhFrac: latestSample.profiles.series.midTroposphericRhFrac || null,
+    boundaryLayerThetaeK: latestSample.profiles.series.boundaryLayerThetaeK || null,
+    lowerTroposphereThetaeK: latestSample.profiles.series.lowerTroposphereThetaeK || null,
+    thetaeGradientBoundaryMinusLowerK: latestSample.profiles.series.thetaeGradientBoundaryMinusLowerK || null,
+    boundaryLayerMseJkg: latestSample.profiles.series.boundaryLayerMseJkg || null,
+    lowerTroposphereMseJkg: latestSample.profiles.series.lowerTroposphereMseJkg || null,
+    mseGradientBoundaryMinusLowerJkg: latestSample.profiles.series.mseGradientBoundaryMinusLowerJkg || null,
+    lowerTroposphericInversionStrengthK: latestSample.profiles.series.lowerTroposphericInversionStrengthK || null
+  } : null,
+  radiativeSeries: latestSample?.profiles?.series ? {
+    surfaceCloudShortwaveShieldingWm2: latestSample.profiles.series.surfaceCloudShortwaveShieldingWm2 || null,
+    upperCloudClearSkyLwCoolingWm2: latestSample.profiles.series.upperCloudClearSkyLwCoolingWm2 || null,
+    upperCloudCloudyLwCoolingWm2: latestSample.profiles.series.upperCloudCloudyLwCoolingWm2 || null,
+    upperCloudLwCloudEffectWm2: latestSample.profiles.series.upperCloudLwCloudEffectWm2 || null,
+    upperCloudNetCloudRadiativeEffectWm2: latestSample.profiles.series.upperCloudNetCloudRadiativeEffectWm2 || null
+  } : null
+});
+
+const compactThermodynamicSupportSummary = (sample = null) => {
+  if (!sample?.thermodynamicSupportTracing) return null;
+  return {
+    primaryRegime: sample.thermodynamicSupportTracing?.classification?.primaryRegime ?? null,
+    radiativeRole: sample.thermodynamicSupportTracing?.classification?.radiativeRole ?? null,
+    thermodynamicRole: sample.thermodynamicSupportTracing?.classification?.thermodynamicRole ?? null,
+    northDryBeltInversionStrengthMeanK: sample.thermodynamicSupportTracing?.stability?.northDryBeltInversionStrengthMeanK ?? null,
+    northDryBeltUpperCloudNetCloudRadiativeEffectMeanWm2: sample.thermodynamicSupportTracing?.radiation?.northDryBeltUpperCloudNetCloudRadiativeEffectMeanWm2 ?? null,
+    rootCauseAssessment: sample.thermodynamicSupportTracing?.rootCauseAssessment || null
+  };
+};
+
 const compactSampleForSummary = (sample = null) => {
   if (!sample) return sample;
-  const { transportTracing, verticalCloudBirthTracing, upperCloudResidenceTracing, ...rest } = sample;
+  const { transportTracing, verticalCloudBirthTracing, upperCloudResidenceTracing, thermodynamicSupportTracing, ...rest } = sample;
   return {
     ...rest,
     transportTracingSummary: compactTransportSummary(sample),
     verticalCloudBirthTracingSummary: compactVerticalCloudBirthSummary(sample),
-    upperCloudResidenceTracingSummary: compactUpperCloudResidenceSummary(sample)
+    upperCloudResidenceTracingSummary: compactUpperCloudResidenceSummary(sample),
+    thermodynamicSupportTracingSummary: compactThermodynamicSupportSummary(sample)
   };
 };
 
@@ -1672,6 +1787,15 @@ const renderMarkdown = (summary) => {
     if (summary.artifacts.nhDryBeltSourceSectorSummaryJsonPath) {
       lines.push(`- NH dry-belt source sector JSON: ${summary.artifacts.nhDryBeltSourceSectorSummaryJsonPath}`);
     }
+    if (summary.artifacts.thermodynamicSupportSummaryJsonPath) {
+      lines.push(`- Thermodynamic support summary JSON: ${summary.artifacts.thermodynamicSupportSummaryJsonPath}`);
+    }
+    if (summary.artifacts.radiativeCloudMaintenanceJsonPath) {
+      lines.push(`- Radiative cloud maintenance JSON: ${summary.artifacts.radiativeCloudMaintenanceJsonPath}`);
+    }
+    if (summary.artifacts.boundaryLayerStabilityProfilesJsonPath) {
+      lines.push(`- Boundary-layer stability profiles JSON: ${summary.artifacts.boundaryLayerStabilityProfilesJsonPath}`);
+    }
     lines.push('');
   }
 
@@ -1769,6 +1893,9 @@ export async function main() {
   const upperCloudResidence = buildUpperCloudResidenceReport(latestSample);
   const upperCloudErosionBudget = buildUpperCloudErosionBudgetReport(latestSample);
   const upperCloudVentilationSummary = buildUpperCloudVentilationSummaryReport(latestSample);
+  const thermodynamicSupportSummary = buildThermodynamicSupportSummaryReport(latestSample);
+  const radiativeCloudMaintenance = buildRadiativeCloudMaintenanceReport(latestSample);
+  const boundaryLayerStabilityProfiles = buildBoundaryLayerStabilityProfilesReport(latestSample);
   const checkpointDay = sampleTargetsDays.find((day) => day > 0 && day < sampleTargetsDays[sampleTargetsDays.length - 1])
     || sampleTargetsDays[Math.max(0, Math.floor(sampleTargetsDays.length / 2))] || null;
   const restartParity = reproCheck
@@ -1794,7 +1921,10 @@ export async function main() {
     dryBeltCloudOriginMatrixJsonPath: `${artifactBase}-dry-belt-cloud-origin-matrix.json`,
     upperCloudResidenceJsonPath: `${artifactBase}-upper-cloud-residence.json`,
     upperCloudErosionBudgetJsonPath: `${artifactBase}-upper-cloud-erosion-budget.json`,
-    upperCloudVentilationSummaryJsonPath: `${artifactBase}-upper-cloud-ventilation-summary.json`
+    upperCloudVentilationSummaryJsonPath: `${artifactBase}-upper-cloud-ventilation-summary.json`,
+    thermodynamicSupportSummaryJsonPath: `${artifactBase}-thermodynamic-support-summary.json`,
+    radiativeCloudMaintenanceJsonPath: `${artifactBase}-radiative-cloud-maintenance.json`,
+    boundaryLayerStabilityProfilesJsonPath: `${artifactBase}-boundary-layer-stability-profiles.json`
   } : null;
   const summarySamples = samples.map((sample) => compactSampleForSummary(sample));
   const summaryHorizons = horizonSummaries.map((horizon) => ({
@@ -1838,6 +1968,9 @@ export async function main() {
     upperCloudResidence,
     upperCloudErosionBudget,
     upperCloudVentilationSummary,
+    thermodynamicSupportSummary,
+    radiativeCloudMaintenance,
+    boundaryLayerStabilityProfiles,
     artifacts,
     defaultNextPriorities
   };
@@ -1884,6 +2017,9 @@ export async function main() {
     fs.writeFileSync(artifacts.upperCloudResidenceJsonPath, toJson(upperCloudResidence));
     fs.writeFileSync(artifacts.upperCloudErosionBudgetJsonPath, toJson(upperCloudErosionBudget));
     fs.writeFileSync(artifacts.upperCloudVentilationSummaryJsonPath, toJson(upperCloudVentilationSummary));
+    fs.writeFileSync(artifacts.thermodynamicSupportSummaryJsonPath, toJson(thermodynamicSupportSummary));
+    fs.writeFileSync(artifacts.radiativeCloudMaintenanceJsonPath, toJson(radiativeCloudMaintenance));
+    fs.writeFileSync(artifacts.boundaryLayerStabilityProfilesJsonPath, toJson(boundaryLayerStabilityProfiles));
   }
   process.stdout.write(toJson(summary));
   return summary;
@@ -1913,6 +2049,9 @@ export const _test = {
   buildUpperCloudResidenceReport,
   buildUpperCloudErosionBudgetReport,
   buildUpperCloudVentilationSummaryReport,
+  buildThermodynamicSupportSummaryReport,
+  buildRadiativeCloudMaintenanceReport,
+  buildBoundaryLayerStabilityProfilesReport,
   buildSurfaceFluxDecompositionReport,
   buildSurfaceSourceAttributionReport,
   classifySnapshot,

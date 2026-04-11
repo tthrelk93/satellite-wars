@@ -112,6 +112,11 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const upperCloudShortwaveAbsorptionWm2 = makeArray(N);
   const upperCloudLongwaveRelaxationBoost = makeArray(N);
   const upperCloudRadiativePersistenceSupportWm2 = makeArray(N);
+  const upperCloudClearSkyLwCoolingWm2 = makeArray(N);
+  const upperCloudCloudyLwCoolingWm2 = makeArray(N);
+  const upperCloudLwCloudEffectWm2 = makeArray(N);
+  const upperCloudNetCloudRadiativeEffectWm2 = makeArray(N);
+  const surfaceCloudShortwaveShieldingWm2 = makeArray(N);
   const sourceTracer3D = Object.fromEntries(
     SURFACE_MOISTURE_SOURCE_TRACERS.map(({ field }) => [field, makeArray(SZ)])
   );
@@ -241,6 +246,11 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
     upperCloudShortwaveAbsorptionWm2,
     upperCloudLongwaveRelaxationBoost,
     upperCloudRadiativePersistenceSupportWm2,
+    upperCloudClearSkyLwCoolingWm2,
+    upperCloudCloudyLwCoolingWm2,
+    upperCloudLwCloudEffectWm2,
+    upperCloudNetCloudRadiativeEffectWm2,
+    surfaceCloudShortwaveShieldingWm2,
     ...sourceTracer3D,
     surfaceEvapPotentialRate,
     surfaceEvapTransferCoeff,
