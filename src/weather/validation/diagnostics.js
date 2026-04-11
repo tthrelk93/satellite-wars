@@ -6,20 +6,17 @@ import {
   classifyNhDryBeltSector
 } from '../v2/sourceTracing5.js';
 import { CLOUD_BIRTH_LEVEL_BANDS } from '../v2/cloudBirthTracing5.js';
+import { INSTRUMENTATION_LEVEL_BANDS } from '../v2/instrumentationBands5.js';
 
 const EPS = 1e-6;
 const P0 = 100000;
 const KAPPA = Rd / Cp;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const clamp01 = (value) => clamp(value, 0, 1);
+const round = (value, digits = 3) => Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
 const scaleToUnit = (value, min, max) => clamp01((value - min) / Math.max(EPS, max - min));
 const TRANSPORT_INTERFACE_TARGETS_DEG = [-35, -22, -12, 0, 12, 22, 35];
-const TRANSPORT_LEVEL_BANDS = [
-  { key: 'boundaryLayer', label: 'Boundary layer', minSigma: 0.85, maxSigma: 1.01 },
-  { key: 'lowerTroposphere', label: 'Lower troposphere', minSigma: 0.65, maxSigma: 0.85 },
-  { key: 'midTroposphere', label: 'Mid troposphere', minSigma: 0.35, maxSigma: 0.65 },
-  { key: 'upperTroposphere', label: 'Upper troposphere', minSigma: 0.0, maxSigma: 0.35 }
-];
+const TRANSPORT_LEVEL_BANDS = INSTRUMENTATION_LEVEL_BANDS.map((band) => ({ ...band }));
 const TRANSPORT_LATITUDE_BANDS = [
   { key: 'southExtratropics', label: 'South extratropics', lat0: -60, lat1: -35 },
   { key: 'southDryBelt', label: 'South dry belt', lat0: -35, lat1: -15 },
@@ -228,6 +225,12 @@ const computeVerticallyIntegratedFlux = (state, componentField, tracerSelector) 
 };
 
 const arrayOrZeros = (arrLike, length) => Array.from(arrLike || new Float32Array(length));
+const sliceBandField = (field, bandIndex, cellCount) => {
+  if (!(field instanceof Float32Array) || field.length !== cellCount * INSTRUMENTATION_LEVEL_BANDS.length) {
+    return new Float32Array(cellCount);
+  }
+  return field.subarray(bandIndex * cellCount, (bandIndex + 1) * cellCount);
+};
 
 const sigmaMidAtLevel = (sigmaHalf, lev, nz) => (
   sigmaHalf && sigmaHalf.length > lev + 1
@@ -1152,6 +1155,171 @@ const buildThermodynamicSupportTracing = (state, grid, upperCloudResidenceTracin
   };
 };
 
+const weightedAccumulationMean = (field, nx, ny, latitudesDeg, rowWeights, lat0, lat1, landMask = null, landMaskMode = 'all') => (
+  weightedFieldBandMean(field, nx, ny, latitudesDeg, rowWeights, lat0, lat1, landMask, landMaskMode)
+);
+
+const weightedCountNormalizedMean = (field, countField, nx, ny, latitudesDeg, rowWeights, lat0, lat1, landMask = null, landMaskMode = 'all') => {
+  const normalized = new Float32Array(field?.length || 0);
+  if (field?.length && countField?.length === field.length) {
+    for (let index = 0; index < field.length; index += 1) {
+      const count = countField[index] || 0;
+      normalized[index] = count > 0 ? (field[index] || 0) / count : 0;
+    }
+  }
+  return weightedFieldBandMean(normalized, nx, ny, latitudesDeg, rowWeights, lat0, lat1, landMask, landMaskMode);
+};
+
+const buildForcingOppositionTracing = (state, grid) => {
+  if (!state?.helperNativeDryingSupportMass || !grid) return null;
+  const { nx, ny } = grid;
+  const latitudesDeg = Array.from(grid.latDeg || []);
+  const rowWeights = makeRowWeights(latitudesDeg);
+  const landMask = Array.from(state.landMask || new Uint8Array(state.N));
+  const northDryBelt = {
+    nativeDryingSupportMeanKgM2: round(weightedAccumulationMean(state.helperNativeDryingSupportMass, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    nudgingMoisteningMeanKgM2: round(weightedAccumulationMean(state.nudgingMoisteningMass, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    nudgingOpposedDryingMeanKgM2: round(weightedAccumulationMean(state.nudgingOpposedDryingMass, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    analysisMoisteningMeanKgM2: round(weightedAccumulationMean(state.analysisMoisteningMass, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    analysisOpposedDryingMeanKgM2: round(weightedAccumulationMean(state.analysisOpposedDryingMass, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    windOpposedDryingCorrectionMean: round(weightedAccumulationMean(state.windOpposedDryingCorrection, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    nudgingTargetQvMismatchMeanKgKg: round(weightedCountNormalizedMean(state.nudgingTargetQvMismatchAccum, state.nudgingTargetQvSampleCount, nx, ny, latitudesDeg, rowWeights, 15, 35), 6),
+    nudgingTargetThetaMismatchMeanK: round(weightedCountNormalizedMean(state.nudgingTargetThetaMismatchAccum, state.nudgingTargetThetaSampleCount, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    nudgingTargetWindMismatchMeanMs: round(weightedCountNormalizedMean(state.nudgingTargetWindMismatchAccum, state.nudgingTargetWindSampleCount, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    analysisTargetQvMismatchMeanKgKg: round(weightedCountNormalizedMean(state.analysisTargetQvMismatchAccum, state.analysisTargetQvSampleCount, nx, ny, latitudesDeg, rowWeights, 15, 35), 6),
+    analysisTargetThetaMismatchMeanK: round(weightedCountNormalizedMean(state.analysisTargetThetaMismatchAccum, state.analysisTargetThetaSampleCount, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    analysisTargetWindMismatchMeanMs: round(weightedCountNormalizedMean(state.analysisTargetWindMismatchAccum, state.analysisTargetWindSampleCount, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    windTargetMismatchMeanMs: round(weightedCountNormalizedMean(state.windTargetMismatchAccum, state.windTargetSampleCount, nx, ny, latitudesDeg, rowWeights, 15, 35), 5)
+  };
+  const northDryBeltLandOcean = {
+    land: {
+      nativeDryingSupportMeanKgM2: round(weightedAccumulationMean(state.helperNativeDryingSupportMass, nx, ny, latitudesDeg, rowWeights, 15, 35, landMask, 'land'), 5),
+      nudgingMoisteningMeanKgM2: round(weightedAccumulationMean(state.nudgingMoisteningMass, nx, ny, latitudesDeg, rowWeights, 15, 35, landMask, 'land'), 5),
+      analysisMoisteningMeanKgM2: round(weightedAccumulationMean(state.analysisMoisteningMass, nx, ny, latitudesDeg, rowWeights, 15, 35, landMask, 'land'), 5),
+      windOpposedDryingCorrectionMean: round(weightedAccumulationMean(state.windOpposedDryingCorrection, nx, ny, latitudesDeg, rowWeights, 15, 35, landMask, 'land'), 5)
+    },
+    ocean: {
+      nativeDryingSupportMeanKgM2: round(weightedAccumulationMean(state.helperNativeDryingSupportMass, nx, ny, latitudesDeg, rowWeights, 15, 35, landMask, 'ocean'), 5),
+      nudgingMoisteningMeanKgM2: round(weightedAccumulationMean(state.nudgingMoisteningMass, nx, ny, latitudesDeg, rowWeights, 15, 35, landMask, 'ocean'), 5),
+      analysisMoisteningMeanKgM2: round(weightedAccumulationMean(state.analysisMoisteningMass, nx, ny, latitudesDeg, rowWeights, 15, 35, landMask, 'ocean'), 5),
+      windOpposedDryingCorrectionMean: round(weightedAccumulationMean(state.windOpposedDryingCorrection, nx, ny, latitudesDeg, rowWeights, 15, 35, landMask, 'ocean'), 5)
+    }
+  };
+  const levelBands = Object.fromEntries(
+    INSTRUMENTATION_LEVEL_BANDS.map((band, bandIndex) => [
+      band.key,
+      {
+        label: band.label,
+        nativeDryingSupportMeanKgM2: round(weightedAccumulationMean(sliceBandField(state.helperNativeDryingSupportByBandMass, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+        nudgingMoisteningMeanKgM2: round(weightedAccumulationMean(sliceBandField(state.nudgingMoisteningByBandMass, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+        nudgingOpposedDryingMeanKgM2: round(weightedAccumulationMean(sliceBandField(state.nudgingOpposedDryingByBandMass, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+        analysisMoisteningMeanKgM2: round(weightedAccumulationMean(sliceBandField(state.analysisMoisteningByBandMass, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+        analysisOpposedDryingMeanKgM2: round(weightedAccumulationMean(sliceBandField(state.analysisOpposedDryingByBandMass, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+        windOpposedDryingCorrectionMean: round(weightedAccumulationMean(sliceBandField(state.windOpposedDryingByBandCorrection, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+        nudgingQvTargetMismatchAccumMean: round(weightedAccumulationMean(sliceBandField(state.nudgingQvTargetMismatchByBand, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 6),
+        analysisQvTargetMismatchAccumMean: round(weightedAccumulationMean(sliceBandField(state.analysisQvTargetMismatchByBand, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 6),
+        windTargetMismatchAccumMean: round(weightedAccumulationMean(sliceBandField(state.windTargetMismatchByBand, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 5)
+      }
+    ])
+  );
+  const helperMoistening = (northDryBelt.nudgingMoisteningMeanKgM2 || 0) + (northDryBelt.analysisMoisteningMeanKgM2 || 0);
+  const opposedDrying = (northDryBelt.nudgingOpposedDryingMeanKgM2 || 0) + (northDryBelt.analysisOpposedDryingMeanKgM2 || 0);
+  const nativeDrying = northDryBelt.nativeDryingSupportMeanKgM2 || 0;
+  const ruledIn = [];
+  const ruledOut = [];
+  const ambiguous = [];
+  if (nativeDrying > 0 && helperMoistening / nativeDrying < 0.08 && opposedDrying / nativeDrying < 0.08) {
+    ruledOut.push('Helper moisture terms are too small to be the primary NH dry-belt driver.');
+  } else if (nativeDrying > 0 && (helperMoistening / nativeDrying > 0.25 || opposedDrying / nativeDrying > 0.25)) {
+    ruledIn.push('Helper forcing materially opposes native dry-belt clearing support.');
+  } else {
+    ambiguous.push('Helper forcing remains secondary-sized but not fully exonerated.');
+  }
+  if ((northDryBeltLandOcean.ocean.nudgingMoisteningMeanKgM2 || 0) > (northDryBeltLandOcean.land.nudgingMoisteningMeanKgM2 || 0) * 1.5) {
+    ruledIn.push('Ocean-side nudging moistening outweighs land-side nudging within the NH dry belt.');
+  }
+  return {
+    schema: 'satellite-wars.forcing-opposition-tracing.v1',
+    northDryBelt,
+    northDryBeltLandOcean,
+    levelBands,
+    rootCauseAssessment: { ruledIn, ruledOut, ambiguous }
+  };
+};
+
+const buildNumericalIntegrityTracing = (state, grid) => {
+  if (!state?.numericalBacktraceClampCount || !grid) return null;
+  const { nx, ny } = grid;
+  const latitudesDeg = Array.from(grid.latDeg || []);
+  const rowWeights = makeRowWeights(latitudesDeg);
+  const north = {
+    backtraceClampCountMean: round(weightedAccumulationMean(state.numericalBacktraceClampCount, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    backtraceClampExcessCellsMean: round(weightedAccumulationMean(state.numericalBacktraceClampExcessCells, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    negativeClipCountMean: round(weightedAccumulationMean(state.numericalNegativeClipCount, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    negativeClipMassMeanKgM2: round(weightedAccumulationMean(state.numericalNegativeClipMass, nx, ny, latitudesDeg, rowWeights, 15, 35), 7),
+    supersaturationClampCountMean: round(weightedAccumulationMean(state.numericalSupersaturationClampCount, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    supersaturationClampMassMeanKgM2: round(weightedAccumulationMean(state.numericalSupersaturationClampMass, nx, ny, latitudesDeg, rowWeights, 15, 35), 7),
+    cloudLimiterCountMean: round(weightedAccumulationMean(state.numericalCloudLimiterCount, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    cloudLimiterMassMeanKgM2: round(weightedAccumulationMean(state.numericalCloudLimiterMass, nx, ny, latitudesDeg, rowWeights, 15, 35), 7),
+    verticalCflClampCountMean: round(weightedAccumulationMean(state.numericalVerticalCflClampCount, nx, ny, latitudesDeg, rowWeights, 15, 35), 5),
+    verticalCflClampMassMeanKgM2: round(weightedAccumulationMean(state.numericalVerticalCflClampMass, nx, ny, latitudesDeg, rowWeights, 15, 35), 7)
+  };
+  const south = {
+    backtraceClampCountMean: round(weightedAccumulationMean(state.numericalBacktraceClampCount, nx, ny, latitudesDeg, rowWeights, -35, -15), 5),
+    backtraceClampExcessCellsMean: round(weightedAccumulationMean(state.numericalBacktraceClampExcessCells, nx, ny, latitudesDeg, rowWeights, -35, -15), 5),
+    negativeClipCountMean: round(weightedAccumulationMean(state.numericalNegativeClipCount, nx, ny, latitudesDeg, rowWeights, -35, -15), 5),
+    negativeClipMassMeanKgM2: round(weightedAccumulationMean(state.numericalNegativeClipMass, nx, ny, latitudesDeg, rowWeights, -35, -15), 7),
+    supersaturationClampCountMean: round(weightedAccumulationMean(state.numericalSupersaturationClampCount, nx, ny, latitudesDeg, rowWeights, -35, -15), 5),
+    supersaturationClampMassMeanKgM2: round(weightedAccumulationMean(state.numericalSupersaturationClampMass, nx, ny, latitudesDeg, rowWeights, -35, -15), 7),
+    cloudLimiterCountMean: round(weightedAccumulationMean(state.numericalCloudLimiterCount, nx, ny, latitudesDeg, rowWeights, -35, -15), 5),
+    cloudLimiterMassMeanKgM2: round(weightedAccumulationMean(state.numericalCloudLimiterMass, nx, ny, latitudesDeg, rowWeights, -35, -15), 7),
+    verticalCflClampCountMean: round(weightedAccumulationMean(state.numericalVerticalCflClampCount, nx, ny, latitudesDeg, rowWeights, -35, -15), 5),
+    verticalCflClampMassMeanKgM2: round(weightedAccumulationMean(state.numericalVerticalCflClampMass, nx, ny, latitudesDeg, rowWeights, -35, -15), 7)
+  };
+  const levelBands = Object.fromEntries(
+    INSTRUMENTATION_LEVEL_BANDS.map((band, bandIndex) => [
+      band.key,
+      {
+        label: band.label,
+        northNegativeClipMassMeanKgM2: round(weightedAccumulationMean(sliceBandField(state.numericalNegativeClipByBandMass, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 7),
+        northSupersaturationClampMassMeanKgM2: round(weightedAccumulationMean(sliceBandField(state.numericalSupersaturationClampByBandMass, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 7),
+        northCloudLimiterMassMeanKgM2: round(weightedAccumulationMean(sliceBandField(state.numericalCloudLimiterByBandMass, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 7),
+        northVerticalCflClampMassMeanKgM2: round(weightedAccumulationMean(sliceBandField(state.numericalVerticalCflClampByBandMass, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 7),
+        northBacktraceClampCountMean: round(weightedAccumulationMean(sliceBandField(state.numericalBacktraceClampByBandCount, bandIndex, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35), 5)
+      }
+    ])
+  );
+  const asymmetry = {
+    negativeClipMassNorthToSouthRatio: round((north.negativeClipMassMeanKgM2 || 0) / Math.max(EPS, south.negativeClipMassMeanKgM2 || 0), 5),
+    supersaturationClampMassNorthToSouthRatio: round((north.supersaturationClampMassMeanKgM2 || 0) / Math.max(EPS, south.supersaturationClampMassMeanKgM2 || 0), 5),
+    cloudLimiterMassNorthToSouthRatio: round((north.cloudLimiterMassMeanKgM2 || 0) / Math.max(EPS, south.cloudLimiterMassMeanKgM2 || 0), 5),
+    verticalCflClampMassNorthToSouthRatio: round((north.verticalCflClampMassMeanKgM2 || 0) / Math.max(EPS, south.verticalCflClampMassMeanKgM2 || 0), 5)
+  };
+  const ruledIn = [];
+  const ruledOut = [];
+  const ambiguous = [];
+  const numericalMassTotal = (north.negativeClipMassMeanKgM2 || 0)
+    + (north.supersaturationClampMassMeanKgM2 || 0)
+    + (north.cloudLimiterMassMeanKgM2 || 0)
+    + (north.verticalCflClampMassMeanKgM2 || 0);
+  if (numericalMassTotal < 0.02) {
+    ruledOut.push('Numerical clipping and clamp mass are too small to be the primary NH dry-belt driver.');
+  } else {
+    ambiguous.push('Numerical limiter mass is non-zero and still worth checking against dt/grid sensitivity.');
+  }
+  if ((asymmetry.cloudLimiterMassNorthToSouthRatio || 0) > 2 || (asymmetry.verticalCflClampMassNorthToSouthRatio || 0) > 2) {
+    ruledIn.push('A north-heavy numerical asymmetry remains present and must be falsified with sensitivity runs.');
+  }
+  return {
+    schema: 'satellite-wars.numerical-integrity-tracing.v1',
+    northDryBelt: north,
+    southDryBelt: south,
+    levelBands,
+    asymmetry,
+    rootCauseAssessment: { ruledIn, ruledOut, ambiguous }
+  };
+};
+
 const buildStormSpilloverTracing = ({
   state,
   grid,
@@ -1692,6 +1860,8 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     thetaeGradientBoundaryMinusLowerK,
     mseGradientBoundaryMinusLowerJkg
   });
+  const forcingOppositionTracing = buildForcingOppositionTracing(state, grid);
+  const numericalIntegrityTracing = buildNumericalIntegrityTracing(state, grid);
   const cycloneSupportFields = {
     relativeVorticityS_1: Array.from(fields.vort || []),
     omegaLowerPaS: Array.from(fields.omegaL || []),
@@ -1823,6 +1993,8 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     verticalCloudBirthTracing,
     upperCloudResidenceTracing,
     thermodynamicSupportTracing,
+    forcingOppositionTracing,
+    numericalIntegrityTracing,
     stormSpilloverTracing,
     lowLevelMoistureSourceTracersKgM2: {
       ...lowLevelSourceTracers,

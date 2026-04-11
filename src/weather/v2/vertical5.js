@@ -5,6 +5,11 @@ import {
   findCloudBirthLevelBandIndex,
   sigmaMidAtLevel
 } from './cloudBirthTracing5.js';
+import {
+  INSTRUMENTATION_LEVEL_BAND_COUNT,
+  findInstrumentationLevelBandIndex,
+  instrumentationBandOffset
+} from './instrumentationBands5.js';
 
 const P0 = 100000;
 const KAPPA = Rd / Cp;
@@ -13,6 +18,15 @@ const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const smoothstep = (edge0, edge1, x) => {
   const t = clamp((x - edge0) / Math.max(1e-6, edge1 - edge0), 0, 1);
   return t * t * (3 - 2 * t);
+};
+const accumulateBandValue = (field, bandIndex, cell, cellCount, value) => {
+  if (
+    !(field instanceof Float32Array)
+    || field.length !== cellCount * INSTRUMENTATION_LEVEL_BAND_COUNT
+    || !Number.isFinite(value)
+    || value === 0
+  ) return;
+  field[instrumentationBandOffset(bandIndex, cell, cellCount)] += value;
 };
 const VERTICAL_ALLOWED_PARAMS = new Set([
   'enableMixing',
@@ -619,7 +633,21 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             const idxBelow = (lev + 1) * N + k;
             const dpNeighbor = pMid[idxBelow] - pMid[idx];
             if (dpNeighbor > 0) {
-              const frac = clamp(((-omegaMid) * dt * transportScale) / dpNeighbor, 0, cflMax);
+              const rawFrac = ((-omegaMid) * dt * transportScale) / dpNeighbor;
+              const frac = clamp(rawFrac, 0, cflMax);
+              if (rawFrac > cflMax) {
+                const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+                const excessMass = dpLev > 0 ? (dpLev / g) * Math.max(0, rawFrac - cflMax) : 0;
+                state.numericalVerticalCflClampCount[k] += 1;
+                state.numericalVerticalCflClampMass[k] += excessMass;
+                accumulateBandValue(
+                  state.numericalVerticalCflClampByBandMass,
+                  findInstrumentationLevelBandIndex(sigmaMid),
+                  k,
+                  N,
+                  excessMass
+                );
+              }
               const qvDelta = frac * (qv[idxBelow] - qv[idx]);
               qvUpdated += qvDelta;
               thetaUpdated += frac * (theta[idxBelow] - theta[idx]);
@@ -647,12 +675,39 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             const idxAbove = (lev - 1) * N + k;
             const dpNeighbor = pMid[idx] - pMid[idxAbove];
             if (dpNeighbor > 0) {
-              const frac = clamp((omegaMid * dt * transportScale) / dpNeighbor, 0, cflMax);
+              const rawFrac = (omegaMid * dt * transportScale) / dpNeighbor;
+              const frac = clamp(rawFrac, 0, cflMax);
+              if (rawFrac > cflMax) {
+                const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+                const excessMass = dpLev > 0 ? (dpLev / g) * Math.max(0, rawFrac - cflMax) : 0;
+                state.numericalVerticalCflClampCount[k] += 1;
+                state.numericalVerticalCflClampMass[k] += excessMass;
+                accumulateBandValue(
+                  state.numericalVerticalCflClampByBandMass,
+                  findInstrumentationLevelBandIndex(sigmaMid),
+                  k,
+                  N,
+                  excessMass
+                );
+              }
               qvUpdated += frac * (qv[idxAbove] - qv[idx]);
               thetaUpdated += frac * (theta[idxAbove] - theta[idx]);
             }
           }
 
+          if (qvUpdated < 0) {
+            const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+            const clippedMass = dpLev > 0 ? (-qvUpdated) * (dpLev / g) : 0;
+            state.numericalNegativeClipCount[k] += 1;
+            state.numericalNegativeClipMass[k] += clippedMass;
+            accumulateBandValue(
+              state.numericalNegativeClipByBandMass,
+              findInstrumentationLevelBandIndex(sigmaMid),
+              k,
+              N,
+              clippedMass
+            );
+          }
           qvNext[idx] = Math.max(0, qvUpdated);
           if (dThetaMaxVertAdvPerStep > 0) {
             const dTheta = thetaUpdated - theta[idx];
@@ -674,7 +729,22 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       qv.set(qvNext);
       theta.set(thetaNext);
       for (let m = 0; m < qv.length; m++) {
-        if (qv[m] < 0) qv[m] = 0;
+        if (qv[m] < 0) {
+          const cell = m % N;
+          const lev = Math.floor(m / N);
+          const dpLev = pHalf[(lev + 1) * N + cell] - pHalf[lev * N + cell];
+          const clippedMass = dpLev > 0 ? (-qv[m]) * (dpLev / g) : 0;
+          state.numericalNegativeClipCount[cell] += 1;
+          state.numericalNegativeClipMass[cell] += clippedMass;
+          accumulateBandValue(
+            state.numericalNegativeClipByBandMass,
+            findInstrumentationLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz)),
+            cell,
+            N,
+            clippedMass
+          );
+          qv[m] = 0;
+        }
       }
     }
   }
@@ -759,6 +829,26 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         const levTopPbl = clamp(pblTopIndex ? pblTopIndex[k] : nz - 1, 0, nz - 1);
         for (let lev = levTopPbl; lev < nz; lev++) {
           const idx = lev * N + k;
+          const bandIndex = findInstrumentationLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));
+          const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+          const clipMass = dpLev > 0
+            ? ((-Math.min(0, qv[idx])) + (-Math.min(0, qc[idx])) + (-Math.min(0, qi[idx])) + (-Math.min(0, qr[idx]))) * (dpLev / g)
+            : 0;
+          const cloudClipMass = dpLev > 0
+            ? ((-Math.min(0, qc[idx])) + (-Math.min(0, qi[idx])) + (-Math.min(0, qr[idx]))) * (dpLev / g)
+            : 0;
+          const clipCount = (qv[idx] < 0) + (qc[idx] < 0) + (qi[idx] < 0) + (qr[idx] < 0);
+          const cloudClipCount = (qc[idx] < 0) + (qi[idx] < 0) + (qr[idx] < 0);
+          if (clipCount > 0) {
+            state.numericalNegativeClipCount[k] += clipCount;
+            state.numericalNegativeClipMass[k] += clipMass;
+            accumulateBandValue(state.numericalNegativeClipByBandMass, bandIndex, k, N, clipMass);
+          }
+          if (cloudClipCount > 0) {
+            state.numericalCloudLimiterCount[k] += cloudClipCount;
+            state.numericalCloudLimiterMass[k] += cloudClipMass;
+            accumulateBandValue(state.numericalCloudLimiterByBandMass, bandIndex, k, N, cloudClipMass);
+          }
           qv[idx] = Math.max(0, qv[idx]);
           qc[idx] = Math.max(0, qc[idx]);
           qi[idx] = Math.max(0, qi[idx]);
@@ -1354,6 +1444,28 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   // Positivity guards
   const len3d = theta.length;
   for (let m = 0; m < len3d; m++) {
+    const cell = m % N;
+    const lev = Math.floor(m / N);
+    const bandIndex = findInstrumentationLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));
+    const dpLev = pHalf[(lev + 1) * N + cell] - pHalf[lev * N + cell];
+    const clipMass = dpLev > 0
+      ? ((-Math.min(0, qv[m])) + (-Math.min(0, qc[m])) + (-Math.min(0, qi[m])) + (-Math.min(0, qr[m]))) * (dpLev / g)
+      : 0;
+    const cloudClipMass = dpLev > 0
+      ? ((-Math.min(0, qc[m])) + (-Math.min(0, qi[m])) + (-Math.min(0, qr[m]))) * (dpLev / g)
+      : 0;
+    const clipCount = (qv[m] < 0) + (qc[m] < 0) + (qi[m] < 0) + (qr[m] < 0);
+    const cloudClipCount = (qc[m] < 0) + (qi[m] < 0) + (qr[m] < 0);
+    if (clipCount > 0) {
+      state.numericalNegativeClipCount[cell] += clipCount;
+      state.numericalNegativeClipMass[cell] += clipMass;
+      accumulateBandValue(state.numericalNegativeClipByBandMass, bandIndex, cell, N, clipMass);
+    }
+    if (cloudClipCount > 0) {
+      state.numericalCloudLimiterCount[cell] += cloudClipCount;
+      state.numericalCloudLimiterMass[cell] += cloudClipMass;
+      accumulateBandValue(state.numericalCloudLimiterByBandMass, bandIndex, cell, N, cloudClipMass);
+    }
     qv[m] = Math.max(0, qv[m]);
     qc[m] = Math.max(0, qc[m]);
     qi[m] = Math.max(0, qi[m]);

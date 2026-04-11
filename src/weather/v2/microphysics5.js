@@ -5,6 +5,11 @@ import {
   findCloudBirthLevelBandIndex,
   sigmaMidAtLevel
 } from './cloudBirthTracing5.js';
+import {
+  INSTRUMENTATION_LEVEL_BAND_COUNT,
+  findInstrumentationLevelBandIndex,
+  instrumentationBandOffset
+} from './instrumentationBands5.js';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const smoothstep = (edge0, edge1, x) => {
@@ -23,6 +28,16 @@ const saturationMixingRatio = (T, p) => {
 };
 
 const applyThetaLatent = (thetaVal, dq, latentHeat, Pi) => thetaVal + (latentHeat / Cp * dq) / Pi;
+
+const accumulateBandValue = (field, bandIndex, cell, cellCount, value) => {
+  if (
+    !(field instanceof Float32Array)
+    || field.length !== cellCount * INSTRUMENTATION_LEVEL_BAND_COUNT
+    || !Number.isFinite(value)
+    || value === 0
+  ) return;
+  field[instrumentationBandOffset(bandIndex, cell, cellCount)] += value;
+};
 
 export function stepMicrophysics5({ dt, state, params = {} }) {
   if (!state || !Number.isFinite(dt) || dt <= 0) return;
@@ -233,10 +248,14 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
           qvVal -= dq;
           if (massCell > 0) {
             const condMass = dq * massCell;
+            const numericalBandIndex = findInstrumentationLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));
             state.largeScaleCondensationSource[k] += condMass;
             state.saturationAdjustmentCloudBirthAccumMass[k] += condMass;
             state.saturationAdjustmentEventCount[k] += 1;
             state.saturationAdjustmentSupersaturationMassWeighted[k] += supersaturationFrac * condMass;
+            state.numericalSupersaturationClampCount[k] += 1;
+            state.numericalSupersaturationClampMass[k] += condMass;
+            accumulateBandValue(state.numericalSupersaturationClampByBandMass, numericalBandIndex, k, N, condMass);
             const omegaTop = Number.isFinite(omega?.[lev * N + k]) ? omega[lev * N + k] : 0;
             const omegaBot = Number.isFinite(omega?.[(lev + 1) * N + k]) ? omega[(lev + 1) * N + k] : 0;
             const ascentMagnitudePaS = Math.max(0, -0.5 * (omegaTop + omegaBot));
@@ -339,6 +358,25 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         thetaVal = applyThetaLatent(thetaVal, dqRime, Lf, Pi);
       }
 
+      const numericalBandIndex = findInstrumentationLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));
+      const negativeClipMass = massCell > 0
+        ? ((-Math.min(0, qvVal)) + (-Math.min(0, qcVal)) + (-Math.min(0, qiVal)) + (-Math.min(0, qrVal)) + (-Math.min(0, qsVal))) * massCell
+        : 0;
+      const cloudLimiterMass = massCell > 0
+        ? ((-Math.min(0, qcVal)) + (-Math.min(0, qiVal)) + (-Math.min(0, qrVal)) + (-Math.min(0, qsVal))) * massCell
+        : 0;
+      const negativeClipCount = (qvVal < 0) + (qcVal < 0) + (qiVal < 0) + (qrVal < 0) + (qsVal < 0);
+      const cloudLimiterCount = (qcVal < 0) + (qiVal < 0) + (qrVal < 0) + (qsVal < 0);
+      if (negativeClipCount > 0) {
+        state.numericalNegativeClipCount[k] += negativeClipCount;
+        state.numericalNegativeClipMass[k] += negativeClipMass;
+        accumulateBandValue(state.numericalNegativeClipByBandMass, numericalBandIndex, k, N, negativeClipMass);
+      }
+      if (cloudLimiterCount > 0) {
+        state.numericalCloudLimiterCount[k] += cloudLimiterCount;
+        state.numericalCloudLimiterMass[k] += cloudLimiterMass;
+        accumulateBandValue(state.numericalCloudLimiterByBandMass, numericalBandIndex, k, N, cloudLimiterMass);
+      }
       qv[idx] = Math.max(0, qvVal);
       qc[idx] = Math.max(0, qcVal);
       qi[idx] = Math.max(0, qiVal);

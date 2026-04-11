@@ -1,5 +1,6 @@
 import { SURFACE_MOISTURE_SOURCE_TRACERS } from './sourceTracing5.js';
 import { CLOUD_BIRTH_LEVEL_BAND_COUNT } from './cloudBirthTracing5.js';
+import { INSTRUMENTATION_LEVEL_BAND_COUNT } from './instrumentationBands5.js';
 
 const makeArray = (size, value = 0) => {
   const arr = new Float32Array(size);
@@ -131,6 +132,54 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const surfaceEvapSeaIceSuppression = makeArray(N);
   const surfaceEvapSurfaceSaturationMixingRatio = makeArray(N);
   const surfaceEvapAirMixingRatio = makeArray(N);
+  const helperNativeDryingSupportMass = makeArray(N);
+  const helperNativeDryingSupportByBandMass = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const nudgingMoisteningMass = makeArray(N);
+  const nudgingOpposedDryingMass = makeArray(N);
+  const nudgingTargetQvMismatchAccum = makeArray(N);
+  const nudgingTargetThetaMismatchAccum = makeArray(N);
+  const nudgingTargetWindMismatchAccum = makeArray(N);
+  const nudgingTargetQvSampleCount = new Uint32Array(N);
+  const nudgingTargetThetaSampleCount = new Uint32Array(N);
+  const nudgingTargetWindSampleCount = new Uint32Array(N);
+  const analysisMoisteningMass = makeArray(N);
+  const analysisOpposedDryingMass = makeArray(N);
+  const analysisTargetQvMismatchAccum = makeArray(N);
+  const analysisTargetThetaMismatchAccum = makeArray(N);
+  const analysisTargetWindMismatchAccum = makeArray(N);
+  const analysisTargetQvSampleCount = new Uint32Array(N);
+  const analysisTargetThetaSampleCount = new Uint32Array(N);
+  const analysisTargetWindSampleCount = new Uint32Array(N);
+  const windOpposedDryingCorrection = makeArray(N);
+  const windTargetMismatchAccum = makeArray(N);
+  const windTargetSampleCount = new Uint32Array(N);
+  const nudgingMoisteningByBandMass = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const nudgingOpposedDryingByBandMass = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const analysisMoisteningByBandMass = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const analysisOpposedDryingByBandMass = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const nudgingQvTargetMismatchByBand = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const nudgingThetaTargetMismatchByBand = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const nudgingWindTargetMismatchByBand = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const analysisQvTargetMismatchByBand = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const analysisThetaTargetMismatchByBand = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const analysisWindTargetMismatchByBand = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const windOpposedDryingByBandCorrection = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const windTargetMismatchByBand = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const numericalBacktraceClampCount = makeArray(N);
+  const numericalBacktraceClampExcessCells = makeArray(N);
+  const numericalBacktraceClampByBandCount = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const numericalNegativeClipCount = makeArray(N);
+  const numericalNegativeClipMass = makeArray(N);
+  const numericalNegativeClipByBandMass = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const numericalSupersaturationClampCount = makeArray(N);
+  const numericalSupersaturationClampMass = makeArray(N);
+  const numericalSupersaturationClampByBandMass = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const numericalCloudLimiterCount = makeArray(N);
+  const numericalCloudLimiterMass = makeArray(N);
+  const numericalCloudLimiterByBandMass = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const numericalVerticalCflClampCount = makeArray(N);
+  const numericalVerticalCflClampMass = makeArray(N);
+  const numericalVerticalCflClampByBandMass = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
   const analysisIauPs = makeArray(N);
   const analysisIauTs = makeArray(N);
   const analysisIauU = makeArray(SZ);
@@ -251,6 +300,54 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
     upperCloudLwCloudEffectWm2,
     upperCloudNetCloudRadiativeEffectWm2,
     surfaceCloudShortwaveShieldingWm2,
+    helperNativeDryingSupportMass,
+    helperNativeDryingSupportByBandMass,
+    nudgingMoisteningMass,
+    nudgingOpposedDryingMass,
+    nudgingTargetQvMismatchAccum,
+    nudgingTargetThetaMismatchAccum,
+    nudgingTargetWindMismatchAccum,
+    nudgingTargetQvSampleCount,
+    nudgingTargetThetaSampleCount,
+    nudgingTargetWindSampleCount,
+    analysisMoisteningMass,
+    analysisOpposedDryingMass,
+    analysisTargetQvMismatchAccum,
+    analysisTargetThetaMismatchAccum,
+    analysisTargetWindMismatchAccum,
+    analysisTargetQvSampleCount,
+    analysisTargetThetaSampleCount,
+    analysisTargetWindSampleCount,
+    windOpposedDryingCorrection,
+    windTargetMismatchAccum,
+    windTargetSampleCount,
+    nudgingMoisteningByBandMass,
+    nudgingOpposedDryingByBandMass,
+    analysisMoisteningByBandMass,
+    analysisOpposedDryingByBandMass,
+    nudgingQvTargetMismatchByBand,
+    nudgingThetaTargetMismatchByBand,
+    nudgingWindTargetMismatchByBand,
+    analysisQvTargetMismatchByBand,
+    analysisThetaTargetMismatchByBand,
+    analysisWindTargetMismatchByBand,
+    windOpposedDryingByBandCorrection,
+    windTargetMismatchByBand,
+    numericalBacktraceClampCount,
+    numericalBacktraceClampExcessCells,
+    numericalBacktraceClampByBandCount,
+    numericalNegativeClipCount,
+    numericalNegativeClipMass,
+    numericalNegativeClipByBandMass,
+    numericalSupersaturationClampCount,
+    numericalSupersaturationClampMass,
+    numericalSupersaturationClampByBandMass,
+    numericalCloudLimiterCount,
+    numericalCloudLimiterMass,
+    numericalCloudLimiterByBandMass,
+    numericalVerticalCflClampCount,
+    numericalVerticalCflClampMass,
+    numericalVerticalCflClampByBandMass,
     ...sourceTracer3D,
     surfaceEvapPotentialRate,
     surfaceEvapTransferCoeff,

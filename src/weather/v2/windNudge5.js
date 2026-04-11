@@ -1,8 +1,35 @@
 import { LAT_DEG, U10M_ZONAL_MEAN_TARGET, SOURCE_FIXTURE_COUNT } from './windClimoTargets.js';
 import { findClosestLevelIndex } from './verticalGrid.js';
+import {
+  INSTRUMENTATION_LEVEL_BAND_COUNT,
+  findInstrumentationLevelBandIndex,
+  instrumentationBandOffset,
+  sigmaMidAtLevel
+} from './instrumentationBands5.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = (v) => clamp(v, 0, 1);
+const smoothstep = (edge0, edge1, x) => {
+  const t = clamp01((x - edge0) / Math.max(1e-6, edge1 - edge0));
+  return t * t * (3 - 2 * t);
+};
+
+const computeDryingSupport = ({ latAbsDeg = 0, lowLevelOmegaEffectivePaS = 0, subtropicalSubsidenceDryingFrac = 0 }) => {
+  const dryBeltRelief = smoothstep(14, 34, latAbsDeg) * smoothstep(-0.02, 0.25, lowLevelOmegaEffectivePaS);
+  const subtropicalDryingStrength = smoothstep(0.01, 0.08, subtropicalSubsidenceDryingFrac);
+  return clamp01(0.55 * dryBeltRelief + 0.95 * subtropicalDryingStrength);
+};
+
+const accumulateBandValue = (field, bandIndex, cell, cellCount, value) => {
+  if (
+    !(field instanceof Float32Array)
+    || field.length !== cellCount * INSTRUMENTATION_LEVEL_BAND_COUNT
+    || !Number.isFinite(value)
+    || value === 0
+  ) return;
+  field[instrumentationBandOffset(bandIndex, cell, cellCount)] += value;
+};
 
 function applyUpperWindCap(u, v, idx, targetU, targetV, params = {}) {
   const factor = Number.isFinite(params.upperWindCapFactor) ? params.upperWindCapFactor : 0;
@@ -107,8 +134,23 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       for (let i = 0; i < nx; i += 1) {
         const k = row + i;
         const idxS = levS * N + k;
+        const dryingSupport = computeDryingSupport({
+          latAbsDeg: absLat,
+          lowLevelOmegaEffectivePaS: state.lowLevelOmegaEffective?.[k] || 0,
+          subtropicalSubsidenceDryingFrac: state.subtropicalSubsidenceDrying?.[k] || 0
+        });
         const duS = (targetSurfaceU[k] - u[idxS]) * relaxS;
         const dvS = (targetSurfaceV[k] - v[idxS]) * relaxV;
+        const surfaceMismatch = Math.hypot(targetSurfaceU[k] - u[idxS], targetSurfaceV[k] - v[idxS]);
+        state.windTargetMismatchAccum[k] += surfaceMismatch;
+        state.windTargetSampleCount[k] += 1;
+        accumulateBandValue(
+          state.windTargetMismatchByBand,
+          findInstrumentationLevelBandIndex(sigmaMidAtLevel(state.sigmaHalf, levS, nz)),
+          k,
+          N,
+          surfaceMismatch
+        );
         u[idxS] += duS;
         v[idxS] += dvS;
         sumErrS += ((u[idxS] - targetSurfaceU[k]) ** 2 + (v[idxS] - targetSurfaceV[k]) ** 2) * weight;
@@ -139,6 +181,20 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
             };
             const duU = (targetUpperUk - u[idxU]) * relaxU;
             const dvU = (targetUpperVk - v[idxU]) * relaxV;
+            const sigmaMid = sigmaMidAtLevel(state.sigmaHalf, lev, nz);
+            const bandIndex = findInstrumentationLevelBandIndex(sigmaMid);
+            const targetMismatch = Math.hypot(targetUpperUk - u[idxU], targetUpperVk - v[idxU]);
+            state.windTargetMismatchAccum[k] += targetMismatch;
+            state.windTargetSampleCount[k] += 1;
+            accumulateBandValue(state.windTargetMismatchByBand, bandIndex, k, N, targetMismatch);
+            if (absLat >= 15 && absLat <= 35 && sigmaMid <= 0.55 && dryingSupport > 0) {
+              const polewardSign = latDeg >= 0 ? 1 : -1;
+              if (dvU * polewardSign > 0) {
+                const oppositionMagnitude = Math.abs(dvU) * dryingSupport;
+                state.windOpposedDryingCorrection[k] += oppositionMagnitude;
+                accumulateBandValue(state.windOpposedDryingByBandCorrection, bandIndex, k, N, oppositionMagnitude);
+              }
+            }
             u[idxU] += duU;
             v[idxU] += dvU;
             applyUpperWindCap(u, v, idxU, targetUpperUk, targetUpperVk, capParams);
@@ -169,6 +225,20 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
           };
           const duU = (targetUpperUk - u[idxU]) * relaxU;
           const dvU = (targetUpperVk - v[idxU]) * relaxV;
+          const sigmaMid = sigmaMidAtLevel(state.sigmaHalf, levU, nz);
+          const bandIndex = findInstrumentationLevelBandIndex(sigmaMid);
+          const targetMismatch = Math.hypot(targetUpperUk - u[idxU], targetUpperVk - v[idxU]);
+          state.windTargetMismatchAccum[k] += targetMismatch;
+          state.windTargetSampleCount[k] += 1;
+          accumulateBandValue(state.windTargetMismatchByBand, bandIndex, k, N, targetMismatch);
+          if (absLat >= 15 && absLat <= 35 && sigmaMid <= 0.55 && dryingSupport > 0) {
+            const polewardSign = latDeg >= 0 ? 1 : -1;
+            if (dvU * polewardSign > 0) {
+              const oppositionMagnitude = Math.abs(dvU) * dryingSupport;
+              state.windOpposedDryingCorrection[k] += oppositionMagnitude;
+              accumulateBandValue(state.windOpposedDryingByBandCorrection, bandIndex, k, N, oppositionMagnitude);
+            }
+          }
           u[idxU] += duU;
           v[idxU] += dvU;
           applyUpperWindCap(u, v, idxU, targetUpperUk, targetUpperVk, capParams);
@@ -249,6 +319,33 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       const k = row + i;
       const idxS = levS * N + k;
       const idxU = levU * N + k;
+      const dryingSupport = computeDryingSupport({
+        latAbsDeg: absLat,
+        lowLevelOmegaEffectivePaS: state.lowLevelOmegaEffective?.[k] || 0,
+        subtropicalSubsidenceDryingFrac: state.subtropicalSubsidenceDrying?.[k] || 0
+      });
+      state.windTargetMismatchAccum[k] += Math.hypot(targetS - u[idxS], -v[idxS]);
+      state.windTargetSampleCount[k] += 1;
+      accumulateBandValue(
+        state.windTargetMismatchByBand,
+        findInstrumentationLevelBandIndex(sigmaMidAtLevel(state.sigmaHalf, levS, nz)),
+        k,
+        N,
+        Math.hypot(targetS - u[idxS], -v[idxS])
+      );
+      state.windTargetMismatchAccum[k] += Math.hypot(targetU - u[idxU], -v[idxU]);
+      state.windTargetSampleCount[k] += 1;
+      const sigmaMid = sigmaMidAtLevel(state.sigmaHalf, levU, nz);
+      const bandIndex = findInstrumentationLevelBandIndex(sigmaMid);
+      accumulateBandValue(state.windTargetMismatchByBand, bandIndex, k, N, Math.hypot(targetU - u[idxU], -v[idxU]));
+      if (absLat >= 15 && absLat <= 35 && sigmaMid <= 0.55 && dryingSupport > 0) {
+        const polewardSign = latDeg >= 0 ? 1 : -1;
+        if (dvU * polewardSign > 0) {
+          const oppositionMagnitude = Math.abs(dvU) * dryingSupport;
+          state.windOpposedDryingCorrection[k] += oppositionMagnitude;
+          accumulateBandValue(state.windOpposedDryingByBandCorrection, bandIndex, k, N, oppositionMagnitude);
+        }
+      }
       u[idxS] += duS;
       v[idxS] += dvS;
       u[idxU] += duU;

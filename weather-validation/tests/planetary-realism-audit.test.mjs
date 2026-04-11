@@ -447,6 +447,144 @@ test('buildPhase8StormSpilloverReports expose regime coverage and transient leak
   assert.equal(leakage.transientEddyLeakage.dominantCloudEddyImport.levelBandKey, 'upperTroposphere');
 });
 
+test('buildPhase7And9Reports preserve helper-opposition, initialization-memory, and sensitivity summaries', () => {
+  const sampleDay10 = {
+    targetDay: 10,
+    metrics: {
+      northDryBeltSourceNorthDryBeltOceanMeanKgM2: 1.2,
+      northDryBeltSourceLandRecyclingMeanKgM2: 0.3,
+      northDryBeltSourceTropicalOceanNorthMeanKgM2: 0.2,
+      northDryBeltSourceTropicalOceanSouthMeanKgM2: 0.1,
+      northDryBeltSourceNorthExtratropicalOceanMeanKgM2: 0.5,
+      northDryBeltSourceOtherOceanMeanKgM2: 0.2,
+      northDryBeltSourceInitializationMemoryMeanKgM2: 0.9,
+      northDryBeltSourceAtmosphericCarryoverMeanKgM2: 2.4,
+      northDryBeltSourceNudgingInjectionMeanKgM2: 0.05,
+      northDryBeltSourceAnalysisInjectionMeanKgM2: 0.04,
+      northDryBeltCarriedOverUpperCloudMeanKgM2: 0.6,
+      northDryBeltLargeScaleCondensationMeanKgM2: 0.2
+    },
+    forcingOppositionTracing: {
+      northDryBelt: {
+        nudgingMoisteningMeanKgM2: 0.03,
+        analysisMoisteningMeanKgM2: 0.01,
+        nudgingTargetQvMismatchMeanKgKg: 0.002,
+        nudgingTargetThetaMismatchMeanK: 0.8,
+        nudgingTargetWindMismatchMeanMs: 1.2,
+        analysisTargetQvMismatchMeanKgKg: 0.001,
+        analysisTargetThetaMismatchMeanK: 0.6,
+        analysisTargetWindMismatchMeanMs: 0.9,
+        windTargetMismatchMeanMs: 1.5
+      },
+      levelBands: {
+        upperTroposphere: { nudgingMoisteningMeanKgM2: 0.01 }
+      },
+      rootCauseAssessment: {
+        ruledOut: ['helpers_small'],
+        ruledIn: [],
+        ambiguous: []
+      }
+    },
+    numericalIntegrityTracing: {
+      northDryBelt: {
+        negativeClipMassMeanKgM2: 0.001,
+        cloudLimiterMassMeanKgM2: 0.002,
+        verticalCflClampMassMeanKgM2: 0.003
+      },
+      southDryBelt: {
+        negativeClipMassMeanKgM2: 0.001,
+        cloudLimiterMassMeanKgM2: 0.001,
+        verticalCflClampMassMeanKgM2: 0.002
+      },
+      asymmetry: {
+        cloudLimiterMassNorthToSouthRatio: 2
+      },
+      rootCauseAssessment: {
+        ruledOut: ['numerics_small'],
+        ruledIn: [],
+        ambiguous: []
+      }
+    },
+    upperCloudResidenceTracing: {
+      ageAttribution: {
+        northDryBeltStaleFrac: 0.91
+      }
+    },
+    transportTracing: {
+      interfaces: [
+        {
+          targetLatDeg: 35,
+          levelBands: {
+            upperTroposphere: {
+              cloudFluxNorthKgM_1S: 3.2,
+              vaporFluxNorthKgM_1S: 1.1
+            }
+          }
+        }
+      ]
+    },
+    verticalCloudBirthTracing: {
+      attribution: {
+        northDryBeltChannelMeansKgM2: {
+          carryOverUpperCloudEntering: 0.8,
+          saturationAdjustmentCloudBirth: 0.2
+        }
+      }
+    },
+    stormSpilloverTracing: {
+      overall: {
+        dominantCombinedRegime: 'persistent_zonal_background'
+      }
+    }
+  };
+  const sampleDay30 = {
+    ...sampleDay10,
+    targetDay: 30,
+    metrics: {
+      ...sampleDay10.metrics,
+      northDryBeltSourceInitializationMemoryMeanKgM2: 0.4
+    }
+  };
+
+  const forcing = planetaryAuditTest.buildForcingOppositionBudgetReport(sampleDay30);
+  const mismatch = planetaryAuditTest.buildNudgingTargetMismatchReport(sampleDay30);
+  const initMemory = planetaryAuditTest.buildInitializationMemoryReport([sampleDay10, sampleDay30], sampleDay30);
+  const numerical = planetaryAuditTest.buildNumericalIntegritySummaryReport(sampleDay30);
+  const dtSensitivity = planetaryAuditTest.buildDtSensitivityReport({
+    baselineSample: sampleDay30,
+    targetDay: 15,
+    variants: [
+      {
+        variantName: 'dt_half',
+        dtSeconds: 900,
+        elapsedMs: 100,
+        latest: sampleDay30
+      }
+    ]
+  });
+  const gridSensitivity = planetaryAuditTest.buildGridSensitivityReport({
+    baselineSample: sampleDay30,
+    targetDay: 15,
+    variants: [
+      {
+        variantName: 'grid_coarse',
+        nx: 36,
+        ny: 18,
+        elapsedMs: 120,
+        latest: sampleDay30
+      }
+    ]
+  });
+
+  assert.equal(forcing.northDryBelt.nudgingMoisteningMeanKgM2, 0.03);
+  assert.equal(mismatch.northDryBelt.windTargetMismatchMeanMs, 1.5);
+  assert.equal(initMemory.milestones[0].requestedDay, 10);
+  assert.equal(initMemory.milestones[1].sampledDay, 30);
+  assert.equal(numerical.northDryBelt.verticalCflClampMassMeanKgM2, 0.003);
+  assert.equal(dtSensitivity.storyStablePass, true);
+  assert.equal(gridSensitivity.storyStablePass, true);
+});
+
 test('buildMonthlyClimatology averages metrics and zonal profiles by month', () => {
   const monthly = planetaryAuditTest.buildMonthlyClimatology([
     {

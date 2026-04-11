@@ -1,8 +1,24 @@
 import { SURFACE_MOISTURE_SOURCE_FIELDS } from './sourceTracing5.js';
+import {
+  INSTRUMENTATION_LEVEL_BAND_COUNT,
+  findInstrumentationLevelBandIndex,
+  instrumentationBandOffset,
+  sigmaMidAtLevel
+} from './instrumentationBands5.js';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
 const smoothstep01 = (t) => t * t * (3 - 2 * t);
+
+const accumulateBandValue = (field, bandIndex, cell, cellCount, value) => {
+  if (
+    !(field instanceof Float32Array)
+    || field.length !== cellCount * INSTRUMENTATION_LEVEL_BAND_COUNT
+    || !Number.isFinite(value)
+    || value === 0
+  ) return;
+  field[instrumentationBandOffset(bandIndex, cell, cellCount)] += value;
+};
 
 export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
   if (!grid || !state || !scratch) return;
@@ -77,10 +93,24 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
         const idx = base + k;
         const u0 = u[idx];
         const v0 = v[idx];
-        let di = u0 * dt * invDxRow;
-        let dj = v0 * dt * invDyRow;
+        const rawDi = u0 * dt * invDxRow;
+        const rawDj = v0 * dt * invDyRow;
+        let di = rawDi;
+        let dj = rawDj;
         di = clamp(di, -maxBacktraceCells, maxBacktraceCells);
         dj = clamp(dj, -maxBacktraceCells, maxBacktraceCells);
+        const clampedCells = Math.abs(rawDi - di) + Math.abs(rawDj - dj);
+        if (clampedCells > 0) {
+          state.numericalBacktraceClampCount[k] += 1;
+          state.numericalBacktraceClampExcessCells[k] += clampedCells;
+          accumulateBandValue(
+            state.numericalBacktraceClampByBandCount,
+            findInstrumentationLevelBandIndex(sigmaMidAtLevel(state.sigmaHalf, lev, nz)),
+            k,
+            N,
+            1
+          );
+        }
         let iSrc = i - di;
         let jSrc = j - dj;
         if (jSrc < 0) jSrc = 0;

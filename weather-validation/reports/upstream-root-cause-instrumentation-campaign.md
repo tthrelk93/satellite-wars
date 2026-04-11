@@ -48,28 +48,53 @@ Interpretation update:
 - the wet NH dry belt is now clearly an imported-pathway problem, not a primarily local source problem
 - the dominant corridor is known, but the exact mechanism inside that corridor is not yet closed
 
+Latest Phase 7 forcing evidence from `/tmp/planetary-phase79-smoke-forcing-opposition-budget.json` and `/tmp/planetary-phase79-smoke-nudging-target-mismatch.json`:
+- helper moisture forcing remains too small to explain the NH dry-belt bias as a primary driver
+- initialization-memory sidecars are now available for the same smoke run and can be checked against longer horizons before Phase 10
+
+Latest Phase 9 numerical evidence from `/tmp/planetary-phase79-smoke-dt-sensitivity.json` and `/tmp/planetary-phase79-smoke-grid-sensitivity.json`:
+- the dominant attribution story does **not** survive reasonable `dt` perturbations
+- the dominant attribution story does **not** survive coarse/dense grid perturbations
+- the transport corridor and vertical dominance remain broadly imported-cloud driven, but the exact dominant interface/band and magnitude shift materially with numerics
+
+Interpretation update:
+- helper forcing is now mostly exonerated as a primary cause
+- numerical sensitivity is not yet exonerated and remains an active ambiguity that has to stay in the root-cause tree
+
 ## Status And Execution-Order Update
 
 Completed phases:
 - `Phase 1`: reproducibility and closure harness
 - `Phase 2`: surface moisture source attribution
 - `Phase 3`: transport and circulation partition tracing
+- `Phase 4`: large-scale cloud birth attribution inside the vertical path
+- `Phase 5`: upper-cloud residency, ventilation, and erosion diagnostics
+- `Phase 6`: thermodynamic and radiative support diagnostics
+- `Phase 7`: external forcing, nudging, climatology, and initialization interference
+- `Phase 8`: sectoral storm spillover and synoptic leakage
+- `Phase 9`: numerical integrity and sensitivity diagnostics
 
 Current active phase:
-- `Phase 4`: large-scale cloud birth attribution inside the vertical path
+- `Phase 10`: seasonal memory and hysteresis diagnostics, followed by `Phase 11` counterfactual closure once numerical ambiguity is better bounded
 
 Revised execution order from this point forward:
-1. Complete `Phase 4` to distinguish local cloud birth from imported carried-over cloud within the NH dry belt.
-2. Run `Phase 5` immediately after `Phase 4` to determine whether imported upper cloud is repeatedly regenerated or simply not being ventilated / eroded.
-3. Promote `Phase 8` earlier than originally planned if `Phases 4-5` still point at the `35°N upper-tropospheric` import corridor, because sectoral storm spillover is now a first-class candidate rather than a late cleanup check.
-4. Run `Phases 6-7` only if `Phases 4-5-8` leave real ambiguity about thermodynamic, radiative, or forcing interference.
-5. Run `Phases 9-10` after the main causal corridor is stable, to make sure the result is not a numerical or seasonal-memory artifact.
-6. Finish with `Phase 11` counterfactual ablations and `Phase 12` root-cause closure before writing the next real physics patch.
+1. Treat `Phases 4-8` as completed causal narrowing layers:
+   - imported upper cloud dominates
+   - weak effective erosion dominates repeated local regeneration
+   - sectoral storm leakage is mostly ruled out
+   - helper forcing is mostly ruled out
+2. Carry the imported-cloud / weak-erosion story into `Phase 10` so we can test whether it remains the same causal chain across longer horizons rather than only in the quick screen.
+3. Keep `Phase 9` open as an ambiguity flag:
+   - instrumentation is complete
+   - outcome is not “ruled out”
+   - the dominant attribution story still shifts under `dt` and grid perturbations
+4. Use `Phase 11` to run counterfactual ablations against the imported-cloud / erosion pathway while explicitly checking whether those counterfactual results remain directionally stable across the Phase 9 sensitivity variants.
+5. Finish with `Phase 12` root-cause closure only after both seasonal and numerical checks agree on one dominant pathway.
 
 What this means:
 - we are not abandoning any of the remaining phases
-- we are changing the campaign from a rigid linear checklist into an evidence-gated decision tree
-- later phases still matter, but the next best information comes from cloud-birth attribution, upper-cloud residency, and promoted storm-spillover tracing
+- we have already changed the campaign from a rigid linear checklist into an evidence-gated decision tree
+- later phases still matter, but the remaining highest-value work is now seasonal validation, numerical closure, and controlled counterfactual proof rather than more early-pipeline discovery
 
 ## Campaign design principles
 
@@ -410,6 +435,11 @@ Observed Phase 6 result:
 
 ## Phase 7: External Forcing, Nudging, Climatology, And Initialization Interference
 
+Status:
+- complete with the Phase 7 forcing-opposition and initialization-memory instrumentation pass
+- current evidence says helper moisture forcing is too small to be the primary NH dry-belt driver
+- initialization-memory tracing is now available and should be carried into longer-horizon seasonal checks before final closure
+
 Objective:
 - prove whether “helper” terms are fighting the physical solution
 
@@ -444,6 +474,12 @@ Rules out / confirms:
 
 Exit criteria:
 - helper terms are either exonerated or quantitatively implicated
+
+Observed Phase 7 result:
+- helper moisture forcing is mostly ruled out as a primary cause
+- target-mismatch diagnostics are now exposed for humidity, temperature, and wind, split by band and level
+- initialization-memory attribution is instrumented, but longer-horizon Phase 10 evidence is still needed before memory effects are fully closed
+- this phase reduces the remaining root-cause tree rather than replacing the imported-cloud / weak-erosion diagnosis
 
 ## Phase 8: Sectoral Storm Spillover And Synoptic Leakage
 
@@ -505,6 +541,11 @@ Root-cause effect on the plan:
 
 ## Phase 9: Numerical Integrity And Sensitivity Diagnostics
 
+Status:
+- complete with the Phase 9 numerical-integrity and sensitivity instrumentation pass
+- current evidence does **not** exonerate numerics yet
+- the dominant attribution story changes under both `dt` and grid perturbations, so numerical sensitivity remains an active ambiguity
+
 Objective:
 - make sure the remaining bias is not being manufactured by numerics
 
@@ -536,6 +577,17 @@ Rules out / confirms:
 
 Exit criteria:
 - dominant attribution story survives reasonable `dt` and grid perturbations
+
+Observed Phase 9 result:
+- the smoke audit now writes clipping, limiter, forcing, and sensitivity sidecars for the same baseline run
+- `dtSensitivity.storyStablePass = false`
+- `gridSensitivity.storyStablePass = false`
+- the broad interpretation still points at imported cloud plus weak erosion, but the dominant interface/band and relative large-scale-vs-carryover weighting move enough that numerics cannot be ruled out yet
+
+Root-cause effect on the plan:
+- Phase 9 is complete as an instrumentation phase, but not complete as a falsification outcome
+- this means later closure work has to keep checking whether the imported-cloud / weak-erosion story is robust across longer horizons and counterfactuals
+- the next phases are therefore `Phase 10`, then `Phase 11`, then `Phase 12`, with explicit numerical-stability checks carried forward
 
 ## Phase 10: Seasonal Memory And Hysteresis Diagnostics
 

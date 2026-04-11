@@ -1823,6 +1823,7 @@ export class WeatherCore5 {
       analysisIncrementResult = stepAnalysisIncrement5({
         dt,
         state: this.state,
+        grid: this.grid,
         params: {
           ...this.analysisIncrementParams,
           psMin: this.massParams?.psMin,

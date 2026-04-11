@@ -459,6 +459,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     verticalCloudBirthTracing,
     upperCloudResidenceTracing,
     thermodynamicSupportTracing,
+    forcingOppositionTracing,
+    numericalIntegrityTracing,
     stormSpilloverTracing
   } = diagnostics;
   const { nx, ny, latitudesDeg } = grid;
@@ -744,6 +746,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     verticalCloudBirthTracing: verticalCloudBirthTracing || null,
     upperCloudResidenceTracing: upperCloudResidenceTracing || null,
     thermodynamicSupportTracing: thermodynamicSupportTracing || null,
+    forcingOppositionTracing: forcingOppositionTracing || null,
+    numericalIntegrityTracing: numericalIntegrityTracing || null,
     stormSpilloverTracing: stormSpilloverTracing || null,
     profiles: {
       latitudesDeg: roundSeries(latitudesDeg),
@@ -1231,6 +1235,94 @@ export const buildBoundaryLayerStabilityProfilesReport = (latestSample = null) =
   } : null
 });
 
+export const buildForcingOppositionBudgetReport = (latestSample = null) => ({
+  schema: 'satellite-wars.forcing-opposition-budget.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  northDryBelt: latestSample?.forcingOppositionTracing?.northDryBelt || null,
+  northDryBeltLandOcean: latestSample?.forcingOppositionTracing?.northDryBeltLandOcean || null,
+  levelBands: latestSample?.forcingOppositionTracing?.levelBands || null,
+  rootCauseAssessment: latestSample?.forcingOppositionTracing?.rootCauseAssessment || null
+});
+
+export const buildNudgingTargetMismatchReport = (latestSample = null) => {
+  const northDryBelt = latestSample?.forcingOppositionTracing?.northDryBelt || null;
+  return {
+    schema: 'satellite-wars.nudging-target-mismatch.v1',
+    generatedAt: new Date().toISOString(),
+    targetDay: latestSample?.targetDay ?? null,
+    northDryBelt: northDryBelt ? {
+      nudgingTargetQvMismatchMeanKgKg: northDryBelt.nudgingTargetQvMismatchMeanKgKg,
+      nudgingTargetThetaMismatchMeanK: northDryBelt.nudgingTargetThetaMismatchMeanK,
+      nudgingTargetWindMismatchMeanMs: northDryBelt.nudgingTargetWindMismatchMeanMs,
+      analysisTargetQvMismatchMeanKgKg: northDryBelt.analysisTargetQvMismatchMeanKgKg,
+      analysisTargetThetaMismatchMeanK: northDryBelt.analysisTargetThetaMismatchMeanK,
+      analysisTargetWindMismatchMeanMs: northDryBelt.analysisTargetWindMismatchMeanMs,
+      windTargetMismatchMeanMs: northDryBelt.windTargetMismatchMeanMs
+    } : null,
+    levelBands: latestSample?.forcingOppositionTracing?.levelBands || null,
+    rootCauseAssessment: latestSample?.forcingOppositionTracing?.rootCauseAssessment || null
+  };
+};
+
+const findNearestSampleAtOrBefore = (samples, targetDay) => {
+  const eligible = samples
+    .filter((sample) => Number.isFinite(sample?.targetDay) && sample.targetDay <= targetDay)
+    .sort((a, b) => b.targetDay - a.targetDay);
+  return eligible[0] || null;
+};
+
+export const buildInitializationMemoryReport = (samples = [], latestSample = null) => {
+  const milestones = [10, 30, 60, 90].map((requestedDay) => {
+    const sample = findNearestSampleAtOrBefore(samples, requestedDay)
+      || samples.find((entry) => Number.isFinite(entry?.targetDay))
+      || null;
+    const metrics = sample?.metrics || {};
+    const totalTracked = (Number(metrics.northDryBeltSourceNorthDryBeltOceanMeanKgM2) || 0)
+      + (Number(metrics.northDryBeltSourceTropicalOceanNorthMeanKgM2) || 0)
+      + (Number(metrics.northDryBeltSourceTropicalOceanSouthMeanKgM2) || 0)
+      + (Number(metrics.northDryBeltSourceNorthExtratropicalOceanMeanKgM2) || 0)
+      + (Number(metrics.northDryBeltSourceLandRecyclingMeanKgM2) || 0)
+      + (Number(metrics.northDryBeltSourceOtherOceanMeanKgM2) || 0)
+      + (Number(metrics.northDryBeltSourceInitializationMemoryMeanKgM2) || 0)
+      + (Number(metrics.northDryBeltSourceAtmosphericCarryoverMeanKgM2) || 0)
+      + (Number(metrics.northDryBeltSourceNudgingInjectionMeanKgM2) || 0)
+      + (Number(metrics.northDryBeltSourceAnalysisInjectionMeanKgM2) || 0);
+    const initializationFrac = totalTracked > 0
+      ? (Number(metrics.northDryBeltSourceInitializationMemoryMeanKgM2) || 0) / totalTracked
+      : null;
+    return {
+      requestedDay,
+      sampledDay: sample?.targetDay ?? null,
+      lowLevelInitializationMemoryMeanKgM2: round(metrics.northDryBeltSourceInitializationMemoryMeanKgM2, 5),
+      lowLevelInitializationMemoryFrac: round(initializationFrac, 5),
+      lowLevelAtmosphericCarryoverMeanKgM2: round(metrics.northDryBeltSourceAtmosphericCarryoverMeanKgM2, 5),
+      upperCloudStaleFrac: sample?.upperCloudResidenceTracing?.ageAttribution?.northDryBeltStaleFrac ?? null,
+      note: sample?.targetDay === requestedDay
+        ? 'exact milestone sample'
+        : 'nearest available milestone sample at or before requested day'
+    };
+  });
+  return {
+    schema: 'satellite-wars.initialization-memory.v1',
+    generatedAt: new Date().toISOString(),
+    latestTargetDay: latestSample?.targetDay ?? null,
+    milestones,
+    latestRootCauseContext: latestSample?.forcingOppositionTracing?.rootCauseAssessment || null
+  };
+};
+
+export const buildNumericalIntegritySummaryReport = (latestSample = null) => ({
+  schema: 'satellite-wars.numerical-integrity-summary.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  northDryBelt: latestSample?.numericalIntegrityTracing?.northDryBelt || null,
+  southDryBelt: latestSample?.numericalIntegrityTracing?.southDryBelt || null,
+  levelBands: latestSample?.numericalIntegrityTracing?.levelBands || null,
+  asymmetry: latestSample?.numericalIntegrityTracing?.asymmetry || null,
+  rootCauseAssessment: latestSample?.numericalIntegrityTracing?.rootCauseAssessment || null
+});
+
 export const buildStormSpilloverCatalogReport = (latestSample = null) => ({
   schema: 'satellite-wars.storm-spillover-catalog.v1',
   generatedAt: new Date().toISOString(),
@@ -1270,6 +1362,26 @@ const compactThermodynamicSupportSummary = (sample = null) => {
   };
 };
 
+const compactForcingOppositionSummary = (sample = null) => {
+  if (!sample?.forcingOppositionTracing) return null;
+  return {
+    nudgingMoisteningMeanKgM2: sample.forcingOppositionTracing?.northDryBelt?.nudgingMoisteningMeanKgM2 ?? null,
+    analysisMoisteningMeanKgM2: sample.forcingOppositionTracing?.northDryBelt?.analysisMoisteningMeanKgM2 ?? null,
+    windOpposedDryingCorrectionMean: sample.forcingOppositionTracing?.northDryBelt?.windOpposedDryingCorrectionMean ?? null,
+    rootCauseAssessment: sample.forcingOppositionTracing?.rootCauseAssessment || null
+  };
+};
+
+const compactNumericalIntegritySummary = (sample = null) => {
+  if (!sample?.numericalIntegrityTracing) return null;
+  return {
+    northNegativeClipMassMeanKgM2: sample.numericalIntegrityTracing?.northDryBelt?.negativeClipMassMeanKgM2 ?? null,
+    northCloudLimiterMassMeanKgM2: sample.numericalIntegrityTracing?.northDryBelt?.cloudLimiterMassMeanKgM2 ?? null,
+    northVerticalCflClampMassMeanKgM2: sample.numericalIntegrityTracing?.northDryBelt?.verticalCflClampMassMeanKgM2 ?? null,
+    rootCauseAssessment: sample.numericalIntegrityTracing?.rootCauseAssessment || null
+  };
+};
+
 const compactStormSpilloverSummary = (sample = null) => {
   if (!sample?.stormSpilloverTracing) return null;
   return {
@@ -1289,6 +1401,8 @@ const compactSampleForSummary = (sample = null) => {
     verticalCloudBirthTracing,
     upperCloudResidenceTracing,
     thermodynamicSupportTracing,
+    forcingOppositionTracing,
+    numericalIntegrityTracing,
     stormSpilloverTracing,
     ...rest
   } = sample;
@@ -1298,6 +1412,8 @@ const compactSampleForSummary = (sample = null) => {
     verticalCloudBirthTracingSummary: compactVerticalCloudBirthSummary(sample),
     upperCloudResidenceTracingSummary: compactUpperCloudResidenceSummary(sample),
     thermodynamicSupportTracingSummary: compactThermodynamicSupportSummary(sample),
+    forcingOppositionTracingSummary: compactForcingOppositionSummary(sample),
+    numericalIntegrityTracingSummary: compactNumericalIntegritySummary(sample),
     stormSpilloverTracingSummary: compactStormSpilloverSummary(sample)
   };
 };
@@ -1686,6 +1802,120 @@ export const buildRealismGapReport = (horizons) => {
   return [...aggregated.values()].sort((a, b) => (b.severity || 0) - (a.severity || 0) || (b.horizonsDays?.[b.horizonsDays.length - 1] || 0) - (a.horizonsDays?.[a.horizonsDays.length - 1] || 0));
 };
 
+const extractAttributionStory = (sample = null) => ({
+  dominantCloudImport: sample?.transportTracing?.interfaces
+    ? buildTransportInterfaceBudgetReport(sample)?.dominantNhDryBeltCloudImport || null
+    : null,
+  dominantVerticalChannel: sample?.verticalCloudBirthTracing
+    ? dominantVerticalCloudBirthChannel(sample.verticalCloudBirthTracing)
+    : null,
+  dominantStormRegime: sample?.stormSpilloverTracing?.overall?.dominantCombinedRegime || null,
+  carryoverDominatesLargeScale: (Number(sample?.metrics?.northDryBeltCarriedOverUpperCloudMeanKgM2) || 0)
+    > (Number(sample?.metrics?.northDryBeltLargeScaleCondensationMeanKgM2) || 0),
+  importedSourceDominatesLocal: (Number(sample?.metrics?.northDryBeltSourceAtmosphericCarryoverMeanKgM2) || 0)
+    > ((Number(sample?.metrics?.northDryBeltSourceNorthDryBeltOceanMeanKgM2) || 0)
+      + (Number(sample?.metrics?.northDryBeltSourceLandRecyclingMeanKgM2) || 0)),
+  helperRootCauseAssessment: sample?.forcingOppositionTracing?.rootCauseAssessment || null,
+  numericalRootCauseAssessment: sample?.numericalIntegrityTracing?.rootCauseAssessment || null
+});
+
+const compareAttributionStory = (baselineSample, variantSample) => {
+  const baseline = extractAttributionStory(baselineSample);
+  const variant = extractAttributionStory(variantSample);
+  const sameCloudImport = JSON.stringify(baseline.dominantCloudImport || null) === JSON.stringify(variant.dominantCloudImport || null);
+  const sameVerticalChannel = JSON.stringify(baseline.dominantVerticalChannel || null) === JSON.stringify(variant.dominantVerticalChannel || null);
+  const sameStormRegime = (baseline.dominantStormRegime || null) === (variant.dominantStormRegime || null);
+  const stable = sameCloudImport
+    && sameVerticalChannel
+    && sameStormRegime
+    && baseline.carryoverDominatesLargeScale === variant.carryoverDominatesLargeScale
+    && baseline.importedSourceDominatesLocal === variant.importedSourceDominatesLocal;
+  return {
+    stable,
+    sameCloudImport,
+    sameVerticalChannel,
+    sameStormRegime,
+    baseline,
+    variant
+  };
+};
+
+const roundGridDimension = (value, minimum) => Math.max(minimum, Math.round(value / 2) * 2);
+
+const runSensitivityVariant = async ({
+  variantName,
+  variantNx,
+  variantNy,
+  variantDtSeconds,
+  targetDay,
+  configSnapshot
+}) => {
+  const startedAt = Date.now();
+  const core = new WeatherCore5({ nx: variantNx, ny: variantNy, dt: variantDtSeconds, seed });
+  await core._initPromise;
+  applyCoreConfigSnapshot(core, configSnapshot);
+  const terrainFallback = applyHeadlessTerrainFixture(core);
+  core.advanceModelSeconds(targetDay * SECONDS_PER_DAY);
+  const latest = classifySnapshot(buildValidationDiagnostics(core), targetDay);
+  return {
+    variantName,
+    nx: variantNx,
+    ny: variantNy,
+    dtSeconds: variantDtSeconds,
+    targetDay,
+    elapsedMs: Date.now() - startedAt,
+    terrainFallback,
+    latest
+  };
+};
+
+export const buildDtSensitivityReport = ({ baselineSample = null, variants = [], targetDay = null } = {}) => {
+  const comparisons = variants.map((variant) => ({
+    variantName: variant.variantName,
+    dtSeconds: variant.dtSeconds,
+    elapsedMs: variant.elapsedMs,
+    metrics: {
+      subtropicalDryNorthRatio: variant.latest?.metrics?.subtropicalDryNorthRatio ?? null,
+      northDryBeltCarriedOverUpperCloudMeanKgM2: variant.latest?.metrics?.northDryBeltCarriedOverUpperCloudMeanKgM2 ?? null,
+      northDryBeltLargeScaleCondensationMeanKgM2: variant.latest?.metrics?.northDryBeltLargeScaleCondensationMeanKgM2 ?? null,
+      northDryBeltSourceAtmosphericCarryoverMeanKgM2: variant.latest?.metrics?.northDryBeltSourceAtmosphericCarryoverMeanKgM2 ?? null
+    },
+    storyComparison: compareAttributionStory(baselineSample, variant.latest)
+  }));
+  return {
+    schema: 'satellite-wars.dt-sensitivity.v1',
+    generatedAt: new Date().toISOString(),
+    targetDay,
+    baselineStory: extractAttributionStory(baselineSample),
+    storyStablePass: comparisons.every((entry) => entry.storyComparison.stable),
+    variants: comparisons
+  };
+};
+
+export const buildGridSensitivityReport = ({ baselineSample = null, variants = [], targetDay = null } = {}) => {
+  const comparisons = variants.map((variant) => ({
+    variantName: variant.variantName,
+    nx: variant.nx,
+    ny: variant.ny,
+    elapsedMs: variant.elapsedMs,
+    metrics: {
+      subtropicalDryNorthRatio: variant.latest?.metrics?.subtropicalDryNorthRatio ?? null,
+      northDryBeltCarriedOverUpperCloudMeanKgM2: variant.latest?.metrics?.northDryBeltCarriedOverUpperCloudMeanKgM2 ?? null,
+      northDryBeltLargeScaleCondensationMeanKgM2: variant.latest?.metrics?.northDryBeltLargeScaleCondensationMeanKgM2 ?? null,
+      northDryBeltSourceAtmosphericCarryoverMeanKgM2: variant.latest?.metrics?.northDryBeltSourceAtmosphericCarryoverMeanKgM2 ?? null
+    },
+    storyComparison: compareAttributionStory(baselineSample, variant.latest)
+  }));
+  return {
+    schema: 'satellite-wars.grid-sensitivity.v1',
+    generatedAt: new Date().toISOString(),
+    targetDay,
+    baselineStory: extractAttributionStory(baselineSample),
+    storyStablePass: comparisons.every((entry) => entry.storyComparison.stable),
+    variants: comparisons
+  };
+};
+
 export const evaluateHorizons = (samples, horizonDays) => {
   const warnings = [];
   const latest = samples.find((sample) => sample.targetDay === horizonDays) || samples[samples.length - 1];
@@ -1850,6 +2080,18 @@ const renderMarkdown = (summary) => {
     if (summary.artifacts.boundaryLayerStabilityProfilesJsonPath) {
       lines.push(`- Boundary-layer stability profiles JSON: ${summary.artifacts.boundaryLayerStabilityProfilesJsonPath}`);
     }
+    if (summary.artifacts.forcingOppositionBudgetJsonPath) {
+      lines.push(`- Forcing opposition budget JSON: ${summary.artifacts.forcingOppositionBudgetJsonPath}`);
+    }
+    if (summary.artifacts.nudgingTargetMismatchJsonPath) {
+      lines.push(`- Nudging target mismatch JSON: ${summary.artifacts.nudgingTargetMismatchJsonPath}`);
+    }
+    if (summary.artifacts.initializationMemoryJsonPath) {
+      lines.push(`- Initialization memory JSON: ${summary.artifacts.initializationMemoryJsonPath}`);
+    }
+    if (summary.artifacts.numericalIntegritySummaryJsonPath) {
+      lines.push(`- Numerical integrity summary JSON: ${summary.artifacts.numericalIntegritySummaryJsonPath}`);
+    }
     if (summary.artifacts.stormSpilloverCatalogJsonPath) {
       lines.push(`- Storm spillover catalog JSON: ${summary.artifacts.stormSpilloverCatalogJsonPath}`);
     }
@@ -1858,6 +2100,12 @@ const renderMarkdown = (summary) => {
     }
     if (summary.artifacts.transientEddyLeakageSummaryJsonPath) {
       lines.push(`- Transient eddy leakage summary JSON: ${summary.artifacts.transientEddyLeakageSummaryJsonPath}`);
+    }
+    if (summary.artifacts.dtSensitivityJsonPath) {
+      lines.push(`- DT sensitivity JSON: ${summary.artifacts.dtSensitivityJsonPath}`);
+    }
+    if (summary.artifacts.gridSensitivityJsonPath) {
+      lines.push(`- Grid sensitivity JSON: ${summary.artifacts.gridSensitivityJsonPath}`);
     }
     lines.push('');
   }
@@ -1962,6 +2210,59 @@ export async function main() {
   const stormSpilloverCatalog = buildStormSpilloverCatalogReport(latestSample);
   const sectoralDryBeltRegimes = buildSectoralDryBeltRegimesReport(latestSample);
   const transientEddyLeakageSummary = buildTransientEddyLeakageSummaryReport(latestSample);
+  const forcingOppositionBudget = buildForcingOppositionBudgetReport(latestSample);
+  const nudgingTargetMismatch = buildNudgingTargetMismatchReport(latestSample);
+  const initializationMemory = buildInitializationMemoryReport(samples, latestSample);
+  const numericalIntegritySummary = buildNumericalIntegritySummaryReport(latestSample);
+  const sensitivityTargetDay = sampleTargetsDays.find((day) => day >= Math.min(15, sampleTargetsDays[sampleTargetsDays.length - 1]))
+    || sampleTargetsDays[0];
+  const baselineSensitivitySample = samples.find((sample) => sample.targetDay === sensitivityTargetDay) || latestSample;
+  const dtSensitivityVariants = await Promise.all([
+    runSensitivityVariant({
+      variantName: 'dt_half',
+      variantNx: nx,
+      variantNy: ny,
+      variantDtSeconds: Math.max(300, Math.round(dt * 0.5 / 300) * 300),
+      targetDay: sensitivityTargetDay,
+      configSnapshot
+    }),
+    runSensitivityVariant({
+      variantName: 'dt_150pct',
+      variantNx: nx,
+      variantNy: ny,
+      variantDtSeconds: Math.max(300, Math.round(dt * 1.5 / 300) * 300),
+      targetDay: sensitivityTargetDay,
+      configSnapshot
+    })
+  ]);
+  const gridSensitivityVariants = await Promise.all([
+    runSensitivityVariant({
+      variantName: 'grid_coarse',
+      variantNx: roundGridDimension(nx * 0.75, 24),
+      variantNy: roundGridDimension(ny * 0.75, 12),
+      variantDtSeconds: dt,
+      targetDay: sensitivityTargetDay,
+      configSnapshot
+    }),
+    runSensitivityVariant({
+      variantName: 'grid_dense',
+      variantNx: roundGridDimension(nx * 1.25, 24),
+      variantNy: roundGridDimension(ny * 1.25, 12),
+      variantDtSeconds: dt,
+      targetDay: sensitivityTargetDay,
+      configSnapshot
+    })
+  ]);
+  const dtSensitivity = buildDtSensitivityReport({
+    baselineSample: baselineSensitivitySample,
+    variants: dtSensitivityVariants,
+    targetDay: sensitivityTargetDay
+  });
+  const gridSensitivity = buildGridSensitivityReport({
+    baselineSample: baselineSensitivitySample,
+    variants: gridSensitivityVariants,
+    targetDay: sensitivityTargetDay
+  });
   const checkpointDay = sampleTargetsDays.find((day) => day > 0 && day < sampleTargetsDays[sampleTargetsDays.length - 1])
     || sampleTargetsDays[Math.max(0, Math.floor(sampleTargetsDays.length / 2))] || null;
   const restartParity = reproCheck
@@ -1991,9 +2292,15 @@ export async function main() {
     thermodynamicSupportSummaryJsonPath: `${artifactBase}-thermodynamic-support-summary.json`,
     radiativeCloudMaintenanceJsonPath: `${artifactBase}-radiative-cloud-maintenance.json`,
     boundaryLayerStabilityProfilesJsonPath: `${artifactBase}-boundary-layer-stability-profiles.json`,
+    forcingOppositionBudgetJsonPath: `${artifactBase}-forcing-opposition-budget.json`,
+    nudgingTargetMismatchJsonPath: `${artifactBase}-nudging-target-mismatch.json`,
+    initializationMemoryJsonPath: `${artifactBase}-initialization-memory.json`,
+    numericalIntegritySummaryJsonPath: `${artifactBase}-numerical-integrity-summary.json`,
     stormSpilloverCatalogJsonPath: `${artifactBase}-storm-spillover-catalog.json`,
     sectoralDryBeltRegimesJsonPath: `${artifactBase}-sectoral-dry-belt-regimes.json`,
-    transientEddyLeakageSummaryJsonPath: `${artifactBase}-transient-eddy-leakage-summary.json`
+    transientEddyLeakageSummaryJsonPath: `${artifactBase}-transient-eddy-leakage-summary.json`,
+    dtSensitivityJsonPath: `${artifactBase}-dt-sensitivity.json`,
+    gridSensitivityJsonPath: `${artifactBase}-grid-sensitivity.json`
   } : null;
   const summarySamples = samples.map((sample) => compactSampleForSummary(sample));
   const summaryHorizons = horizonSummaries.map((horizon) => ({
@@ -2040,9 +2347,15 @@ export async function main() {
     thermodynamicSupportSummary,
     radiativeCloudMaintenance,
     boundaryLayerStabilityProfiles,
+    forcingOppositionBudget,
+    nudgingTargetMismatch,
+    initializationMemory,
+    numericalIntegritySummary,
     stormSpilloverCatalog,
     sectoralDryBeltRegimes,
     transientEddyLeakageSummary,
+    dtSensitivity,
+    gridSensitivity,
     artifacts,
     defaultNextPriorities
   };
@@ -2092,9 +2405,15 @@ export async function main() {
     fs.writeFileSync(artifacts.thermodynamicSupportSummaryJsonPath, toJson(thermodynamicSupportSummary));
     fs.writeFileSync(artifacts.radiativeCloudMaintenanceJsonPath, toJson(radiativeCloudMaintenance));
     fs.writeFileSync(artifacts.boundaryLayerStabilityProfilesJsonPath, toJson(boundaryLayerStabilityProfiles));
+    fs.writeFileSync(artifacts.forcingOppositionBudgetJsonPath, toJson(forcingOppositionBudget));
+    fs.writeFileSync(artifacts.nudgingTargetMismatchJsonPath, toJson(nudgingTargetMismatch));
+    fs.writeFileSync(artifacts.initializationMemoryJsonPath, toJson(initializationMemory));
+    fs.writeFileSync(artifacts.numericalIntegritySummaryJsonPath, toJson(numericalIntegritySummary));
     fs.writeFileSync(artifacts.stormSpilloverCatalogJsonPath, toJson(stormSpilloverCatalog));
     fs.writeFileSync(artifacts.sectoralDryBeltRegimesJsonPath, toJson(sectoralDryBeltRegimes));
     fs.writeFileSync(artifacts.transientEddyLeakageSummaryJsonPath, toJson(transientEddyLeakageSummary));
+    fs.writeFileSync(artifacts.dtSensitivityJsonPath, toJson(dtSensitivity));
+    fs.writeFileSync(artifacts.gridSensitivityJsonPath, toJson(gridSensitivity));
   }
   process.stdout.write(toJson(summary));
   return summary;
@@ -2127,6 +2446,12 @@ export const _test = {
   buildThermodynamicSupportSummaryReport,
   buildRadiativeCloudMaintenanceReport,
   buildBoundaryLayerStabilityProfilesReport,
+  buildForcingOppositionBudgetReport,
+  buildNudgingTargetMismatchReport,
+  buildInitializationMemoryReport,
+  buildNumericalIntegritySummaryReport,
+  buildDtSensitivityReport,
+  buildGridSensitivityReport,
   buildStormSpilloverCatalogReport,
   buildSectoralDryBeltRegimesReport,
   buildTransientEddyLeakageSummaryReport,
