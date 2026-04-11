@@ -49,6 +49,11 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const lowLevelMoistureConvergence = makeArray(N);
   const lowLevelOmegaEffective = makeArray(N);
   const subtropicalSubsidenceDrying = makeArray(N);
+  const largeScaleCondensationSource = makeArray(N);
+  const cloudReevaporationMass = makeArray(N);
+  const precipReevaporationMass = makeArray(N);
+  const upperCloudPath = makeArray(N);
+  const importedAnvilPersistenceMass = makeArray(N);
   const analysisIauPs = makeArray(N);
   const analysisIauTs = makeArray(N);
   const analysisIauU = makeArray(SZ);
@@ -104,6 +109,11 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
     lowLevelMoistureConvergence,
     lowLevelOmegaEffective,
     subtropicalSubsidenceDrying,
+    largeScaleCondensationSource,
+    cloudReevaporationMass,
+    precipReevaporationMass,
+    upperCloudPath,
+    importedAnvilPersistenceMass,
     soilCap,
     analysisIauPs,
     analysisIauTs,

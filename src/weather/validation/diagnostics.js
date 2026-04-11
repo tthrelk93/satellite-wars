@@ -48,6 +48,25 @@ const computeTotalColumnWaterKgM2 = (state) => {
   return computeColumnIntegralKgM2(state, (idx) => qv[idx] + qc[idx] + (qi?.[idx] || 0) + (qr?.[idx] || 0) + (qs?.[idx] || 0));
 };
 
+const computeLayerCondensatePathKgM2 = (state, minSigma, maxSigma) => {
+  const { N, nz, sigmaHalf, pHalf, qc, qi, qr, qs } = state;
+  const out = new Array(N).fill(0);
+  for (let cell = 0; cell < N; cell += 1) {
+    let total = 0;
+    for (let lev = 0; lev < nz; lev += 1) {
+      const sigmaMid = sigmaHalf && sigmaHalf.length > lev + 1
+        ? 0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1])
+        : (lev + 0.5) / Math.max(1, nz);
+      if (sigmaMid < minSigma || sigmaMid > maxSigma) continue;
+      const idx = lev * N + cell;
+      const dp = pHalf[(lev + 1) * N + cell] - pHalf[lev * N + cell];
+      total += ((qc?.[idx] || 0) + (qi?.[idx] || 0) + (qr?.[idx] || 0) + (qs?.[idx] || 0)) * (dp / g);
+    }
+    out[cell] = total;
+  }
+  return out;
+};
+
 const computeLayerMeanRelativeHumidity = (state, minSigma, maxSigma) => {
   const { N, nz, sigmaHalf, pHalf, pMid, qv, theta, T } = state;
   const out = new Array(N).fill(0);
@@ -132,6 +151,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     surfaceSensibleFluxWm2: Array.from(state.surfaceSensibleFlux || []),
     cloudWaterPathKgM2: computeColumnIntegralKgM2(state, (idx) => (state.qc?.[idx] || 0) + (state.qr?.[idx] || 0)),
     snowWaterPathKgM2: computeColumnIntegralKgM2(state, (idx) => (state.qi?.[idx] || 0) + (state.qs?.[idx] || 0)),
+    upperCloudPathKgM2: computeLayerCondensatePathKgM2(state, 0, 0.55),
     verticallyIntegratedVaporFluxNorthKgM_1S: computeVerticallyIntegratedFlux(state, state.v, (idx) => state.qv[idx] || 0),
     verticallyIntegratedTotalWaterFluxNorthKgM_1S: computeVerticallyIntegratedFlux(
       state,
@@ -160,6 +180,10 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     lowLevelMoistureConvergenceS_1: arrayOrZeros(state.lowLevelMoistureConvergence, state.N),
     lowLevelOmegaEffectivePaS: arrayOrZeros(state.lowLevelOmegaEffective, state.N),
     subtropicalSubsidenceDryingFrac: arrayOrZeros(state.subtropicalSubsidenceDrying, state.N),
+    largeScaleCondensationSourceKgM2: arrayOrZeros(state.largeScaleCondensationSource, state.N),
+    cloudReevaporationMassKgM2: arrayOrZeros(state.cloudReevaporationMass, state.N),
+    precipReevaporationMassKgM2: arrayOrZeros(state.precipReevaporationMass, state.N),
+    importedAnvilPersistenceMassKgM2: arrayOrZeros(state.importedAnvilPersistenceMass, state.N),
     processMoistureBudget: typeof core?.getClimateProcessBudgetSummary === 'function'
       ? core.getClimateProcessBudgetSummary()
       : null,

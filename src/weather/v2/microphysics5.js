@@ -68,6 +68,18 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   if (!enable) return;
 
   const { N, nz, theta, qv, qc, qi, qr, qs, precipRate, precipRainRate, precipSnowRate, precipAccum, pHalf, pMid, T: Tstate } = state;
+  if (!state.largeScaleCondensationSource || state.largeScaleCondensationSource.length !== N) {
+    state.largeScaleCondensationSource = new Float32Array(N);
+  }
+  if (!state.cloudReevaporationMass || state.cloudReevaporationMass.length !== N) {
+    state.cloudReevaporationMass = new Float32Array(N);
+  }
+  if (!state.precipReevaporationMass || state.precipReevaporationMass.length !== N) {
+    state.precipReevaporationMass = new Float32Array(N);
+  }
+  state.largeScaleCondensationSource.fill(0);
+  state.cloudReevaporationMass.fill(0);
+  state.precipReevaporationMass.fill(0);
   if (precipRate) precipRate.fill(0);
   if (precipRainRate) precipRainRate.fill(0);
   if (precipSnowRate) precipSnowRate.fill(0);
@@ -87,6 +99,8 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
     for (let k = 0; k < N; k++) {
       const idx = base + k;
       const p = Math.max(pTop, pMid[idx]);
+      const dpCell = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+      const massCell = dpCell > 0 ? dpCell / g : 0;
       const Pi = Math.pow(p / p0, kappa);
       const Tcell = Number.isFinite(Tstate?.[idx]) ? Tstate[idx] : theta[idx] * Pi;
       const qsat = saturationMixingRatio(Tcell, p);
@@ -189,6 +203,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         let dq = applyLatentCap(qvVal - qsat, iceFrac > 0.5 ? Ls : Lv);
         if (dq > 0) {
           qvVal -= dq;
+          if (massCell > 0) state.largeScaleCondensationSource[k] += dq * massCell;
           if (iceFrac > 0.5) {
             qiVal += dq;
             thetaVal = applyThetaLatent(thetaVal, dq, Ls, Pi);
@@ -204,21 +219,25 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         const tauSubSnow = tauSubSnowMinEff + (tauSubSnowMaxEff - tauSubSnowMinEff) * RH;
         let deficit = qsat - qvVal;
 
-        const evaporate = (storeVal, tau, latentHeat) => {
+        const evaporate = (storeVal, tau, latentHeat, bucket) => {
           if (storeVal <= 0 || deficit <= 0) return [storeVal, 0];
           let dq = Math.min(storeVal, deficit * dt / Math.max(1e-6, tau));
           dq = applyLatentCap(dq, latentHeat);
           if (dq <= 0) return [storeVal, 0];
           deficit -= dq;
           qvVal += dq;
+          if (massCell > 0) {
+            if (bucket === 'cloud') state.cloudReevaporationMass[k] += dq * massCell;
+            else if (bucket === 'precip') state.precipReevaporationMass[k] += dq * massCell;
+          }
           thetaVal = applyThetaLatent(thetaVal, -dq, latentHeat, Pi);
           return [storeVal - dq, dq];
         };
 
-        [qcVal] = evaporate(qcVal, tauEvapCloud, Lv);
-        [qiVal] = evaporate(qiVal, tauEvapCloud, Ls);
-        [qrVal] = evaporate(qrVal, tauEvapRain, Lv);
-        [qsVal] = evaporate(qsVal, tauSubSnow, Ls);
+        [qcVal] = evaporate(qcVal, tauEvapCloud, Lv, 'cloud');
+        [qiVal] = evaporate(qiVal, tauEvapCloud, Ls, 'cloud');
+        [qrVal] = evaporate(qrVal, tauEvapRain, Lv, 'precip');
+        [qsVal] = evaporate(qsVal, tauSubSnow, Ls, 'precip');
       }
 
       const qCond = qcVal + qiVal;

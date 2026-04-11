@@ -102,3 +102,18 @@ test('microphysics scales convective autoconversion continuously with organized 
   assert.ok(strong.precipRate[0] >= weak.precipRate[0]);
   assert.ok(strong.qr[lowIdx] >= weak.qr[lowIdx]);
 });
+
+test('microphysics records large-scale condensation and re-evaporation diagnostics', () => {
+  const state = setupState(279);
+  const lowIdx = (state.nz - 1) * state.N;
+  state.qv.fill(0.015);
+  state.qc.fill(0);
+  state.qr.fill(0.0012);
+  state.qc[lowIdx] = 0.0016;
+
+  stepMicrophysics5({ dt: 900, state, params: { enableConvectiveOutcome: false } });
+
+  assert.ok(state.largeScaleCondensationSource[0] > 0);
+  assert.ok(state.cloudReevaporationMass[0] >= 0);
+  assert.ok(state.precipReevaporationMass[0] >= 0);
+});

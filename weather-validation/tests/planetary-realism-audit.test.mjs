@@ -126,6 +126,31 @@ test('classifySnapshot reports broad convection and subtropical drying diagnosti
       0.7, 0.75,
       0.1, 0.1
     ],
+    largeScaleCondensationSourceKgM2: [
+      0.08, 0.06,
+      0.04, 0.05,
+      0.09, 0.08
+    ],
+    cloudReevaporationMassKgM2: [
+      0.01, 0.02,
+      0.03, 0.02,
+      0.02, 0.02
+    ],
+    precipReevaporationMassKgM2: [
+      0.02, 0.02,
+      0.01, 0.01,
+      0.03, 0.03
+    ],
+    importedAnvilPersistenceMassKgM2: [
+      0.03, 0.04,
+      0.02, 0.02,
+      0.05, 0.05
+    ],
+    upperCloudPathKgM2: [
+      0.1, 0.12,
+      0.2, 0.18,
+      0.14, 0.15
+    ],
     lowerTroposphericRhFrac: [
       0.6, 0.62,
       0.85, 0.84,
@@ -154,9 +179,13 @@ test('classifySnapshot reports broad convection and subtropical drying diagnosti
   assert.ok(snapshot.metrics.tropicalAnvilPersistenceFrac > 0.6);
   assert.ok(snapshot.metrics.crossEquatorialVaporFluxNorthKgM_1S > 0);
   assert.ok(snapshot.metrics.northDryBeltLandPrecipMeanMmHr > 0);
+  assert.ok(snapshot.metrics.northDryBeltLargeScaleCondensationMeanKgM2 > 0);
+  assert.ok(snapshot.metrics.northDryBeltImportedAnvilPersistenceMeanKgM2 > 0);
+  assert.ok(snapshot.metrics.northDryBeltUpperCloudPathMeanKgM2 > 0);
   assert.equal(snapshot.profiles.latitudesDeg.length, 3);
   assert.equal(snapshot.profiles.series.convectivePotential.length, 3);
   assert.equal(snapshot.profiles.series.surfaceEvapRateMmHr.length, 3);
+  assert.equal(snapshot.profiles.series.largeScaleCondensationSourceKgM2.length, 3);
 });
 
 test('buildMoistureAttributionReport ranks moistening drivers and keeps regime totals', () => {
@@ -198,6 +227,13 @@ test('buildMoistureAttributionReport ranks moistening drivers and keeps regime t
     },
     {
       subtropicalDryNorthRatio: 1.2,
+      northDryBeltLargeScaleCondensationMeanKgM2: 0.08,
+      northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.07,
+      northDryBeltLandLargeScaleCondensationMeanKgM2: 0.01,
+      northDryBeltImportedAnvilPersistenceMeanKgM2: 0.03,
+      northDryBeltCloudReevaporationMeanKgM2: 0.02,
+      northDryBeltPrecipReevaporationMeanKgM2: 0.01,
+      northDryBeltUpperCloudPathMeanKgM2: 0.12,
       northTransitionVaporFluxNorthKgM_1S: 0.22,
       northDryBeltVaporFluxNorthKgM_1S: 0.14
     }
@@ -206,6 +242,7 @@ test('buildMoistureAttributionReport ranks moistening drivers and keeps regime t
   assert.equal(report.positiveNorthDryBeltMoisteningDrivers[0].module, 'stepAdvection5');
   assert.equal(report.strongestNorthDryBeltPrecipSinks[0].module, 'stepMicrophysics5');
   assert.equal(report.precipitationRegimes.deep_core_tropical.surfacePrecipDeltaMm, 8);
+  assert.equal(report.northDryBeltGenerationAttribution.oceanLargeScaleCondensationMeanKgM2, 0.07);
 });
 
 test('buildMonthlyClimatology averages metrics and zonal profiles by month', () => {

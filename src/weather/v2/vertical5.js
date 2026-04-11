@@ -188,7 +188,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   } = params;
 
   const { nx, ny, invDx, invDy, cosLat } = grid;
-  const { N, nz, u, v, omega, theta, qv, qc, qi, qr, T, pHalf, pMid, sigmaHalf, dpsDtApplied } = state;
+  const { N, nz, u, v, omega, theta, qv, qc, qi, qr, qs, T, pHalf, pMid, sigmaHalf, dpsDtApplied } = state;
 
   // Persistent organized-convection state used by both plume physics and microphysics.
   if (!state.convMask || state.convMask.length !== N) state.convMask = new Uint8Array(N);
@@ -203,6 +203,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.lowLevelMoistureConvergence || state.lowLevelMoistureConvergence.length !== N) state.lowLevelMoistureConvergence = new Float32Array(N);
   if (!state.lowLevelOmegaEffective || state.lowLevelOmegaEffective.length !== N) state.lowLevelOmegaEffective = new Float32Array(N);
   if (!state.subtropicalSubsidenceDrying || state.subtropicalSubsidenceDrying.length !== N) state.subtropicalSubsidenceDrying = new Float32Array(N);
+  if (!state.upperCloudPath || state.upperCloudPath.length !== N) state.upperCloudPath = new Float32Array(N);
+  if (!state.importedAnvilPersistenceMass || state.importedAnvilPersistenceMass.length !== N) state.importedAnvilPersistenceMass = new Float32Array(N);
   const convMask = state.convMask;
   const convectivePotential = state.convectivePotential;
   const convectiveOrganization = state.convectiveOrganization;
@@ -215,6 +217,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const lowLevelMoistureConvergence = state.lowLevelMoistureConvergence;
   const lowLevelOmegaEffective = state.lowLevelOmegaEffective;
   const subtropicalSubsidenceDrying = state.subtropicalSubsidenceDrying;
+  const upperCloudPath = state.upperCloudPath;
+  const importedAnvilPersistenceMass = state.importedAnvilPersistenceMass;
   convMask.fill(0);
   convectiveMassFlux.fill(0);
   convectiveDetrainmentMass.fill(0);
@@ -225,6 +229,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   lowLevelMoistureConvergence.fill(0);
   lowLevelOmegaEffective.fill(0);
   subtropicalSubsidenceDrying.fill(0);
+  upperCloudPath.fill(0);
+  importedAnvilPersistenceMass.fill(0);
 
   if (!state.terrainFlowForcing || state.terrainFlowForcing.length !== N) {
     state.terrainFlowForcing = new Float32Array(N);
@@ -1059,6 +1065,38 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       lowLevelMoistureConvergenceMeanS_1: totalWeightAll > 0 ? lowLevelConvergenceWeightedSum / totalWeightAll : 0,
       subtropicalSubsidenceDryingMean: totalWeightAll > 0 ? subsidenceDryingWeightedSum / totalWeightAll : 0
     };
+  }
+
+  if (!state._prevUpperCloudPath || state._prevUpperCloudPath.length !== N) {
+    state._prevUpperCloudPath = new Float32Array(N);
+  }
+  const prevUpperCloudPath = state._prevUpperCloudPath;
+  for (let k = 0; k < N; k++) {
+    let upperCloudMass = 0;
+    for (let lev = 0; lev < nz; lev++) {
+      const sigmaMid = sigmaHalf
+        ? clamp01(0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1]))
+        : clamp01((lev + 0.5) / Math.max(1, nz));
+      if (sigmaMid > 0.55) continue;
+      const idx = lev * N + k;
+      const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+      if (dp <= 0) continue;
+      upperCloudMass += ((qc[idx] || 0) + (qi[idx] || 0) + (qr[idx] || 0) + (qs[idx] || 0)) * (dp / g);
+    }
+    upperCloudPath[k] = upperCloudMass;
+    const overlap = Math.min(prevUpperCloudPath[k] || 0, upperCloudMass);
+    const weakLocalOrganization = 1 - smoothstep(0.12, 0.42, convectiveOrganization[k]);
+    const weakLocalMassFlux = 1 - smoothstep(5e-4, 0.004, convectiveMassFlux[k]);
+    const weakLocalDetrainment = 1 - smoothstep(0.001, 0.02, convectiveDetrainmentMass[k]);
+    const weakLocalAnvilSource = 1 - smoothstep(0.05, 0.35, convectiveAnvilSource[k]);
+    const persistenceSupport = clamp01(
+      0.35 * weakLocalOrganization +
+      0.25 * weakLocalMassFlux +
+      0.2 * weakLocalDetrainment +
+      0.2 * weakLocalAnvilSource
+    );
+    importedAnvilPersistenceMass[k] = overlap * persistenceSupport;
+    prevUpperCloudPath[k] = upperCloudMass;
   }
 
   // Positivity guards

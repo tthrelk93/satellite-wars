@@ -300,6 +300,11 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     convectiveMassFluxKgM2S,
     convectiveDetrainmentMassKgM2,
     convectiveAnvilSourceFrac,
+    largeScaleCondensationSourceKgM2,
+    cloudReevaporationMassKgM2,
+    precipReevaporationMassKgM2,
+    importedAnvilPersistenceMassKgM2,
+    upperCloudPathKgM2,
     lowLevelMoistureConvergenceS_1,
     lowerTroposphericRhFrac,
     subtropicalSubsidenceDryingFrac,
@@ -317,6 +322,11 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalConvectiveMassFlux = zonalMean(convectiveMassFluxKgM2S || new Array(nx * ny).fill(0), nx, ny);
   const zonalDetrainment = zonalMean(convectiveDetrainmentMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalAnvil = zonalMean(convectiveAnvilSourceFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalLargeScaleCondensation = zonalMean(largeScaleCondensationSourceKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalCloudReevaporation = zonalMean(cloudReevaporationMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalPrecipReevaporation = zonalMean(precipReevaporationMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalImportedAnvilPersistence = zonalMean(importedAnvilPersistenceMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalUpperCloudPath = zonalMean(upperCloudPathKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalMoistureConvergence = zonalMean(lowLevelMoistureConvergenceS_1 || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
@@ -348,12 +358,22 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const subtropicalSubsidenceSouth = weightedBandMean(zonalSubsidenceDrying, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
   const tropicalUpperDetrainment = weightedBandMean(zonalDetrainment, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
   const tropicalAnvilPersistence = weightedBandMean(zonalAnvil, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
+  const northDryBeltLargeScaleCondensation = weightedBandMean(zonalLargeScaleCondensation, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const northDryBeltConvectiveDetrainment = weightedBandMean(zonalDetrainment, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const northDryBeltImportedAnvilPersistence = weightedBandMean(zonalImportedAnvilPersistence, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const northDryBeltCloudReevaporation = weightedBandMean(zonalCloudReevaporation, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const northDryBeltPrecipReevaporation = weightedBandMean(zonalPrecipReevaporation, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const northDryBeltUpperCloudPath = weightedBandMean(zonalUpperCloudPath, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const northDryBeltLandPrecip = weightedFieldBandMean(precipRateMmHr, nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
   const northDryBeltOceanPrecip = weightedFieldBandMean(precipRateMmHr, nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
   const northDryBeltLandRh = weightedFieldBandMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
   const northDryBeltOceanRh = weightedFieldBandMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
   const northDryBeltLandEvap = weightedFieldBandMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
   const northDryBeltOceanEvap = weightedFieldBandMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
+  const northDryBeltLandLargeScaleCondensation = weightedFieldBandMean(largeScaleCondensationSourceKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
+  const northDryBeltOceanLargeScaleCondensation = weightedFieldBandMean(largeScaleCondensationSourceKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
+  const northDryBeltLandImportedAnvilPersistence = weightedFieldBandMean(importedAnvilPersistenceMassKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
+  const northDryBeltOceanImportedAnvilPersistence = weightedFieldBandMean(importedAnvilPersistenceMassKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
   const crossEquatorialVaporFlux = weightedBandMean(zonalVaporFluxNorth, latitudesDeg, rowWeights, -5, 5);
   const northTransitionVaporFlux = weightedBandMean(zonalVaporFluxNorth, latitudesDeg, rowWeights, 12, 22);
   const northDryBeltVaporFlux = weightedBandMean(zonalVaporFluxNorth, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
@@ -395,6 +415,16 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       northDryBeltOceanRhMeanFrac: round(northDryBeltOceanRh),
       northDryBeltLandEvapMeanMmHr: round(northDryBeltLandEvap),
       northDryBeltOceanEvapMeanMmHr: round(northDryBeltOceanEvap),
+      northDryBeltLargeScaleCondensationMeanKgM2: round(northDryBeltLargeScaleCondensation, 5),
+      northDryBeltLandLargeScaleCondensationMeanKgM2: round(northDryBeltLandLargeScaleCondensation, 5),
+      northDryBeltOceanLargeScaleCondensationMeanKgM2: round(northDryBeltOceanLargeScaleCondensation, 5),
+      northDryBeltConvectiveDetrainmentCloudSourceMeanKgM2: round(northDryBeltConvectiveDetrainment, 5),
+      northDryBeltImportedAnvilPersistenceMeanKgM2: round(northDryBeltImportedAnvilPersistence, 5),
+      northDryBeltLandImportedAnvilPersistenceMeanKgM2: round(northDryBeltLandImportedAnvilPersistence, 5),
+      northDryBeltOceanImportedAnvilPersistenceMeanKgM2: round(northDryBeltOceanImportedAnvilPersistence, 5),
+      northDryBeltCloudReevaporationMeanKgM2: round(northDryBeltCloudReevaporation, 5),
+      northDryBeltPrecipReevaporationMeanKgM2: round(northDryBeltPrecipReevaporation, 5),
+      northDryBeltUpperCloudPathMeanKgM2: round(northDryBeltUpperCloudPath, 5),
       crossEquatorialVaporFluxNorthKgM_1S: round(crossEquatorialVaporFlux, 5),
       northTransitionVaporFluxNorthKgM_1S: round(northTransitionVaporFlux, 5),
       northDryBeltVaporFluxNorthKgM_1S: round(northDryBeltVaporFlux, 5),
@@ -429,6 +459,11 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         lowerLevelMoistureConvergenceS_1: roundSeries(zonalMoistureConvergence, 6),
         subtropicalSubsidenceDryingFrac: roundSeries(zonalSubsidenceDrying, 5),
         surfaceEvapRateMmHr: roundSeries(zonalSurfaceEvap),
+        largeScaleCondensationSourceKgM2: roundSeries(zonalLargeScaleCondensation, 5),
+        cloudReevaporationMassKgM2: roundSeries(zonalCloudReevaporation, 5),
+        precipReevaporationMassKgM2: roundSeries(zonalPrecipReevaporation, 5),
+        importedAnvilPersistenceMassKgM2: roundSeries(zonalImportedAnvilPersistence, 5),
+        upperCloudPathKgM2: roundSeries(zonalUpperCloudPath, 5),
         verticallyIntegratedVaporFluxNorthKgM_1S: roundSeries(zonalVaporFluxNorth, 5),
         verticallyIntegratedTotalWaterFluxNorthKgM_1S: roundSeries(zonalTotalWaterFluxNorth, 5),
         upperDetrainmentKgM2: roundSeries(zonalDetrainment, 5),
@@ -480,9 +515,31 @@ export const buildMoistureAttributionReport = (processMoistureBudget, latestMetr
       northDryBeltOceanRhMeanFrac: latestMetrics?.northDryBeltOceanRhMeanFrac ?? null,
       northDryBeltLandEvapMeanMmHr: latestMetrics?.northDryBeltLandEvapMeanMmHr ?? null,
       northDryBeltOceanEvapMeanMmHr: latestMetrics?.northDryBeltOceanEvapMeanMmHr ?? null,
+      northDryBeltLargeScaleCondensationMeanKgM2: latestMetrics?.northDryBeltLargeScaleCondensationMeanKgM2 ?? null,
+      northDryBeltLandLargeScaleCondensationMeanKgM2: latestMetrics?.northDryBeltLandLargeScaleCondensationMeanKgM2 ?? null,
+      northDryBeltOceanLargeScaleCondensationMeanKgM2: latestMetrics?.northDryBeltOceanLargeScaleCondensationMeanKgM2 ?? null,
+      northDryBeltConvectiveDetrainmentCloudSourceMeanKgM2: latestMetrics?.northDryBeltConvectiveDetrainmentCloudSourceMeanKgM2 ?? null,
+      northDryBeltImportedAnvilPersistenceMeanKgM2: latestMetrics?.northDryBeltImportedAnvilPersistenceMeanKgM2 ?? null,
+      northDryBeltLandImportedAnvilPersistenceMeanKgM2: latestMetrics?.northDryBeltLandImportedAnvilPersistenceMeanKgM2 ?? null,
+      northDryBeltOceanImportedAnvilPersistenceMeanKgM2: latestMetrics?.northDryBeltOceanImportedAnvilPersistenceMeanKgM2 ?? null,
+      northDryBeltCloudReevaporationMeanKgM2: latestMetrics?.northDryBeltCloudReevaporationMeanKgM2 ?? null,
+      northDryBeltPrecipReevaporationMeanKgM2: latestMetrics?.northDryBeltPrecipReevaporationMeanKgM2 ?? null,
+      northDryBeltUpperCloudPathMeanKgM2: latestMetrics?.northDryBeltUpperCloudPathMeanKgM2 ?? null,
       crossEquatorialVaporFluxNorthKgM_1S: latestMetrics?.crossEquatorialVaporFluxNorthKgM_1S ?? null,
       northTransitionVaporFluxNorthKgM_1S: latestMetrics?.northTransitionVaporFluxNorthKgM_1S ?? null,
       northDryBeltVaporFluxNorthKgM_1S: latestMetrics?.northDryBeltVaporFluxNorthKgM_1S ?? null
+    },
+    northDryBeltGenerationAttribution: {
+      largeScaleCondensationMeanKgM2: latestMetrics?.northDryBeltLargeScaleCondensationMeanKgM2 ?? null,
+      landLargeScaleCondensationMeanKgM2: latestMetrics?.northDryBeltLandLargeScaleCondensationMeanKgM2 ?? null,
+      oceanLargeScaleCondensationMeanKgM2: latestMetrics?.northDryBeltOceanLargeScaleCondensationMeanKgM2 ?? null,
+      convectiveDetrainmentCloudSourceMeanKgM2: latestMetrics?.northDryBeltConvectiveDetrainmentCloudSourceMeanKgM2 ?? null,
+      importedAnvilPersistenceMeanKgM2: latestMetrics?.northDryBeltImportedAnvilPersistenceMeanKgM2 ?? null,
+      landImportedAnvilPersistenceMeanKgM2: latestMetrics?.northDryBeltLandImportedAnvilPersistenceMeanKgM2 ?? null,
+      oceanImportedAnvilPersistenceMeanKgM2: latestMetrics?.northDryBeltOceanImportedAnvilPersistenceMeanKgM2 ?? null,
+      cloudReevaporationMeanKgM2: latestMetrics?.northDryBeltCloudReevaporationMeanKgM2 ?? null,
+      precipReevaporationMeanKgM2: latestMetrics?.northDryBeltPrecipReevaporationMeanKgM2 ?? null,
+      upperCloudPathMeanKgM2: latestMetrics?.northDryBeltUpperCloudPathMeanKgM2 ?? null
     },
     positiveNorthDryBeltMoisteningDrivers: positiveNorthDryMoisteningDrivers.slice(0, 8),
     strongestNorthDryBeltDryingDrivers: strongestNorthDryDryingDrivers.slice(0, 8),
