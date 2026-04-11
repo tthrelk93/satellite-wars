@@ -28,6 +28,9 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const precipRate = makeArray(N);
   const precipRainRate = makeArray(N);
   const precipSnowRate = makeArray(N);
+  const surfaceEvapRate = makeArray(N);
+  const surfaceLatentFlux = makeArray(N);
+  const surfaceSensibleFlux = makeArray(N);
   const sstNow = makeArray(N, 300);
   const seaIceFrac = makeArray(N);
   const seaIceThicknessM = makeArray(N);
@@ -85,6 +88,9 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
     precipRate,
     precipRainRate,
     precipSnowRate,
+    surfaceEvapRate,
+    surfaceLatentFlux,
+    surfaceSensibleFlux,
     landMask,
     convMask,
     convectivePotential,

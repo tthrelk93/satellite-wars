@@ -62,7 +62,7 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
   } = params;
   if (!enable) return;
 
-  const { N, nz, theta, T, u, v, qv, Ts, soilW, soilCap, landMask, sstNow, seaIceFrac, seaIceThicknessM, surfaceRadiativeFlux, precipRate, pHalf, pMid } = state;
+  const { N, nz, theta, T, u, v, qv, Ts, soilW, soilCap, landMask, sstNow, seaIceFrac, seaIceThicknessM, surfaceRadiativeFlux, precipRate, pHalf, pMid, surfaceEvapRate, surfaceLatentFlux, surfaceSensibleFlux } = state;
   const { nx, ny, latDeg, invDx, invDy } = grid;
   const elevField = geo?.elev && geo.elev.length === N ? geo.elev : null;
   const levS = nz - 1;
@@ -126,6 +126,9 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     }
 
     const H = rhoAir * CpAir * ChLocal * U * (TsVal - Tair);
+    if (surfaceEvapRate) surfaceEvapRate[k] = E * 3600;
+    if (surfaceLatentFlux) surfaceLatentFlux[k] = LvAir * E;
+    if (surfaceSensibleFlux) surfaceSensibleFlux[k] = H;
 
     if (!land) {
       const skinTarget = iceFrac > 0

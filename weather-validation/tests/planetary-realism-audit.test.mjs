@@ -63,6 +63,11 @@ test('classifySnapshot reports broad convection and subtropical drying diagnosti
       ny,
       latitudesDeg: [20, 0, -20]
     },
+    landMask: [
+      1, 0,
+      0, 0,
+      1, 0
+    ],
     precipRateMmHr: [
       0.4, 0.4,
       2.0, 1.8,
@@ -76,6 +81,21 @@ test('classifySnapshot reports broad convection and subtropical drying diagnosti
     ],
     wind10mSpeedMs: new Array(nx * ny).fill(10),
     totalColumnWaterKgM2: new Array(nx * ny).fill(30),
+    surfaceEvapRateMmHr: [
+      0.06, 0.04,
+      0.12, 0.11,
+      0.05, 0.04
+    ],
+    verticallyIntegratedVaporFluxNorthKgM_1S: [
+      0.12, 0.1,
+      0.4, 0.35,
+      -0.08, -0.07
+    ],
+    verticallyIntegratedTotalWaterFluxNorthKgM_1S: [
+      0.14, 0.12,
+      0.44, 0.4,
+      -0.06, -0.05
+    ],
     convectiveMaskFrac: [
       0, 0,
       1, 1,
@@ -132,8 +152,60 @@ test('classifySnapshot reports broad convection and subtropical drying diagnosti
   assert.ok(snapshot.metrics.tropicalConvectiveMassFluxKgM2S > 0.01);
   assert.ok(snapshot.metrics.subtropicalSubsidenceNorthMean > 0.05);
   assert.ok(snapshot.metrics.tropicalAnvilPersistenceFrac > 0.6);
+  assert.ok(snapshot.metrics.crossEquatorialVaporFluxNorthKgM_1S > 0);
+  assert.ok(snapshot.metrics.northDryBeltLandPrecipMeanMmHr > 0);
   assert.equal(snapshot.profiles.latitudesDeg.length, 3);
   assert.equal(snapshot.profiles.series.convectivePotential.length, 3);
+  assert.equal(snapshot.profiles.series.surfaceEvapRateMmHr.length, 3);
+});
+
+test('buildMoistureAttributionReport ranks moistening drivers and keeps regime totals', () => {
+  const report = planetaryAuditTest.buildMoistureAttributionReport(
+    {
+      sampledModelSeconds: 3 * 86400,
+      modules: {
+        stepAdvection5: {
+          callCount: 12,
+          bands: {
+            north_dry_belt: {
+              surfaceVaporDeltaKgKg: 0.0024,
+              upperVaporDeltaKgKg: 0.0011,
+              surfacePrecipDeltaMm: 0.2
+            },
+            north_dry_belt_land: { surfaceVaporDeltaKgKg: 0.0008 },
+            north_dry_belt_ocean: { surfaceVaporDeltaKgKg: 0.0016 }
+          }
+        },
+        stepMicrophysics5: {
+          callCount: 12,
+          bands: {
+            north_dry_belt: {
+              surfaceVaporDeltaKgKg: -0.0004,
+              upperVaporDeltaKgKg: -0.0001,
+              surfacePrecipDeltaMm: 1.8
+            },
+            north_dry_belt_land: { surfaceVaporDeltaKgKg: -0.0001 },
+            north_dry_belt_ocean: { surfaceVaporDeltaKgKg: -0.0003 }
+          }
+        }
+      },
+      precipitationRegimes: {
+        deep_core_tropical: { surfacePrecipDeltaMm: 8 },
+        tropical_transition_spillover: { surfacePrecipDeltaMm: 2 },
+        marginal_subtropical: { surfacePrecipDeltaMm: 1 },
+        large_scale_other: { surfacePrecipDeltaMm: 3 }
+      }
+    },
+    {
+      subtropicalDryNorthRatio: 1.2,
+      northTransitionVaporFluxNorthKgM_1S: 0.22,
+      northDryBeltVaporFluxNorthKgM_1S: 0.14
+    }
+  );
+
+  assert.equal(report.positiveNorthDryBeltMoisteningDrivers[0].module, 'stepAdvection5');
+  assert.equal(report.strongestNorthDryBeltPrecipSinks[0].module, 'stepMicrophysics5');
+  assert.equal(report.precipitationRegimes.deep_core_tropical.surfacePrecipDeltaMm, 8);
 });
 
 test('buildMonthlyClimatology averages metrics and zonal profiles by month', () => {

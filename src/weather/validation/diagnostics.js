@@ -73,6 +73,21 @@ const computeLayerMeanRelativeHumidity = (state, minSigma, maxSigma) => {
   return out;
 };
 
+const computeVerticallyIntegratedFlux = (state, componentField, tracerSelector) => {
+  const { N, nz, pHalf } = state;
+  const out = new Array(N).fill(0);
+  for (let cell = 0; cell < N; cell += 1) {
+    let total = 0;
+    for (let lev = 0; lev < nz; lev += 1) {
+      const idx = lev * N + cell;
+      const dp = pHalf[(lev + 1) * N + cell] - pHalf[lev * N + cell];
+      total += componentField[idx] * tracerSelector(idx) * (dp / g);
+    }
+    out[cell] = total;
+  }
+  return out;
+};
+
 const arrayOrZeros = (arrLike, length) => Array.from(arrLike || new Float32Array(length));
 
 export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PRESSURE_LEVELS_PA } = {}) {
@@ -97,6 +112,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
       latitudesDeg: Array.from(grid.latDeg || []),
       longitudesDeg: Array.from(grid.lonDeg || [])
     },
+    landMask: Array.from(state.landMask || []),
     pressureLevelsPa: pressureLevelsPa.slice(),
     seaLevelPressurePa,
     surfacePressurePa: Array.from(state.ps || []),
@@ -111,8 +127,17 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     precipRainRateMmHr: Array.from(state.precipRainRate || []),
     precipSnowRateMmHr: Array.from(state.precipSnowRate || []),
     precipAccumMm: Array.from(state.precipAccum || []),
+    surfaceEvapRateMmHr: Array.from(state.surfaceEvapRate || []),
+    surfaceLatentFluxWm2: Array.from(state.surfaceLatentFlux || []),
+    surfaceSensibleFluxWm2: Array.from(state.surfaceSensibleFlux || []),
     cloudWaterPathKgM2: computeColumnIntegralKgM2(state, (idx) => (state.qc?.[idx] || 0) + (state.qr?.[idx] || 0)),
     snowWaterPathKgM2: computeColumnIntegralKgM2(state, (idx) => (state.qi?.[idx] || 0) + (state.qs?.[idx] || 0)),
+    verticallyIntegratedVaporFluxNorthKgM_1S: computeVerticallyIntegratedFlux(state, state.v, (idx) => state.qv[idx] || 0),
+    verticallyIntegratedTotalWaterFluxNorthKgM_1S: computeVerticallyIntegratedFlux(
+      state,
+      state.v,
+      (idx) => (state.qv[idx] || 0) + (state.qc?.[idx] || 0) + (state.qi?.[idx] || 0) + (state.qr?.[idx] || 0) + (state.qs?.[idx] || 0)
+    ),
     sstK: Array.from(state.sstNow || []),
     seaIceFraction: Array.from(state.seaIceFrac || []),
     seaIceThicknessM: Array.from(state.seaIceThicknessM || []),
@@ -135,6 +160,9 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     lowLevelMoistureConvergenceS_1: arrayOrZeros(state.lowLevelMoistureConvergence, state.N),
     lowLevelOmegaEffectivePaS: arrayOrZeros(state.lowLevelOmegaEffective, state.N),
     subtropicalSubsidenceDryingFrac: arrayOrZeros(state.subtropicalSubsidenceDrying, state.N),
+    processMoistureBudget: typeof core?.getClimateProcessBudgetSummary === 'function'
+      ? core.getClimateProcessBudgetSummary()
+      : null,
     cycloneSupportFields: {
       relativeVorticityS_1: Array.from(fields.vort || []),
       wind10mSpeedMs,

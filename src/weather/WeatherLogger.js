@@ -88,6 +88,8 @@ const buildBroadClimateStats = (diagnostics) => {
   const zonalSubsidenceDrying = zonalMean(diagnostics.subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalDetrainment = zonalMean(diagnostics.convectiveDetrainmentMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalAnvil = zonalMean(diagnostics.convectiveAnvilSourceFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSurfaceEvap = zonalMean(diagnostics.surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny);
+  const zonalVaporFluxNorth = zonalMean(diagnostics.verticallyIntegratedVaporFluxNorthKgM_1S || new Array(nx * ny).fill(0), nx, ny);
   const itczLat = weightedBandCentroid(zonalPrecip, latitudesDeg, rowWeights, -20, 20);
   const itczWidth = weightedBandWidth(zonalPrecip, latitudesDeg, rowWeights, -25, 25, itczLat);
   const equatorialPrecip = weightedBandMean(zonalPrecip, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
@@ -103,6 +105,11 @@ const buildBroadClimateStats = (diagnostics) => {
     tropicalConvectiveOrganization: round(weightedBandMean(zonalConvectiveOrganization, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT)),
     tropicalConvectiveMassFluxKgM2S: round(weightedBandMean(zonalConvectiveMassFlux, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT), 5),
     tropicalMoistureConvergenceS_1: round(weightedBandMean(zonalMoistureConvergence, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT), 6),
+    crossEquatorialVaporFluxNorthKgM_1S: round(weightedBandMean(zonalVaporFluxNorth, latitudesDeg, rowWeights, -5, 5), 5),
+    northTransitionVaporFluxNorthKgM_1S: round(weightedBandMean(zonalVaporFluxNorth, latitudesDeg, rowWeights, 12, 22), 5),
+    northDryBeltVaporFluxNorthKgM_1S: round(weightedBandMean(zonalVaporFluxNorth, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 5),
+    northDryBeltEvapMeanMmHr: round(weightedBandMean(zonalSurfaceEvap, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),
+    southDryBeltEvapMeanMmHr: round(weightedBandMean(zonalSurfaceEvap, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT)),
     subtropicalRhNorthMeanFrac: round(weightedBandMean(zonalLowerRh, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),
     subtropicalRhSouthMeanFrac: round(weightedBandMean(zonalLowerRh, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT)),
     subtropicalSubsidenceNorthMean: round(weightedBandMean(zonalSubsidenceDrying, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT)),

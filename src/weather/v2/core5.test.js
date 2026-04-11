@@ -37,3 +37,20 @@ test('WeatherCore5 refreshes runtime nudge params from current nudgeParams befor
   assert.equal(core._nudgeParamsRuntime.enableQvColumn, false);
   assert.equal(core._nudgeParamsRuntime.tauQvColumn, 20 * 86400);
 });
+
+test('WeatherCore5 accumulates causal climate process budgets for later audits', async () => {
+  const core = new WeatherCore5({ nx: 16, ny: 8, seed: 12345 });
+  await core._initPromise;
+
+  core.resetClimateProcessDiagnostics();
+  core._stepOnce(core.modelDt);
+
+  const summary = core.getClimateProcessBudgetSummary();
+  assert.ok(summary.sampleCount >= 1);
+  assert.ok(summary.modules.stepSurface2D5);
+  assert.ok(summary.modules.stepAdvection5);
+  assert.ok(summary.modules.stepVertical5);
+  assert.ok(summary.modules.stepMicrophysics5);
+  assert.ok(summary.modules.stepSurface2D5.bands.north_dry_belt);
+  assert.ok('deep_core_tropical' in summary.precipitationRegimes);
+});

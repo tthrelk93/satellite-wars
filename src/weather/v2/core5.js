@@ -50,6 +50,70 @@ const makeArray = (count, value = 0) => {
   return arr;
 };
 
+const PROCESS_BUDGET_MODULES = new Set([
+  'stepSurface2D5',
+  'stepSurfacePressure5',
+  'stepAdvection5',
+  'stepVertical5',
+  'stepMicrophysics5',
+  'stepNudging5'
+]);
+const PROCESS_BUDGET_BANDS = [
+  { key: 'tropical_core', label: 'Tropical core', lat0: -12, lat1: 12 },
+  { key: 'north_transition', label: 'North transition', lat0: 12, lat1: 22 },
+  { key: 'south_transition', label: 'South transition', lat0: -22, lat1: -12 },
+  { key: 'north_dry_belt', label: 'North dry belt', lat0: 15, lat1: 35 },
+  { key: 'south_dry_belt', label: 'South dry belt', lat0: -35, lat1: -15 },
+  { key: 'north_dry_belt_land', label: 'North dry belt land', lat0: 15, lat1: 35, landMaskMode: 'land' },
+  { key: 'north_dry_belt_ocean', label: 'North dry belt ocean', lat0: 15, lat1: 35, landMaskMode: 'ocean' },
+  { key: 'south_dry_belt_land', label: 'South dry belt land', lat0: -35, lat1: -15, landMaskMode: 'land' },
+  { key: 'south_dry_belt_ocean', label: 'South dry belt ocean', lat0: -35, lat1: -15, landMaskMode: 'ocean' }
+];
+const PRECIP_REGIME_KEYS = [
+  'deep_core_tropical',
+  'tropical_transition_spillover',
+  'marginal_subtropical',
+  'large_scale_other'
+];
+
+const createBandDeltaAccumulator = () => ({
+  surfaceVaporDeltaKgKg: 0,
+  upperVaporDeltaKgKg: 0,
+  surfaceCloudDeltaKgKg: 0,
+  upperCloudDeltaKgKg: 0,
+  surfacePrecipDeltaMm: 0,
+  convectiveOrganizationDelta: 0,
+  convectiveMassFluxDeltaKgM2S: 0,
+  detrainmentDeltaKgM2: 0,
+  anvilDeltaFrac: 0,
+  subtropicalSubsidenceDryingDeltaFrac: 0
+});
+
+const createProcessBudgetAccumulator = () => ({
+  schema: 'satellite-wars.climate-process-budget.v1',
+  sampleCount: 0,
+  sampledModelSeconds: 0,
+  bandDefinitions: PROCESS_BUDGET_BANDS.map((band) => ({
+    key: band.key,
+    label: band.label,
+    lat0: band.lat0,
+    lat1: band.lat1,
+    landMaskMode: band.landMaskMode || 'all'
+  })),
+  modules: {},
+  precipitationRegimes: Object.fromEntries(PRECIP_REGIME_KEYS.map((key) => [key, { surfacePrecipDeltaMm: 0 }])),
+  notes: {
+    interpretation: 'Positive surface/upper vapor deltas moisten a band; positive surface-precip deltas remove atmospheric water locally.'
+  }
+});
+
+const createModuleBudgetAccumulator = (moduleName) => ({
+  module: moduleName,
+  callCount: 0,
+  sampledModelSeconds: 0,
+  bands: Object.fromEntries(PROCESS_BUDGET_BANDS.map((band) => [band.key, createBandDeltaAccumulator()]))
+});
+
 export class WeatherCore5 {
   constructor({
     nx = 180,
@@ -489,6 +553,7 @@ export class WeatherCore5 {
     }
 
     this._updateHydrostatic();
+    this.resetClimateProcessDiagnostics();
 
     debugStdErr(`[V2] seed=${this.seed} version=v2 nz=${this.nz}`);
     this._initPromise = this._init();
@@ -542,6 +607,46 @@ export class WeatherCore5 {
     this._windNudgeSpinupSeconds = 0;
     this._updateClimoNow(0, true);
     this._updateHydrostatic();
+    this.resetClimateProcessDiagnostics();
+  }
+
+  resetClimateProcessDiagnostics() {
+    this._climateProcessBudget = createProcessBudgetAccumulator();
+  }
+
+  getClimateProcessBudgetSummary() {
+    const summary = this._climateProcessBudget
+      ? JSON.parse(JSON.stringify(this._climateProcessBudget))
+      : createProcessBudgetAccumulator();
+    const sampledDays = Number(summary.sampledModelSeconds) > 0
+      ? summary.sampledModelSeconds / 86400
+      : 0;
+    for (const moduleSummary of Object.values(summary.modules || {})) {
+      const moduleDays = Number(moduleSummary.sampledModelSeconds) > 0
+        ? moduleSummary.sampledModelSeconds / 86400
+        : sampledDays;
+      for (const bandSummary of Object.values(moduleSummary.bands || {})) {
+        bandSummary.surfaceVaporDeltaRateKgKgDay = moduleDays > 0
+          ? bandSummary.surfaceVaporDeltaKgKg / moduleDays
+          : null;
+        bandSummary.upperVaporDeltaRateKgKgDay = moduleDays > 0
+          ? bandSummary.upperVaporDeltaKgKg / moduleDays
+          : null;
+        bandSummary.surfacePrecipDeltaRateMmDay = moduleDays > 0
+          ? bandSummary.surfacePrecipDeltaMm / moduleDays
+          : null;
+      }
+    }
+    const totalRegimePrecip = Object.values(summary.precipitationRegimes || {}).reduce(
+      (sum, regime) => sum + (Number.isFinite(regime?.surfacePrecipDeltaMm) ? regime.surfacePrecipDeltaMm : 0),
+      0
+    );
+    for (const regimeSummary of Object.values(summary.precipitationRegimes || {})) {
+      regimeSummary.fractionOfTrackedMicrophysicsPrecip = totalRegimePrecip > 0
+        ? regimeSummary.surfacePrecipDeltaMm / totalRegimePrecip
+        : null;
+    }
+    return summary;
   }
 
   setSeed(seed) {
@@ -695,6 +800,139 @@ export class WeatherCore5 {
   _updateHydrostatic() {
     updateHydrostatic(this.state, { pTop: P_TOP, terrainHeightM: this.geo?.elev || null });
     this._updateStandardPressureDiagnostics();
+  }
+
+  _shouldSampleClimateProcessBudget() {
+    if (!this._climateProcessBudget) {
+      this.resetClimateProcessDiagnostics();
+    }
+    this._climateProcessBudget.sampleCount += 1;
+    return true;
+  }
+
+  _captureClimateProcessBudgetSnapshot(includePrecipCells = false) {
+    const { grid, state } = this;
+    const { nx, ny } = grid;
+    const { N, landMask, precipAccum } = state;
+    const bandSums = Object.fromEntries(PROCESS_BUDGET_BANDS.map((band) => [band.key, {
+      weight: 0,
+      surfaceVaporKgKg: 0,
+      upperVaporKgKg: 0,
+      surfaceCloudKgKg: 0,
+      upperCloudKgKg: 0,
+      surfacePrecipMm: 0,
+      convectiveOrganizationFrac: 0,
+      convectiveMassFluxKgM2S: 0,
+      detrainmentKgM2: 0,
+      anvilFrac: 0,
+      subtropicalSubsidenceDryingFrac: 0
+    }]));
+
+    for (let k = 0; k < N; k += 1) {
+      const row = Math.floor(k / nx);
+      const lat = grid.latDeg[row];
+      const weight = Math.max(0.05, grid.cosLat[row] || 0);
+      const isLand = landMask[k] === 1;
+      const surfaceVaporKgKg = this.fields.qv?.[k] || 0;
+      const upperVaporKgKg = this.fields.qvU?.[k] || 0;
+      const surfaceCloudKgKg = (this.fields.qc?.[k] || 0) + (this.fields.qi?.[k] || 0);
+      const upperCloudKgKg = (this.fields.qcU?.[k] || 0) + (this.fields.qiU?.[k] || 0);
+
+      for (const band of PROCESS_BUDGET_BANDS) {
+        if (lat < band.lat0 || lat > band.lat1) continue;
+        if (band.landMaskMode === 'land' && !isLand) continue;
+        if (band.landMaskMode === 'ocean' && isLand) continue;
+        const acc = bandSums[band.key];
+        acc.weight += weight;
+        acc.surfaceVaporKgKg += surfaceVaporKgKg * weight;
+        acc.upperVaporKgKg += upperVaporKgKg * weight;
+        acc.surfaceCloudKgKg += surfaceCloudKgKg * weight;
+        acc.upperCloudKgKg += upperCloudKgKg * weight;
+        acc.surfacePrecipMm += (precipAccum?.[k] || 0) * weight;
+        acc.convectiveOrganizationFrac += (state.convectiveOrganization?.[k] || 0) * weight;
+        acc.convectiveMassFluxKgM2S += (state.convectiveMassFlux?.[k] || 0) * weight;
+        acc.detrainmentKgM2 += (state.convectiveDetrainmentMass?.[k] || 0) * weight;
+        acc.anvilFrac += (state.convectiveAnvilSource?.[k] || 0) * weight;
+        acc.subtropicalSubsidenceDryingFrac += (state.subtropicalSubsidenceDrying?.[k] || 0) * weight;
+      }
+    }
+
+    const bands = Object.fromEntries(
+      Object.entries(bandSums).map(([key, value]) => {
+        const weight = value.weight;
+        const mean = (field) => (weight > 0 ? value[field] / weight : 0);
+        return [key, {
+          surfaceVaporKgKg: mean('surfaceVaporKgKg'),
+          upperVaporKgKg: mean('upperVaporKgKg'),
+          surfaceCloudKgKg: mean('surfaceCloudKgKg'),
+          upperCloudKgKg: mean('upperCloudKgKg'),
+          surfacePrecipMm: mean('surfacePrecipMm'),
+          convectiveOrganizationFrac: mean('convectiveOrganizationFrac'),
+          convectiveMassFluxKgM2S: mean('convectiveMassFluxKgM2S'),
+          detrainmentKgM2: mean('detrainmentKgM2'),
+          anvilFrac: mean('anvilFrac'),
+          subtropicalSubsidenceDryingFrac: mean('subtropicalSubsidenceDryingFrac')
+        }];
+      })
+    );
+
+    return {
+      bands,
+      precipAccumCell: includePrecipCells && precipAccum ? Float64Array.from(precipAccum) : null
+    };
+  }
+
+  _classifyTrackedPrecipRegime(latDeg, cellIndex) {
+    const latAbs = Math.abs(latDeg);
+    const convOrg = this.state.convectiveOrganization?.[cellIndex] || 0;
+    const convMassFlux = this.state.convectiveMassFlux?.[cellIndex] || 0;
+    const anvil = this.state.convectiveAnvilSource?.[cellIndex] || 0;
+    const subsidence = this.state.subtropicalSubsidenceDrying?.[cellIndex] || 0;
+    if (latAbs <= 12 && (convOrg >= 0.4 || convMassFlux >= 0.0045)) return 'deep_core_tropical';
+    if (latAbs > 12 && latAbs <= 25 && (anvil >= 0.1 || convOrg >= 0.2 || convMassFlux >= 0.001)) {
+      return 'tropical_transition_spillover';
+    }
+    if (latAbs >= 15 && latAbs <= 35 && convOrg < 0.35 && convMassFlux < 0.004 && subsidence < 0.08) {
+      return 'marginal_subtropical';
+    }
+    return 'large_scale_other';
+  }
+
+  _accumulateClimateProcessBudget(moduleName, beforeSnapshot, sampledDtSeconds) {
+    if (!this._climateProcessBudget || !beforeSnapshot?.bands) return;
+    const afterSnapshot = this._captureClimateProcessBudgetSnapshot(moduleName === 'stepMicrophysics5');
+    const moduleBudget = this._climateProcessBudget.modules[moduleName]
+      || (this._climateProcessBudget.modules[moduleName] = createModuleBudgetAccumulator(moduleName));
+    moduleBudget.callCount += 1;
+    moduleBudget.sampledModelSeconds += sampledDtSeconds;
+
+    for (const band of PROCESS_BUDGET_BANDS) {
+      const beforeBand = beforeSnapshot.bands[band.key];
+      const afterBand = afterSnapshot.bands[band.key];
+      if (!beforeBand || !afterBand) continue;
+      const acc = moduleBudget.bands[band.key];
+      acc.surfaceVaporDeltaKgKg += afterBand.surfaceVaporKgKg - beforeBand.surfaceVaporKgKg;
+      acc.upperVaporDeltaKgKg += afterBand.upperVaporKgKg - beforeBand.upperVaporKgKg;
+      acc.surfaceCloudDeltaKgKg += afterBand.surfaceCloudKgKg - beforeBand.surfaceCloudKgKg;
+      acc.upperCloudDeltaKgKg += afterBand.upperCloudKgKg - beforeBand.upperCloudKgKg;
+      acc.surfacePrecipDeltaMm += afterBand.surfacePrecipMm - beforeBand.surfacePrecipMm;
+      acc.convectiveOrganizationDelta += afterBand.convectiveOrganizationFrac - beforeBand.convectiveOrganizationFrac;
+      acc.convectiveMassFluxDeltaKgM2S += afterBand.convectiveMassFluxKgM2S - beforeBand.convectiveMassFluxKgM2S;
+      acc.detrainmentDeltaKgM2 += afterBand.detrainmentKgM2 - beforeBand.detrainmentKgM2;
+      acc.anvilDeltaFrac += afterBand.anvilFrac - beforeBand.anvilFrac;
+      acc.subtropicalSubsidenceDryingDeltaFrac += afterBand.subtropicalSubsidenceDryingFrac - beforeBand.subtropicalSubsidenceDryingFrac;
+    }
+
+    if (moduleName === 'stepMicrophysics5' && beforeSnapshot.precipAccumCell && afterSnapshot.precipAccumCell) {
+      const { nx } = this.grid;
+      for (let k = 0; k < this.state.N; k += 1) {
+        const deltaPrecip = afterSnapshot.precipAccumCell[k] - beforeSnapshot.precipAccumCell[k];
+        if (!(deltaPrecip > 0)) continue;
+        const row = Math.floor(k / nx);
+        const regime = this._classifyTrackedPrecipRegime(this.grid.latDeg[row], k);
+        this._climateProcessBudget.precipitationRegimes[regime].surfacePrecipDeltaMm += deltaPrecip;
+      }
+    }
   }
 
   setV2ConvectionEnabled(enabled) {
@@ -895,15 +1133,22 @@ export class WeatherCore5 {
     if (shouldLogModules) {
       this._nextModuleLogSimTime = this.timeUTC + moduleCadenceSeconds;
     }
-    const runWithLog = (name, fn) => {
-      if (!shouldLogModules) {
-        fn();
-        return;
-      }
-      const before = logger.buildProcessSnapshot(this);
+    const shouldSampleClimateBudget = this._shouldSampleClimateProcessBudget();
+    if (shouldSampleClimateBudget && this._climateProcessBudget) {
+      this._climateProcessBudget.sampledModelSeconds += dt;
+    }
+    const runWithDiagnostics = (name, fn, { sampledDtSeconds = dt } = {}) => {
+      const collectBudget = shouldSampleClimateBudget && PROCESS_BUDGET_MODULES.has(name);
+      const beforeLog = shouldLogModules ? logger.buildProcessSnapshot(this) : null;
+      const beforeBudget = collectBudget ? this._captureClimateProcessBudgetSnapshot(name === 'stepMicrophysics5') : null;
       fn();
-      const after = logger.buildProcessSnapshot(this);
-      logger.logProcessDelta(logContext, this, name, before, after);
+      if (shouldLogModules) {
+        const after = logger.buildProcessSnapshot(this);
+        logger.logProcessDelta(logContext, this, name, beforeLog, after);
+      }
+      if (collectBudget) {
+        this._accumulateClimateProcessBudget(name, beforeBudget, sampledDtSeconds);
+      }
     };
     const lodActive = this.lodParams?.enable && this.simSpeed > this.lodParams.simSpeedThreshold;
     const microEvery = Math.max(1, Number(this.lodParams?.microphysicsEvery) || 1);
@@ -911,8 +1156,8 @@ export class WeatherCore5 {
     const doRadiation = !lodActive || (this._dynStepIndex % radEvery === 0);
     const doMicrophysics = !lodActive || (this._dynStepIndex % microEvery === 0);
 
-    runWithLog('updateHydrostatic', () => this._updateHydrostatic());
-    runWithLog('stepSurface2D5', () => {
+    runWithDiagnostics('updateHydrostatic', () => this._updateHydrostatic());
+    runWithDiagnostics('stepSurface2D5', () => {
       stepSurface2D5({
         dt,
         grid: this.grid,
@@ -922,9 +1167,9 @@ export class WeatherCore5 {
         params: this.surfaceParams
       });
     });
-    runWithLog('updateHydrostatic', () => this._updateHydrostatic());
+    runWithDiagnostics('updateHydrostatic', () => this._updateHydrostatic());
     if (doRadiation) {
-      runWithLog('stepRadiation2D5', () => {
+      runWithDiagnostics('stepRadiation2D5', () => {
         stepRadiation2D5({
           dt,
           grid: this.grid,
@@ -934,9 +1179,9 @@ export class WeatherCore5 {
         });
       });
     }
-    runWithLog('updateHydrostatic', () => this._updateHydrostatic());
+    runWithDiagnostics('updateHydrostatic', () => this._updateHydrostatic());
     let windDynamicsDiagnostics = null;
-    runWithLog('stepWinds5', () => {
+    runWithDiagnostics('stepWinds5', () => {
       this.dynParams.stepIndex = this._dynStepIndex;
       windDynamicsDiagnostics = stepWinds5({
         dt,
@@ -1044,7 +1289,7 @@ export class WeatherCore5 {
         );
       }
     }
-    runWithLog('stepSurfacePressure5', () => {
+    runWithDiagnostics('stepSurfacePressure5', () => {
       stepSurfacePressure5({
         dt,
         grid: this.grid,
@@ -1053,7 +1298,7 @@ export class WeatherCore5 {
         scratch: this._dynScratch
       });
     });
-    runWithLog('stepAdvection5', () => {
+    runWithDiagnostics('stepAdvection5', () => {
       this.advectParams.stepIndex = this._dynStepIndex;
       stepAdvection5({
         dt,
@@ -1063,7 +1308,7 @@ export class WeatherCore5 {
         scratch: this._dynScratch
       });
     });
-    runWithLog('stepVertical5', () => {
+    runWithDiagnostics('stepVertical5', () => {
       stepVertical5({
         dt,
         grid: this.grid,
@@ -1073,19 +1318,19 @@ export class WeatherCore5 {
         scratch: this._dynScratch
       });
     });
-    runWithLog('updateHydrostatic', () => this._updateHydrostatic());
+    runWithDiagnostics('updateHydrostatic', () => this._updateHydrostatic());
     if (typeof this.vertParams?.enableConvectiveOutcome === 'boolean') {
       this.microParams.enableConvectiveOutcome = this.vertParams.enableConvectiveOutcome;
     }
     if (doMicrophysics) {
-      runWithLog('stepMicrophysics5', () => stepMicrophysics5({ dt, state: this.state, params: this.microParams }));
+      runWithDiagnostics('stepMicrophysics5', () => stepMicrophysics5({ dt, state: this.state, params: this.microParams }));
     }
-    runWithLog('updateHydrostatic', () => this._updateHydrostatic());
+    runWithDiagnostics('updateHydrostatic', () => this._updateHydrostatic());
     this._nudgeAccumSeconds += dt;
     if (this.nudgeParams.enable && this._nudgeAccumSeconds >= this.nudgeParams.cadenceSeconds) {
       const dtNudge = this._nudgeAccumSeconds;
       this._nudgeAccumSeconds = 0;
-      runWithLog('stepNudging5', () => {
+      runWithDiagnostics('stepNudging5', () => {
       Object.assign(this._nudgeParamsRuntime, this.nudgeParams);
       this._nudgeParamsRuntime.psMin = this.massParams?.psMin;
       this._nudgeParamsRuntime.psMax = this.massParams?.psMax;
@@ -1097,8 +1342,8 @@ export class WeatherCore5 {
         params: this._nudgeParamsRuntime,
         scratch: this._nudgeScratch
       });
-      });
-      runWithLog('updateHydrostatic', () => this._updateHydrostatic());
+      }, { sampledDtSeconds: dtNudge });
+      runWithDiagnostics('updateHydrostatic', () => this._updateHydrostatic());
     }
     const analysisIncrementResult = stepAnalysisIncrement5({
       dt,
@@ -1110,7 +1355,7 @@ export class WeatherCore5 {
       }
     });
     if (analysisIncrementResult?.didApply) {
-      runWithLog('updateHydrostatic', () => this._updateHydrostatic());
+      runWithDiagnostics('updateHydrostatic', () => this._updateHydrostatic());
       if (shouldLogModules) {
         logger.recordEvent(
           'analysisIncrementDiagnostics',
@@ -1125,7 +1370,7 @@ export class WeatherCore5 {
         );
       }
     }
-    runWithLog('updateDiagnostics2D5', () => {
+    runWithDiagnostics('updateDiagnostics2D5', () => {
       updateDiagnostics2D5({
         dt,
         grid: this.grid,
