@@ -76,6 +76,42 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const carryOverUpperCloudEnteringByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const carryOverUpperCloudSurvivingByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const prevUpperCloudBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const upperCloudResidenceTimeSeconds = makeArray(N);
+  const upperCloudTimeSinceLocalBirthSeconds = makeArray(N);
+  const upperCloudTimeSinceImportSeconds = makeArray(N);
+  const upperCloudFreshBornMass = makeArray(N);
+  const upperCloudRecentlyImportedMass = makeArray(N);
+  const upperCloudStaleMass = makeArray(N);
+  const upperCloudPassiveSurvivalMass = makeArray(N);
+  const upperCloudRegenerationMass = makeArray(N);
+  const upperCloudOscillatoryMass = makeArray(N);
+  const upperCloudPotentialErosionMass = makeArray(N);
+  const upperCloudAppliedErosionMass = makeArray(N);
+  const upperCloudBlockedErosionMass = makeArray(N);
+  const upperCloudBlockedByWeakSubsidenceMass = makeArray(N);
+  const upperCloudBlockedByWeakDescentVentMass = makeArray(N);
+  const upperCloudBlockedByLocalSupportMass = makeArray(N);
+  const upperCloudResidenceTimeMassWeightedSeconds = makeArray(N);
+  const upperCloudTimeSinceLocalBirthMassWeightedSeconds = makeArray(N);
+  const upperCloudTimeSinceImportMassWeightedSeconds = makeArray(N);
+  const upperCloudFreshBornAccumMass = makeArray(N);
+  const upperCloudRecentlyImportedAccumMass = makeArray(N);
+  const upperCloudStaleAccumMass = makeArray(N);
+  const upperCloudPassiveSurvivalAccumMass = makeArray(N);
+  const upperCloudRegenerationAccumMass = makeArray(N);
+  const upperCloudOscillatoryAccumMass = makeArray(N);
+  const upperCloudPotentialErosionAccumMass = makeArray(N);
+  const upperCloudAppliedErosionAccumMass = makeArray(N);
+  const upperCloudBlockedErosionAccumMass = makeArray(N);
+  const upperCloudBlockedByWeakSubsidenceAccumMass = makeArray(N);
+  const upperCloudBlockedByWeakDescentVentAccumMass = makeArray(N);
+  const upperCloudBlockedByLocalSupportAccumMass = makeArray(N);
+  const upperCloudPotentialErosionByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const upperCloudAppliedErosionByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const upperCloudBlockedErosionByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const upperCloudShortwaveAbsorptionWm2 = makeArray(N);
+  const upperCloudLongwaveRelaxationBoost = makeArray(N);
+  const upperCloudRadiativePersistenceSupportWm2 = makeArray(N);
   const sourceTracer3D = Object.fromEntries(
     SURFACE_MOISTURE_SOURCE_TRACERS.map(({ field }) => [field, makeArray(SZ)])
   );
@@ -169,6 +205,42 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
     carryOverUpperCloudEnteringByBandMass,
     carryOverUpperCloudSurvivingByBandMass,
     prevUpperCloudBandMass,
+    upperCloudResidenceTimeSeconds,
+    upperCloudTimeSinceLocalBirthSeconds,
+    upperCloudTimeSinceImportSeconds,
+    upperCloudFreshBornMass,
+    upperCloudRecentlyImportedMass,
+    upperCloudStaleMass,
+    upperCloudPassiveSurvivalMass,
+    upperCloudRegenerationMass,
+    upperCloudOscillatoryMass,
+    upperCloudPotentialErosionMass,
+    upperCloudAppliedErosionMass,
+    upperCloudBlockedErosionMass,
+    upperCloudBlockedByWeakSubsidenceMass,
+    upperCloudBlockedByWeakDescentVentMass,
+    upperCloudBlockedByLocalSupportMass,
+    upperCloudResidenceTimeMassWeightedSeconds,
+    upperCloudTimeSinceLocalBirthMassWeightedSeconds,
+    upperCloudTimeSinceImportMassWeightedSeconds,
+    upperCloudFreshBornAccumMass,
+    upperCloudRecentlyImportedAccumMass,
+    upperCloudStaleAccumMass,
+    upperCloudPassiveSurvivalAccumMass,
+    upperCloudRegenerationAccumMass,
+    upperCloudOscillatoryAccumMass,
+    upperCloudPotentialErosionAccumMass,
+    upperCloudAppliedErosionAccumMass,
+    upperCloudBlockedErosionAccumMass,
+    upperCloudBlockedByWeakSubsidenceAccumMass,
+    upperCloudBlockedByWeakDescentVentAccumMass,
+    upperCloudBlockedByLocalSupportAccumMass,
+    upperCloudPotentialErosionByBandMass,
+    upperCloudAppliedErosionByBandMass,
+    upperCloudBlockedErosionByBandMass,
+    upperCloudShortwaveAbsorptionWm2,
+    upperCloudLongwaveRelaxationBoost,
+    upperCloudRadiativePersistenceSupportWm2,
     ...sourceTracer3D,
     surfaceEvapPotentialRate,
     surfaceEvapTransferCoeff,

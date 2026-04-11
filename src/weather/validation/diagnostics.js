@@ -756,6 +756,172 @@ const buildVerticalCloudBirthTracing = (state, grid) => {
   };
 };
 
+const buildUpperCloudResidenceTracing = (state, grid, transportTracing = null) => {
+  if (!state?.upperCloudResidenceTimeSeconds || !grid) return null;
+  const { nx, ny } = grid;
+  const latitudesDeg = Array.from(grid.latDeg || []);
+  const rowWeights = makeRowWeights(latitudesDeg);
+  const stateLandMask = Array.from(state.landMask || new Uint8Array(state.N));
+  const upperCloudPath = arrayOrZeros(state.upperCloudPath, state.N);
+  const residenceSeconds = arrayOrZeros(state.upperCloudResidenceTimeSeconds, state.N);
+  const localBirthSeconds = arrayOrZeros(state.upperCloudTimeSinceLocalBirthSeconds, state.N);
+  const importSeconds = arrayOrZeros(state.upperCloudTimeSinceImportSeconds, state.N);
+  const freshBornMass = arrayOrZeros(state.upperCloudFreshBornMass, state.N);
+  const recentlyImportedMass = arrayOrZeros(state.upperCloudRecentlyImportedMass, state.N);
+  const staleMass = arrayOrZeros(state.upperCloudStaleMass, state.N);
+  const passiveSurvivalMass = arrayOrZeros(state.upperCloudPassiveSurvivalMass, state.N);
+  const regenerationMass = arrayOrZeros(state.upperCloudRegenerationMass, state.N);
+  const oscillatoryMass = arrayOrZeros(state.upperCloudOscillatoryMass, state.N);
+  const potentialErosionMass = arrayOrZeros(state.upperCloudPotentialErosionMass, state.N);
+  const appliedErosionMass = arrayOrZeros(state.upperCloudAppliedErosionMass, state.N);
+  const blockedErosionMass = arrayOrZeros(state.upperCloudBlockedErosionMass, state.N);
+  const blockedByWeakSubsidenceMass = arrayOrZeros(state.upperCloudBlockedByWeakSubsidenceMass, state.N);
+  const blockedByWeakDescentVentMass = arrayOrZeros(state.upperCloudBlockedByWeakDescentVentMass, state.N);
+  const blockedByLocalSupportMass = arrayOrZeros(state.upperCloudBlockedByLocalSupportMass, state.N);
+  const radiativeSupport = arrayOrZeros(state.upperCloudRadiativePersistenceSupportWm2, state.N);
+  const shortwaveAbsorption = arrayOrZeros(state.upperCloudShortwaveAbsorptionWm2, state.N);
+  const longwaveRelaxationBoost = arrayOrZeros(state.upperCloudLongwaveRelaxationBoost, state.N);
+
+  const northUpperCloudPathMeanKgM2 = weightedFieldBandMean(upperCloudPath, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northFreshMeanKgM2 = weightedFieldBandMean(freshBornMass, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northRecentImportedMeanKgM2 = weightedFieldBandMean(recentlyImportedMass, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northStaleMeanKgM2 = weightedFieldBandMean(staleMass, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northPotentialErosionMeanKgM2 = weightedFieldBandMean(potentialErosionMass, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northAppliedErosionMeanKgM2 = weightedFieldBandMean(appliedErosionMass, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northBlockedErosionMeanKgM2 = weightedFieldBandMean(blockedErosionMass, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northPassiveMeanKgM2 = weightedFieldBandMean(passiveSurvivalMass, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northRegenerationMeanKgM2 = weightedFieldBandMean(regenerationMass, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northOscillatoryMeanKgM2 = weightedFieldBandMean(oscillatoryMass, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northResidenceMeanDays = weightedFieldBandMean(residenceSeconds, nx, ny, latitudesDeg, rowWeights, 15, 35) / 86400;
+  const northTimeSinceLocalBirthMeanDays = weightedFieldBandMean(localBirthSeconds, nx, ny, latitudesDeg, rowWeights, 15, 35) / 86400;
+  const northTimeSinceImportMeanDays = weightedFieldBandMean(importSeconds, nx, ny, latitudesDeg, rowWeights, 15, 35) / 86400;
+  const northRadiativeSupportMeanWm2 = weightedFieldBandMean(radiativeSupport, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northUpperCloudSwAbsorptionMeanWm2 = weightedFieldBandMean(shortwaveAbsorption, nx, ny, latitudesDeg, rowWeights, 15, 35);
+  const northUpperCloudLwBoostMean = weightedFieldBandMean(longwaveRelaxationBoost, nx, ny, latitudesDeg, rowWeights, 15, 35);
+
+  const northClassifiedFrac = northUpperCloudPathMeanKgM2 > EPS
+    ? (northFreshMeanKgM2 + northRecentImportedMeanKgM2 + northStaleMeanKgM2) / northUpperCloudPathMeanKgM2
+    : 0;
+  const northFreshFrac = northUpperCloudPathMeanKgM2 > EPS ? northFreshMeanKgM2 / northUpperCloudPathMeanKgM2 : 0;
+  const northRecentImportedFrac = northUpperCloudPathMeanKgM2 > EPS ? northRecentImportedMeanKgM2 / northUpperCloudPathMeanKgM2 : 0;
+  const northStaleFrac = northUpperCloudPathMeanKgM2 > EPS ? northStaleMeanKgM2 / northUpperCloudPathMeanKgM2 : 0;
+  const northAppliedErosionFrac = northPotentialErosionMeanKgM2 > EPS ? northAppliedErosionMeanKgM2 / northPotentialErosionMeanKgM2 : 0;
+  const northBlockedErosionFrac = northPotentialErosionMeanKgM2 > EPS ? northBlockedErosionMeanKgM2 / northPotentialErosionMeanKgM2 : 0;
+
+  const regimeAccumTotal = weightedFieldBandMean(
+    arrayOrZeros(state.upperCloudPassiveSurvivalAccumMass, state.N).map((value, index) => (
+      value
+      + (state.upperCloudRegenerationAccumMass?.[index] || 0)
+      + (state.upperCloudOscillatoryAccumMass?.[index] || 0)
+    )),
+    nx,
+    ny,
+    latitudesDeg,
+    rowWeights,
+    15,
+    35
+  );
+  const regimePersistence = {
+    passiveSurvivalFrac: regimeAccumTotal > EPS
+      ? Number((weightedFieldBandMean(arrayOrZeros(state.upperCloudPassiveSurvivalAccumMass, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35) / regimeAccumTotal).toFixed(5))
+      : 0,
+    regenerationFrac: regimeAccumTotal > EPS
+      ? Number((weightedFieldBandMean(arrayOrZeros(state.upperCloudRegenerationAccumMass, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35) / regimeAccumTotal).toFixed(5))
+      : 0,
+    oscillatoryFrac: regimeAccumTotal > EPS
+      ? Number((weightedFieldBandMean(arrayOrZeros(state.upperCloudOscillatoryAccumMass, state.N), nx, ny, latitudesDeg, rowWeights, 15, 35) / regimeAccumTotal).toFixed(5))
+      : 0
+  };
+
+  const erosionByLevelBand = Object.fromEntries(
+    CLOUD_BIRTH_LEVEL_BANDS.map((band, bandIndex) => {
+      const base = bandIndex * state.N;
+      const potentialField = arrayOrZeros(state.upperCloudPotentialErosionByBandMass?.subarray?.(base, base + state.N), state.N);
+      const appliedField = arrayOrZeros(state.upperCloudAppliedErosionByBandMass?.subarray?.(base, base + state.N), state.N);
+      const blockedField = arrayOrZeros(state.upperCloudBlockedErosionByBandMass?.subarray?.(base, base + state.N), state.N);
+      const potentialMean = weightedFieldBandMean(potentialField, nx, ny, latitudesDeg, rowWeights, 15, 35);
+      const appliedMean = weightedFieldBandMean(appliedField, nx, ny, latitudesDeg, rowWeights, 15, 35);
+      const blockedMean = weightedFieldBandMean(blockedField, nx, ny, latitudesDeg, rowWeights, 15, 35);
+      return [band.key, {
+        label: band.label,
+        potentialErosionMeanKgM2: Number(potentialMean.toFixed(5)),
+        appliedErosionMeanKgM2: Number(appliedMean.toFixed(5)),
+        blockedErosionMeanKgM2: Number(blockedMean.toFixed(5)),
+        appliedFrac: potentialMean > EPS ? Number((appliedMean / potentialMean).toFixed(5)) : 0,
+        blockedFrac: potentialMean > EPS ? Number((blockedMean / potentialMean).toFixed(5)) : 0
+      }];
+    })
+  );
+
+  const dominantCloudImport = ((transportTracing?.interfaces || []).find((entry) => Number(entry?.targetLatDeg) === 35)?.levelBands?.upperTroposphere) || null;
+  const upperCloudVentilation = {
+    dominantImportInterfaceTargetLatDeg: 35,
+    north35UpperTroposphereCloudFluxNorthKgM_1S: dominantCloudImport ? Number((dominantCloudImport.cloudFluxNorthKgM_1S || 0).toFixed(5)) : null,
+    north35UpperTroposphereImportMagnitudeKgM_1S: dominantCloudImport
+      ? Number(Math.max(0, -(dominantCloudImport.cloudFluxNorthKgM_1S || 0)).toFixed(5))
+      : null,
+    northDryBeltRadiativePersistenceSupportMeanWm2: Number(northRadiativeSupportMeanWm2.toFixed(5)),
+    northDryBeltUpperCloudShortwaveAbsorptionMeanWm2: Number(northUpperCloudSwAbsorptionMeanWm2.toFixed(5)),
+    northDryBeltUpperCloudLongwaveRelaxationBoostMean: Number(northUpperCloudLwBoostMean.toFixed(5)),
+    northDryBeltAppliedErosionFrac: Number(northAppliedErosionFrac.toFixed(5)),
+    northDryBeltBlockedErosionFrac: Number(northBlockedErosionFrac.toFixed(5))
+  };
+
+  const rootCauseAssessment = { ruledIn: [], ruledOut: [], ambiguous: [] };
+  if (northStaleFrac >= 0.5 && northAppliedErosionFrac <= 0.2) {
+    rootCauseAssessment.ruledIn.push('NH dry-belt upper cloud is dominated by older imported/stale cloud with weak effective erosion.');
+  } else {
+    rootCauseAssessment.ambiguous.push('NH dry-belt upper cloud is not yet dominated by a single stale-cloud regime.');
+  }
+  if (regimePersistence.passiveSurvivalFrac > regimePersistence.regenerationFrac * 1.25) {
+    rootCauseAssessment.ruledIn.push('Passive survival is more important than repeated local regeneration.');
+  } else if (regimePersistence.regenerationFrac > regimePersistence.passiveSurvivalFrac * 1.25) {
+    rootCauseAssessment.ruledIn.push('Repeated regeneration remains competitive with passive survival.');
+  } else {
+    rootCauseAssessment.ambiguous.push('Passive survival and regeneration remain comparable.');
+  }
+  if (northBlockedErosionMeanKgM2 > northAppliedErosionMeanKgM2 * 1.25) {
+    rootCauseAssessment.ruledIn.push('Blocked erosion outweighs applied erosion in the NH dry belt.');
+  }
+  if (northRadiativeSupportMeanWm2 <= 0.5) {
+    rootCauseAssessment.ruledOut.push('Strong radiative maintenance is not obviously the main persistence mechanism in the NH dry belt.');
+  } else {
+    rootCauseAssessment.ambiguous.push('Radiative support may still be reinforcing persistence and should be checked against Phase 6.');
+  }
+
+  return {
+    schema: 'satellite-wars.upper-cloud-residence-tracing.v1',
+    ageAttribution: {
+      northDryBeltResidenceMeanDays: Number(northResidenceMeanDays.toFixed(5)),
+      northDryBeltTimeSinceLocalBirthMeanDays: Number(northTimeSinceLocalBirthMeanDays.toFixed(5)),
+      northDryBeltTimeSinceImportMeanDays: Number(northTimeSinceImportMeanDays.toFixed(5)),
+      northDryBeltUpperCloudPathMeanKgM2: Number(northUpperCloudPathMeanKgM2.toFixed(5)),
+      northDryBeltFreshBornFrac: Number(northFreshFrac.toFixed(5)),
+      northDryBeltRecentlyImportedFrac: Number(northRecentImportedFrac.toFixed(5)),
+      northDryBeltStaleFrac: Number(northStaleFrac.toFixed(5)),
+      northDryBeltClassifiedFrac: Number(northClassifiedFrac.toFixed(5)),
+      northDryBeltLandResidenceMeanDays: Number((weightedFieldBandMean(residenceSeconds, nx, ny, latitudesDeg, rowWeights, 15, 35, stateLandMask, 'land') / 86400).toFixed(5)),
+      northDryBeltOceanResidenceMeanDays: Number((weightedFieldBandMean(residenceSeconds, nx, ny, latitudesDeg, rowWeights, 15, 35, stateLandMask, 'ocean') / 86400).toFixed(5))
+    },
+    erosionBudget: {
+      northDryBeltPotentialErosionMeanKgM2: Number(northPotentialErosionMeanKgM2.toFixed(5)),
+      northDryBeltAppliedErosionMeanKgM2: Number(northAppliedErosionMeanKgM2.toFixed(5)),
+      northDryBeltBlockedErosionMeanKgM2: Number(northBlockedErosionMeanKgM2.toFixed(5)),
+      northDryBeltBlockedByWeakSubsidenceMeanKgM2: Number(weightedFieldBandMean(blockedByWeakSubsidenceMass, nx, ny, latitudesDeg, rowWeights, 15, 35).toFixed(5)),
+      northDryBeltBlockedByWeakDescentVentMeanKgM2: Number(weightedFieldBandMean(blockedByWeakDescentVentMass, nx, ny, latitudesDeg, rowWeights, 15, 35).toFixed(5)),
+      northDryBeltBlockedByLocalSupportMeanKgM2: Number(weightedFieldBandMean(blockedByLocalSupportMass, nx, ny, latitudesDeg, rowWeights, 15, 35).toFixed(5)),
+      northDryBeltAppliedErosionFrac: Number(northAppliedErosionFrac.toFixed(5)),
+      northDryBeltBlockedErosionFrac: Number(northBlockedErosionFrac.toFixed(5)),
+      levelBands: erosionByLevelBand
+    },
+    ventilation: {
+      ...upperCloudVentilation,
+      regimePersistence
+    },
+    rootCauseAssessment
+  };
+};
+
 export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PRESSURE_LEVELS_PA } = {}) {
   const grid = core?.grid;
   const state = core?.state;
@@ -774,6 +940,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
   const lowLevelVaporPath = computeLayerFieldPathKgM2(state, state.qv, 0.65, 1.0);
   const transportTracing = buildTransportTracing(state, grid);
   const verticalCloudBirthTracing = buildVerticalCloudBirthTracing(state, grid);
+  const upperCloudResidenceTracing = buildUpperCloudResidenceTracing(state, grid, transportTracing);
   const lowLevelSourceResidual = lowLevelVaporPath.map((value, index) => {
     let attributed = 0;
     for (const tracer of Object.values(lowLevelSourceTracers)) attributed += tracer[index] || 0;
@@ -858,6 +1025,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     weakErosionCloudSurvivalMassKgM2: arrayOrZeros(state.weakErosionCloudSurvivalMass, state.N),
     transportTracing,
     verticalCloudBirthTracing,
+    upperCloudResidenceTracing,
     lowLevelMoistureSourceTracersKgM2: {
       ...lowLevelSourceTracers,
       unattributedResidual: lowLevelSourceResidual

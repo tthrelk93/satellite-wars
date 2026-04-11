@@ -176,6 +176,10 @@ test('stepVertical5 tracks imported upper-cloud persistence when cloud lingers w
   assert.ok(state.weakErosionCloudSurvivalMass[0] > 0);
   assert.ok(state.carryOverUpperCloudEnteringAccumMass[0] > 0);
   assert.ok(state.carryOverUpperCloudSurvivingAccumMass[0] > 0);
+  assert.ok(state.upperCloudResidenceTimeSeconds[0] > 0);
+  assert.ok(state.upperCloudTimeSinceImportSeconds[0] > 0);
+  assert.ok(state.upperCloudPotentialErosionAccumMass[0] >= state.upperCloudAppliedErosionAccumMass[0]);
+  assert.ok(state.upperCloudBlockedErosionAccumMass[0] >= 0);
   assert.ok(Array.from(state.carryOverUpperCloudEnteringByBandMass).some((value) => value > 0));
   assert.ok(Array.from(state.carryOverUpperCloudSurvivingByBandMass).some((value) => value > 0));
 });

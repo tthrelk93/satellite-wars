@@ -304,6 +304,11 @@ Exit criteria:
 
 ## Phase 5: Upper-Cloud Residency, Ventilation, And Erosion Diagnostics
 
+Status:
+- complete with the Phase 5 upper-cloud residence / erosion instrumentation pass
+- current evidence says the NH dry belt is dominated by stale imported upper cloud with very weak applied erosion, not repeated local regeneration
+- the strongest remaining ambiguity is whether radiative support is materially reinforcing that persistence, so `Phase 6` stays important
+
 Objective:
 - determine whether the problem is not cloud birth, but failure to remove or ventilate upper cloud after arrival
 
@@ -346,6 +351,12 @@ Exit criteria:
   - freshly born
   - recently imported
   - long-lived stale cloud
+
+Observed Phase 5 result:
+- NH dry-belt stale fraction is now measurable and dominant
+- blocked erosion outweighs applied erosion by a very large margin
+- passive survival clearly outweighs repeated regeneration
+- next phase priority stays `Phase 6`, with `Phase 8` still promoted soon after because the persistent import corridor is ocean-side and upper-tropospheric
 
 ## Phase 6: Thermodynamic And Radiative Support Diagnostics
 

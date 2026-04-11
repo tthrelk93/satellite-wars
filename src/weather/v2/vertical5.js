@@ -233,6 +233,45 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.prevUpperCloudBandMass || state.prevUpperCloudBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
     state.prevUpperCloudBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   }
+  if (!state.upperCloudResidenceTimeSeconds || state.upperCloudResidenceTimeSeconds.length !== N) state.upperCloudResidenceTimeSeconds = new Float32Array(N);
+  if (!state.upperCloudTimeSinceLocalBirthSeconds || state.upperCloudTimeSinceLocalBirthSeconds.length !== N) state.upperCloudTimeSinceLocalBirthSeconds = new Float32Array(N);
+  if (!state.upperCloudTimeSinceImportSeconds || state.upperCloudTimeSinceImportSeconds.length !== N) state.upperCloudTimeSinceImportSeconds = new Float32Array(N);
+  if (!state.upperCloudFreshBornMass || state.upperCloudFreshBornMass.length !== N) state.upperCloudFreshBornMass = new Float32Array(N);
+  if (!state.upperCloudRecentlyImportedMass || state.upperCloudRecentlyImportedMass.length !== N) state.upperCloudRecentlyImportedMass = new Float32Array(N);
+  if (!state.upperCloudStaleMass || state.upperCloudStaleMass.length !== N) state.upperCloudStaleMass = new Float32Array(N);
+  if (!state.upperCloudPassiveSurvivalMass || state.upperCloudPassiveSurvivalMass.length !== N) state.upperCloudPassiveSurvivalMass = new Float32Array(N);
+  if (!state.upperCloudRegenerationMass || state.upperCloudRegenerationMass.length !== N) state.upperCloudRegenerationMass = new Float32Array(N);
+  if (!state.upperCloudOscillatoryMass || state.upperCloudOscillatoryMass.length !== N) state.upperCloudOscillatoryMass = new Float32Array(N);
+  if (!state.upperCloudPotentialErosionMass || state.upperCloudPotentialErosionMass.length !== N) state.upperCloudPotentialErosionMass = new Float32Array(N);
+  if (!state.upperCloudAppliedErosionMass || state.upperCloudAppliedErosionMass.length !== N) state.upperCloudAppliedErosionMass = new Float32Array(N);
+  if (!state.upperCloudBlockedErosionMass || state.upperCloudBlockedErosionMass.length !== N) state.upperCloudBlockedErosionMass = new Float32Array(N);
+  if (!state.upperCloudBlockedByWeakSubsidenceMass || state.upperCloudBlockedByWeakSubsidenceMass.length !== N) state.upperCloudBlockedByWeakSubsidenceMass = new Float32Array(N);
+  if (!state.upperCloudBlockedByWeakDescentVentMass || state.upperCloudBlockedByWeakDescentVentMass.length !== N) state.upperCloudBlockedByWeakDescentVentMass = new Float32Array(N);
+  if (!state.upperCloudBlockedByLocalSupportMass || state.upperCloudBlockedByLocalSupportMass.length !== N) state.upperCloudBlockedByLocalSupportMass = new Float32Array(N);
+  if (!state.upperCloudResidenceTimeMassWeightedSeconds || state.upperCloudResidenceTimeMassWeightedSeconds.length !== N) state.upperCloudResidenceTimeMassWeightedSeconds = new Float32Array(N);
+  if (!state.upperCloudTimeSinceLocalBirthMassWeightedSeconds || state.upperCloudTimeSinceLocalBirthMassWeightedSeconds.length !== N) state.upperCloudTimeSinceLocalBirthMassWeightedSeconds = new Float32Array(N);
+  if (!state.upperCloudTimeSinceImportMassWeightedSeconds || state.upperCloudTimeSinceImportMassWeightedSeconds.length !== N) state.upperCloudTimeSinceImportMassWeightedSeconds = new Float32Array(N);
+  if (!state.upperCloudFreshBornAccumMass || state.upperCloudFreshBornAccumMass.length !== N) state.upperCloudFreshBornAccumMass = new Float32Array(N);
+  if (!state.upperCloudRecentlyImportedAccumMass || state.upperCloudRecentlyImportedAccumMass.length !== N) state.upperCloudRecentlyImportedAccumMass = new Float32Array(N);
+  if (!state.upperCloudStaleAccumMass || state.upperCloudStaleAccumMass.length !== N) state.upperCloudStaleAccumMass = new Float32Array(N);
+  if (!state.upperCloudPassiveSurvivalAccumMass || state.upperCloudPassiveSurvivalAccumMass.length !== N) state.upperCloudPassiveSurvivalAccumMass = new Float32Array(N);
+  if (!state.upperCloudRegenerationAccumMass || state.upperCloudRegenerationAccumMass.length !== N) state.upperCloudRegenerationAccumMass = new Float32Array(N);
+  if (!state.upperCloudOscillatoryAccumMass || state.upperCloudOscillatoryAccumMass.length !== N) state.upperCloudOscillatoryAccumMass = new Float32Array(N);
+  if (!state.upperCloudPotentialErosionAccumMass || state.upperCloudPotentialErosionAccumMass.length !== N) state.upperCloudPotentialErosionAccumMass = new Float32Array(N);
+  if (!state.upperCloudAppliedErosionAccumMass || state.upperCloudAppliedErosionAccumMass.length !== N) state.upperCloudAppliedErosionAccumMass = new Float32Array(N);
+  if (!state.upperCloudBlockedErosionAccumMass || state.upperCloudBlockedErosionAccumMass.length !== N) state.upperCloudBlockedErosionAccumMass = new Float32Array(N);
+  if (!state.upperCloudBlockedByWeakSubsidenceAccumMass || state.upperCloudBlockedByWeakSubsidenceAccumMass.length !== N) state.upperCloudBlockedByWeakSubsidenceAccumMass = new Float32Array(N);
+  if (!state.upperCloudBlockedByWeakDescentVentAccumMass || state.upperCloudBlockedByWeakDescentVentAccumMass.length !== N) state.upperCloudBlockedByWeakDescentVentAccumMass = new Float32Array(N);
+  if (!state.upperCloudBlockedByLocalSupportAccumMass || state.upperCloudBlockedByLocalSupportAccumMass.length !== N) state.upperCloudBlockedByLocalSupportAccumMass = new Float32Array(N);
+  if (!state.upperCloudPotentialErosionByBandMass || state.upperCloudPotentialErosionByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.upperCloudPotentialErosionByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
+  if (!state.upperCloudAppliedErosionByBandMass || state.upperCloudAppliedErosionByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.upperCloudAppliedErosionByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
+  if (!state.upperCloudBlockedErosionByBandMass || state.upperCloudBlockedErosionByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.upperCloudBlockedErosionByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
   const convMask = state.convMask;
   const convectivePotential = state.convectivePotential;
   const convectiveOrganization = state.convectiveOrganization;
@@ -259,6 +298,39 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const carryOverUpperCloudEnteringByBandMass = state.carryOverUpperCloudEnteringByBandMass;
   const carryOverUpperCloudSurvivingByBandMass = state.carryOverUpperCloudSurvivingByBandMass;
   const prevUpperCloudBandMass = state.prevUpperCloudBandMass;
+  const upperCloudResidenceTimeSeconds = state.upperCloudResidenceTimeSeconds;
+  const upperCloudTimeSinceLocalBirthSeconds = state.upperCloudTimeSinceLocalBirthSeconds;
+  const upperCloudTimeSinceImportSeconds = state.upperCloudTimeSinceImportSeconds;
+  const upperCloudFreshBornMass = state.upperCloudFreshBornMass;
+  const upperCloudRecentlyImportedMass = state.upperCloudRecentlyImportedMass;
+  const upperCloudStaleMass = state.upperCloudStaleMass;
+  const upperCloudPassiveSurvivalMass = state.upperCloudPassiveSurvivalMass;
+  const upperCloudRegenerationMass = state.upperCloudRegenerationMass;
+  const upperCloudOscillatoryMass = state.upperCloudOscillatoryMass;
+  const upperCloudPotentialErosionMass = state.upperCloudPotentialErosionMass;
+  const upperCloudAppliedErosionMass = state.upperCloudAppliedErosionMass;
+  const upperCloudBlockedErosionMass = state.upperCloudBlockedErosionMass;
+  const upperCloudBlockedByWeakSubsidenceMass = state.upperCloudBlockedByWeakSubsidenceMass;
+  const upperCloudBlockedByWeakDescentVentMass = state.upperCloudBlockedByWeakDescentVentMass;
+  const upperCloudBlockedByLocalSupportMass = state.upperCloudBlockedByLocalSupportMass;
+  const upperCloudResidenceTimeMassWeightedSeconds = state.upperCloudResidenceTimeMassWeightedSeconds;
+  const upperCloudTimeSinceLocalBirthMassWeightedSeconds = state.upperCloudTimeSinceLocalBirthMassWeightedSeconds;
+  const upperCloudTimeSinceImportMassWeightedSeconds = state.upperCloudTimeSinceImportMassWeightedSeconds;
+  const upperCloudFreshBornAccumMass = state.upperCloudFreshBornAccumMass;
+  const upperCloudRecentlyImportedAccumMass = state.upperCloudRecentlyImportedAccumMass;
+  const upperCloudStaleAccumMass = state.upperCloudStaleAccumMass;
+  const upperCloudPassiveSurvivalAccumMass = state.upperCloudPassiveSurvivalAccumMass;
+  const upperCloudRegenerationAccumMass = state.upperCloudRegenerationAccumMass;
+  const upperCloudOscillatoryAccumMass = state.upperCloudOscillatoryAccumMass;
+  const upperCloudPotentialErosionAccumMass = state.upperCloudPotentialErosionAccumMass;
+  const upperCloudAppliedErosionAccumMass = state.upperCloudAppliedErosionAccumMass;
+  const upperCloudBlockedErosionAccumMass = state.upperCloudBlockedErosionAccumMass;
+  const upperCloudBlockedByWeakSubsidenceAccumMass = state.upperCloudBlockedByWeakSubsidenceAccumMass;
+  const upperCloudBlockedByWeakDescentVentAccumMass = state.upperCloudBlockedByWeakDescentVentAccumMass;
+  const upperCloudBlockedByLocalSupportAccumMass = state.upperCloudBlockedByLocalSupportAccumMass;
+  const upperCloudPotentialErosionByBandMass = state.upperCloudPotentialErosionByBandMass;
+  const upperCloudAppliedErosionByBandMass = state.upperCloudAppliedErosionByBandMass;
+  const upperCloudBlockedErosionByBandMass = state.upperCloudBlockedErosionByBandMass;
   convMask.fill(0);
   convectiveMassFlux.fill(0);
   convectiveDetrainmentMass.fill(0);
@@ -274,6 +346,18 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   importedAnvilPersistenceMass.fill(0);
   carriedOverUpperCloudMass.fill(0);
   weakErosionCloudSurvivalMass.fill(0);
+  upperCloudFreshBornMass.fill(0);
+  upperCloudRecentlyImportedMass.fill(0);
+  upperCloudStaleMass.fill(0);
+  upperCloudPassiveSurvivalMass.fill(0);
+  upperCloudRegenerationMass.fill(0);
+  upperCloudOscillatoryMass.fill(0);
+  upperCloudPotentialErosionMass.fill(0);
+  upperCloudAppliedErosionMass.fill(0);
+  upperCloudBlockedErosionMass.fill(0);
+  upperCloudBlockedByWeakSubsidenceMass.fill(0);
+  upperCloudBlockedByWeakDescentVentMass.fill(0);
+  upperCloudBlockedByLocalSupportMass.fill(0);
 
   if (!state.terrainFlowForcing || state.terrainFlowForcing.length !== N) {
     state.terrainFlowForcing = new Float32Array(N);
@@ -1152,6 +1236,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       upperCloudBandMass[bandIndex] += layerCloudMass;
     }
     upperCloudPath[k] = upperCloudMass;
+    const previousUpperCloudMass = prevUpperCloudPath[k] || 0;
     const overlap = Math.min(prevUpperCloudPath[k] || 0, upperCloudMass);
     carriedOverUpperCloudMass[k] = overlap;
     const weakLocalOrganization = 1 - smoothstep(0.12, 0.42, convectiveOrganization[k]);
@@ -1175,6 +1260,70 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       0.2 * weakLocalAnvilSource
     );
     importedAnvilPersistenceMass[k] = overlap * persistenceSupport;
+    const localBirthMass = Math.max(0, upperCloudMass - overlap);
+    const previousResidenceSeconds = upperCloudResidenceTimeSeconds[k] || 0;
+    const previousLocalBirthSeconds = upperCloudTimeSinceLocalBirthSeconds[k] || 0;
+    const previousImportSeconds = upperCloudTimeSinceImportSeconds[k] || 0;
+    const nextResidenceSeconds = upperCloudMass > 0
+      ? (overlap * (previousResidenceSeconds + dt) + localBirthMass * 0) / upperCloudMass
+      : 0;
+    const nextLocalBirthSeconds = upperCloudMass > 0
+      ? (overlap * (previousLocalBirthSeconds + dt) + localBirthMass * 0) / upperCloudMass
+      : 0;
+    const nextImportSeconds = overlap > 0 ? previousImportSeconds + dt : 0;
+    upperCloudResidenceTimeSeconds[k] = nextResidenceSeconds;
+    upperCloudTimeSinceLocalBirthSeconds[k] = nextLocalBirthSeconds;
+    upperCloudTimeSinceImportSeconds[k] = nextImportSeconds;
+    upperCloudResidenceTimeMassWeightedSeconds[k] += upperCloudMass * nextResidenceSeconds;
+    upperCloudTimeSinceLocalBirthMassWeightedSeconds[k] += upperCloudMass * nextLocalBirthSeconds;
+    upperCloudTimeSinceImportMassWeightedSeconds[k] += overlap * nextImportSeconds;
+    const recentlyImportedThresholdSeconds = 36 * 3600;
+    const recentlyImportedMass = overlap > 0 && nextImportSeconds <= recentlyImportedThresholdSeconds ? overlap : 0;
+    const staleMass = Math.max(0, upperCloudMass - localBirthMass - recentlyImportedMass);
+    upperCloudFreshBornMass[k] = localBirthMass;
+    upperCloudRecentlyImportedMass[k] = recentlyImportedMass;
+    upperCloudStaleMass[k] = staleMass;
+    upperCloudFreshBornAccumMass[k] += localBirthMass;
+    upperCloudRecentlyImportedAccumMass[k] += recentlyImportedMass;
+    upperCloudStaleAccumMass[k] += staleMass;
+    const appliedErosionMass = Math.max(0, previousUpperCloudMass - overlap);
+    const potentialErosionMass = previousUpperCloudMass;
+    const blockedErosionMass = Math.max(0, potentialErosionMass - appliedErosionMass);
+    upperCloudPotentialErosionMass[k] = potentialErosionMass;
+    upperCloudAppliedErosionMass[k] = appliedErosionMass;
+    upperCloudBlockedErosionMass[k] = blockedErosionMass;
+    upperCloudPotentialErosionAccumMass[k] += potentialErosionMass;
+    upperCloudAppliedErosionAccumMass[k] += appliedErosionMass;
+    upperCloudBlockedErosionAccumMass[k] += blockedErosionMass;
+    const weakLocalSupport = clamp01(
+      0.2 * weakLocalOrganization +
+      0.1 * weakLocalMassFlux +
+      0.05 * weakLocalAnvilSource
+    );
+    const supportTotal = Math.max(
+      eps,
+      0.4 * weakSubsidenceErosion + 0.25 * weakDescentVent + weakLocalSupport
+    );
+    const blockedByWeakSubsidence = blockedErosionMass * (0.4 * weakSubsidenceErosion) / supportTotal;
+    const blockedByWeakDescentVent = blockedErosionMass * (0.25 * weakDescentVent) / supportTotal;
+    const blockedByLocalSupport = blockedErosionMass * weakLocalSupport / supportTotal;
+    upperCloudBlockedByWeakSubsidenceMass[k] = blockedByWeakSubsidence;
+    upperCloudBlockedByWeakDescentVentMass[k] = blockedByWeakDescentVent;
+    upperCloudBlockedByLocalSupportMass[k] = blockedByLocalSupport;
+    upperCloudBlockedByWeakSubsidenceAccumMass[k] += blockedByWeakSubsidence;
+    upperCloudBlockedByWeakDescentVentAccumMass[k] += blockedByWeakDescentVent;
+    upperCloudBlockedByLocalSupportAccumMass[k] += blockedByLocalSupport;
+    const passiveSurvivalMass = overlap > 0 && localBirthMass <= upperCloudMass * 0.1 ? overlap : 0;
+    const regenerationMass = overlap > 0 && localBirthMass > upperCloudMass * 0.1 ? localBirthMass : 0;
+    const oscillatoryMass = overlap > 0 && localBirthMass > upperCloudMass * 0.05 && appliedErosionMass > potentialErosionMass * 0.05
+      ? Math.min(overlap, localBirthMass)
+      : 0;
+    upperCloudPassiveSurvivalMass[k] = passiveSurvivalMass;
+    upperCloudRegenerationMass[k] = regenerationMass;
+    upperCloudOscillatoryMass[k] = oscillatoryMass;
+    upperCloudPassiveSurvivalAccumMass[k] += passiveSurvivalMass;
+    upperCloudRegenerationAccumMass[k] += regenerationMass;
+    upperCloudOscillatoryAccumMass[k] += oscillatoryMass;
     let enteringMass = 0;
     let survivingMass = 0;
     for (let bandIndex = 0; bandIndex < CLOUD_BIRTH_LEVEL_BAND_COUNT; bandIndex += 1) {
@@ -1182,6 +1331,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const previousMass = prevUpperCloudBandMass[offset] || 0;
       const currentMass = upperCloudBandMass[bandIndex] || 0;
       const bandOverlap = Math.min(previousMass, currentMass);
+      const bandAppliedErosionMass = Math.max(0, previousMass - bandOverlap);
+      const bandBlockedErosionMass = Math.max(0, previousMass - bandAppliedErosionMass);
+      upperCloudPotentialErosionByBandMass[offset] += previousMass;
+      upperCloudAppliedErosionByBandMass[offset] += bandAppliedErosionMass;
+      upperCloudBlockedErosionByBandMass[offset] += bandBlockedErosionMass;
       if (previousMass > 0) {
         carryOverUpperCloudEnteringByBandMass[offset] += previousMass;
         enteringMass += previousMass;

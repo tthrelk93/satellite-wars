@@ -55,6 +55,18 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
     cloudFrac3D,
     cloudTau3D
   } = state;
+  if (!state.upperCloudShortwaveAbsorptionWm2 || state.upperCloudShortwaveAbsorptionWm2.length !== N) {
+    state.upperCloudShortwaveAbsorptionWm2 = new Float32Array(N);
+  }
+  if (!state.upperCloudLongwaveRelaxationBoost || state.upperCloudLongwaveRelaxationBoost.length !== N) {
+    state.upperCloudLongwaveRelaxationBoost = new Float32Array(N);
+  }
+  if (!state.upperCloudRadiativePersistenceSupportWm2 || state.upperCloudRadiativePersistenceSupportWm2.length !== N) {
+    state.upperCloudRadiativePersistenceSupportWm2 = new Float32Array(N);
+  }
+  state.upperCloudShortwaveAbsorptionWm2.fill(0);
+  state.upperCloudLongwaveRelaxationBoost.fill(0);
+  state.upperCloudRadiativePersistenceSupportWm2.fill(0);
 
   const dayOfYear = (timeUTC / 86400) % 365;
   const levLowB = nz - 1;
@@ -89,6 +101,9 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
       let tauCloudTotal = 0;
       let cloudCoverTotal = 0;
       let runningTauAbove = 0;
+      let upperSwAbsLayerSum = 0;
+      let upperLwBoostWeightedSum = 0;
+      let upperLwBoostWeight = 0;
       for (let lev = 0; lev < nz; lev++) {
         const idx = lev * N + k;
         const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
@@ -133,6 +148,12 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
         const lwCloudBoost = enableFullColumnLW
           ? 1 + 0.35 * clamp01((tauAbove[lev] + tauLayer) / 8) + 0.15 * cf
           : 1 + 0.15 * cloudCoverTotal;
+        const sigmaMid = nz > 0 ? (lev + 0.5) / nz : 1;
+        if (sigmaMid <= 0.55) {
+          upperSwAbsLayerSum += swAbsLayer;
+          upperLwBoostWeightedSum += lwCloudBoost * Math.max(tauLayer, 0.05 * cf);
+          upperLwBoostWeight += Math.max(tauLayer, 0.05 * cf);
+        }
 
         let dT = 0;
         if (swAbsLayer > 0) {
@@ -144,6 +165,10 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
         dTheta = clamp(dTheta, -dThetaMaxPerStep, dThetaMaxPerStep);
         theta[idx] += dTheta;
       }
+      const upperLwBoostMean = upperLwBoostWeight > 0 ? upperLwBoostWeightedSum / upperLwBoostWeight : 1;
+      state.upperCloudShortwaveAbsorptionWm2[k] = upperSwAbsLayerSum;
+      state.upperCloudLongwaveRelaxationBoost[k] = upperLwBoostMean;
+      state.upperCloudRadiativePersistenceSupportWm2[k] = upperSwAbsLayerSum / Math.max(1, upperLwBoostMean);
     }
   }
 }

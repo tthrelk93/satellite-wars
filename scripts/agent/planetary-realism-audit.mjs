@@ -442,7 +442,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     surfaceEvapAirMixingRatioKgKg,
     processMoistureBudget,
     transportTracing,
-    verticalCloudBirthTracing
+    verticalCloudBirthTracing,
+    upperCloudResidenceTracing
   } = diagnostics;
   const { nx, ny, latitudesDeg } = grid;
   const longitudesDeg = Array.isArray(grid.longitudesDeg)
@@ -692,6 +693,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     surfaceFluxDecomposition,
     transportTracing: transportTracing || null,
     verticalCloudBirthTracing: verticalCloudBirthTracing || null,
+    upperCloudResidenceTracing: upperCloudResidenceTracing || null,
     profiles: {
       latitudesDeg: roundSeries(latitudesDeg),
       series: {
@@ -1080,13 +1082,54 @@ const compactVerticalCloudBirthSummary = (sample = null) => {
   };
 };
 
+export const buildUpperCloudResidenceReport = (latestSample = null) => ({
+  schema: 'satellite-wars.upper-cloud-residence.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  ageAttribution: latestSample?.upperCloudResidenceTracing?.ageAttribution || null,
+  rootCauseAssessment: latestSample?.upperCloudResidenceTracing?.rootCauseAssessment || null
+});
+
+export const buildUpperCloudErosionBudgetReport = (latestSample = null) => ({
+  schema: 'satellite-wars.upper-cloud-erosion-budget.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  erosionBudget: latestSample?.upperCloudResidenceTracing?.erosionBudget || null,
+  rootCauseAssessment: latestSample?.upperCloudResidenceTracing?.rootCauseAssessment || null
+});
+
+export const buildUpperCloudVentilationSummaryReport = (latestSample = null) => ({
+  schema: 'satellite-wars.upper-cloud-ventilation-summary.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  ventilation: latestSample?.upperCloudResidenceTracing?.ventilation || null,
+  rootCauseAssessment: latestSample?.upperCloudResidenceTracing?.rootCauseAssessment || null
+});
+
+const compactUpperCloudResidenceSummary = (sample = null) => {
+  if (!sample?.upperCloudResidenceTracing) return null;
+  return {
+    northDryBeltResidenceMeanDays: sample.upperCloudResidenceTracing?.ageAttribution?.northDryBeltResidenceMeanDays ?? null,
+    northDryBeltTimeSinceImportMeanDays: sample.upperCloudResidenceTracing?.ageAttribution?.northDryBeltTimeSinceImportMeanDays ?? null,
+    northDryBeltStaleFrac: sample.upperCloudResidenceTracing?.ageAttribution?.northDryBeltStaleFrac ?? null,
+    northDryBeltAppliedErosionFrac: sample.upperCloudResidenceTracing?.erosionBudget?.northDryBeltAppliedErosionFrac ?? null,
+    northDryBeltBlockedErosionFrac: sample.upperCloudResidenceTracing?.erosionBudget?.northDryBeltBlockedErosionFrac ?? null,
+    dominantCloudImport: {
+      interfaceTargetLatDeg: sample.upperCloudResidenceTracing?.ventilation?.dominantImportInterfaceTargetLatDeg ?? null,
+      north35UpperTroposphereImportMagnitudeKgM_1S: sample.upperCloudResidenceTracing?.ventilation?.north35UpperTroposphereImportMagnitudeKgM_1S ?? null
+    },
+    rootCauseAssessment: sample.upperCloudResidenceTracing?.rootCauseAssessment || null
+  };
+};
+
 const compactSampleForSummary = (sample = null) => {
   if (!sample) return sample;
-  const { transportTracing, verticalCloudBirthTracing, ...rest } = sample;
+  const { transportTracing, verticalCloudBirthTracing, upperCloudResidenceTracing, ...rest } = sample;
   return {
     ...rest,
     transportTracingSummary: compactTransportSummary(sample),
-    verticalCloudBirthTracingSummary: compactVerticalCloudBirthSummary(sample)
+    verticalCloudBirthTracingSummary: compactVerticalCloudBirthSummary(sample),
+    upperCloudResidenceTracingSummary: compactUpperCloudResidenceSummary(sample)
   };
 };
 
@@ -1723,6 +1766,9 @@ export async function main() {
   const verticalCloudBirthAttribution = buildVerticalCloudBirthAttributionReport(latestSample);
   const verticalCloudBirthHistograms = buildVerticalCloudBirthHistogramsReport(latestSample);
   const dryBeltCloudOriginMatrix = buildDryBeltCloudOriginMatrixReport(latestSample);
+  const upperCloudResidence = buildUpperCloudResidenceReport(latestSample);
+  const upperCloudErosionBudget = buildUpperCloudErosionBudgetReport(latestSample);
+  const upperCloudVentilationSummary = buildUpperCloudVentilationSummaryReport(latestSample);
   const checkpointDay = sampleTargetsDays.find((day) => day > 0 && day < sampleTargetsDays[sampleTargetsDays.length - 1])
     || sampleTargetsDays[Math.max(0, Math.floor(sampleTargetsDays.length / 2))] || null;
   const restartParity = reproCheck
@@ -1745,7 +1791,10 @@ export async function main() {
     bandLevelFluxMatrixJsonPath: `${artifactBase}-band-level-flux-matrix.json`,
     verticalCloudBirthAttributionJsonPath: `${artifactBase}-vertical-cloud-birth-attribution.json`,
     verticalCloudBirthHistogramsJsonPath: `${artifactBase}-vertical-cloud-birth-histograms.json`,
-    dryBeltCloudOriginMatrixJsonPath: `${artifactBase}-dry-belt-cloud-origin-matrix.json`
+    dryBeltCloudOriginMatrixJsonPath: `${artifactBase}-dry-belt-cloud-origin-matrix.json`,
+    upperCloudResidenceJsonPath: `${artifactBase}-upper-cloud-residence.json`,
+    upperCloudErosionBudgetJsonPath: `${artifactBase}-upper-cloud-erosion-budget.json`,
+    upperCloudVentilationSummaryJsonPath: `${artifactBase}-upper-cloud-ventilation-summary.json`
   } : null;
   const summarySamples = samples.map((sample) => compactSampleForSummary(sample));
   const summaryHorizons = horizonSummaries.map((horizon) => ({
@@ -1786,6 +1835,9 @@ export async function main() {
     verticalCloudBirthAttribution,
     verticalCloudBirthHistograms,
     dryBeltCloudOriginMatrix,
+    upperCloudResidence,
+    upperCloudErosionBudget,
+    upperCloudVentilationSummary,
     artifacts,
     defaultNextPriorities
   };
@@ -1829,6 +1881,9 @@ export async function main() {
     fs.writeFileSync(artifacts.verticalCloudBirthAttributionJsonPath, toJson(verticalCloudBirthAttribution));
     fs.writeFileSync(artifacts.verticalCloudBirthHistogramsJsonPath, toJson(verticalCloudBirthHistograms));
     fs.writeFileSync(artifacts.dryBeltCloudOriginMatrixJsonPath, toJson(dryBeltCloudOriginMatrix));
+    fs.writeFileSync(artifacts.upperCloudResidenceJsonPath, toJson(upperCloudResidence));
+    fs.writeFileSync(artifacts.upperCloudErosionBudgetJsonPath, toJson(upperCloudErosionBudget));
+    fs.writeFileSync(artifacts.upperCloudVentilationSummaryJsonPath, toJson(upperCloudVentilationSummary));
   }
   process.stdout.write(toJson(summary));
   return summary;
@@ -1855,6 +1910,9 @@ export const _test = {
   buildVerticalCloudBirthAttributionReport,
   buildVerticalCloudBirthHistogramsReport,
   buildDryBeltCloudOriginMatrixReport,
+  buildUpperCloudResidenceReport,
+  buildUpperCloudErosionBudgetReport,
+  buildUpperCloudVentilationSummaryReport,
   buildSurfaceFluxDecompositionReport,
   buildSurfaceSourceAttributionReport,
   classifySnapshot,

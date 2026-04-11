@@ -277,6 +277,58 @@ test('buildMoistureAttributionReport ranks moistening drivers and keeps regime t
   assert.equal(report.northDryBeltGenerationAttribution.oceanCarriedOverUpperCloudMeanKgM2, 0.03);
 });
 
+test('buildUpperCloudPhase5Reports surfaces residence, erosion, and ventilation evidence', () => {
+  const sample = {
+    targetDay: 30,
+    upperCloudResidenceTracing: {
+      ageAttribution: {
+        northDryBeltResidenceMeanDays: 4.2,
+        northDryBeltTimeSinceImportMeanDays: 2.8,
+        northDryBeltStaleFrac: 0.74
+      },
+      erosionBudget: {
+        northDryBeltPotentialErosionMeanKgM2: 0.4,
+        northDryBeltAppliedErosionMeanKgM2: 0.08,
+        northDryBeltBlockedErosionMeanKgM2: 0.32,
+        northDryBeltAppliedErosionFrac: 0.2,
+        northDryBeltBlockedErosionFrac: 0.8,
+        levelBands: {
+          upperTroposphere: {
+            appliedFrac: 0.18,
+            blockedFrac: 0.82
+          }
+        }
+      },
+      ventilation: {
+        dominantImportInterfaceTargetLatDeg: 35,
+        north35UpperTroposphereCloudFluxNorthKgM_1S: -6.31,
+        north35UpperTroposphereImportMagnitudeKgM_1S: 6.31,
+        northDryBeltRadiativePersistenceSupportMeanWm2: 0.32,
+        regimePersistence: {
+          passiveSurvivalFrac: 0.7,
+          regenerationFrac: 0.2,
+          oscillatoryFrac: 0.1
+        }
+      },
+      rootCauseAssessment: {
+        ruledIn: ['Passive survival dominates.'],
+        ruledOut: ['Strong radiative maintenance is not dominant.'],
+        ambiguous: []
+      }
+    }
+  };
+
+  const residence = planetaryAuditTest.buildUpperCloudResidenceReport(sample);
+  const erosion = planetaryAuditTest.buildUpperCloudErosionBudgetReport(sample);
+  const ventilation = planetaryAuditTest.buildUpperCloudVentilationSummaryReport(sample);
+
+  assert.equal(residence.ageAttribution.northDryBeltResidenceMeanDays, 4.2);
+  assert.equal(erosion.erosionBudget.northDryBeltBlockedErosionFrac, 0.8);
+  assert.equal(erosion.erosionBudget.levelBands.upperTroposphere.blockedFrac, 0.82);
+  assert.equal(ventilation.ventilation.north35UpperTroposphereImportMagnitudeKgM_1S, 6.31);
+  assert.equal(ventilation.rootCauseAssessment.ruledIn[0], 'Passive survival dominates.');
+});
+
 test('buildMonthlyClimatology averages metrics and zonal profiles by month', () => {
   const monthly = planetaryAuditTest.buildMonthlyClimatology([
     {
