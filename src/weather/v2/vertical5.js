@@ -731,10 +731,32 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         ) / 6.5
       );
       const latAbs = Math.abs(latDeg?.[rowIndex] ?? 0);
-      const subtropicalSuppression = latDeg
-        ? smoothstep(12, 28, latAbs) * smoothstep(0.02, 0.25, omegaLow) * (0.6 + 0.4 * (1 - rhMidSupport))
+      const tropicalCore = latDeg
+        ? 1 - smoothstep(Math.max(6, tropicalOrganizationBandDeg * 0.55), tropicalOrganizationBandDeg + 2, latAbs)
+        : 1;
+      const subtropicalBand = latDeg
+        ? smoothstep(subtropicalSubsidenceLat0 - 5, subtropicalSubsidenceLat0 + 2, latAbs)
+            * (1 - smoothstep(subtropicalSubsidenceLat1 - 4, subtropicalSubsidenceLat1 + 2, latAbs))
         : 0;
-      potentialTarget *= 1 - 0.3 * subtropicalSuppression;
+      const organizedSupport = clamp01(
+        0.5 * moistureConvergenceSupport +
+        0.35 * ascentSupport +
+        0.15 * rhMidSupport
+      );
+      const neutralToSubsidingSupport = smoothstep(-0.015, 0.18, omegaLow);
+      const subtropicalSuppression = clamp01(
+        subtropicalBand * (
+          0.5 +
+          0.4 * neutralToSubsidingSupport +
+          0.35 * (1 - organizedSupport) +
+          0.25 * (1 - rhMidSupport)
+        )
+      );
+      potentialTarget = clamp01(
+        potentialTarget
+          * (0.84 + 0.24 * tropicalCore)
+          * (1 - 0.62 * subtropicalSuppression)
+      );
       const potentialPrev = convectivePotential[k];
       const potentialTau = potentialTarget >= potentialPrev ? convPotentialGrowTau : convPotentialDecayTau;
       const potentialAlpha = 1 - Math.exp(-dt / Math.max(potentialTau, eps));
@@ -743,14 +765,24 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       );
 
       const organizationPrev = convectiveOrganization[k];
+      const persistentOrganizationSupport = Math.max(
+        organizationPrev * 0.82,
+        ascentSupport * rhMidSupport
+      );
       const organizationTarget = clamp01(
-        0.55 * convectivePotential[k] +
-        0.25 * moistureConvergenceSupport +
-        0.2 * Math.max(organizationPrev * 0.7, ascentSupport * rhMidSupport)
-      ) * (1 - 0.55 * subtropicalSuppression);
+        (
+          0.5 * convectivePotential[k] +
+          0.28 * moistureConvergenceSupport +
+          0.22 * persistentOrganizationSupport +
+          0.12 * tropicalCore * Math.max(convectivePotential[k], moistureConvergenceSupport)
+        ) * (0.84 + 0.32 * tropicalCore) * (1 - 0.82 * subtropicalSuppression)
+      );
+      const organizationDecayScale = subtropicalSuppression > 0.15 && organizationTarget < organizationPrev
+        ? 0.55
+        : 1;
       const organizationTau = organizationTarget >= organizationPrev
         ? convOrganizationGrowTau
-        : convOrganizationDecayTau;
+        : convOrganizationDecayTau * organizationDecayScale;
       const organizationAlpha = 1 - Math.exp(-dt / Math.max(organizationTau, eps));
       convectiveOrganization[k] = clamp01(
         organizationPrev + (organizationTarget - organizationPrev) * organizationAlpha
@@ -762,7 +794,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
 
       const activityPotential = smoothstep(convMinPotential, 0.95, convectivePotential[k]);
       const activityOrganization = smoothstep(convMinOrganization, 0.95, convectiveOrganization[k]);
-      const activity = clamp01(0.45 * activityPotential + 0.55 * activityOrganization);
+      const activity = clamp01(
+        (0.35 * activityPotential + 0.65 * activityOrganization)
+        * (0.92 + 0.16 * tropicalCore)
+        * (1 - 0.4 * subtropicalSuppression)
+      );
       const hasSupport = activity > 0
         && (qvSupport > 0.08 || rhSupport > 0.08)
         && (ascentSupport > 0.05 || moistureConvergenceSupport > 0.05)
@@ -774,30 +810,52 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
 
       const dpSurface = pHalf[(levS + 1) * N + k] - pHalf[levS * N + k];
       const massSurface = dpSurface / g;
-      const mu = baseMu * activity;
+      const mu = clamp(
+        baseMu
+          * activity
+          * (0.55 + 0.95 * activityOrganization + 0.3 * tropicalCore)
+          * (1 - 0.45 * subtropicalSuppression),
+        0,
+        0.35
+      );
       convectiveMassFlux[k] = massSurface > 0 && dt > 0 ? (mu * massSurface) / dt : 0;
       convMassFluxWeightedSum += convectiveMassFlux[k] * columnWeight;
-      rowConvectiveSource[rowIndex] += 0.75 * convectiveOrganization[k]
-        + 0.55 * smoothstep(0.0005, 0.02, convectiveMassFlux[k]);
+      const convMassFluxSupport = smoothstep(0.0005, 0.02, convectiveMassFlux[k]);
+      rowConvectiveSource[rowIndex] += 0.95 * Math.pow(convectiveOrganization[k], 1.1) * (0.85 + 0.15 * tropicalCore)
+        + 0.75 * convMassFluxSupport;
       if (mu <= 1e-6 || massSurface <= 0) continue;
 
       const entrainEff = clamp(
-        entrainFrac * (1.25 - 0.55 * convectiveOrganization[k] + 0.35 * (1 - rhMidSupport)),
-        0.04,
-        0.65
+        entrainFrac * (
+          1.35 -
+          0.7 * convectiveOrganization[k] -
+          0.18 * tropicalCore +
+          0.45 * (1 - rhMidSupport) +
+          0.2 * subtropicalSuppression
+        ),
+        0.03,
+        0.75
       );
       const detrainTopEff = clamp(
-        detrainTop + 0.18 * convectiveOrganization[k] + 0.08 * instabSupport - 0.1 * (1 - rhMidSupport),
+        detrainTop +
+          0.22 * convectiveOrganization[k] +
+          0.12 * tropicalCore +
+          0.08 * instabSupport -
+          0.12 * (1 - rhMidSupport) -
+          0.05 * subtropicalSuppression,
         0.45,
-        0.95
+        0.97
       );
       const rainoutFrac = clamp(
         convRainoutBase
-          + convRainoutOrganizationWeight * convectiveOrganization[k]
-          + convRainoutHumidityWeight * rhMidSupport
-          - 0.16 * (1 - rhSupport),
+          - 0.55 * convRainoutOrganizationWeight * convectiveOrganization[k]
+          + 0.7 * convRainoutHumidityWeight * (1 - rhMidSupport)
+          + 0.18 * subtropicalSuppression
+          + 0.08 * (1 - moistureConvergenceSupport)
+          + 0.08 * convMassFluxSupport * tropicalCore
+          - 0.08 * tropicalCore,
         0.08,
-        0.9
+        0.88
       );
       convectiveRainoutFraction[k] = rainoutFrac;
 
@@ -890,7 +948,10 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             convectiveTopLevel[k] = plumeTopLev;
             const anvilDepth = 1 - plumeTopLev / Math.max(1, nz - 1);
             convectiveAnvilSource[k] = clamp01(
-              convectiveOrganization[k] * anvilDepth * (1 - rainoutFrac * 0.65)
+              (
+                0.75 * convectiveOrganization[k] +
+                0.25 * convMassFluxSupport
+              ) * anvilDepth * (1 - rainoutFrac * 0.85) * (0.9 + 0.1 * tropicalCore)
             );
             convCondMassSum += usedCondMass * columnWeight;
             totalCondensed += usedCondMass;
@@ -923,7 +984,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       }
       nhSource = nhWeight > 0 ? nhSource / nhWeight : 0;
       shSource = shWeight > 0 ? shSource / shWeight : 0;
-      const subtropicalAlpha = dt / Math.max(subtropicalSubsidenceTau, eps);
+      const meanTropicalSource = (nhSource * nhWeight + shSource * shWeight) / Math.max(eps, nhWeight + shWeight);
+      const subtropicalAlpha = 1 - Math.exp(-dt / Math.max(subtropicalSubsidenceTau, eps));
       const subtropicalMidSigma = 0.5 * (subtropicalSubsidenceTopSigma + subtropicalSubsidenceBottomSigma);
 
       for (let j = 0; j < ny; j++) {
@@ -931,18 +993,30 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         const latAbs = Math.abs(lat);
         if (latAbs < subtropicalSubsidenceLat0 || latAbs > subtropicalSubsidenceLat1) continue;
         const hemiSource = lat >= 0 ? nhSource : shSource;
-        const latShape = smoothstep(subtropicalSubsidenceLat0, subtropicalSubsidenceLat0 + 6, latAbs)
-          * (1 - smoothstep(subtropicalSubsidenceLat1 - 4, subtropicalSubsidenceLat1, latAbs));
+        const sourceDriver = Math.max(hemiSource, meanTropicalSource * 0.45);
+        const latShape = smoothstep(subtropicalSubsidenceLat0 - 2, subtropicalSubsidenceLat0 + 4, latAbs)
+          * (1 - smoothstep(subtropicalSubsidenceLat1 - 3, subtropicalSubsidenceLat1 + 2, latAbs));
         const row = j * nx;
         for (let i = 0; i < nx; i++) {
           const k = row + i;
-          const descentSupport = smoothstep(0.02, 0.3, lowLevelOmegaEffective[k]);
+          const descentSupport = smoothstep(-0.01, 0.24, lowLevelOmegaEffective[k]);
+          const localOrganizationRelief = 1 - 0.45 * convectiveOrganization[k];
+          const localMoistureExportSupport = 0.7 + 0.3 * (1 - clamp01(lowLevelMoistureConvergence[k] * 21600));
           const dryDriver = clamp01(
-            1.4 * hemiSource * latShape * descentSupport * (1 - 0.25 * convectiveOrganization[k])
+            1.9 * sourceDriver
+              * latShape
+              * descentSupport
+              * localOrganizationRelief
+              * localMoistureExportSupport
+              * (1 - 0.2 * convectivePotential[k])
           );
           subtropicalSubsidenceDrying[k] = dryDriver;
           if (dryDriver <= 0) continue;
-          const dryFracBase = clamp(subtropicalAlpha * dryDriver, 0, subtropicalSubsidenceMaxDryFrac);
+          const dryFracBase = clamp(
+            subtropicalAlpha * dryDriver * (1.05 + 0.35 * latShape),
+            0,
+            subtropicalSubsidenceMaxDryFrac
+          );
           for (let lev = 0; lev < nz; lev++) {
             const sigmaMid = sigmaHalf
               ? clamp01(0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1]))
@@ -956,7 +1030,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             const dryFrac = dryFracBase * layerWeight;
             const dq = qv[idx] * dryFrac;
             qv[idx] = Math.max(0, qv[idx] - dq);
-            theta[idx] += subtropicalSubsidenceThetaStepK * dryFrac * (0.5 + 0.5 * layerWeight);
+            theta[idx] += subtropicalSubsidenceThetaStepK * dryFrac * (0.65 + 0.55 * layerWeight);
           }
           subsidenceDryingWeightedSum += dryDriver * cosLat[j];
         }
