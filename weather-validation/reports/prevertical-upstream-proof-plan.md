@@ -543,6 +543,20 @@ Result:
 - consequence:
   - pre-repair long-jump numerical ownership artifacts should be treated as stale until regenerated on the repaired harness
 
+Post-repair regenerated ownership result:
+- [prevertical-numerical-ownership-check.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-numerical-ownership-check.json) was regenerated on the repaired harness using the ownership-only path
+- `dt_half` no longer loses the early boundary or flips the target owner
+  - first boundary is now `endPreviousStepMicrophysics5`
+  - target owner is now `previousStepResidualUpperCloud`
+- the raw single-cell target still sparsifies on `grid_dense`, so the direct U5 file still does not fully pass on raw target-owner equality
+- the repaired normalized follow-up now closes cleanly across all four variants:
+  - [prevertical-variant-normalized-ownership.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-variant-normalized-ownership.json)
+  - `informativeVariantCount = 4`
+  - `collapsedSignalVariants = []`
+  - `normalizedStableOwner = previousStepResidualUpperCloud`
+  - `normalizedStableBoundary = endPreviousStepMicrophysics5`
+  - `exitCriteriaPass = true`
+
 ## Phase U6: Upstream Patch-Placement Proof
 
 Objective:

@@ -46,6 +46,7 @@ const BOUNDARY_ORDER = [
 
 let contractPath = DEFAULT_CONTRACT_PATH;
 let reportBase = DEFAULT_REPORT_BASE;
+let skipCounterfactuals = false;
 
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i += 1) {
@@ -54,6 +55,7 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--contract=')) contractPath = path.resolve(arg.slice('--contract='.length));
   else if (arg === '--report-base' && argv[i + 1]) reportBase = path.resolve(argv[++i]);
   else if (arg.startsWith('--report-base=')) reportBase = path.resolve(arg.slice('--report-base='.length));
+  else if (arg === '--skip-counterfactuals') skipCounterfactuals = true;
 }
 
 const round = corridorProof.round || ((value, digits = 5) => Number.isFinite(value) ? Number(value.toFixed(digits)) : null);
@@ -890,7 +892,7 @@ const determineRetentionDecision = ({ retentionOff, advectionOff, carryoverOnly,
   return 'coupled';
 };
 
-const summarizeVariant = async ({ contract, variant, historicalRoot }) => {
+const summarizeVariant = async ({ contract, variant, historicalRoot, skipCounterfactuals: omitCounterfactuals = false }) => {
   const corridorMeta = {
     sectorKey: contract.corridor.sectorKey,
     latBandDeg: contract.corridor.latBandDeg,
@@ -908,6 +910,32 @@ const summarizeVariant = async ({ contract, variant, historicalRoot }) => {
     targetCell: rankPrimaryOwner(ownershipExcess.targetCell),
     corridorBand: rankPrimaryOwner(ownershipExcess.corridorBand)
   };
+
+  if (omitCounterfactuals) {
+    return {
+      variant: {
+        name: variant.name,
+        nx: variant.nx,
+        ny: variant.ny,
+        dtSeconds: variant.dtSeconds,
+        checkpointDay: variant.checkpointDay
+      },
+      currentCommit: currentTrace.commit,
+      historicalCommit: historicalTrace.commit,
+      targetCell: currentTrace.targetCell,
+      corridorCellCount: currentTrace.corridorIndices.length,
+      firstMaterialBoundary: boundaryComparisons.firstMaterialBoundary,
+      ownershipExcess,
+      primaryOwner,
+      retentionDecision: 'not-computed',
+      counterfactuals: {
+        retentionOff: null,
+        advectionOff: null,
+        carryoverOnly: null,
+        advectionOnly: null
+      }
+    };
+  }
 
   // Rebuild pre-advection clones for the U3-style decision.
   const currentCheckpointCore = await createConfiguredCore(currentModules, variant);
@@ -1064,7 +1092,12 @@ const runExperiment = async () => {
 
   const variantResults = [];
   for (const variant of variants) {
-    variantResults.push(await corridorProof.suppressProcessOutput(() => summarizeVariant({ contract, variant, historicalRoot })));
+    variantResults.push(await corridorProof.suppressProcessOutput(() => summarizeVariant({
+      contract,
+      variant,
+      historicalRoot,
+      skipCounterfactuals
+    })));
   }
 
   const assessment = buildCrossVariantAssessment(variantResults);
