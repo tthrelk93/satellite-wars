@@ -167,6 +167,12 @@ const CLOUD_TRANSITION_LEDGER_MODULES = new Set([
   'stepMicrophysics5',
   'stepRadiation2D5'
 ]);
+const REPLAY_TOGGLEABLE_MODULES = new Set([
+  'stepAdvection5',
+  'stepVertical5',
+  'stepMicrophysics5',
+  'stepRadiation2D5'
+]);
 const CLOUD_TRANSITION_LEDGER_TRANSITIONS = [
   { key: 'importedCloudEntering', label: 'Imported cloud entering' },
   { key: 'importedCloudSurvivingUnchanged', label: 'Imported cloud surviving unchanged' },
@@ -324,6 +330,7 @@ export class WeatherCore5 {
     this._loggerContext = null;
     this.simSpeed = 1;
     this.instrumentationMode = 'full';
+    this._replayDisabledModules = new Set();
     this.lodParams = {
       enable: true,
       simSpeedThreshold: 8,
@@ -768,6 +775,24 @@ export class WeatherCore5 {
     return this.instrumentationMode || 'full';
   }
 
+  setReplayDisabledModules(moduleNames = []) {
+    const nextDisabled = new Set();
+    for (const moduleName of moduleNames || []) {
+      if (REPLAY_TOGGLEABLE_MODULES.has(moduleName)) {
+        nextDisabled.add(moduleName);
+      }
+    }
+    this._replayDisabledModules = nextDisabled;
+  }
+
+  clearReplayDisabledModules() {
+    this._replayDisabledModules = new Set();
+  }
+
+  getReplayDisabledModules() {
+    return Array.from(this._replayDisabledModules || []);
+  }
+
   setSimSpeed(simSpeed) {
     if (!Number.isFinite(simSpeed)) return;
     this.simSpeed = Math.max(0, simSpeed);
@@ -789,6 +814,7 @@ export class WeatherCore5 {
     this.resetCloudTransitionLedger();
     this.resetConservationDiagnostics();
     this.resetModuleTimingDiagnostics();
+    this.clearReplayDisabledModules();
   }
 
   resetVerticalCloudBirthTracingDiagnostics() {
@@ -1144,6 +1170,7 @@ export class WeatherCore5 {
     if (this._climoUpdateArgs) {
       this._climoUpdateArgs.timeUTC = this.timeUTC;
     }
+    this.clearReplayDisabledModules();
   }
 
   resetModuleTimingDiagnostics() {
@@ -1839,8 +1866,11 @@ export class WeatherCore5 {
       const beforeBudget = collectBudget ? this._captureClimateProcessBudgetSnapshot(name === 'stepMicrophysics5') : null;
       const beforeCloudTransition = collectCloudTransitionLedger ? this._captureCloudTransitionSnapshot(name) : null;
       const beforeConservation = collectConservation ? this._captureConservationSnapshot() : null;
+      const replayDisabled = this._replayDisabledModules?.has(name);
       const startedAt = Date.now();
-      fn();
+      if (!replayDisabled) {
+        fn();
+      }
       const elapsedMs = Date.now() - startedAt;
       this._recordModuleTiming(name, elapsedMs);
       if (shouldLogModules) {

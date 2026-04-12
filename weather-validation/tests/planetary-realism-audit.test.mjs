@@ -1232,3 +1232,92 @@ test('phase B cloud-transition reports surface the first persistent module and s
   assert.equal(summary.summary.attributedUpperCloudPathChangeFrac, 0.972);
   assert.equal(sector.sectoral.stepVertical5.eastPacific.bands.upperTroposphere.transitions.importedCloudSurvivingUnchanged, 0.12);
 });
+
+test('phase C corridor replay reports preserve checkpoints, slices, and module toggle deltas', () => {
+  const phaseCReplay = {
+    targetDay: 30,
+    targets: [
+      {
+        sectorKey: 'eastPacific',
+        cellIndex: 42,
+        latDeg: 22.5,
+        lonDeg: -131.25,
+        bandKey: 'midTroposphere',
+        score: 12.44
+      }
+    ],
+    checkpoints: {
+      eastPacific: {
+        sectorKey: 'eastPacific',
+        cellIndex: 42,
+        latDeg: 22.5,
+        lonDeg: -131.25,
+        bandKey: 'midTroposphere',
+        score: 12.44,
+        checkpoints: {
+          importArrival: { stepIndex: 480, simTimeSeconds: 864000 },
+          failedErosion: { stepIndex: 486, simTimeSeconds: 874800 }
+        }
+      }
+    },
+    slices: {
+      eastPacific: [
+        {
+          eventKey: 'importArrival',
+          checkpointStepIndex: 480,
+          checkpointSimTimeSeconds: 864000,
+          windowSteps: 6,
+          preWindowTotalsByModule: {
+            stepVertical5: {
+              actualNetCloudDeltaKgM2: 0.02,
+              transitions: { importedCloudSurvivingUnchanged: 0.08 }
+            }
+          },
+          eventStepByModule: {
+            stepVertical5: {
+              actualNetCloudDeltaKgM2: 0.03,
+              transitions: { importedCloudEntering: 0.12 }
+            }
+          },
+          postWindowTotalsByModule: {
+            stepMicrophysics5: {
+              actualNetCloudDeltaKgM2: 0.01,
+              transitions: { cloudConvertedIntoLocalCondensationSupport: 0.04 }
+            }
+          }
+        }
+      ]
+    },
+    moduleToggleDeltas: {
+      eastPacific: {
+        importArrival: {
+          toggles: {
+            stepVertical5: {
+              windows: {
+                24: {
+                  deltaVsBaseline: {
+                    targetCellCloudPathDeltaKgM2: -0.11
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    rootCauseAssessment: {
+      ruledIn: ['Replay toggles show the vertical-path handoff is the first causal break in at least two corridor events.'],
+      ruledOut: [],
+      ambiguous: []
+    }
+  };
+
+  const catalog = planetaryAuditTest.buildCorridorReplayCatalogReport(phaseCReplay);
+  const slices = planetaryAuditTest.buildCorridorStepSliceAttributionReport(phaseCReplay);
+  const toggles = planetaryAuditTest.buildCorridorModuleToggleDeltasReport(phaseCReplay);
+
+  assert.equal(catalog.targets[0].sectorKey, 'eastPacific');
+  assert.equal(catalog.checkpoints.eastPacific.checkpoints.importArrival.stepIndex, 480);
+  assert.equal(slices.slices.eastPacific[0].eventKey, 'importArrival');
+  assert.equal(toggles.deltas.eastPacific.importArrival.toggles.stepVertical5.windows[24].deltaVsBaseline.targetCellCloudPathDeltaKgM2, -0.11);
+});

@@ -5,6 +5,7 @@ import { execSync } from 'child_process';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { WeatherCore5 } from '../../src/weather/v2/core5.js';
 import { buildValidationDiagnostics } from '../../src/weather/validation/diagnostics.js';
+import { CLOUD_BIRTH_LEVEL_BANDS, cloudBirthBandOffset } from '../../src/weather/v2/cloudBirthTracing5.js';
 import { NH_DRY_BELT_SOURCE_SECTOR_KEYS, SURFACE_MOISTURE_SOURCE_TRACERS, classifyNhDryBeltSector } from '../../src/weather/v2/sourceTracing5.js';
 import { applyHeadlessTerrainFixture } from './headless-terrain-fixture.mjs';
 import { ensureCyclePlanReady } from './plan-guard.mjs';
@@ -138,6 +139,11 @@ const PHASE1_BASELINE_METRIC_KEYS = [
   'midlatitudeWesterliesNorthU10Ms',
   'midlatitudeWesterliesSouthU10Ms'
 ];
+const PHASE_C_CORRIDOR_SECTORS = ['eastPacific', 'atlantic', 'continentalSubtropics'];
+const PHASE_C_REPLAY_WINDOWS = [1, 6, 24];
+const PHASE_C_TOGGLEABLE_MODULES = ['stepAdvection5', 'stepVertical5', 'stepMicrophysics5', 'stepRadiation2D5'];
+const PHASE_C_EVENT_ORDER = ['importArrival', 'failedErosion', 'largeScaleMaintenanceRebound'];
+const CLOUD_BAND_INDEX_BY_KEY = new Map(CLOUD_BIRTH_LEVEL_BANDS.map((band, index) => [band.key, index]));
 const PHASE1_BASELINE_METRIC_TOLERANCES = {
   itczWidthDeg: 0.05,
   subtropicalDryNorthRatio: 0.05,
@@ -496,6 +502,341 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
   terrain: terrainFallback || null,
   params: cloneConfigSnapshot(core)
 });
+
+const createConfiguredCore = async ({
+  variantNx = nx,
+  variantNy = ny,
+  variantDtSeconds = dt,
+  variantSeed = seed,
+  configSnapshot = null,
+  instrumentationModeOverride = 'full'
+} = {}) => {
+  const core = new WeatherCore5({
+    nx: variantNx,
+    ny: variantNy,
+    dt: variantDtSeconds,
+    seed: variantSeed,
+    instrumentationMode: instrumentationModeOverride
+  });
+  await core._initPromise;
+  if (configSnapshot) {
+    applyCoreConfigSnapshot(core, configSnapshot, { instrumentationModeOverride });
+  }
+  applyHeadlessTerrainFixture(core);
+  core.clearReplayDisabledModules?.();
+  return core;
+};
+
+const createEmptyTransitionSummary = () => ({
+  actualNetCloudDeltaKgM2: 0,
+  transitions: {
+    importedCloudEntering: 0,
+    importedCloudSurvivingUnchanged: 0,
+    cloudErodedAway: 0,
+    cloudConvertedIntoLocalCondensationSupport: 0,
+    cloudConvertedIntoPrecipSupport: 0,
+    cloudLostToReevaporation: 0,
+    cloudKeptAliveByRadiativePersistence: 0,
+    advectiveExportLoss: 0,
+    unattributedResidual: 0
+  }
+});
+
+const cloneTransitionSummary = (summary = null) => {
+  const base = createEmptyTransitionSummary();
+  if (!summary) return base;
+  base.actualNetCloudDeltaKgM2 = round(summary.actualNetCloudDeltaKgM2 || 0, 5);
+  for (const key of Object.keys(base.transitions)) {
+    base.transitions[key] = round(summary.transitions?.[key] || 0, 5);
+  }
+  return base;
+};
+
+const extractLedgerCellBandSummary = (rawLedger, moduleName, cellIndex, bandKey, cellCount) => {
+  const moduleSummary = rawLedger?.modules?.[moduleName];
+  const bandIndex = CLOUD_BAND_INDEX_BY_KEY.get(bandKey);
+  if (!moduleSummary || !Number.isInteger(cellIndex) || !(cellIndex >= 0) || !Number.isInteger(bandIndex)) {
+    return createEmptyTransitionSummary();
+  }
+  const offset = cloudBirthBandOffset(bandIndex, cellIndex, cellCount);
+  const summary = {
+    actualNetCloudDeltaKgM2: round(moduleSummary.netCloudDeltaByBandCell?.[offset] || 0, 5),
+    transitions: {}
+  };
+  for (const key of [
+    'importedCloudEntering',
+    'importedCloudSurvivingUnchanged',
+    'cloudErodedAway',
+    'cloudConvertedIntoLocalCondensationSupport',
+    'cloudConvertedIntoPrecipSupport',
+    'cloudLostToReevaporation',
+    'cloudKeptAliveByRadiativePersistence',
+    'advectiveExportLoss',
+    'unattributedResidual'
+  ]) {
+    summary.transitions[key] = round(moduleSummary.transitions?.[key]?.[offset] || 0, 5);
+  }
+  return summary;
+};
+
+const computeCorridorTargetScore = (cell = null) => {
+  if (!cell?.modules?.stepVertical5) return null;
+  let bestBandKey = 'midTroposphere';
+  let bestScore = -Infinity;
+  for (const bandKey of ['midTroposphere', 'upperTroposphere']) {
+    const band = cell.modules.stepVertical5?.[bandKey];
+    if (!band) continue;
+    const transitions = band.transitions || {};
+    const score = (
+      1.2 * (transitions.importedCloudSurvivingUnchanged || 0)
+      + 1.0 * (transitions.cloudConvertedIntoLocalCondensationSupport || 0)
+      + 0.5 * (transitions.importedCloudEntering || 0)
+      - 1.0 * (transitions.cloudErodedAway || 0)
+      - 0.5 * (transitions.cloudLostToReevaporation || 0)
+    );
+    if (score > bestScore) {
+      bestScore = score;
+      bestBandKey = bandKey;
+    }
+  }
+  return Number.isFinite(bestScore) ? { score: round(bestScore, 5), bandKey: bestBandKey } : null;
+};
+
+const selectPhaseCCorridorTargets = (latestSample = null) => {
+  const cells = Array.isArray(latestSample?.cloudTransitionLedgerTracing?.cells)
+    ? latestSample.cloudTransitionLedgerTracing.cells
+    : [];
+  return PHASE_C_CORRIDOR_SECTORS.map((sectorKey) => {
+    const ranked = cells
+      .filter((cell) => cell?.sectorKey === sectorKey)
+      .map((cell) => ({ cell, scoreInfo: computeCorridorTargetScore(cell) }))
+      .filter((entry) => entry.scoreInfo && Number.isFinite(entry.scoreInfo.score))
+      .sort((a, b) => b.scoreInfo.score - a.scoreInfo.score);
+    const best = ranked[0] || null;
+    return {
+      sectorKey,
+      available: Boolean(best),
+      cellIndex: best?.cell?.cellIndex ?? null,
+      latDeg: best?.cell?.latDeg ?? null,
+      lonDeg: best?.cell?.lonDeg ?? null,
+      bandKey: best?.scoreInfo?.bandKey ?? 'midTroposphere',
+      score: best?.scoreInfo?.score ?? null
+    };
+  });
+};
+
+const buildCorridorStepEntry = ({ rawLedger, target, cellCount, stepIndex, simTimeSeconds }) => {
+  const modules = Object.fromEntries(
+    PHASE_C_TOGGLEABLE_MODULES.map((moduleName) => [
+      moduleName,
+      extractLedgerCellBandSummary(rawLedger, moduleName, target.cellIndex, target.bandKey, cellCount)
+    ])
+  );
+  return {
+    sectorKey: target.sectorKey,
+    bandKey: target.bandKey,
+    cellIndex: target.cellIndex,
+    stepIndex,
+    simTimeSeconds: round(simTimeSeconds, 5),
+    modules,
+    signals: {
+      importArrival: round(
+        (modules.stepVertical5?.transitions?.importedCloudEntering || 0)
+        + 0.5 * (modules.stepAdvection5?.transitions?.importedCloudEntering || 0),
+        5
+      ),
+      failedErosion: round(
+        (modules.stepVertical5?.transitions?.importedCloudSurvivingUnchanged || 0)
+        - (modules.stepVertical5?.transitions?.cloudErodedAway || 0),
+        5
+      ),
+      largeScaleMaintenanceRebound: round(
+        modules.stepMicrophysics5?.transitions?.cloudConvertedIntoLocalCondensationSupport || 0,
+        5
+      )
+    }
+  };
+};
+
+const findFirstEventFromTrace = (steps = [], signalKey, startStepIndex = 0) => {
+  const candidates = steps.filter((entry) => entry.stepIndex >= startStepIndex);
+  if (!candidates.length) return null;
+  const maxSignal = candidates.reduce((best, entry) => Math.max(best, entry.signals?.[signalKey] || 0), 0);
+  const threshold = Math.max(0.0001, maxSignal * 0.25);
+  return candidates.find((entry) => (entry.signals?.[signalKey] || 0) >= threshold) || null;
+};
+
+const buildCorridorCheckpointCatalog = (traceBySector = {}) => (
+  Object.fromEntries(
+    Object.entries(traceBySector).map(([sectorKey, payload]) => {
+      const steps = payload?.steps || [];
+      const importArrival = findFirstEventFromTrace(steps, 'importArrival', 0);
+      const failedErosion = importArrival ? findFirstEventFromTrace(steps, 'failedErosion', importArrival.stepIndex) : null;
+      const maintenance = failedErosion ? findFirstEventFromTrace(steps, 'largeScaleMaintenanceRebound', failedErosion.stepIndex) : null;
+      const checkpoints = {
+        importArrival,
+        failedErosion,
+        largeScaleMaintenanceRebound: maintenance
+      };
+      return [sectorKey, {
+        ...payload,
+        checkpoints
+      }];
+    })
+  )
+);
+
+const aggregateCorridorWindow = (steps = []) => {
+  const aggregate = Object.fromEntries(
+    PHASE_C_TOGGLEABLE_MODULES.map((moduleName) => [moduleName, createEmptyTransitionSummary()])
+  );
+  for (const step of steps) {
+    for (const moduleName of PHASE_C_TOGGLEABLE_MODULES) {
+      const current = step.modules?.[moduleName];
+      const acc = aggregate[moduleName];
+      acc.actualNetCloudDeltaKgM2 += current?.actualNetCloudDeltaKgM2 || 0;
+      for (const key of Object.keys(acc.transitions)) {
+        acc.transitions[key] += current?.transitions?.[key] || 0;
+      }
+    }
+  }
+  for (const moduleName of PHASE_C_TOGGLEABLE_MODULES) {
+    aggregate[moduleName] = cloneTransitionSummary(aggregate[moduleName]);
+  }
+  return aggregate;
+};
+
+const buildCorridorSlicesForSector = (sectorPayload = null) => {
+  const results = [];
+  const steps = sectorPayload?.steps || [];
+  for (const eventKey of PHASE_C_EVENT_ORDER) {
+    const checkpoint = sectorPayload?.checkpoints?.[eventKey];
+    if (!checkpoint) continue;
+    for (const windowSteps of PHASE_C_REPLAY_WINDOWS) {
+      const preSteps = steps.filter((entry) => entry.stepIndex >= checkpoint.stepIndex - windowSteps && entry.stepIndex < checkpoint.stepIndex);
+      const postSteps = steps.filter((entry) => entry.stepIndex > checkpoint.stepIndex && entry.stepIndex <= checkpoint.stepIndex + windowSteps);
+      results.push({
+        eventKey,
+        checkpointStepIndex: checkpoint.stepIndex,
+        checkpointSimTimeSeconds: checkpoint.simTimeSeconds,
+        windowSteps,
+        preWindowTotalsByModule: aggregateCorridorWindow(preSteps),
+        eventStepByModule: Object.fromEntries(
+          PHASE_C_TOGGLEABLE_MODULES.map((moduleName) => [moduleName, cloneTransitionSummary(checkpoint.modules?.[moduleName])])
+        ),
+        postWindowTotalsByModule: aggregateCorridorWindow(postSteps)
+      });
+    }
+  }
+  return results;
+};
+
+const computeBandCellPaths = (core, cellIndex, bandKey) => {
+  const band = CLOUD_BIRTH_LEVEL_BANDS[CLOUD_BAND_INDEX_BY_KEY.get(bandKey) ?? 2];
+  const { state, nz, sigmaHalf } = core;
+  const { N, pHalf, qc, qi, qr, qs } = state;
+  let cloudPathKgM2 = 0;
+  let precipPathKgM2 = 0;
+  for (let lev = 0; lev < nz; lev += 1) {
+    const sigmaMid = (sigmaHalf[lev] + sigmaHalf[lev + 1]) * 0.5;
+    if (!(sigmaMid >= band.minSigma && sigmaMid < band.maxSigma)) continue;
+    const idx = lev * N + cellIndex;
+    const dp = pHalf[(lev + 1) * N + cellIndex] - pHalf[lev * N + cellIndex];
+    if (!(dp > 0)) continue;
+    const layerMassKgM2 = dp / 9.80665;
+    const precipMixingRatio = (qr?.[idx] || 0) + (qs?.[idx] || 0);
+    const cloudMixingRatio = (qc?.[idx] || 0) + (qi?.[idx] || 0) + precipMixingRatio;
+    cloudPathKgM2 += cloudMixingRatio * layerMassKgM2;
+    precipPathKgM2 += precipMixingRatio * layerMassKgM2;
+  }
+  return {
+    cloudPathKgM2: round(cloudPathKgM2, 5),
+    precipPathKgM2: round(precipPathKgM2, 5)
+  };
+};
+
+const computeSectorStateMetrics = (core, target) => {
+  const { state, grid } = core;
+  const { nx, ny } = grid;
+  const sectorTotals = {
+    carriedOverUpperCloudMassKgM2: 0,
+    weakErosionCloudSurvivalMassKgM2: 0,
+    largeScaleCondensationSourceKgM2: 0,
+    importedAnvilPersistenceMassKgM2: 0
+  };
+  let sectorCount = 0;
+  for (let row = 0; row < ny; row += 1) {
+    const latDeg = grid.latDeg[row];
+    if (latDeg < 15 || latDeg > 35) continue;
+    for (let i = 0; i < nx; i += 1) {
+      const idx = row * nx + i;
+      const isLand = (state.landMask?.[idx] || 0) === 1;
+      if (classifyNhDryBeltSector({ lonDeg: grid.lonDeg[i], isLand }) !== target.sectorKey) continue;
+      sectorCount += 1;
+      sectorTotals.carriedOverUpperCloudMassKgM2 += state.carriedOverUpperCloudMass?.[idx] || 0;
+      sectorTotals.weakErosionCloudSurvivalMassKgM2 += state.weakErosionCloudSurvivalMass?.[idx] || 0;
+      sectorTotals.largeScaleCondensationSourceKgM2 += state.largeScaleCondensationSource?.[idx] || 0;
+      sectorTotals.importedAnvilPersistenceMassKgM2 += state.importedAnvilPersistenceMass?.[idx] || 0;
+    }
+  }
+  const cellMetrics = computeBandCellPaths(core, target.cellIndex, target.bandKey);
+  return {
+    targetCell: {
+      ...cellMetrics,
+      carriedOverUpperCloudMassKgM2: round(state.carriedOverUpperCloudMass?.[target.cellIndex] || 0, 5),
+      weakErosionCloudSurvivalMassKgM2: round(state.weakErosionCloudSurvivalMass?.[target.cellIndex] || 0, 5),
+      largeScaleCondensationSourceKgM2: round(state.largeScaleCondensationSource?.[target.cellIndex] || 0, 5),
+      importedAnvilPersistenceMassKgM2: round(state.importedAnvilPersistenceMass?.[target.cellIndex] || 0, 5)
+    },
+    sectorMean: Object.fromEntries(
+      Object.entries(sectorTotals).map(([key, value]) => [key, round(sectorCount > 0 ? value / sectorCount : 0, 5)])
+    )
+  };
+};
+
+const runCorridorReplayWindow = async ({ checkpointSnapshot, target, disabledModule = null, maxWindowSteps = 24 } = {}) => {
+  const core = new WeatherCore5({ nx, ny, dt, seed, instrumentationMode: 'full' });
+  await core._initPromise;
+  applyHeadlessTerrainFixture(core);
+  core.loadStateSnapshot(checkpointSnapshot);
+  if (disabledModule) {
+    core.setReplayDisabledModules([disabledModule]);
+  } else {
+    core.clearReplayDisabledModules();
+  }
+
+  const windows = {};
+  const cumulativeByModule = Object.fromEntries(
+    PHASE_C_TOGGLEABLE_MODULES.map((moduleName) => [moduleName, createEmptyTransitionSummary()])
+  );
+
+  for (let stepOffset = 1; stepOffset <= maxWindowSteps; stepOffset += 1) {
+    core.resetCloudTransitionLedger();
+    core.advanceModelSeconds(core.modelDt);
+    const rawLedger = core.getCloudTransitionLedgerRaw();
+    for (const moduleName of PHASE_C_TOGGLEABLE_MODULES) {
+      const summary = extractLedgerCellBandSummary(rawLedger, moduleName, target.cellIndex, target.bandKey, core.state.N);
+      cumulativeByModule[moduleName].actualNetCloudDeltaKgM2 += summary.actualNetCloudDeltaKgM2 || 0;
+      for (const key of Object.keys(cumulativeByModule[moduleName].transitions)) {
+        cumulativeByModule[moduleName].transitions[key] += summary.transitions?.[key] || 0;
+      }
+    }
+    if (PHASE_C_REPLAY_WINDOWS.includes(stepOffset)) {
+      windows[stepOffset] = {
+        stepCount: stepOffset,
+        metrics: computeSectorStateMetrics(core, target),
+        cumulativeByModule: Object.fromEntries(
+          Object.entries(cumulativeByModule).map(([moduleName, summary]) => [moduleName, cloneTransitionSummary(summary)])
+        )
+      };
+    }
+  }
+
+  return {
+    disabledModule: disabledModule || null,
+    windows
+  };
+};
 
 const loadTrustedBaselineArtifact = (artifactPath = defaultTrustedPhase1BaselinePath) => {
   if (!artifactPath || !fs.existsSync(artifactPath)) {
@@ -1495,6 +1836,33 @@ export const buildCloudTransitionLedgerSectorSplitReport = (latestSample = null)
   sectoral: latestSample?.cloudTransitionLedgerTracing?.sectoral || null
 });
 
+export const buildCorridorReplayCatalogReport = (phaseCReplay = null) => ({
+  schema: 'satellite-wars.corridor-replay-catalog.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: phaseCReplay?.targetDay ?? null,
+  targets: phaseCReplay?.targets || [],
+  checkpoints: phaseCReplay?.checkpoints || {},
+  rootCauseAssessment: phaseCReplay?.rootCauseAssessment || null
+});
+
+export const buildCorridorStepSliceAttributionReport = (phaseCReplay = null) => ({
+  schema: 'satellite-wars.corridor-step-slice-attribution.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: phaseCReplay?.targetDay ?? null,
+  slices: phaseCReplay?.slices || {},
+  rootCauseAssessment: phaseCReplay?.rootCauseAssessment || null
+});
+
+export const buildCorridorModuleToggleDeltasReport = (phaseCReplay = null) => ({
+  schema: 'satellite-wars.corridor-module-toggle-deltas.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: phaseCReplay?.targetDay ?? null,
+  toggleableModules: PHASE_C_TOGGLEABLE_MODULES.slice(),
+  replayWindows: PHASE_C_REPLAY_WINDOWS.slice(),
+  deltas: phaseCReplay?.moduleToggleDeltas || {},
+  rootCauseAssessment: phaseCReplay?.rootCauseAssessment || null
+});
+
 const compactVerticalCloudBirthSummary = (sample = null) => {
   if (!sample?.verticalCloudBirthTracing) return null;
   return {
@@ -1867,6 +2235,195 @@ const runRestartParityCheck = async ({ configSnapshot, checkpointDay, sampleTarg
     referenceSamples: uninterruptedSamples,
     resumedSamples
   });
+};
+
+const buildCorridorToggleWindowDelta = (baselineWindow = null, toggledWindow = null) => {
+  const baselineTarget = baselineWindow?.metrics?.targetCell || {};
+  const baselineSector = baselineWindow?.metrics?.sectorMean || {};
+  const toggledTarget = toggledWindow?.metrics?.targetCell || {};
+  const toggledSector = toggledWindow?.metrics?.sectorMean || {};
+  return {
+    targetCellCloudPathDeltaKgM2: round((toggledTarget.cloudPathKgM2 || 0) - (baselineTarget.cloudPathKgM2 || 0), 5),
+    targetCellPrecipPathDeltaKgM2: round((toggledTarget.precipPathKgM2 || 0) - (baselineTarget.precipPathKgM2 || 0), 5),
+    targetCellLargeScaleCondensationDeltaKgM2: round((toggledTarget.largeScaleCondensationSourceKgM2 || 0) - (baselineTarget.largeScaleCondensationSourceKgM2 || 0), 5),
+    targetCellWeakErosionSurvivalDeltaKgM2: round((toggledTarget.weakErosionCloudSurvivalMassKgM2 || 0) - (baselineTarget.weakErosionCloudSurvivalMassKgM2 || 0), 5),
+    sectorImportedAnvilPersistenceDeltaKgM2: round((toggledSector.importedAnvilPersistenceMassKgM2 || 0) - (baselineSector.importedAnvilPersistenceMassKgM2 || 0), 5),
+    sectorLargeScaleCondensationDeltaKgM2: round((toggledSector.largeScaleCondensationSourceKgM2 || 0) - (baselineSector.largeScaleCondensationSourceKgM2 || 0), 5)
+  };
+};
+
+const identifyPhaseCBestToggle = (eventToggleReport = null, windowSteps = 24) => {
+  const toggles = eventToggleReport?.toggles || {};
+  const ranked = Object.entries(toggles)
+    .map(([moduleName, payload]) => ({
+      moduleName,
+      targetCellCloudPathDeltaKgM2: payload?.windows?.[windowSteps]?.deltaVsBaseline?.targetCellCloudPathDeltaKgM2 ?? null
+    }))
+    .filter((entry) => Number.isFinite(entry.targetCellCloudPathDeltaKgM2))
+    .sort((a, b) => a.targetCellCloudPathDeltaKgM2 - b.targetCellCloudPathDeltaKgM2);
+  return ranked[0] || null;
+};
+
+const runPhaseCCorridorReplay = async ({ configSnapshot, latestSample, targetDay }) => {
+  if (!latestSample?.cloudTransitionLedgerTracing || !Number.isFinite(targetDay)) return null;
+  const selectedTargets = selectPhaseCCorridorTargets(latestSample).filter((target) => target.available);
+  if (!selectedTargets.length) return {
+    targetDay,
+    targets: [],
+    checkpoints: {},
+    slices: {},
+    moduleToggleDeltas: {},
+    rootCauseAssessment: {
+      ruledIn: [],
+      ruledOut: [],
+      ambiguous: ['Phase C could not select any corridor targets from the current Phase B ledger output.']
+    }
+  };
+
+  const traceCore = await createConfiguredCore({ configSnapshot, instrumentationModeOverride: 'full' });
+  const targetSteps = Math.max(1, Math.round((targetDay * SECONDS_PER_DAY) / traceCore.modelDt));
+  const traceBySector = Object.fromEntries(
+    selectedTargets.map((target) => [target.sectorKey, { ...target, steps: [] }])
+  );
+
+  for (let stepIndex = 0; stepIndex < targetSteps; stepIndex += 1) {
+    traceCore.resetCloudTransitionLedger();
+    traceCore.advanceModelSeconds(traceCore.modelDt);
+    const rawLedger = traceCore.getCloudTransitionLedgerRaw();
+    for (const target of selectedTargets) {
+      traceBySector[target.sectorKey].steps.push(
+        buildCorridorStepEntry({
+          rawLedger,
+          target,
+          cellCount: traceCore.state.N,
+          stepIndex,
+          simTimeSeconds: traceCore.timeUTC
+        })
+      );
+    }
+  }
+
+  const checkpointCatalog = buildCorridorCheckpointCatalog(traceBySector);
+  const checkpointSnapshots = {};
+  for (const target of selectedTargets) {
+    checkpointSnapshots[target.sectorKey] = {};
+    const checkpoints = checkpointCatalog[target.sectorKey]?.checkpoints || {};
+    for (const eventKey of PHASE_C_EVENT_ORDER) {
+      const checkpoint = checkpoints[eventKey];
+      if (!checkpoint) continue;
+      const replayCore = await createConfiguredCore({ configSnapshot, instrumentationModeOverride: 'full' });
+      const checkpointSeconds = checkpoint.stepIndex * replayCore.modelDt;
+      if (checkpointSeconds > 0) replayCore.advanceModelSeconds(checkpointSeconds);
+      checkpointSnapshots[target.sectorKey][eventKey] = replayCore.getStateSnapshot({ mode: 'full' });
+    }
+  }
+
+  const slices = {};
+  const moduleToggleDeltas = {};
+  for (const target of selectedTargets) {
+    const sectorPayload = checkpointCatalog[target.sectorKey];
+    slices[target.sectorKey] = buildCorridorSlicesForSector(sectorPayload);
+    moduleToggleDeltas[target.sectorKey] = {};
+    for (const eventKey of PHASE_C_EVENT_ORDER) {
+      const checkpointSnapshot = checkpointSnapshots[target.sectorKey]?.[eventKey];
+      if (!checkpointSnapshot) continue;
+      const baselineReplay = await runCorridorReplayWindow({
+        checkpointSnapshot,
+        target,
+        disabledModule: null,
+        maxWindowSteps: PHASE_C_REPLAY_WINDOWS[PHASE_C_REPLAY_WINDOWS.length - 1]
+      });
+      const toggles = {};
+      for (const moduleName of PHASE_C_TOGGLEABLE_MODULES) {
+        const replay = await runCorridorReplayWindow({
+          checkpointSnapshot,
+          target,
+          disabledModule: moduleName,
+          maxWindowSteps: PHASE_C_REPLAY_WINDOWS[PHASE_C_REPLAY_WINDOWS.length - 1]
+        });
+        toggles[moduleName] = {
+          disabledModule: moduleName,
+          windows: Object.fromEntries(
+            PHASE_C_REPLAY_WINDOWS.map((windowSteps) => [
+              windowSteps,
+              {
+                deltaVsBaseline: buildCorridorToggleWindowDelta(
+                  baselineReplay.windows?.[windowSteps],
+                  replay.windows?.[windowSteps]
+                ),
+                replayWindow: replay.windows?.[windowSteps] || null
+              }
+            ])
+          )
+        };
+      }
+      moduleToggleDeltas[target.sectorKey][eventKey] = {
+        checkpoint: sectorPayload.checkpoints[eventKey],
+        baseline: baselineReplay,
+        toggles
+      };
+    }
+  }
+
+  const verticalWins = [];
+  const microWins = [];
+  const ruledOutModules = new Set();
+  for (const sectorKey of Object.keys(moduleToggleDeltas)) {
+    for (const eventKey of PHASE_C_EVENT_ORDER) {
+      const bestToggle = identifyPhaseCBestToggle(moduleToggleDeltas[sectorKey]?.[eventKey], 24);
+      if (!bestToggle) continue;
+      if ((bestToggle.targetCellCloudPathDeltaKgM2 || 0) >= 0) {
+        ruledOutModules.add(bestToggle.moduleName);
+        continue;
+      }
+      if ((eventKey === 'importArrival' || eventKey === 'failedErosion') && bestToggle.moduleName === 'stepVertical5') {
+        verticalWins.push({ sectorKey, eventKey, delta: bestToggle.targetCellCloudPathDeltaKgM2 });
+      }
+      if (eventKey === 'largeScaleMaintenanceRebound' && (bestToggle.moduleName === 'stepMicrophysics5' || bestToggle.moduleName === 'stepVertical5')) {
+        microWins.push({ sectorKey, eventKey, delta: bestToggle.targetCellCloudPathDeltaKgM2, moduleName: bestToggle.moduleName });
+      }
+    }
+  }
+
+  const rootCauseAssessment = { ruledIn: [], ruledOut: [], ambiguous: [] };
+  if (verticalWins.length >= 2) {
+    rootCauseAssessment.ruledIn.push('Replay toggles show the vertical-path handoff is the first causal break in at least two corridor events.');
+  } else {
+    rootCauseAssessment.ambiguous.push('Phase C replay does not yet prove the vertical handoff across enough corridor events for closure.');
+  }
+  if (microWins.length >= 1) {
+    rootCauseAssessment.ruledIn.push('A downstream maintenance handoff remains active after the vertical failure, usually in microphysics or vertical large-scale maintenance.');
+  } else {
+    rootCauseAssessment.ambiguous.push('Phase C replay has not yet isolated the downstream maintenance handoff strongly enough.');
+  }
+  for (const moduleName of PHASE_C_TOGGLEABLE_MODULES) {
+    const everWinning = Object.values(moduleToggleDeltas).some((events) => Object.values(events || {}).some((eventReport) => {
+      const best = identifyPhaseCBestToggle(eventReport, 24);
+      return best?.moduleName === moduleName && (best?.targetCellCloudPathDeltaKgM2 || 0) < 0;
+    }));
+    if (!everWinning) {
+      rootCauseAssessment.ruledOut.push(`${moduleName} does not emerge as the best 24-step replay toggle in the current corridor set.`);
+    }
+  }
+
+  return {
+    targetDay,
+    targets: selectedTargets,
+    checkpoints: Object.fromEntries(
+      Object.entries(checkpointCatalog).map(([sectorKey, payload]) => [sectorKey, {
+        sectorKey,
+        cellIndex: payload.cellIndex,
+        latDeg: payload.latDeg,
+        lonDeg: payload.lonDeg,
+        bandKey: payload.bandKey,
+        score: payload.score,
+        checkpoints: payload.checkpoints
+      }])
+    ),
+    slices,
+    moduleToggleDeltas,
+    rootCauseAssessment
+  };
 };
 
 export const computeSeasonalityScore = (samples) => {
@@ -3312,6 +3869,15 @@ const renderMarkdown = (summary) => {
     if (summary.artifacts.nhDryBeltSourceSectorSummaryJsonPath) {
       lines.push(`- NH dry-belt source sector JSON: ${summary.artifacts.nhDryBeltSourceSectorSummaryJsonPath}`);
     }
+    if (summary.artifacts.corridorReplayCatalogJsonPath) {
+      lines.push(`- Corridor replay catalog JSON: ${summary.artifacts.corridorReplayCatalogJsonPath}`);
+    }
+    if (summary.artifacts.corridorStepSliceAttributionJsonPath) {
+      lines.push(`- Corridor step-slice attribution JSON: ${summary.artifacts.corridorStepSliceAttributionJsonPath}`);
+    }
+    if (summary.artifacts.corridorModuleToggleDeltasJsonPath) {
+      lines.push(`- Corridor module-toggle deltas JSON: ${summary.artifacts.corridorModuleToggleDeltasJsonPath}`);
+    }
     if (summary.artifacts.thermodynamicSupportSummaryJsonPath) {
       lines.push(`- Thermodynamic support summary JSON: ${summary.artifacts.thermodynamicSupportSummaryJsonPath}`);
     }
@@ -3424,6 +3990,8 @@ export async function main() {
   const attributionLagAnalysis = buildAttributionLagAnalysis(samples);
   const realismGaps = buildRealismGapReport(horizonSummaries);
   const latestSample = horizonSummaries[horizonSummaries.length - 1]?.latest || samples[samples.length - 1] || null;
+  const phaseCTargetDay = sampleTargetsDays.find((day) => day >= 30) || latestSample?.targetDay || null;
+  const phaseCSample = samples.find((sample) => sample.targetDay === phaseCTargetDay) || latestSample;
   const moistureAttribution = buildMoistureAttributionReport(latestSample?.processMoistureBudget, latestSample?.metrics);
   const runManifest = buildRunManifest({ core, terrainFallback, sampleTargetsDays, targetsSeconds });
   const conservationSummary = buildConservationSummary({ core });
@@ -3439,6 +4007,19 @@ export async function main() {
   const cloudTransitionLedger = buildCloudTransitionLedgerReport(latestSample);
   const cloudTransitionLedgerSummary = buildCloudTransitionLedgerSummaryReport(latestSample);
   const cloudTransitionLedgerSectorSplit = buildCloudTransitionLedgerSectorSplitReport(latestSample);
+  let corridorReplayCatalog = null;
+  let corridorStepSliceAttribution = null;
+  let corridorModuleToggleDeltas = null;
+  if (!observerEffectAudit && phaseCSample && Number.isFinite(phaseCTargetDay)) {
+    const phaseCReplay = await runPhaseCCorridorReplay({
+      configSnapshot,
+      latestSample: phaseCSample,
+      targetDay: phaseCTargetDay
+    });
+    corridorReplayCatalog = buildCorridorReplayCatalogReport(phaseCReplay);
+    corridorStepSliceAttribution = buildCorridorStepSliceAttributionReport(phaseCReplay);
+    corridorModuleToggleDeltas = buildCorridorModuleToggleDeltasReport(phaseCReplay);
+  }
   const upperCloudResidence = buildUpperCloudResidenceReport(latestSample);
   const upperCloudErosionBudget = buildUpperCloudErosionBudgetReport(latestSample);
   const upperCloudVentilationSummary = buildUpperCloudVentilationSummaryReport(latestSample);
@@ -3669,6 +4250,9 @@ export async function main() {
     cloudTransitionLedgerJsonPath: `${artifactBase}-cloud-transition-ledger.json`,
     cloudTransitionLedgerSummaryJsonPath: `${artifactBase}-cloud-transition-ledger-summary.json`,
     cloudTransitionLedgerSectorSplitJsonPath: `${artifactBase}-cloud-transition-ledger-sector-split.json`,
+    corridorReplayCatalogJsonPath: `${artifactBase}-corridor-replay-catalog.json`,
+    corridorStepSliceAttributionJsonPath: `${artifactBase}-corridor-step-slice-attribution.json`,
+    corridorModuleToggleDeltasJsonPath: `${artifactBase}-corridor-module-toggle-deltas.json`,
     upperCloudResidenceJsonPath: `${artifactBase}-upper-cloud-residence.json`,
     upperCloudErosionBudgetJsonPath: `${artifactBase}-upper-cloud-erosion-budget.json`,
     upperCloudVentilationSummaryJsonPath: `${artifactBase}-upper-cloud-ventilation-summary.json`,
@@ -3736,6 +4320,9 @@ export async function main() {
     cloudTransitionLedger,
     cloudTransitionLedgerSummary,
     cloudTransitionLedgerSectorSplit,
+    corridorReplayCatalog,
+    corridorStepSliceAttribution,
+    corridorModuleToggleDeltas,
     upperCloudResidence,
     upperCloudErosionBudget,
     upperCloudVentilationSummary,
@@ -3803,6 +4390,9 @@ export async function main() {
     fs.writeFileSync(artifacts.cloudTransitionLedgerJsonPath, toJson(cloudTransitionLedger));
     fs.writeFileSync(artifacts.cloudTransitionLedgerSummaryJsonPath, toJson(cloudTransitionLedgerSummary));
     fs.writeFileSync(artifacts.cloudTransitionLedgerSectorSplitJsonPath, toJson(cloudTransitionLedgerSectorSplit));
+    fs.writeFileSync(artifacts.corridorReplayCatalogJsonPath, toJson(corridorReplayCatalog));
+    fs.writeFileSync(artifacts.corridorStepSliceAttributionJsonPath, toJson(corridorStepSliceAttribution));
+    fs.writeFileSync(artifacts.corridorModuleToggleDeltasJsonPath, toJson(corridorModuleToggleDeltas));
     fs.writeFileSync(artifacts.upperCloudResidenceJsonPath, toJson(upperCloudResidence));
     fs.writeFileSync(artifacts.upperCloudErosionBudgetJsonPath, toJson(upperCloudErosionBudget));
     fs.writeFileSync(artifacts.upperCloudVentilationSummaryJsonPath, toJson(upperCloudVentilationSummary));
@@ -3867,6 +4457,11 @@ export const _test = {
   buildCloudTransitionLedgerReport,
   buildCloudTransitionLedgerSummaryReport,
   buildCloudTransitionLedgerSectorSplitReport,
+  buildCorridorReplayCatalogReport,
+  buildCorridorStepSliceAttributionReport,
+  buildCorridorModuleToggleDeltasReport,
+  runPhaseCCorridorReplay,
+  cloneConfigSnapshot,
   buildUpperCloudResidenceReport,
   buildUpperCloudErosionBudgetReport,
   buildUpperCloudVentilationSummaryReport,

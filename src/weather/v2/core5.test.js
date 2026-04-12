@@ -135,3 +135,32 @@ test('WeatherCore5 keeps terrain-fixture surface theta bounded during early step
   assert.ok(minTheta >= 150, `expected bounded terrain-fixture surface theta, got ${minTheta}`);
   assert.ok(maxTheta <= 400, `expected bounded terrain-fixture surface theta, got ${maxTheta}`);
 });
+
+test('WeatherCore5 replay module disabling can skip a targeted module without affecting the control path API', async () => {
+  const baseline = new WeatherCore5({ nx: 16, ny: 8, seed: 12345 });
+  await baseline._initPromise;
+  applyHeadlessTerrainFixture(baseline);
+  baseline.advanceModelSeconds(baseline.modelDt);
+  const baselineLedger = baseline.getCloudTransitionLedgerRaw();
+
+  const replay = new WeatherCore5({ nx: 16, ny: 8, seed: 12345 });
+  await replay._initPromise;
+  applyHeadlessTerrainFixture(replay);
+  replay.setReplayDisabledModules(['stepVertical5']);
+  assert.deepEqual(replay.getReplayDisabledModules(), ['stepVertical5']);
+  replay.advanceModelSeconds(replay.modelDt);
+  const replayLedger = replay.getCloudTransitionLedgerRaw();
+
+  const baselineVerticalCalls = baselineLedger.modules.stepVertical5.callCount;
+  const replayVerticalCalls = replayLedger.modules.stepVertical5.callCount;
+  let replayVerticalSignal = 0;
+  for (const field of Object.values(replayLedger.modules.stepVertical5.transitions)) {
+    for (const value of field) replayVerticalSignal += Math.abs(value || 0);
+  }
+
+  assert.ok(baselineVerticalCalls >= 1);
+  assert.ok(replayVerticalCalls >= 1);
+  assert.equal(replayVerticalSignal, 0);
+  replay.clearReplayDisabledModules();
+  assert.deepEqual(replay.getReplayDisabledModules(), []);
+});

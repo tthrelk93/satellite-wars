@@ -183,6 +183,27 @@ Artifacts:
 Exit criteria:
 - one or two concrete module handoffs are shown to create the persistent cloud/rain problem in replay
 
+Phase C result:
+- completed on `2026-04-11`
+- targeted verification artifacts:
+  - `/tmp/phaseC-targeted-corridor-replay-catalog.json`
+  - `/tmp/phaseC-targeted-corridor-step-slice-attribution.json`
+  - `/tmp/phaseC-targeted-corridor-module-toggle-deltas.json`
+- selected corridor targets:
+  - `eastPacific / midTroposphere / cell 390`
+  - `atlantic / midTroposphere / cell 453`
+  - `continentalSubtropics / midTroposphere / cell 371`
+- strongest replay result:
+  - disabling `stepVertical5` is the best 24-step replay toggle for `importArrival`, `failedErosion`, and `largeScaleMaintenanceRebound` in all three sectors
+  - representative 24-step target-cell cloud-path deltas:
+    - east Pacific: `-1.90467`, `-2.30613`, `-2.24894`
+    - Atlantic: `-3.32867` across all three replay checkpoints
+    - continental subtropics: `-1.11928` across all three replay checkpoints
+- current diagnosis:
+  - the first causal break and the strongest short-window lever both sit inside `stepVertical5`
+  - downstream maintenance is still visible, especially via local condensation support, but it does not beat the vertical replay toggle as the dominant short-window intervention
+  - `stepAdvection5`, `stepMicrophysics5`, and `stepRadiation2D5` do not emerge as the best 24-step replay toggle in the current corridor set
+
 ## Phase D: Coupled Counterfactual Matrix
 
 Objective:
