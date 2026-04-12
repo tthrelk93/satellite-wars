@@ -8,7 +8,7 @@ const makeArray = (size, value = 0) => {
   return arr;
 };
 
-export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
+export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = 'full' } = {}) {
   const N = grid.count;
   const SZ = N * nz;
 
@@ -196,6 +196,8 @@ export function createState5({ grid, nz = 26, sigmaHalf } = {}) {
   const T = makeArray(SZ, 280);
 
   return {
+    instrumentationMode,
+    instrumentationEnabled: instrumentationMode !== 'disabled',
     N,
     nz,
     SZ,

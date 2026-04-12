@@ -10,6 +10,7 @@ const DEG2RAD = Math.PI / 180;
 
 export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
   if (!grid || !state || !Number.isFinite(dt) || dt <= 0) return;
+  const traceEnabled = state.instrumentationEnabled !== false;
   const {
     enable = true,
     S0 = 1361,
@@ -146,7 +147,7 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
 
       const eps = clamp01(eps0 + kWv * (wvCol / 50) + kCld * Math.min(1, tauCloudTotal / 10) + 0.1 * cloudCoverTotal);
       const SW_sfc = swSource * Math.exp(-kSw * tauCloudTotal);
-      state.surfaceCloudShortwaveShieldingWm2[k] = Math.max(0, swSource - SW_sfc);
+      if (traceEnabled) state.surfaceCloudShortwaveShieldingWm2[k] = Math.max(0, swSource - SW_sfc);
       const surfaceTemp = Ts && Ts.length === N ? Ts[k] : T[levLowB * N + k];
       const lwSurfaceNet = -eps * sigmaSb * (Math.pow(Math.max(180, surfaceTemp), 4) - Math.pow(TeqLower, 4));
       if (surfaceRadiativeFlux && surfaceRadiativeFlux.length === N) {
@@ -197,13 +198,15 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
         theta[idx] += dTheta;
       }
       const upperLwBoostMean = upperLwBoostWeight > 0 ? upperLwBoostWeightedSum / upperLwBoostWeight : 1;
-      state.upperCloudShortwaveAbsorptionWm2[k] = upperSwAbsLayerSum;
-      state.upperCloudLongwaveRelaxationBoost[k] = upperLwBoostMean;
-      state.upperCloudRadiativePersistenceSupportWm2[k] = upperSwAbsLayerSum / Math.max(1, upperLwBoostMean);
-      state.upperCloudClearSkyLwCoolingWm2[k] = upperClearSkyLwCoolingSum;
-      state.upperCloudCloudyLwCoolingWm2[k] = upperCloudyLwCoolingSum;
-      state.upperCloudLwCloudEffectWm2[k] = upperLwCloudEffectSum;
-      state.upperCloudNetCloudRadiativeEffectWm2[k] = upperSwAbsLayerSum + upperLwCloudEffectSum;
+      if (traceEnabled) {
+        state.upperCloudShortwaveAbsorptionWm2[k] = upperSwAbsLayerSum;
+        state.upperCloudLongwaveRelaxationBoost[k] = upperLwBoostMean;
+        state.upperCloudRadiativePersistenceSupportWm2[k] = upperSwAbsLayerSum / Math.max(1, upperLwBoostMean);
+        state.upperCloudClearSkyLwCoolingWm2[k] = upperClearSkyLwCoolingSum;
+        state.upperCloudCloudyLwCoolingWm2[k] = upperCloudyLwCoolingSum;
+        state.upperCloudLwCloudEffectWm2[k] = upperLwCloudEffectSum;
+        state.upperCloudNetCloudRadiativeEffectWm2[k] = upperSwAbsLayerSum + upperLwCloudEffectSum;
+      }
     }
   }
 }

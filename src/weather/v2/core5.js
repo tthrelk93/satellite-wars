@@ -223,7 +223,8 @@ export class WeatherCore5 {
     seed,
     nz = 26,
     sigmaHalf,
-    pressureLevelsPa = DEFAULT_PRESSURE_LEVELS_PA
+    pressureLevelsPa = DEFAULT_PRESSURE_LEVELS_PA,
+    instrumentationMode = 'full'
   } = {}) {
     this.grid = createLatLonGridV2(nx, ny, { minDxMeters: 80000 });
     if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
@@ -244,7 +245,7 @@ export class WeatherCore5 {
       ? sigmaInput
       : createSigmaHalfLevels({ nz: this.nz });
     this.verticalLayout = buildVerticalLayout({ sigmaHalf: this.sigmaHalf, pressureLevelsPa });
-    this.state = createState5({ grid: this.grid, nz: this.nz, sigmaHalf: this.sigmaHalf });
+    this.state = createState5({ grid: this.grid, nz: this.nz, sigmaHalf: this.sigmaHalf, instrumentationMode });
     const { N } = this.state;
 
     this.modelDt = dt;
@@ -268,6 +269,7 @@ export class WeatherCore5 {
     this.logger = null;
     this._loggerContext = null;
     this.simSpeed = 1;
+    this.instrumentationMode = 'full';
     this.lodParams = {
       enable: true,
       simSpeedThreshold: 8,
@@ -660,6 +662,7 @@ export class WeatherCore5 {
     this.resetClimateProcessDiagnostics();
     this.resetConservationDiagnostics();
     this.resetModuleTimingDiagnostics();
+    this.setInstrumentationMode(instrumentationMode);
 
     debugStdErr(`[V2] seed=${this.seed} version=v2 nz=${this.nz}`);
     this._initPromise = this._init();
@@ -695,6 +698,19 @@ export class WeatherCore5 {
 
   getLoggerContext() {
     return this._loggerContext;
+  }
+
+  setInstrumentationMode(mode = 'full') {
+    const nextMode = mode === 'disabled' ? 'disabled' : mode === 'noop' ? 'noop' : 'full';
+    this.instrumentationMode = nextMode;
+    if (this.state) {
+      this.state.instrumentationMode = nextMode;
+      this.state.instrumentationEnabled = nextMode !== 'disabled';
+    }
+  }
+
+  getInstrumentationMode() {
+    return this.instrumentationMode || 'full';
   }
 
   setSimSpeed(simSpeed) {
@@ -936,7 +952,8 @@ export class WeatherCore5 {
         metricsCounter: this._metricsCounter,
         nextModuleLogSimTime: this._nextModuleLogSimTime,
         simSpeed: this.simSpeed,
-        windNudgeMaxAbsCorrection: this._windNudgeMaxAbsCorrection
+        windNudgeMaxAbsCorrection: this._windNudgeMaxAbsCorrection,
+        instrumentationMode: this.getInstrumentationMode()
       },
       params: {
         surfaceParams: { ...this.surfaceParams },
@@ -1009,6 +1026,7 @@ export class WeatherCore5 {
     }
     this._restoreAnalysisTargets(snapshot);
     this._restoreDiagnosticState(snapshot);
+    this.setInstrumentationMode(snapshot?.runtime?.instrumentationMode || this.getInstrumentationMode());
 
     Object.assign(this.surfaceParams, snapshot?.params?.surfaceParams || {});
     Object.assign(this.advectParams, snapshot?.params?.advectParams || {});
@@ -1131,6 +1149,7 @@ export class WeatherCore5 {
   }
 
   _seedInitializationMoistureTracer() {
+    if (this.state?.instrumentationEnabled === false) return;
     const initField = this.state.qvSourceInitializationMemory;
     if (!(initField instanceof Float32Array) || initField.length !== this.state.qv.length) return;
     initField.set(this.state.qv);
@@ -1142,6 +1161,7 @@ export class WeatherCore5 {
   }
 
   _closeSurfaceSourceTracerBudget(fallbackFieldName = null) {
+    if (this.state?.instrumentationEnabled === false) return;
     const { qv } = this.state;
     if (!(qv instanceof Float32Array)) return;
     const tracerFields = SURFACE_MOISTURE_SOURCE_FIELDS

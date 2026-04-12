@@ -10,8 +10,10 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
 const smoothstep01 = (t) => t * t * (3 - 2 * t);
 
-const accumulateBandValue = (field, bandIndex, cell, cellCount, value) => {
+const accumulateBandValue = (field, bandIndex, cell, cellCount, value, enabled = true) => {
   if (
+    !enabled
+    || 
     !(field instanceof Float32Array)
     || field.length !== cellCount * INSTRUMENTATION_LEVEL_BAND_COUNT
     || !Number.isFinite(value)
@@ -22,6 +24,7 @@ const accumulateBandValue = (field, bandIndex, cell, cellCount, value) => {
 
 export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
   if (!grid || !state || !scratch) return;
+  const traceEnabled = state.instrumentationEnabled !== false;
   const {
     polarLatStartDeg = 60,
     filterMoisture = false,
@@ -108,7 +111,8 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
             findInstrumentationLevelBandIndex(sigmaMidAtLevel(state.sigmaHalf, lev, nz)),
             k,
             N,
-            1
+            1,
+            traceEnabled
           );
         }
         let iSrc = i - di;

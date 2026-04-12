@@ -29,8 +29,10 @@ const saturationMixingRatio = (T, p) => {
 
 const applyThetaLatent = (thetaVal, dq, latentHeat, Pi) => thetaVal + (latentHeat / Cp * dq) / Pi;
 
-const accumulateBandValue = (field, bandIndex, cell, cellCount, value) => {
+const accumulateBandValue = (field, bandIndex, cell, cellCount, value, enabled = true) => {
   if (
+    !enabled
+    ||
     !(field instanceof Float32Array)
     || field.length !== cellCount * INSTRUMENTATION_LEVEL_BAND_COUNT
     || !Number.isFinite(value)
@@ -41,6 +43,10 @@ const accumulateBandValue = (field, bandIndex, cell, cellCount, value) => {
 
 export function stepMicrophysics5({ dt, state, params = {} }) {
   if (!state || !Number.isFinite(dt) || dt <= 0) return;
+  const traceEnabled = state.instrumentationEnabled !== false;
+  const recordBandValue = (field, bandIndex, cell, cellCount, value) => {
+    accumulateBandValue(field, bandIndex, cell, cellCount, value, traceEnabled);
+  };
   const {
     p0 = 100000,
     pTop = 20000,
@@ -246,7 +252,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         let dq = applyLatentCap(qvVal - qsat, iceFrac > 0.5 ? Ls : Lv);
         if (dq > 0) {
           qvVal -= dq;
-          if (massCell > 0) {
+          if (traceEnabled && massCell > 0) {
             const condMass = dq * massCell;
             const numericalBandIndex = findInstrumentationLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));
             state.largeScaleCondensationSource[k] += condMass;
@@ -255,7 +261,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
             state.saturationAdjustmentSupersaturationMassWeighted[k] += supersaturationFrac * condMass;
             state.numericalSupersaturationClampCount[k] += 1;
             state.numericalSupersaturationClampMass[k] += condMass;
-            accumulateBandValue(state.numericalSupersaturationClampByBandMass, numericalBandIndex, k, N, condMass);
+            recordBandValue(state.numericalSupersaturationClampByBandMass, numericalBandIndex, k, N, condMass);
             const omegaTop = Number.isFinite(omega?.[lev * N + k]) ? omega[lev * N + k] : 0;
             const omegaBot = Number.isFinite(omega?.[(lev + 1) * N + k]) ? omega[(lev + 1) * N + k] : 0;
             const ascentMagnitudePaS = Math.max(0, -0.5 * (omegaTop + omegaBot));
@@ -287,7 +293,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
           if (dq <= 0) return [storeVal, 0];
           deficit -= dq;
           qvVal += dq;
-          if (massCell > 0) {
+          if (traceEnabled && massCell > 0) {
             if (bucket === 'cloud') state.cloudReevaporationMass[k] += dq * massCell;
             else if (bucket === 'precip') state.precipReevaporationMass[k] += dq * massCell;
           }
@@ -370,12 +376,12 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
       if (negativeClipCount > 0) {
         state.numericalNegativeClipCount[k] += negativeClipCount;
         state.numericalNegativeClipMass[k] += negativeClipMass;
-        accumulateBandValue(state.numericalNegativeClipByBandMass, numericalBandIndex, k, N, negativeClipMass);
+        recordBandValue(state.numericalNegativeClipByBandMass, numericalBandIndex, k, N, negativeClipMass);
       }
       if (cloudLimiterCount > 0) {
         state.numericalCloudLimiterCount[k] += cloudLimiterCount;
         state.numericalCloudLimiterMass[k] += cloudLimiterMass;
-        accumulateBandValue(state.numericalCloudLimiterByBandMass, numericalBandIndex, k, N, cloudLimiterMass);
+        recordBandValue(state.numericalCloudLimiterByBandMass, numericalBandIndex, k, N, cloudLimiterMass);
       }
       qv[idx] = Math.max(0, qvVal);
       qc[idx] = Math.max(0, qcVal);

@@ -1042,3 +1042,111 @@ test('phase 11 counterfactual ranking surfaces stable causal candidates', () => 
   assert.equal(rankingReport.closureReadyPass, true);
   assert.ok(rankingReport.rootCauseAssessment.ruledOut.some((line) => line.includes('Source moisture ablation')));
 });
+
+test('phase A observer-effect reports distinguish baseline drift from tracing variants', () => {
+  const trustedBaseline = {
+    artifactPath: '/tmp/trusted-phase1.json',
+    metrics: {
+      itczWidthDeg: 23.646,
+      subtropicalDryNorthRatio: 1.1,
+      subtropicalDrySouthRatio: 0.519,
+      subtropicalSubsidenceNorthMean: 0.065,
+      subtropicalSubsidenceSouthMean: 0.038,
+      tropicalTradesNorthU10Ms: -0.788,
+      tropicalTradesSouthU10Ms: -0.328,
+      midlatitudeWesterliesNorthU10Ms: 1.192,
+      midlatitudeWesterliesSouthU10Ms: 0.943
+    }
+  };
+  const variants = [
+    {
+      key: 'full',
+      label: 'Current full tracing',
+      instrumentationMode: 'full',
+      latest: {
+        targetDay: 30,
+        metrics: {
+          itczWidthDeg: 27.36,
+          subtropicalDryNorthRatio: 1.772,
+          subtropicalDrySouthRatio: 1.437,
+          subtropicalSubsidenceNorthMean: 0.085,
+          subtropicalSubsidenceSouthMean: 0.033,
+          tropicalTradesNorthU10Ms: -0.743,
+          tropicalTradesSouthU10Ms: -0.373,
+          midlatitudeWesterliesNorthU10Ms: 0.532,
+          midlatitudeWesterliesSouthU10Ms: 0.851
+        }
+      },
+      runManifest: {
+        runtime: {
+          moduleOrder: ['a', 'b'],
+          moduleTiming: { modules: {} }
+        }
+      }
+    },
+    {
+      key: 'noop',
+      label: 'Current no-op tracing',
+      instrumentationMode: 'noop',
+      latest: {
+        targetDay: 30,
+        metrics: {
+          itczWidthDeg: 27.36,
+          subtropicalDryNorthRatio: 1.772,
+          subtropicalDrySouthRatio: 1.437,
+          subtropicalSubsidenceNorthMean: 0.085,
+          subtropicalSubsidenceSouthMean: 0.033,
+          tropicalTradesNorthU10Ms: -0.743,
+          tropicalTradesSouthU10Ms: -0.373,
+          midlatitudeWesterliesNorthU10Ms: 0.532,
+          midlatitudeWesterliesSouthU10Ms: 0.851
+        }
+      },
+      runManifest: {
+        runtime: {
+          moduleOrder: ['a', 'b'],
+          moduleTiming: { modules: {} }
+        }
+      }
+    },
+    {
+      key: 'disabled',
+      label: 'Current tracing disabled',
+      instrumentationMode: 'disabled',
+      latest: {
+        targetDay: 30,
+        metrics: {
+          itczWidthDeg: 27.31,
+          subtropicalDryNorthRatio: 1.75,
+          subtropicalDrySouthRatio: 1.42,
+          subtropicalSubsidenceNorthMean: 0.084,
+          subtropicalSubsidenceSouthMean: 0.034,
+          tropicalTradesNorthU10Ms: -0.744,
+          tropicalTradesSouthU10Ms: -0.372,
+          midlatitudeWesterliesNorthU10Ms: 0.54,
+          midlatitudeWesterliesSouthU10Ms: 0.852
+        }
+      },
+      runManifest: {
+        runtime: {
+          moduleOrder: ['a', 'b'],
+          moduleTiming: { modules: {} }
+        }
+      }
+    }
+  ];
+
+  const parityReport = planetaryAuditTest.buildObserverEffectModuleOrderParityReport(variants);
+  const diffReport = planetaryAuditTest.buildObserverEffectBaselineDiffReport({
+    trustedBaseline,
+    variants,
+    moduleOrderParity: parityReport
+  });
+  const markdown = planetaryAuditTest.renderObserverEffectBaselineDiffMarkdown(diffReport);
+
+  assert.equal(diffReport.assessment.baselineReconciledPass, false);
+  assert.equal(diffReport.assessment.likelyCause, 'branch_drift_or_audit_semantics_drift');
+  assert.equal(diffReport.comparisons.fullVsNoop.itczWidthDeg.delta, 0);
+  assert.equal(parityReport.parity.every((entry) => entry.sameOrderAsReference), true);
+  assert.ok(markdown.includes('Observer-Effect Baseline Diff'));
+});

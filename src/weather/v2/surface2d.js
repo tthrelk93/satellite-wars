@@ -70,6 +70,7 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
   const sourceTracerByKey = Object.fromEntries(
     SURFACE_MOISTURE_SOURCE_TRACERS.map(({ key, field }) => [key, state[field]])
   );
+  const traceEnabled = state.instrumentationEnabled !== false;
   const elevField = geo?.elev && geo.elev.length === N ? geo.elev : null;
   const levS = nz - 1;
   const t2mNow = enableLandClimoTs && landTsUseT2m && climo?.hasT2m && climo?.t2mNow?.length === N
@@ -209,7 +210,7 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     const m0 = Math.max(1e-6, dp0 / g);
     const dqv = (E * dt) / m0;
     qv[idxS] += dqv;
-    if (dqv > 0) {
+    if (traceEnabled && dqv > 0) {
       const sourceKey = classifySurfaceMoistureSource({
         latDeg: latDeg[row],
         isLand: land

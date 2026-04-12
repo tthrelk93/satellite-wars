@@ -13,6 +13,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
 const defaultReportBase = path.join(repoRoot, 'weather-validation', 'reports', 'planetary-realism-status');
+const defaultTrustedPhase1BaselinePath = path.join(
+  repoRoot,
+  'weather-validation',
+  'output',
+  'phase1-hadley-second-pass-restore-v4.json'
+);
 
 export const PLANETARY_PRESETS = {
   quick: {
@@ -58,6 +64,9 @@ let mdOutPath = null;
 let reportBase = null;
 let reproCheck = null;
 let counterfactuals = null;
+let instrumentationMode = 'full';
+let observerEffectAudit = false;
+let trustedBaselinePath = null;
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -91,6 +100,11 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg === '--no-repro-check') reproCheck = false;
   else if (arg === '--counterfactuals') counterfactuals = true;
   else if (arg === '--no-counterfactuals') counterfactuals = false;
+  else if (arg === '--instrumentation-mode' && argv[i + 1]) instrumentationMode = argv[++i];
+  else if (arg.startsWith('--instrumentation-mode=')) instrumentationMode = arg.slice('--instrumentation-mode='.length);
+  else if (arg === '--observer-effect-audit') observerEffectAudit = true;
+  else if (arg === '--trusted-baseline' && argv[i + 1]) trustedBaselinePath = path.resolve(argv[++i]);
+  else if (arg.startsWith('--trusted-baseline=')) trustedBaselinePath = path.resolve(arg.slice('--trusted-baseline='.length));
 }
 
 const presetConfig = PLANETARY_PRESETS[preset] || PLANETARY_PRESETS.quick;
@@ -104,10 +118,37 @@ horizonsDays = Array.isArray(horizonsDays) && horizonsDays.length
 if (!Number.isFinite(seed)) seed = 12345;
 if (reproCheck == null) reproCheck = preset === 'quick';
 if (counterfactuals == null) counterfactuals = preset === 'quick';
+instrumentationMode = instrumentationMode === 'disabled'
+  ? 'disabled'
+  : instrumentationMode === 'noop'
+    ? 'noop'
+    : 'full';
 
 const effectiveReportBase = outPath || mdOutPath ? null : (reportBase || defaultReportBase);
 
 const SECONDS_PER_DAY = 86400;
+const PHASE1_BASELINE_METRIC_KEYS = [
+  'itczWidthDeg',
+  'subtropicalDryNorthRatio',
+  'subtropicalDrySouthRatio',
+  'subtropicalSubsidenceNorthMean',
+  'subtropicalSubsidenceSouthMean',
+  'tropicalTradesNorthU10Ms',
+  'tropicalTradesSouthU10Ms',
+  'midlatitudeWesterliesNorthU10Ms',
+  'midlatitudeWesterliesSouthU10Ms'
+];
+const PHASE1_BASELINE_METRIC_TOLERANCES = {
+  itczWidthDeg: 0.05,
+  subtropicalDryNorthRatio: 0.05,
+  subtropicalDrySouthRatio: 0.05,
+  subtropicalSubsidenceNorthMean: 0.005,
+  subtropicalSubsidenceSouthMean: 0.005,
+  tropicalTradesNorthU10Ms: 0.05,
+  tropicalTradesSouthU10Ms: 0.05,
+  midlatitudeWesterliesNorthU10Ms: 0.1,
+  midlatitudeWesterliesSouthU10Ms: 0.1
+};
 const DEFAULT_TROPICAL_LAT = 12;
 const DEFAULT_DRY_MIN_LAT = 15;
 const DEFAULT_DRY_MAX_LAT = 35;
@@ -375,6 +416,7 @@ const getRepoCommitSha = () => {
 };
 
 const cloneConfigSnapshot = (core) => ({
+  instrumentationMode: core.getInstrumentationMode ? core.getInstrumentationMode() : 'full',
   surfaceParams: { ...core.surfaceParams },
   advectParams: { ...core.advectParams },
   vertParams: { ...core.vertParams },
@@ -391,8 +433,10 @@ const cloneConfigSnapshot = (core) => ({
   lodParams: { ...core.lodParams }
 });
 
-const applyCoreConfigSnapshot = (core, snapshot) => {
+const applyCoreConfigSnapshot = (core, snapshot, { instrumentationModeOverride = null } = {}) => {
   if (!snapshot) return;
+  const nextInstrumentationMode = instrumentationModeOverride || snapshot.instrumentationMode || 'full';
+  if (core.setInstrumentationMode) core.setInstrumentationMode(nextInstrumentationMode);
   Object.assign(core.surfaceParams, snapshot.surfaceParams || {});
   Object.assign(core.advectParams, snapshot.advectParams || {});
   Object.assign(core.vertParams, snapshot.vertParams || {});
@@ -421,6 +465,7 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
     seed,
     sampleEveryDays,
     horizonsDays,
+    instrumentationMode: core.getInstrumentationMode ? core.getInstrumentationMode() : instrumentationMode,
     sampleTargetsDays,
     targetSeconds: targetsSeconds,
     reproCheckEnabled: Boolean(reproCheck)
@@ -451,6 +496,199 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
   terrain: terrainFallback || null,
   params: cloneConfigSnapshot(core)
 });
+
+const loadTrustedBaselineArtifact = (artifactPath = defaultTrustedPhase1BaselinePath) => {
+  if (!artifactPath || !fs.existsSync(artifactPath)) {
+    throw new Error(`Trusted baseline artifact not found at ${artifactPath}`);
+  }
+  const parsed = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+  return {
+    artifactPath,
+    schema: parsed?.schema || null,
+    config: parsed?.config || null,
+    gitCommit: parsed?.runManifest?.gitCommit || null,
+    metrics: parsed?.horizons?.[0]?.latest?.metrics || parsed?.samples?.[parsed.samples.length - 1]?.metrics || null
+  };
+};
+
+const buildMetricDiffMap = (referenceMetrics = {}, candidateMetrics = {}, metricKeys = PHASE1_BASELINE_METRIC_KEYS) => (
+  Object.fromEntries(metricKeys.map((key) => {
+    const reference = Number(referenceMetrics?.[key]);
+    const candidate = Number(candidateMetrics?.[key]);
+    const delta = Number.isFinite(reference) && Number.isFinite(candidate) ? candidate - reference : null;
+    const tolerance = PHASE1_BASELINE_METRIC_TOLERANCES[key] ?? 0.05;
+    return [key, {
+      reference: Number.isFinite(reference) ? round(reference, 5) : null,
+      candidate: Number.isFinite(candidate) ? round(candidate, 5) : null,
+      delta: Number.isFinite(delta) ? round(delta, 5) : null,
+      absDelta: Number.isFinite(delta) ? round(Math.abs(delta), 5) : null,
+      tolerance,
+      pass: Number.isFinite(delta) ? Math.abs(delta) <= tolerance : false
+    }];
+  }))
+);
+
+const advanceAndSampleCore = ({ core, sampleTargetsDays }) => {
+  const samples = [];
+  const timingByTarget = [];
+  let previousSeconds = 0;
+  for (const targetDay of sampleTargetsDays) {
+    const startedAt = Date.now();
+    const targetSeconds = targetDay * SECONDS_PER_DAY;
+    const deltaSeconds = Math.max(0, targetSeconds - previousSeconds);
+    if (deltaSeconds > 0) core.advanceModelSeconds(deltaSeconds);
+    previousSeconds = targetSeconds;
+    const diagnostics = buildValidationDiagnostics(core);
+    samples.push(classifySnapshot(diagnostics, targetDay));
+    timingByTarget.push({
+      targetDay,
+      elapsedMs: Date.now() - startedAt
+    });
+  }
+  const horizonSummaries = horizonsDays.map((horizonDaysValue) => {
+    const horizonSamples = samples.filter((sample) => sample.targetDay <= horizonDaysValue);
+    return {
+      horizonDays: horizonDaysValue,
+      ...evaluateHorizons(horizonSamples, horizonDaysValue),
+      sampleCount: horizonSamples.length
+    };
+  });
+  return { samples, timingByTarget, horizonSummaries };
+};
+
+const runObserverEffectVariant = async ({
+  variantKey,
+  label,
+  variantInstrumentationMode,
+  sampleTargetsDays,
+  targetsSeconds,
+  configSnapshot
+}) => {
+  const core = new WeatherCore5({
+    nx,
+    ny,
+    dt,
+    seed,
+    instrumentationMode: variantInstrumentationMode
+  });
+  await core._initPromise;
+  applyCoreConfigSnapshot(core, configSnapshot, { instrumentationModeOverride: variantInstrumentationMode });
+  const terrainFallback = applyHeadlessTerrainFixture(core);
+  const { samples, timingByTarget, horizonSummaries } = advanceAndSampleCore({ core, sampleTargetsDays });
+  const latest = horizonSummaries[horizonSummaries.length - 1]?.latest || samples[samples.length - 1] || null;
+  return {
+    key: variantKey,
+    label,
+    instrumentationMode: variantInstrumentationMode,
+    headlessTerrain: terrainFallback,
+    timings: timingByTarget,
+    samples,
+    horizons: horizonSummaries,
+    latest,
+    runManifest: buildRunManifest({ core, terrainFallback, sampleTargetsDays, targetsSeconds })
+  };
+};
+
+const buildObserverEffectModuleOrderParityReport = (variants = []) => {
+  const referenceOrder = variants[0]?.runManifest?.runtime?.moduleOrder || [];
+  return {
+    schema: 'satellite-wars.observer-effect-module-order-parity.v1',
+    generatedAt: new Date().toISOString(),
+    variants: variants.map((variant) => ({
+      key: variant.key,
+      label: variant.label,
+      instrumentationMode: variant.instrumentationMode,
+      moduleOrder: variant.runManifest?.runtime?.moduleOrder || [],
+      moduleTiming: variant.runManifest?.runtime?.moduleTiming || null
+    })),
+    parity: variants.map((variant) => ({
+      key: variant.key,
+      instrumentationMode: variant.instrumentationMode,
+      sameOrderAsReference: JSON.stringify(variant.runManifest?.runtime?.moduleOrder || []) === JSON.stringify(referenceOrder)
+    }))
+  };
+};
+
+const renderObserverEffectBaselineDiffMarkdown = (report) => {
+  const lines = [
+    '# Observer-Effect Baseline Diff',
+    '',
+    `Generated: ${report.generatedAt}`,
+    `Trusted baseline: ${report.trustedBaseline.artifactPath}`,
+    '',
+    '## Verdict',
+    '',
+    `- Baseline reconciled: ${report.assessment.baselineReconciledPass ? 'yes' : 'no'}`,
+    `- Observer effect likely: ${report.assessment.observerEffectLikely ? 'yes' : 'no'}`,
+    `- Current diagnosis: ${report.assessment.likelyCause}`
+  ];
+  for (const variant of report.variants) {
+    lines.push('', `## ${variant.label}`, '');
+    lines.push(`- instrumentation mode: ${variant.instrumentationMode}`);
+    lines.push(`- phase1 metrics within tolerance: ${variant.phase1WithinToleranceCount}/${PHASE1_BASELINE_METRIC_KEYS.length}`);
+    lines.push(`- max abs phase1 delta: ${variant.maxAbsPhase1Delta}`);
+    for (const key of PHASE1_BASELINE_METRIC_KEYS) {
+      const diff = variant.phase1MetricDiff[key];
+      lines.push(`- ${key}: ${diff.candidate} vs ${diff.reference} (${diff.delta >= 0 ? '+' : ''}${diff.delta})`);
+    }
+  }
+  return `${lines.join('\n')}\n`;
+};
+
+const buildObserverEffectBaselineDiffReport = ({
+  trustedBaseline,
+  variants,
+  moduleOrderParity
+}) => {
+  const variantSummaries = variants.map((variant) => {
+    const phase1MetricDiff = buildMetricDiffMap(trustedBaseline.metrics || {}, variant.latest?.metrics || {});
+    const phase1WithinToleranceCount = Object.values(phase1MetricDiff).filter((entry) => entry.pass).length;
+    const maxAbsPhase1Delta = Object.values(phase1MetricDiff).reduce(
+      (max, entry) => Math.max(max, Number(entry.absDelta) || 0),
+      0
+    );
+    return {
+      key: variant.key,
+      label: variant.label,
+      instrumentationMode: variant.instrumentationMode,
+      latestTargetDay: variant.latest?.targetDay ?? null,
+      latestMetrics: variant.latest?.metrics || {},
+      phase1MetricDiff,
+      phase1WithinToleranceCount,
+      maxAbsPhase1Delta: round(maxAbsPhase1Delta, 5)
+    };
+  });
+  const variantByKey = Object.fromEntries(variantSummaries.map((entry) => [entry.key, entry]));
+  const full = variantByKey.full || null;
+  const noop = variantByKey.noop || null;
+  const disabled = variantByKey.disabled || null;
+  const fullReconciled = Boolean(full && full.phase1WithinToleranceCount === PHASE1_BASELINE_METRIC_KEYS.length);
+  const observerEffectLikely = Boolean(
+    full && disabled
+      && disabled.phase1WithinToleranceCount > full.phase1WithinToleranceCount
+      && ((full.maxAbsPhase1Delta || 0) - (disabled.maxAbsPhase1Delta || 0)) > 0.1
+  );
+  return {
+    schema: 'satellite-wars.observer-effect-baseline-diff.v1',
+    generatedAt: new Date().toISOString(),
+    trustedBaseline,
+    variants: variantSummaries,
+    comparisons: {
+      fullVsNoop: full && noop ? buildMetricDiffMap(full.latestMetrics || {}, noop.latestMetrics || {}) : null,
+      fullVsDisabled: full && disabled ? buildMetricDiffMap(full.latestMetrics || {}, disabled.latestMetrics || {}) : null
+    },
+    moduleOrderParity,
+    assessment: {
+      baselineReconciledPass: fullReconciled,
+      observerEffectLikely,
+      likelyCause: fullReconciled
+        ? 'reconciled'
+        : observerEffectLikely
+          ? 'observer_effect_or_tracing_side_effect'
+          : 'branch_drift_or_audit_semantics_drift'
+    }
+  };
+};
 
 const buildConservationSummary = ({ core }) => ({
   schema: 'satellite-wars.conservation-summary.v1',
@@ -3115,35 +3353,11 @@ export async function main() {
   }
   const sampleTargetsDays = buildSampleTargetsDays(horizonsDays, sampleEveryDays);
   const targetsSeconds = sampleTargetsDays.map((day) => day * SECONDS_PER_DAY);
-  const core = new WeatherCore5({ nx, ny, dt, seed });
+  const core = new WeatherCore5({ nx, ny, dt, seed, instrumentationMode });
   await core._initPromise;
   const terrainFallback = applyHeadlessTerrainFixture(core);
   const configSnapshot = cloneConfigSnapshot(core);
-
-  const samples = [];
-  const timingByTarget = [];
-  let previousSeconds = 0;
-  for (const targetSeconds of targetsSeconds) {
-    const startedAt = Date.now();
-    const deltaSeconds = Math.max(0, targetSeconds - previousSeconds);
-    if (deltaSeconds > 0) core.advanceModelSeconds(deltaSeconds);
-    previousSeconds = targetSeconds;
-    const diagnostics = buildValidationDiagnostics(core);
-    samples.push(classifySnapshot(diagnostics, targetSeconds / SECONDS_PER_DAY));
-    timingByTarget.push({
-      targetDay: targetSeconds / SECONDS_PER_DAY,
-      elapsedMs: Date.now() - startedAt
-    });
-  }
-
-  const horizonSummaries = horizonsDays.map((horizonDaysValue) => {
-    const horizonSamples = samples.filter((sample) => sample.targetDay <= horizonDaysValue);
-    return {
-      horizonDays: horizonDaysValue,
-      ...evaluateHorizons(horizonSamples, horizonDaysValue),
-      sampleCount: horizonSamples.length
-    };
-  });
+  const { samples, timingByTarget, horizonSummaries } = advanceAndSampleCore({ core, sampleTargetsDays });
 
   const overallPass = horizonSummaries.every((horizon) => horizon.overallPass);
   const defaultNextPriorities = [];
@@ -3193,62 +3407,68 @@ export async function main() {
   const nudgingTargetMismatch = buildNudgingTargetMismatchReport(latestSample);
   const initializationMemory = buildInitializationMemoryReport(samples, latestSample);
   const numericalIntegritySummary = buildNumericalIntegritySummaryReport(latestSample);
+  let dtSensitivity = null;
+  let gridSensitivity = null;
+  let dtSensitivityVariants = [];
+  let gridSensitivityVariants = [];
+  let counterfactualTargetDay = sampleTargetsDays.find((day) => day >= 30)
+    || sampleTargetsDays[sampleTargetsDays.length - 1]
+    || null;
   const sensitivityTargetDay = sampleTargetsDays.find((day) => day >= Math.min(15, sampleTargetsDays[sampleTargetsDays.length - 1]))
     || sampleTargetsDays[0];
   const baselineSensitivitySample = samples.find((sample) => sample.targetDay === sensitivityTargetDay) || latestSample;
-  const dtSensitivityVariants = await Promise.all([
-    runSensitivityVariant({
-      variantName: 'dt_half',
-      variantNx: nx,
-      variantNy: ny,
-      variantDtSeconds: Math.max(300, Math.round(dt * 0.5 / 300) * 300),
-      targetDay: sensitivityTargetDay,
-      configSnapshot
-    }),
-    runSensitivityVariant({
-      variantName: 'dt_150pct',
-      variantNx: nx,
-      variantNy: ny,
-      variantDtSeconds: Math.max(300, Math.round(dt * 1.5 / 300) * 300),
-      targetDay: sensitivityTargetDay,
-      configSnapshot
-    })
-  ]);
-  const gridSensitivityVariants = await Promise.all([
-    runSensitivityVariant({
-      variantName: 'grid_coarse',
-      variantNx: roundGridDimension(nx * 0.75, 24),
-      variantNy: roundGridDimension(ny * 0.75, 12),
-      variantDtSeconds: dt,
-      targetDay: sensitivityTargetDay,
-      configSnapshot
-    }),
-    runSensitivityVariant({
-      variantName: 'grid_dense',
-      variantNx: roundGridDimension(nx * 1.25, 24),
-      variantNy: roundGridDimension(ny * 1.25, 12),
-      variantDtSeconds: dt,
-      targetDay: sensitivityTargetDay,
-      configSnapshot
-    })
-  ]);
-  const dtSensitivity = buildDtSensitivityReport({
-    baselineSample: baselineSensitivitySample,
-    variants: dtSensitivityVariants,
-    targetDay: sensitivityTargetDay
-  });
-  const gridSensitivity = buildGridSensitivityReport({
-    baselineSample: baselineSensitivitySample,
-    variants: gridSensitivityVariants,
-    targetDay: sensitivityTargetDay
-  });
-  const counterfactualTargetDay = sampleTargetsDays.find((day) => day >= 30)
-    || sampleTargetsDays[sampleTargetsDays.length - 1]
-    || null;
   const baselineCounterfactualSample = samples.find((sample) => sample.targetDay === counterfactualTargetDay) || latestSample;
+  if (!observerEffectAudit) {
+    dtSensitivityVariants = await Promise.all([
+      runSensitivityVariant({
+        variantName: 'dt_half',
+        variantNx: nx,
+        variantNy: ny,
+        variantDtSeconds: Math.max(300, Math.round(dt * 0.5 / 300) * 300),
+        targetDay: sensitivityTargetDay,
+        configSnapshot
+      }),
+      runSensitivityVariant({
+        variantName: 'dt_150pct',
+        variantNx: nx,
+        variantNy: ny,
+        variantDtSeconds: Math.max(300, Math.round(dt * 1.5 / 300) * 300),
+        targetDay: sensitivityTargetDay,
+        configSnapshot
+      })
+    ]);
+    gridSensitivityVariants = await Promise.all([
+      runSensitivityVariant({
+        variantName: 'grid_coarse',
+        variantNx: roundGridDimension(nx * 0.75, 24),
+        variantNy: roundGridDimension(ny * 0.75, 12),
+        variantDtSeconds: dt,
+        targetDay: sensitivityTargetDay,
+        configSnapshot
+      }),
+      runSensitivityVariant({
+        variantName: 'grid_dense',
+        variantNx: roundGridDimension(nx * 1.25, 24),
+        variantNy: roundGridDimension(ny * 1.25, 12),
+        variantDtSeconds: dt,
+        targetDay: sensitivityTargetDay,
+        configSnapshot
+      })
+    ]);
+    dtSensitivity = buildDtSensitivityReport({
+      baselineSample: baselineSensitivitySample,
+      variants: dtSensitivityVariants,
+      targetDay: sensitivityTargetDay
+    });
+    gridSensitivity = buildGridSensitivityReport({
+      baselineSample: baselineSensitivitySample,
+      variants: gridSensitivityVariants,
+      targetDay: sensitivityTargetDay
+    });
+  }
   let counterfactualPathwaySensitivity = null;
   let rootCauseCandidateRanking = null;
-  if (counterfactuals && baselineCounterfactualSample && Number.isFinite(counterfactualTargetDay)) {
+  if (!observerEffectAudit && counterfactuals && baselineCounterfactualSample && Number.isFinite(counterfactualTargetDay)) {
     const baselineCounterfactualVariants = await Promise.all(
       COUNTERFACTUAL_VARIANTS.map((variant) => runCounterfactualVariant({
         variant,
@@ -3346,6 +3566,43 @@ export async function main() {
   const restartParity = reproCheck
     ? await runRestartParityCheck({ configSnapshot, checkpointDay, sampleTargetsDays })
     : null;
+  let observerEffectBaselineDiff = null;
+  let observerEffectModuleOrderParity = null;
+  if (observerEffectAudit) {
+    const trustedBaseline = loadTrustedBaselineArtifact(trustedBaselinePath || defaultTrustedPhase1BaselinePath);
+    const observerVariants = await Promise.all([
+      runObserverEffectVariant({
+        variantKey: 'full',
+        label: 'Current full tracing',
+        variantInstrumentationMode: 'full',
+        sampleTargetsDays,
+        targetsSeconds,
+        configSnapshot
+      }),
+      runObserverEffectVariant({
+        variantKey: 'noop',
+        label: 'Current no-op tracing',
+        variantInstrumentationMode: 'noop',
+        sampleTargetsDays,
+        targetsSeconds,
+        configSnapshot
+      }),
+      runObserverEffectVariant({
+        variantKey: 'disabled',
+        label: 'Current tracing disabled',
+        variantInstrumentationMode: 'disabled',
+        sampleTargetsDays,
+        targetsSeconds,
+        configSnapshot
+      })
+    ]);
+    observerEffectModuleOrderParity = buildObserverEffectModuleOrderParityReport(observerVariants);
+    observerEffectBaselineDiff = buildObserverEffectBaselineDiffReport({
+      trustedBaseline,
+      variants: observerVariants,
+      moduleOrderParity: observerEffectModuleOrderParity
+    });
+  }
   const artifactBase = deriveArtifactBase();
   const artifacts = artifactBase ? {
     monthlyClimatologyJsonPath: `${artifactBase}-monthly-climatology.json`,
@@ -3383,7 +3640,10 @@ export async function main() {
     seasonalRootCauseRankingJsonPath: `${artifactBase}-seasonal-root-cause-ranking.json`,
     attributionLagAnalysisJsonPath: `${artifactBase}-attribution-lag-analysis.json`,
     counterfactualPathwaySensitivityJsonPath: `${artifactBase}-counterfactual-pathway-sensitivity.json`,
-    rootCauseCandidateRankingJsonPath: `${artifactBase}-root-cause-candidate-ranking.json`
+    rootCauseCandidateRankingJsonPath: `${artifactBase}-root-cause-candidate-ranking.json`,
+    observerEffectBaselineDiffJsonPath: `${artifactBase}-observer-effect-baseline-diff.json`,
+    observerEffectBaselineDiffMdPath: `${artifactBase}-observer-effect-baseline-diff.md`,
+    observerEffectModuleOrderParityJsonPath: `${artifactBase}-observer-effect-module-order-parity.json`
   } : null;
   const summarySamples = samples.map((sample) => compactSampleForSummary(sample));
   const summaryHorizons = horizonSummaries.map((horizon) => ({
@@ -3444,6 +3704,8 @@ export async function main() {
     attributionLagAnalysis,
     counterfactualPathwaySensitivity,
     rootCauseCandidateRanking,
+    observerEffectBaselineDiff,
+    observerEffectModuleOrderParity,
     artifacts,
     defaultNextPriorities
   };
@@ -3507,6 +3769,13 @@ export async function main() {
     fs.writeFileSync(artifacts.attributionLagAnalysisJsonPath, toJson(attributionLagAnalysis));
     fs.writeFileSync(artifacts.counterfactualPathwaySensitivityJsonPath, toJson(counterfactualPathwaySensitivity));
     fs.writeFileSync(artifacts.rootCauseCandidateRankingJsonPath, toJson(rootCauseCandidateRanking));
+    if (observerEffectBaselineDiff) {
+      fs.writeFileSync(artifacts.observerEffectBaselineDiffJsonPath, toJson(observerEffectBaselineDiff));
+      fs.writeFileSync(artifacts.observerEffectBaselineDiffMdPath, renderObserverEffectBaselineDiffMarkdown(observerEffectBaselineDiff));
+    }
+    if (observerEffectModuleOrderParity) {
+      fs.writeFileSync(artifacts.observerEffectModuleOrderParityJsonPath, toJson(observerEffectModuleOrderParity));
+    }
   }
   process.stdout.write(toJson(summary));
   return summary;
@@ -3531,6 +3800,9 @@ export const _test = {
   buildAttributionLagAnalysis,
   buildCounterfactualPathwaySensitivityReport,
   buildRootCauseCandidateRankingReport,
+  buildObserverEffectBaselineDiffReport,
+  buildObserverEffectModuleOrderParityReport,
+  renderObserverEffectBaselineDiffMarkdown,
   buildRealismGapReport,
   buildTransportInterfaceBudgetReport,
   buildHadleyPartitionSummaryReport,

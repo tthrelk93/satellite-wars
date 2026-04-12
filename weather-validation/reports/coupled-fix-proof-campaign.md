@@ -89,6 +89,16 @@ Exit criteria:
 - either the current branch reproduces the trusted baseline within tolerance
 - or we isolate the exact observer/drift cause and fix that first
 
+Phase A result:
+- completed on `2026-04-12`
+- trusted baseline commit `e6fea58` still reproduces the kept Phase 1 artifact exactly
+- current branch does **not** reproduce that baseline
+- current `full`, `noop`, and `disabled` instrumentation modes all land on the same degraded quick baseline
+- module stepping order remains identical across the observer variants
+- current diagnosis:
+  - `observer effect`: ruled out as the primary cause
+  - `branch drift or audit semantics drift`: still active and must be treated as the live baseline problem before any new fix-placement claims
+
 ## Phase B: Module-Local Cloud Transition Ledger
 
 Objective:
