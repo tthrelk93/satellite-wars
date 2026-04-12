@@ -394,6 +394,10 @@ Phase E1 result:
 Objective:
 - only after E0 and E1 close, turn the proven pre-handoff failure chain into an exact “where the fix goes” design before editing physics defaults
 
+Companion plan:
+- execute [prevertical-upstream-proof-plan.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/prevertical-upstream-proof-plan.md) before attempting E2
+- E2 should consume the outputs of that plan, not bypass it
+
 Required deliverables:
 - exact file/function ownership
 - expected before/after transition changes in the E1 ledger
