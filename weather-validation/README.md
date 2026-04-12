@@ -157,6 +157,21 @@ Those artifacts are meant for follow-on tuning, not just pass/fail:
 - zonal profile traces at every sampled checkpoint so you can see where the moisture belts, cloud belts, and convective mass flux are misplaced
 - a ranked realism-gap report that turns the failing warnings into prioritized tuning targets
 
+Run the quick audit with the Phase 11 controlled-ablation harness:
+
+```bash
+SATELLITE_WARS_ALLOW_REPORT_ONLY=1 npm run agent:planetary-realism-audit -- --preset quick --report-base /tmp/planetary-phase11-smoke --counterfactuals
+```
+
+That counterfactual pass adds:
+- `*-counterfactual-pathway-sensitivity.json`
+- `*-root-cause-candidate-ranking.json`
+
+Those artifacts are meant to answer a tighter causal question than the seasonal reports:
+- which single upstream pathway gives the best directional improvement when weakened in isolation
+- whether that directional improvement survives the carried Phase 9 `dt` / grid sensitivity reruns
+- whether the bug is dominated by one lever or behaves like a coupled multi-pathway failure
+
 Live weather logs also now include a `v2.broadClimate` object in every `state` entry so browser-backed runs expose the same ITCZ, subtropical drying, convective organization, and trade/westerly metrics as the headless planetary audit.
 
 Generate the automatic top-5 physics target report from those annual artifacts:

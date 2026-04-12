@@ -75,7 +75,7 @@ Completed phases:
 - `Phase 9`: numerical integrity and sensitivity diagnostics
 
 Current active phase:
-- `Phase 10`: seasonal memory and hysteresis diagnostics, followed by `Phase 11` counterfactual closure once numerical ambiguity is better bounded
+- `Phase 12`: root-cause closure and patch readiness, using the completed Phase 11 counterfactual findings as the last major causal screen
 
 Revised execution order from this point forward:
 1. Treat `Phases 4-8` as completed causal narrowing layers:
@@ -88,8 +88,8 @@ Revised execution order from this point forward:
    - instrumentation is complete
    - outcome is not “ruled out”
    - the dominant attribution story still shifts under `dt` and grid perturbations
-4. Use `Phase 11` to run counterfactual ablations against the imported-cloud / erosion pathway while explicitly checking whether those counterfactual results remain directionally stable across the Phase 9 sensitivity variants.
-5. Finish with `Phase 12` root-cause closure only after both seasonal and numerical checks agree on one dominant pathway.
+4. Use `Phase 11` to run counterfactual ablations against the imported-cloud / erosion / radiative pathway candidates while explicitly checking whether those counterfactual results remain directionally stable across the Phase 9 sensitivity variants.
+5. Finish with `Phase 12` root-cause closure only after both seasonal and numerical checks agree on one dominant pathway, or after Phase 11 proves the bug is a coupled multi-pathway failure instead of a single isolated lever.
 
 What this means:
 - we are not abandoning any of the remaining phases
@@ -646,6 +646,18 @@ Root-cause effect on the plan:
 
 ## Phase 11: Controlled Ablation And Counterfactual Harness
 
+Status:
+- complete on the current branch as the Phase 11 controlled-ablation / counterfactual pass
+- the new harness now runs one-pathway-at-a-time perturbations against:
+  - source moisture
+  - 35°N upper import
+  - resolved-ascent cloud birth
+  - saturation-adjustment cloud birth
+  - upper-cloud erosion
+  - radiative maintenance
+  - nudging opposition
+- the same harness also reruns the strongest candidates across Phase 9 `dt` / grid sensitivity variants before ranking them
+
 Objective:
 - move from observation to causal proof
 
@@ -675,6 +687,22 @@ Rules out / confirms:
 
 Exit criteria:
 - one or two pathway families produce the dominant directional improvement when perturbed
+
+Observed Phase 11 result:
+- no single isolated pathway ablation cleared the gate
+- the best raw dry-belt movers were:
+  - `saturationAdjustmentBirth`: `dryRatioImprovement = 0.301`
+  - `resolvedAscentBirth`: `dryRatioImprovement = 0.291`
+  - `radiativeMaintenance`: `dryRatioImprovement = 0.289`
+  - `upperCloudErosion`: `dryRatioImprovement = 0.216`
+- but every one of those candidates still failed the guarded directional score because they re-broadened the ITCZ and/or became unstable across the carried Phase 9 sensitivity variants
+- `source moisture` and `nudging opposition` now look even weaker as primary explanations:
+  - source-moisture ablation made the north dry-belt ratio worse
+  - nudging-opposition ablation was effectively neutral
+- the current counterfactual result is therefore:
+  - imported transport, blocked erosion, large-scale maintenance, and radiative support all matter
+  - but none wins as a standalone lever
+  - the bug now looks like a coupled multi-pathway failure rather than a single isolated dominant knob
 
 ## Phase 12: Root-Cause Closure And Patch Readiness
 

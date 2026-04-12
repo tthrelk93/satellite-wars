@@ -57,6 +57,7 @@ let outPath = null;
 let mdOutPath = null;
 let reportBase = null;
 let reproCheck = null;
+let counterfactuals = null;
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -88,6 +89,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--report-base=')) reportBase = path.resolve(arg.slice('--report-base='.length));
   else if (arg === '--repro-check') reproCheck = true;
   else if (arg === '--no-repro-check') reproCheck = false;
+  else if (arg === '--counterfactuals') counterfactuals = true;
+  else if (arg === '--no-counterfactuals') counterfactuals = false;
 }
 
 const presetConfig = PLANETARY_PRESETS[preset] || PLANETARY_PRESETS.quick;
@@ -100,6 +103,7 @@ horizonsDays = Array.isArray(horizonsDays) && horizonsDays.length
   : presetConfig.horizonsDays.slice();
 if (!Number.isFinite(seed)) seed = 12345;
 if (reproCheck == null) reproCheck = preset === 'quick';
+if (counterfactuals == null) counterfactuals = preset === 'quick';
 
 const effectiveReportBase = outPath || mdOutPath ? null : (reportBase || defaultReportBase);
 
@@ -111,6 +115,10 @@ const DEFAULT_STORM_MIN_LAT = 25;
 const DEFAULT_STORM_MAX_LAT = 70;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const smoothstep = (edge0, edge1, x) => {
+  const t = clamp((x - edge0) / Math.max(1e-6, edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+};
 const mean = (values) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 const round = (value, digits = 3) => Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
 const toJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
@@ -153,6 +161,58 @@ const SEASON_DEFS = [
   { key: 'JJA', label: 'JJA', monthIndices: [5, 6, 7] },
   { key: 'SON', label: 'SON', monthIndices: [8, 9, 10] }
 ];
+const COUNTERFACTUAL_VARIANTS = [
+  {
+    key: 'sourceMoisture',
+    label: 'Source moisture ablation',
+    family: 'Source moisture supply',
+    description: 'Reduce low-level NH dry-belt ocean and tropical-N source vapor after each step.',
+    strength: 0.18
+  },
+  {
+    key: 'transportImport',
+    label: '35N upper import ablation',
+    family: 'Imported cloud transport',
+    description: 'Reduce carried-over upper cloud arriving through the NH upper-tropospheric import corridor.',
+    strength: 0.18
+  },
+  {
+    key: 'resolvedAscentBirth',
+    label: 'Resolved ascent cloud-birth ablation',
+    family: 'Resolved ascent cloud birth',
+    description: 'Undo a fraction of resolved-ascent cloud birth in the NH dry belt.',
+    strength: 0.18
+  },
+  {
+    key: 'saturationAdjustmentBirth',
+    label: 'Saturation-adjustment cloud-birth ablation',
+    family: 'Large-scale condensation maintenance',
+    description: 'Undo a fraction of saturation-adjustment cloud birth in the NH dry belt.',
+    strength: 0.18
+  },
+  {
+    key: 'upperCloudErosion',
+    label: 'Upper-cloud erosion boost',
+    family: 'Blocked upper-cloud erosion',
+    description: 'Apply extra removal against blocked NH dry-belt upper-cloud erosion mass.',
+    strength: 0.18
+  },
+  {
+    key: 'radiativeMaintenance',
+    label: 'Radiative maintenance ablation',
+    family: 'Radiative cloud maintenance',
+    description: 'Reduce upper-cloud persistence in proportion to radiative support.',
+    strength: 0.18
+  },
+  {
+    key: 'nudgingOpposition',
+    label: 'Nudging opposition ablation',
+    family: 'Helper forcing interference',
+    description: 'Remove nudging and analysis-injected vapor from NH dry-belt lower levels.',
+    strength: 0.18
+  }
+];
+const COUNTERFACTUAL_TOP_CANDIDATE_COUNT = 3;
 
 export const buildSampleTargetsDays = (horizonList, cadenceDays) => {
   const targets = new Set(horizonList);
@@ -2270,6 +2330,453 @@ const compareAttributionStory = (baselineSample, variantSample) => {
   };
 };
 
+const sigmaMidAtLevel = (sigmaHalf, lev, nz) => (
+  sigmaHalf
+    ? clamp01(0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1]))
+    : clamp01((lev + 0.5) / Math.max(1, nz))
+);
+
+const buildCounterfactualContext = (core) => {
+  const { grid, state } = core;
+  const { nx, ny } = grid;
+  const { N, nz, sigmaHalf, landMask } = state;
+  const nhDryBeltWeight = new Float32Array(N);
+  const nhDryBeltOceanWeight = new Float32Array(N);
+  const nhUpperImportWeight = new Float32Array(N);
+  const upperLevels = [];
+  const lowerLevels = [];
+  const cloudBirthLevels = [];
+  for (let lev = 0; lev < nz; lev += 1) {
+    const sigmaMid = sigmaMidAtLevel(sigmaHalf, lev, nz);
+    if (sigmaMid <= 0.55) upperLevels.push(lev);
+    if (sigmaMid >= 0.65) lowerLevels.push(lev);
+    if (sigmaMid <= 0.7) cloudBirthLevels.push(lev);
+  }
+  for (let j = 0; j < ny; j += 1) {
+    const lat = grid.latDeg[j];
+    const dryWeight = smoothstep(13, 17, lat) * (1 - smoothstep(34, 38, lat));
+    const importWeight = smoothstep(20, 24, lat) * (1 - smoothstep(35, 40, lat));
+    const row = j * nx;
+    for (let i = 0; i < nx; i += 1) {
+      const k = row + i;
+      const isOcean = !(landMask && landMask[k] === 1);
+      nhDryBeltWeight[k] = dryWeight;
+      nhUpperImportWeight[k] = importWeight;
+      nhDryBeltOceanWeight[k] = isOcean ? dryWeight : 0;
+    }
+  }
+  return {
+    upperLevels,
+    lowerLevels,
+    cloudBirthLevels,
+    nhDryBeltWeight,
+    nhDryBeltOceanWeight,
+    nhUpperImportWeight
+  };
+};
+
+const createCounterfactualAccumulator = (variant) => ({
+  variantKey: variant.key,
+  label: variant.label,
+  family: variant.family,
+  strength: variant.strength,
+  affectedCellSteps: 0,
+  removedVaporKgM2: 0,
+  removedCloudKgM2: 0,
+  returnedCloudToVaporKgM2: 0
+});
+
+const removeTracerBackedVaporAtLevel = (state, idx, tracerFieldNames, removalFrac, layerAirMass) => {
+  if (!Number.isFinite(removalFrac) || removalFrac <= 0 || !Number.isFinite(layerAirMass) || layerAirMass <= 0) return 0;
+  const tracerFields = tracerFieldNames
+    .map((fieldName) => state[fieldName])
+    .filter((field) => field instanceof Float32Array && field.length === state.qv.length);
+  if (!tracerFields.length) return 0;
+  let tracerTotal = 0;
+  for (const field of tracerFields) tracerTotal += Math.max(0, field[idx] || 0);
+  if (!(tracerTotal > 0)) return 0;
+  const qvAvailable = Math.max(0, state.qv[idx] || 0);
+  const removalMixingRatio = Math.min(qvAvailable, tracerTotal * clamp01(removalFrac));
+  if (!(removalMixingRatio > 0)) return 0;
+  const tracerScale = removalMixingRatio / Math.max(tracerTotal, 1e-9);
+  for (const field of tracerFields) {
+    field[idx] = Math.max(0, field[idx] - Math.max(0, field[idx]) * tracerScale);
+  }
+  state.qv[idx] = Math.max(0, qvAvailable - removalMixingRatio);
+  return removalMixingRatio * layerAirMass;
+};
+
+const removeColumnCloudMass = (state, k, levels, removalMassKgM2, returnToVaporFrac = 0) => {
+  if (!Number.isFinite(removalMassKgM2) || removalMassKgM2 <= 0 || !Array.isArray(levels) || !levels.length) {
+    return { removedCloudKgM2: 0, returnedVaporKgM2: 0 };
+  }
+  const { N, pHalf, qc, qi, qr, qs, qv } = state;
+  const layers = [];
+  let totalCondMass = 0;
+  for (const lev of levels) {
+    const idx = lev * N + k;
+    const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+    const layerAirMass = dp > 0 ? dp / 9.80665 : 0;
+    if (!(layerAirMass > 0)) continue;
+    const condMixingRatio = Math.max(0, qc[idx] || 0) + Math.max(0, qi[idx] || 0) + Math.max(0, qr[idx] || 0) + Math.max(0, qs[idx] || 0);
+    const condMass = condMixingRatio * layerAirMass;
+    if (!(condMass > 0)) continue;
+    layers.push({ idx, layerAirMass, condMixingRatio, condMass });
+    totalCondMass += condMass;
+  }
+  if (!(totalCondMass > 0)) return { removedCloudKgM2: 0, returnedVaporKgM2: 0 };
+  const removalScale = Math.min(1, removalMassKgM2 / Math.max(totalCondMass, 1e-9));
+  let removedCloudKgM2 = 0;
+  let returnedVaporKgM2 = 0;
+  for (const layer of layers) {
+    const layerRemovalMass = layer.condMass * removalScale;
+    if (!(layerRemovalMass > 0)) continue;
+    const speciesScale = layerRemovalMass / Math.max(layer.condMass, 1e-9);
+    qc[layer.idx] = Math.max(0, qc[layer.idx] * (1 - speciesScale));
+    qi[layer.idx] = Math.max(0, qi[layer.idx] * (1 - speciesScale));
+    qr[layer.idx] = Math.max(0, qr[layer.idx] * (1 - speciesScale));
+    qs[layer.idx] = Math.max(0, qs[layer.idx] * (1 - speciesScale));
+    const returnedMass = layerRemovalMass * clamp01(returnToVaporFrac);
+    if (returnedMass > 0) {
+      qv[layer.idx] += returnedMass / layer.layerAirMass;
+      returnedVaporKgM2 += returnedMass;
+    }
+    removedCloudKgM2 += layerRemovalMass;
+  }
+  return { removedCloudKgM2, returnedVaporKgM2 };
+};
+
+const applyCounterfactualIntervention = (core, variant, context, accumulator) => {
+  const { state, grid } = core;
+  const { N, nz, pHalf } = state;
+  const {
+    nhDryBeltWeight,
+    nhDryBeltOceanWeight,
+    nhUpperImportWeight,
+    upperLevels,
+    lowerLevels,
+    cloudBirthLevels
+  } = context;
+  const tracerFieldsByVariant = {
+    sourceMoisture: ['qvSourceNorthDryBeltOcean', 'qvSourceTropicalOceanNorth'],
+    transportImport: ['qvSourceAtmosphericCarryover'],
+    nudgingOpposition: ['qvSourceNudgingInjection', 'qvSourceAnalysisInjection']
+  };
+
+  for (let k = 0; k < N; k += 1) {
+    const dryWeight = nhDryBeltWeight[k] || 0;
+    const oceanWeight = nhDryBeltOceanWeight[k] || 0;
+    const importWeight = nhUpperImportWeight[k] || 0;
+    if (variant.key === 'sourceMoisture' && oceanWeight > 0) {
+      for (const lev of lowerLevels) {
+        const idx = lev * N + k;
+        const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+        const layerAirMass = dp > 0 ? dp / 9.80665 : 0;
+        const removedMass = removeTracerBackedVaporAtLevel(
+          state,
+          idx,
+          tracerFieldsByVariant.sourceMoisture,
+          variant.strength * oceanWeight,
+          layerAirMass
+        );
+        if (removedMass > 0) {
+          accumulator.removedVaporKgM2 += removedMass;
+          accumulator.affectedCellSteps += 1;
+        }
+      }
+      continue;
+    }
+    if (variant.key === 'nudgingOpposition' && dryWeight > 0) {
+      for (const lev of lowerLevels) {
+        const idx = lev * N + k;
+        const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+        const layerAirMass = dp > 0 ? dp / 9.80665 : 0;
+        const removedMass = removeTracerBackedVaporAtLevel(
+          state,
+          idx,
+          tracerFieldsByVariant.nudgingOpposition,
+          variant.strength * dryWeight,
+          layerAirMass
+        );
+        if (removedMass > 0) {
+          accumulator.removedVaporKgM2 += removedMass;
+          accumulator.affectedCellSteps += 1;
+        }
+      }
+      continue;
+    }
+
+    let removalBudgetKgM2 = 0;
+    let levels = upperLevels;
+    let returnToVaporFrac = 0;
+
+    switch (variant.key) {
+      case 'transportImport': {
+        removalBudgetKgM2 = (Number(state.carriedOverUpperCloudMass?.[k]) || 0) * variant.strength * importWeight;
+        if (importWeight > 0) {
+          for (const lev of upperLevels) {
+            const idx = lev * N + k;
+            const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+            const layerAirMass = dp > 0 ? dp / 9.80665 : 0;
+            const removedMass = removeTracerBackedVaporAtLevel(
+              state,
+              idx,
+              tracerFieldsByVariant.transportImport,
+              variant.strength * importWeight * 0.6,
+              layerAirMass
+            );
+            if (removedMass > 0) {
+              accumulator.removedVaporKgM2 += removedMass;
+              accumulator.affectedCellSteps += 1;
+            }
+          }
+        }
+        break;
+      }
+      case 'resolvedAscentBirth':
+        removalBudgetKgM2 = (Number(state.resolvedAscentCloudBirthPotential?.[k]) || 0) * variant.strength * dryWeight;
+        levels = cloudBirthLevels;
+        returnToVaporFrac = 1;
+        break;
+      case 'saturationAdjustmentBirth':
+        removalBudgetKgM2 = (Number(state.largeScaleCondensationSource?.[k]) || 0) * variant.strength * dryWeight;
+        levels = cloudBirthLevels;
+        returnToVaporFrac = 1;
+        break;
+      case 'upperCloudErosion':
+        removalBudgetKgM2 = (Number(state.upperCloudBlockedErosionMass?.[k]) || 0) * variant.strength * dryWeight;
+        break;
+      case 'radiativeMaintenance': {
+        const supportFrac = clamp01(Math.abs(Number(state.upperCloudNetCloudRadiativeEffectWm2?.[k]) || 0) / 40);
+        removalBudgetKgM2 = (Number(state.upperCloudPath?.[k]) || 0) * supportFrac * variant.strength * dryWeight;
+        break;
+      }
+      default:
+        break;
+    }
+
+    if (!(removalBudgetKgM2 > 0)) continue;
+    const removal = removeColumnCloudMass(state, k, levels, removalBudgetKgM2, returnToVaporFrac);
+    if (removal.removedCloudKgM2 > 0 || removal.returnedVaporKgM2 > 0) {
+      accumulator.removedCloudKgM2 += removal.removedCloudKgM2;
+      accumulator.returnedCloudToVaporKgM2 += removal.returnedVaporKgM2;
+      accumulator.affectedCellSteps += 1;
+    }
+  }
+};
+
+const advanceModelSecondsWithCounterfactual = (core, totalSeconds, variant) => {
+  const totalSteps = Math.max(0, Math.floor(totalSeconds / core.modelDt));
+  const context = buildCounterfactualContext(core);
+  const accumulator = createCounterfactualAccumulator(variant);
+  for (let step = 0; step < totalSteps; step += 1) {
+    core._stepOnce(core.modelDt);
+    applyCounterfactualIntervention(core, variant, context, accumulator);
+  }
+  return accumulator;
+};
+
+const buildCounterfactualImprovement = (baselineSample, variantSample) => {
+  const baseline = baselineSample?.metrics || {};
+  const variant = variantSample?.metrics || {};
+  const dryRatioImprovement = (Number(baseline.subtropicalDryNorthRatio) || 0) - (Number(variant.subtropicalDryNorthRatio) || 0);
+  const rhNorthImprovement = (Number(baseline.subtropicalRhNorthMeanFrac) || 0) - (Number(variant.subtropicalRhNorthMeanFrac) || 0);
+  const upperCloudPathImprovement = (Number(baseline.northDryBeltUpperCloudPathMeanKgM2) || 0) - (Number(variant.northDryBeltUpperCloudPathMeanKgM2) || 0);
+  const carryoverImprovement = (Number(baseline.northDryBeltCarriedOverUpperCloudMeanKgM2) || 0) - (Number(variant.northDryBeltCarriedOverUpperCloudMeanKgM2) || 0);
+  const condensationImprovement = (Number(baseline.northDryBeltLargeScaleCondensationMeanKgM2) || 0) - (Number(variant.northDryBeltLargeScaleCondensationMeanKgM2) || 0);
+  const normalized = [
+    clamp(dryRatioImprovement / Math.max(0.05, Math.abs((Number(baseline.subtropicalDryNorthRatio) || 0) - 0.8)), -1.5, 1.5),
+    clamp(rhNorthImprovement / 0.06, -1.5, 1.5),
+    clamp(upperCloudPathImprovement / Math.max(0.05, Number(baseline.northDryBeltUpperCloudPathMeanKgM2) || 0.05), -1.5, 1.5),
+    clamp(carryoverImprovement / Math.max(0.05, Number(baseline.northDryBeltCarriedOverUpperCloudMeanKgM2) || 0.05), -1.5, 1.5),
+    clamp(condensationImprovement / Math.max(0.02, Number(baseline.northDryBeltLargeScaleCondensationMeanKgM2) || 0.02), -1.5, 1.5)
+  ];
+  let guardrailPenalty = 0;
+  const guardrails = {
+    itczWidthPass: (Number(variant.itczWidthDeg) || Infinity) <= 23.8,
+    southSubsidencePass: (Number(variant.subtropicalSubsidenceSouthMean) || -Infinity) >= 0.03,
+    tradeWindsPass: (Number(variant.tropicalTradesNorthU10Ms) || Infinity) < -0.2
+      && (Number(variant.tropicalTradesSouthU10Ms) || Infinity) < -0.2,
+    westerliesPass: (Number(variant.midlatitudeWesterliesNorthU10Ms) || -Infinity) > 0.2
+      && (Number(variant.midlatitudeWesterliesSouthU10Ms) || -Infinity) > 0.2
+  };
+  if (!guardrails.itczWidthPass) guardrailPenalty += 0.25 + clamp(((Number(variant.itczWidthDeg) || 23.8) - 23.8) / 4, 0, 0.4);
+  if (!guardrails.southSubsidencePass) guardrailPenalty += 0.25 + clamp((0.03 - (Number(variant.subtropicalSubsidenceSouthMean) || 0)) / 0.03, 0, 0.4);
+  if (!guardrails.tradeWindsPass) guardrailPenalty += 0.25;
+  if (!guardrails.westerliesPass) guardrailPenalty += 0.25;
+  const directionalImprovementScore = round(
+    (0.32 * normalized[0])
+    + (0.14 * normalized[1])
+    + (0.2 * normalized[2])
+    + (0.18 * normalized[3])
+    + (0.16 * normalized[4])
+    - guardrailPenalty,
+    5
+  );
+  return {
+    dryRatioImprovement: round(dryRatioImprovement, 5),
+    rhNorthImprovement: round(rhNorthImprovement, 5),
+    upperCloudPathImprovement: round(upperCloudPathImprovement, 5),
+    carryoverImprovement: round(carryoverImprovement, 5),
+    largeScaleCondensationImprovement: round(condensationImprovement, 5),
+    directionalImprovementScore,
+    directionalImprovementPass: directionalImprovementScore > 0 && dryRatioImprovement > 0 && Object.values(guardrails).every(Boolean),
+    guardrails
+  };
+};
+
+const runCounterfactualVariant = async ({
+  variant,
+  variantName,
+  variantNx,
+  variantNy,
+  variantDtSeconds,
+  targetDay,
+  configSnapshot
+}) => {
+  const startedAt = Date.now();
+  const core = new WeatherCore5({ nx: variantNx, ny: variantNy, dt: variantDtSeconds, seed });
+  await core._initPromise;
+  applyCoreConfigSnapshot(core, configSnapshot);
+  const terrainFallback = applyHeadlessTerrainFixture(core);
+  const interventionSummary = advanceModelSecondsWithCounterfactual(core, targetDay * SECONDS_PER_DAY, variant);
+  const latest = classifySnapshot(buildValidationDiagnostics(core), targetDay);
+  return {
+    variantName,
+    key: variant.key,
+    label: variant.label,
+    family: variant.family,
+    description: variant.description,
+    strength: variant.strength,
+    nx: variantNx,
+    ny: variantNy,
+    dtSeconds: variantDtSeconds,
+    targetDay,
+    elapsedMs: Date.now() - startedAt,
+    terrainFallback,
+    interventionSummary: {
+      ...interventionSummary,
+      removedVaporKgM2: round(interventionSummary.removedVaporKgM2, 5),
+      removedCloudKgM2: round(interventionSummary.removedCloudKgM2, 5),
+      returnedCloudToVaporKgM2: round(interventionSummary.returnedCloudToVaporKgM2, 5)
+    },
+    latest
+  };
+};
+
+export const buildCounterfactualPathwaySensitivityReport = ({
+  baselineSample = null,
+  targetDay = null,
+  variants = [],
+  sensitivityVariantsByKey = {}
+} = {}) => {
+  const pathways = variants.map((variant) => {
+    const improvement = buildCounterfactualImprovement(baselineSample, variant.latest);
+    const sensitivityVariants = (sensitivityVariantsByKey?.[variant.key] || []).map((entry) => ({
+      scenarioKey: entry.scenarioKey,
+      scenarioLabel: entry.scenarioLabel,
+      improvement: entry.improvement,
+      storyComparison: entry.storyComparison
+    }));
+    const directionalSensitivityPass = sensitivityVariants.length
+      ? sensitivityVariants.every((entry) => (entry.improvement?.dryRatioImprovement || 0) > 0 && (entry.improvement?.directionalImprovementScore || 0) > -0.05)
+      : null;
+    const storyStablePass = sensitivityVariants.length
+      ? sensitivityVariants.every((entry) => entry.storyComparison?.stable)
+      : null;
+    return {
+      key: variant.key,
+      label: variant.label,
+      family: variant.family,
+      description: variant.description,
+      strength: variant.strength,
+      elapsedMs: variant.elapsedMs,
+      metrics: {
+        subtropicalDryNorthRatio: variant.latest?.metrics?.subtropicalDryNorthRatio ?? null,
+        subtropicalRhNorthMeanFrac: variant.latest?.metrics?.subtropicalRhNorthMeanFrac ?? null,
+        northDryBeltUpperCloudPathMeanKgM2: variant.latest?.metrics?.northDryBeltUpperCloudPathMeanKgM2 ?? null,
+        northDryBeltCarriedOverUpperCloudMeanKgM2: variant.latest?.metrics?.northDryBeltCarriedOverUpperCloudMeanKgM2 ?? null,
+        northDryBeltLargeScaleCondensationMeanKgM2: variant.latest?.metrics?.northDryBeltLargeScaleCondensationMeanKgM2 ?? null
+      },
+      interventionSummary: variant.interventionSummary,
+      improvement,
+      sensitivity: {
+        directionalSensitivityPass,
+        storyStablePass,
+        variants: sensitivityVariants
+      }
+    };
+  }).sort((a, b) => (b.improvement?.directionalImprovementScore || -Infinity) - (a.improvement?.directionalImprovementScore || -Infinity));
+
+  const topCandidates = pathways.slice(0, COUNTERFACTUAL_TOP_CANDIDATE_COUNT).map((entry) => ({
+    key: entry.key,
+    label: entry.label,
+    family: entry.family,
+    directionalImprovementScore: entry.improvement?.directionalImprovementScore ?? null,
+    dryRatioImprovement: entry.improvement?.dryRatioImprovement ?? null,
+    directionalImprovementPass: entry.improvement?.directionalImprovementPass ?? false,
+    directionalSensitivityPass: entry.sensitivity?.directionalSensitivityPass ?? null,
+    storyStablePass: entry.sensitivity?.storyStablePass ?? null
+  }));
+
+  return {
+    schema: 'satellite-wars.counterfactual-pathway-sensitivity.v1',
+    generatedAt: new Date().toISOString(),
+    targetDay,
+    baselineMetrics: baselineSample ? {
+      subtropicalDryNorthRatio: baselineSample.metrics?.subtropicalDryNorthRatio ?? null,
+      subtropicalRhNorthMeanFrac: baselineSample.metrics?.subtropicalRhNorthMeanFrac ?? null,
+      northDryBeltUpperCloudPathMeanKgM2: baselineSample.metrics?.northDryBeltUpperCloudPathMeanKgM2 ?? null,
+      northDryBeltCarriedOverUpperCloudMeanKgM2: baselineSample.metrics?.northDryBeltCarriedOverUpperCloudMeanKgM2 ?? null,
+      northDryBeltLargeScaleCondensationMeanKgM2: baselineSample.metrics?.northDryBeltLargeScaleCondensationMeanKgM2 ?? null
+    } : null,
+    pathways,
+    topCandidates
+  };
+};
+
+export const buildRootCauseCandidateRankingReport = (counterfactualReport = null) => {
+  const pathways = Array.isArray(counterfactualReport?.pathways) ? counterfactualReport.pathways : [];
+  const ranking = pathways.map((entry, index) => ({
+    rank: index + 1,
+    key: entry.key,
+    label: entry.label,
+    family: entry.family,
+    directionalImprovementScore: entry.improvement?.directionalImprovementScore ?? null,
+    dryRatioImprovement: entry.improvement?.dryRatioImprovement ?? null,
+    directionalImprovementPass: entry.improvement?.directionalImprovementPass ?? false,
+    directionalSensitivityPass: entry.sensitivity?.directionalSensitivityPass ?? null,
+    storyStablePass: entry.sensitivity?.storyStablePass ?? null
+  }));
+  const stablePositive = ranking.filter((entry) => entry.directionalImprovementPass && entry.directionalSensitivityPass !== false && entry.storyStablePass !== false);
+  const primaryCandidate = stablePositive[0] || ranking[0] || null;
+  const backupCandidate = stablePositive[1] || ranking[1] || null;
+  const rootCauseAssessment = {
+    ruledIn: [],
+    ruledOut: [],
+    ambiguous: []
+  };
+  if (primaryCandidate && primaryCandidate.directionalImprovementPass && primaryCandidate.directionalSensitivityPass !== false) {
+    rootCauseAssessment.ruledIn.push(
+      `${primaryCandidate.label} produced the strongest directional improvement${primaryCandidate.storyStablePass === true ? ' and stayed attribution-stable across Phase 9 sensitivity variants' : ''}.`
+    );
+  } else {
+    rootCauseAssessment.ambiguous.push('No counterfactual pathway yet produces a strong enough stable directional win to close root cause.');
+  }
+  pathways
+    .filter((entry) => (entry.improvement?.directionalImprovementScore || -Infinity) < 0)
+    .forEach((entry) => rootCauseAssessment.ruledOut.push(`${entry.label} did not improve the NH dry-belt target under the current counterfactual harness.`));
+  return {
+    schema: 'satellite-wars.root-cause-candidate-ranking.v1',
+    generatedAt: new Date().toISOString(),
+    primaryCandidate,
+    backupCandidate,
+    closureReadyPass: Boolean(primaryCandidate?.directionalImprovementPass && primaryCandidate?.directionalSensitivityPass !== false),
+    ranking,
+    rootCauseAssessment
+  };
+};
+
 const roundGridDimension = (value, minimum) => Math.max(minimum, Math.round(value / 2) * 2);
 
 const runSensitivityVariant = async ({
@@ -2487,6 +2994,17 @@ const renderMarkdown = (summary) => {
     lines.push('');
   }
 
+  if (summary.rootCauseCandidateRanking?.primaryCandidate) {
+    lines.push('## Counterfactual Root-Cause Ranking');
+    lines.push('');
+    lines.push(`- Primary candidate: ${summary.rootCauseCandidateRanking.primaryCandidate.label} (${summary.rootCauseCandidateRanking.primaryCandidate.directionalImprovementScore})`);
+    if (summary.rootCauseCandidateRanking.backupCandidate) {
+      lines.push(`- Backup candidate: ${summary.rootCauseCandidateRanking.backupCandidate.label} (${summary.rootCauseCandidateRanking.backupCandidate.directionalImprovementScore})`);
+    }
+    lines.push(`- Closure ready: ${summary.rootCauseCandidateRanking.closureReadyPass}`);
+    lines.push('');
+  }
+
   if (summary.artifacts) {
     lines.push('## Rich artifacts');
     lines.push('');
@@ -2558,6 +3076,12 @@ const renderMarkdown = (summary) => {
     }
     if (summary.artifacts.attributionLagAnalysisJsonPath) {
       lines.push(`- Attribution lag analysis JSON: ${summary.artifacts.attributionLagAnalysisJsonPath}`);
+    }
+    if (summary.artifacts.counterfactualPathwaySensitivityJsonPath) {
+      lines.push(`- Counterfactual pathway sensitivity JSON: ${summary.artifacts.counterfactualPathwaySensitivityJsonPath}`);
+    }
+    if (summary.artifacts.rootCauseCandidateRankingJsonPath) {
+      lines.push(`- Root-cause candidate ranking JSON: ${summary.artifacts.rootCauseCandidateRankingJsonPath}`);
     }
     lines.push('');
   }
@@ -2718,6 +3242,105 @@ export async function main() {
     variants: gridSensitivityVariants,
     targetDay: sensitivityTargetDay
   });
+  const counterfactualTargetDay = sampleTargetsDays.find((day) => day >= 30)
+    || sampleTargetsDays[sampleTargetsDays.length - 1]
+    || null;
+  const baselineCounterfactualSample = samples.find((sample) => sample.targetDay === counterfactualTargetDay) || latestSample;
+  let counterfactualPathwaySensitivity = null;
+  let rootCauseCandidateRanking = null;
+  if (counterfactuals && baselineCounterfactualSample && Number.isFinite(counterfactualTargetDay)) {
+    const baselineCounterfactualVariants = await Promise.all(
+      COUNTERFACTUAL_VARIANTS.map((variant) => runCounterfactualVariant({
+        variant,
+        variantName: `${variant.key}_baseline`,
+        variantNx: nx,
+        variantNy: ny,
+        variantDtSeconds: dt,
+        targetDay: counterfactualTargetDay,
+        configSnapshot
+      }))
+    );
+    const preliminaryCounterfactualReport = buildCounterfactualPathwaySensitivityReport({
+      baselineSample: baselineCounterfactualSample,
+      targetDay: counterfactualTargetDay,
+      variants: baselineCounterfactualVariants,
+      sensitivityVariantsByKey: {}
+    });
+    const selectedCounterfactualKeys = preliminaryCounterfactualReport.topCandidates.map((entry) => entry.key);
+    const phase9SensitivityScenarios = [
+      {
+        scenarioKey: 'dt_half',
+        scenarioLabel: 'DT half',
+        nx: dtSensitivityVariants[0]?.nx,
+        ny: dtSensitivityVariants[0]?.ny,
+        dtSeconds: dtSensitivityVariants[0]?.dtSeconds,
+        baselineSample: dtSensitivityVariants[0]?.latest || null
+      },
+      {
+        scenarioKey: 'dt_150pct',
+        scenarioLabel: 'DT 150%',
+        nx: dtSensitivityVariants[1]?.nx,
+        ny: dtSensitivityVariants[1]?.ny,
+        dtSeconds: dtSensitivityVariants[1]?.dtSeconds,
+        baselineSample: dtSensitivityVariants[1]?.latest || null
+      },
+      {
+        scenarioKey: 'grid_coarse',
+        scenarioLabel: 'Grid coarse',
+        nx: gridSensitivityVariants[0]?.nx,
+        ny: gridSensitivityVariants[0]?.ny,
+        dtSeconds: gridSensitivityVariants[0]?.dtSeconds,
+        baselineSample: gridSensitivityVariants[0]?.latest || null
+      },
+      {
+        scenarioKey: 'grid_dense',
+        scenarioLabel: 'Grid dense',
+        nx: gridSensitivityVariants[1]?.nx,
+        ny: gridSensitivityVariants[1]?.ny,
+        dtSeconds: gridSensitivityVariants[1]?.dtSeconds,
+        baselineSample: gridSensitivityVariants[1]?.latest || null
+      }
+    ].filter((entry) => entry.baselineSample && Number.isFinite(entry.nx) && Number.isFinite(entry.ny) && Number.isFinite(entry.dtSeconds));
+    const sensitivityRunsFlat = await Promise.all(
+      selectedCounterfactualKeys.flatMap((variantKey) => {
+        const variant = COUNTERFACTUAL_VARIANTS.find((entry) => entry.key === variantKey);
+        if (!variant) return [];
+        return phase9SensitivityScenarios.map((scenario) => runCounterfactualVariant({
+          variant,
+          variantName: `${variant.key}_${scenario.scenarioKey}`,
+          variantNx: scenario.nx,
+          variantNy: scenario.ny,
+          variantDtSeconds: scenario.dtSeconds,
+          targetDay: counterfactualTargetDay,
+          configSnapshot
+        }).then((result) => ({
+          ...result,
+          scenarioKey: scenario.scenarioKey,
+          scenarioLabel: scenario.scenarioLabel,
+          baselineSample: scenario.baselineSample
+        })));
+      })
+    );
+    const sensitivityVariantsByKey = Object.fromEntries(
+      baselineCounterfactualVariants.map((variant) => [variant.key, []])
+    );
+    for (const result of sensitivityRunsFlat) {
+      if (!sensitivityVariantsByKey[result.key]) sensitivityVariantsByKey[result.key] = [];
+      sensitivityVariantsByKey[result.key].push({
+        scenarioKey: result.scenarioKey,
+        scenarioLabel: result.scenarioLabel,
+        improvement: buildCounterfactualImprovement(result.baselineSample, result.latest),
+        storyComparison: compareAttributionStory(result.baselineSample, result.latest)
+      });
+    }
+    counterfactualPathwaySensitivity = buildCounterfactualPathwaySensitivityReport({
+      baselineSample: baselineCounterfactualSample,
+      targetDay: counterfactualTargetDay,
+      variants: baselineCounterfactualVariants,
+      sensitivityVariantsByKey
+    });
+    rootCauseCandidateRanking = buildRootCauseCandidateRankingReport(counterfactualPathwaySensitivity);
+  }
   const checkpointDay = sampleTargetsDays.find((day) => day > 0 && day < sampleTargetsDays[sampleTargetsDays.length - 1])
     || sampleTargetsDays[Math.max(0, Math.floor(sampleTargetsDays.length / 2))] || null;
   const restartParity = reproCheck
@@ -2758,7 +3381,9 @@ export async function main() {
     gridSensitivityJsonPath: `${artifactBase}-grid-sensitivity.json`,
     monthlyAttributionClimatologyJsonPath: `${artifactBase}-monthly-attribution-climatology.json`,
     seasonalRootCauseRankingJsonPath: `${artifactBase}-seasonal-root-cause-ranking.json`,
-    attributionLagAnalysisJsonPath: `${artifactBase}-attribution-lag-analysis.json`
+    attributionLagAnalysisJsonPath: `${artifactBase}-attribution-lag-analysis.json`,
+    counterfactualPathwaySensitivityJsonPath: `${artifactBase}-counterfactual-pathway-sensitivity.json`,
+    rootCauseCandidateRankingJsonPath: `${artifactBase}-root-cause-candidate-ranking.json`
   } : null;
   const summarySamples = samples.map((sample) => compactSampleForSummary(sample));
   const summaryHorizons = horizonSummaries.map((horizon) => ({
@@ -2767,7 +3392,7 @@ export async function main() {
   }));
 
   const summary = {
-    schema: 'satellite-wars.planetary-realism-audit.v3',
+    schema: 'satellite-wars.planetary-realism-audit.v4',
     generatedAt: new Date().toISOString(),
     overallPass,
     config: {
@@ -2817,6 +3442,8 @@ export async function main() {
     gridSensitivity,
     seasonalRootCauseRanking,
     attributionLagAnalysis,
+    counterfactualPathwaySensitivity,
+    rootCauseCandidateRanking,
     artifacts,
     defaultNextPriorities
   };
@@ -2878,6 +3505,8 @@ export async function main() {
     fs.writeFileSync(artifacts.monthlyAttributionClimatologyJsonPath, toJson(monthlyAttributionClimatology));
     fs.writeFileSync(artifacts.seasonalRootCauseRankingJsonPath, toJson(seasonalRootCauseRanking));
     fs.writeFileSync(artifacts.attributionLagAnalysisJsonPath, toJson(attributionLagAnalysis));
+    fs.writeFileSync(artifacts.counterfactualPathwaySensitivityJsonPath, toJson(counterfactualPathwaySensitivity));
+    fs.writeFileSync(artifacts.rootCauseCandidateRankingJsonPath, toJson(rootCauseCandidateRanking));
   }
   process.stdout.write(toJson(summary));
   return summary;
@@ -2900,6 +3529,8 @@ export const _test = {
   buildMonthlyAttributionClimatology,
   buildSeasonalRootCauseRanking,
   buildAttributionLagAnalysis,
+  buildCounterfactualPathwaySensitivityReport,
+  buildRootCauseCandidateRankingReport,
   buildRealismGapReport,
   buildTransportInterfaceBudgetReport,
   buildHadleyPartitionSummaryReport,

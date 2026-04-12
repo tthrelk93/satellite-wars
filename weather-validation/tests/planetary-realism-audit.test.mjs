@@ -948,3 +948,97 @@ test('vertical cloud-birth reports surface the dominant NH dry-belt channel and 
   assert.equal(histogramsReport.histograms.supersaturation[0].eventCount, 11);
   assert.equal(matrixReport.originMatrix.matrixBySector.atlantic.levelBands.upperTroposphere.carryOverUpperCloudSurviving, 0.28);
 });
+
+test('phase 11 counterfactual ranking surfaces stable causal candidates', () => {
+  const baselineSample = {
+    metrics: {
+      subtropicalDryNorthRatio: 1.1,
+      subtropicalRhNorthMeanFrac: 0.86,
+      northDryBeltUpperCloudPathMeanKgM2: 0.35,
+      northDryBeltCarriedOverUpperCloudMeanKgM2: 0.28,
+      northDryBeltLargeScaleCondensationMeanKgM2: 0.14,
+      itczWidthDeg: 23.6,
+      subtropicalSubsidenceSouthMean: 0.038,
+      tropicalTradesNorthU10Ms: -0.7,
+      tropicalTradesSouthU10Ms: -0.5,
+      midlatitudeWesterliesNorthU10Ms: 1.1,
+      midlatitudeWesterliesSouthU10Ms: 0.9
+    }
+  };
+  const variants = [
+    {
+      key: 'upperCloudErosion',
+      label: 'Upper-cloud erosion boost',
+      family: 'Blocked upper-cloud erosion',
+      description: 'Remove blocked erosion mass.',
+      strength: 0.18,
+      elapsedMs: 1200,
+      interventionSummary: { removedCloudKgM2: 0.08, removedVaporKgM2: 0.01, returnedCloudToVaporKgM2: 0, affectedCellSteps: 42 },
+      latest: {
+        metrics: {
+          subtropicalDryNorthRatio: 0.95,
+          subtropicalRhNorthMeanFrac: 0.82,
+          northDryBeltUpperCloudPathMeanKgM2: 0.22,
+          northDryBeltCarriedOverUpperCloudMeanKgM2: 0.16,
+          northDryBeltLargeScaleCondensationMeanKgM2: 0.11,
+          itczWidthDeg: 23.5,
+          subtropicalSubsidenceSouthMean: 0.039,
+          tropicalTradesNorthU10Ms: -0.72,
+          tropicalTradesSouthU10Ms: -0.49,
+          midlatitudeWesterliesNorthU10Ms: 1.08,
+          midlatitudeWesterliesSouthU10Ms: 0.88
+        }
+      }
+    },
+    {
+      key: 'sourceMoisture',
+      label: 'Source moisture ablation',
+      family: 'Source moisture supply',
+      description: 'Reduce source vapor.',
+      strength: 0.18,
+      elapsedMs: 1000,
+      interventionSummary: { removedCloudKgM2: 0, removedVaporKgM2: 0.05, returnedCloudToVaporKgM2: 0, affectedCellSteps: 30 },
+      latest: {
+        metrics: {
+          subtropicalDryNorthRatio: 1.14,
+          subtropicalRhNorthMeanFrac: 0.87,
+          northDryBeltUpperCloudPathMeanKgM2: 0.34,
+          northDryBeltCarriedOverUpperCloudMeanKgM2: 0.27,
+          northDryBeltLargeScaleCondensationMeanKgM2: 0.15,
+          itczWidthDeg: 24.4,
+          subtropicalSubsidenceSouthMean: 0.027,
+          tropicalTradesNorthU10Ms: -0.12,
+          tropicalTradesSouthU10Ms: -0.18,
+          midlatitudeWesterliesNorthU10Ms: 0.1,
+          midlatitudeWesterliesSouthU10Ms: 0.15
+        }
+      }
+    }
+  ];
+  const sensitivityReport = planetaryAuditTest.buildCounterfactualPathwaySensitivityReport({
+    baselineSample,
+    targetDay: 30,
+    variants,
+    sensitivityVariantsByKey: {
+      upperCloudErosion: [
+        {
+          scenarioKey: 'dt_half',
+          scenarioLabel: 'DT half',
+          improvement: {
+            dryRatioImprovement: 0.11,
+            directionalImprovementScore: 0.41
+          },
+          storyComparison: { stable: true }
+        }
+      ]
+    }
+  });
+  const rankingReport = planetaryAuditTest.buildRootCauseCandidateRankingReport(sensitivityReport);
+
+  assert.equal(sensitivityReport.topCandidates[0].key, 'upperCloudErosion');
+  assert.equal(sensitivityReport.pathways[0].improvement.directionalImprovementPass, true);
+  assert.equal(sensitivityReport.pathways[0].sensitivity.directionalSensitivityPass, true);
+  assert.equal(rankingReport.primaryCandidate.key, 'upperCloudErosion');
+  assert.equal(rankingReport.closureReadyPass, true);
+  assert.ok(rankingReport.rootCauseAssessment.ruledOut.some((line) => line.includes('Source moisture ablation')));
+});
