@@ -264,16 +264,101 @@ Phase D result:
 - current diagnosis after Phase D:
   - a coupled vertical-path intervention can move the north dry-belt ratio in the right direction
   - but the present bundle family still “fixes” the dry belt by re-broadening the ITCZ and changing the causal story too much
-  - that is enough to move on to Phase E, but not enough to justify a production physics patch yet
+- that is enough to move into a stricter pre-patch proof ladder, but not enough to justify a production physics patch yet
 
-## Phase E: Patch-Placement Proof
+## Phase E0: Minimal Failing Corridor Experiment
 
 Objective:
-- turn the winning coupled bundle into an exact “where the fix goes” design before editing physics defaults
+- freeze one trusted historical baseline and one current drifting baseline, then prove exactly where they diverge inside the shortest representative NH dry-belt corridor replay
+
+Why this phase exists:
+- the original Phase E was too eager; Phase D proved we still do not have patch-ready proof
+- before naming any edit location, we need a tiny reproducible failing experiment that a research team could inspect step by step
+
+Required structure:
+- one sector corridor
+- one latitude band
+- one target cell
+- one short replay window
+- one saved checkpoint
+- one historical baseline commit
+- one current branch baseline
+
+Primary harness:
+- [minimal-failing-corridor.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/minimal-failing-corridor.mjs)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+
+Required outputs:
+- `phase-e0-minimal-corridor.json`
+- `phase-e0-minimal-corridor.md`
+
+Exit criteria:
+- the historical and current baselines are both frozen explicitly
+- the first material divergence step is identified inside the replay window
+- the dominant post-vertical divergence fields are ranked for the target cell
+- the corridor is small enough to reuse directly in E1 and E2
+
+Phase E0 result:
+- completed on `2026-04-12`
+- verification artifacts:
+  - [phase-e0-minimal-corridor.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase-e0-minimal-corridor.json)
+  - [phase-e0-minimal-corridor.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase-e0-minimal-corridor.md)
+- frozen corridor:
+  - `eastPacific / 22-35°N / cell 390 / lat 26.25 / lon -131.25`
+  - `checkpointDay = 29.75`
+  - `windowSteps = 12`
+- frozen baselines under the E0 harness:
+  - historical `e6fea58`: `subtropicalDryNorthRatio = 1.352`, `itczWidthDeg = 23.723`
+  - current `246c99a`: `subtropicalDryNorthRatio = 1.698`, `itczWidthDeg = 27.197`
+- dominant replay finding:
+  - the first material divergence occurs immediately at `stepOffset = 0`
+  - the peak divergence is also `stepOffset = 0`
+  - leading target-cell post-vertical deltas at that first step:
+    - `upperCloudPathKgM2 = +3.51914`
+    - `largeScaleCondensationSourceKgM2 = +1.77152`
+    - `precipRateMmHr = +1.4008`
+- across the full 12-step replay window, the divergence repeatedly stays dominated by:
+  - `upperCloudPathKgM2`
+  - `largeScaleCondensationSourceKgM2`
+  - `precipRateMmHr`
+- current diagnosis after E0:
+  - the historical/current split is already present in the very first replayed vertical handoff
+  - we do not need another broad search to find where the failure begins
+  - E1 should budget-close the vertical handoff specifically around imported cloud carryover, large-scale condensation birth, and what is handed into microphysics
+
+## Phase E1: Budget-Closed Vertical Handoff Proof
+
+Objective:
+- make the selected corridor fully budget-closed across the vertical handoff so we can prove the exact failing channel instead of just ranking deltas
+
+Required deliverables:
+- strict ledger for:
+  - cloud in
+  - cloud born
+  - cloud carried
+  - cloud eroded
+  - cloud handed to microphysics
+  - cloud left over
+- zero or near-zero residual at the selected corridor scale
+
+Expected outputs:
+- `vertical-handoff-proof.json`
+- `vertical-handoff-proof.md`
+
+Exit criteria:
+- at least 95% of target-cell and corridor-band cloud change is ledger-closed
+- the first failing channel inside `stepVertical5` is named
+- the result survives the same minimal replay under at least one dt and one grid sensitivity variant
+
+## Phase E2: Patch-Placement Proof
+
+Objective:
+- only after E0 and E1 close, turn the proven failing channel into an exact “where the fix goes” design before editing physics defaults
 
 Required deliverables:
 - exact file/function ownership
-- expected before/after transition changes in the cloud-transition ledger
+- expected before/after transition changes in the E1 ledger
 - expected before/after top-level climate metrics
 - explicit non-goals so we do not accidentally “fix” the dry belt by breaking the tropics
 
@@ -289,7 +374,7 @@ That proof must answer:
 
 Exit criteria:
 - one exact coordinated edit set is named
-- every edit in that set has a causal justification from prior phases
+- every edit in that set has a causal justification from E0 and E1, not just earlier broad phases
 
 ## Phase F: Patch Gate And Verification Ladder
 

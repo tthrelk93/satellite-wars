@@ -32,6 +32,7 @@
     "agent:planetary-realism-audit": "node --experimental-default-type=module --loader ./scripts/agent/resolve-js-loader.mjs scripts/agent/planetary-realism-audit.mjs",
     "agent:annual-physics-targets": "node scripts/agent/annual-physics-targets.mjs",
     "agent:planetary-candidate-sweep": "node --experimental-default-type=module --loader ./scripts/agent/resolve-js-loader.mjs scripts/agent/planetary-candidate-sweep.mjs",
+    "agent:minimal-failing-corridor": "node scripts/agent/minimal-failing-corridor.mjs",
     "agent:orographic-probe-cdp": "node scripts/agent/orographic-probe-cdp.mjs",
     "agent:reuse-localhost-tab": "node scripts/agent/reuse-localhost-tab.mjs",
     "agent:summarize-runtime-log": "node scripts/agent/summarize-runtime-log.mjs",
