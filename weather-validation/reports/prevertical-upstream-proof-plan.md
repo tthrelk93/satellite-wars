@@ -485,6 +485,36 @@ Decision:
 - the best baseline narrative still points at previous-step residual retention, but the owner/decision do not survive dt/grid variants cleanly
 - per the U5 contract, the next honest step is numerical-model repair or variant-normalized ownership targeting before any physics patch proof
 
+### U5 follow-on: Variant-normalized ownership targeting
+
+Objective:
+- separate true ownership flips from variants where the local target signal simply collapses below a meaningful threshold
+- use a physically comparable corridor-scale footprint instead of letting one drifting target cell dominate the conclusion
+
+Required artifact:
+- `prevertical-variant-normalized-ownership.json`
+
+Exit criteria:
+- the informative variants agree on one ownership family
+- the informative variants agree on one first-boundary story
+- collapsed-signal variants are explicitly classified as numerical-signal failures, not mistaken for owner flips
+
+Status:
+- complete
+
+Artifacts:
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-variant-normalized-ownership.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-variant-normalized-ownership.json)
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-variant-normalized-ownership.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-variant-normalized-ownership.md)
+
+Result:
+- the normalized pass succeeds on the informative variants
+  - `baseline`, `grid_coarse`, and `grid_dense` all resolve to `previousStepResidualUpperCloud`
+  - all three keep the first meaningful break at `endPreviousStepMicrophysics5`
+- `dt_half` is reclassified as a signal-collapse variant rather than evidence of a different ownership family
+- the best current read is now:
+  - ownership family is stable after normalization
+  - numerical repair is still needed, but mainly to preserve signal amplitude and replay comparability, not to rediscover a different owner
+
 ## Phase U6: Upstream Patch-Placement Proof
 
 Objective:
