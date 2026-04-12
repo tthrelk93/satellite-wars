@@ -189,6 +189,34 @@ Exit criteria:
 What this phase should decide:
 - does the excess cloud already exist before advection, or appear during advection?
 
+Status:
+- complete
+
+Artifacts:
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-boundary-ledger.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-boundary-ledger.json)
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-boundary-ledger.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-boundary-ledger.md)
+
+Result:
+- trace-disabled parity against the frozen E1 proof reference passed exactly
+  - expected pre-vertical target mass: `3.51914 kg/m²`
+  - observed pre-vertical target mass: `3.51914 kg/m²`
+- target-cell and corridor closure passed the U1 closure bar
+  - target-cell closure stayed at `1.0`
+  - corridor closure stayed at `1.0`
+- the first material divergence boundary is already `endPreviousStepMicrophysics5`
+  - target-cell delta there: `+3.09801 kg/m²`
+  - corridor delta there: `+5.28268 kg/m²`
+- `startCurrentStep` is already divergent from the historical reference
+  - target cell: `3.58051 kg/m²` versus `0`
+  - corridor: `6.1088 kg/m²` versus `0`
+- advection still matters as an amplifier in the corridor, but it is not the first break
+  - corridor advection import between `afterStepSurfacePressure5` and `afterStepAdvection5`: `+0.47288 kg/m²`
+  - target cell actually sees a small advection export at the same boundary: `0.06137 kg/m²`
+
+Decision:
+- the excess upper cloud already exists before the current-step advection handoff
+- U1 therefore shifts ownership pressure toward previous-step retention and away from pure current-step advection creation
+
 ## Phase U2: Provenance Tracer Ownership
 
 Objective:
