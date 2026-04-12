@@ -35,6 +35,7 @@
     "agent:minimal-failing-corridor": "node scripts/agent/minimal-failing-corridor.mjs",
     "agent:vertical-handoff-proof": "node scripts/agent/vertical-handoff-proof.mjs",
     "agent:prevertical-boundary-ledger": "node scripts/agent/prevertical-boundary-ledger.mjs",
+    "agent:prevertical-provenance-ownership": "node scripts/agent/prevertical-provenance-ownership.mjs",
     "agent:orographic-probe-cdp": "node scripts/agent/orographic-probe-cdp.mjs",
     "agent:reuse-localhost-tab": "node scripts/agent/reuse-localhost-tab.mjs",
     "agent:summarize-runtime-log": "node scripts/agent/summarize-runtime-log.mjs",

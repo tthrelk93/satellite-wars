@@ -248,6 +248,35 @@ Exit criteria:
 What this phase should decide:
 - is the excess cloud mostly inherited, imported, or locally generated before vertical?
 
+Status:
+- complete
+
+Artifacts:
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-provenance-ownership.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-provenance-ownership.json)
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-provenance-ownership.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-provenance-ownership.md)
+
+Result:
+- tracer ownership closes exactly to the physical pre-vertical upper-cloud mass
+  - current target closure: `1.0`
+  - current corridor closure: `1.0`
+  - historical target closure: `1.0`
+  - historical corridor closure: `1.0`
+- the dominant ownership family is now proven, not inferred
+  - target-cell primary owner: `previousStepResidualUpperCloud = 3.40135 kg/m²`
+  - corridor primary owner: `previousStepResidualUpperCloud = 5.7033 kg/m²`
+- current-step advection remains a measurable amplifier, but it is secondary
+  - target-cell advected contribution: `0.11779 kg/m²`
+  - corridor advected contribution: `0.87839 kg/m²`
+- local pre-vertical creation is effectively ruled out in the frozen replay
+  - `currentStepLocalUpperCloud = 0` for both target cell and corridor
+- reprocessed ownership is also absent in the frozen replay
+  - `reprocessedUpperCloud = 0` for both target cell and corridor
+
+Decision:
+- the excess cloud entering `stepVertical5` is primarily inherited from the previous step
+- current-step advection still matters, but as amplification rather than first ownership
+- the next proof phase should focus on separating **supply versus retention** within the previous-step residual pathway
+
 ## Phase U3: Supply Versus Retention Counterfactuals
 
 Objective:
