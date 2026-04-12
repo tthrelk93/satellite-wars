@@ -42,6 +42,7 @@
     "agent:prevertical-numerical-repair-audit": "node scripts/agent/prevertical-numerical-repair-audit.mjs",
     "agent:prevertical-variant-normalized-ownership": "node scripts/agent/prevertical-variant-normalized-ownership.mjs",
     "agent:prevertical-patch-placement-proof": "node scripts/agent/prevertical-patch-placement-proof.mjs",
+    "agent:phase1b-exact-corridor-support-proof": "node scripts/agent/phase1b-exact-corridor-support-proof.mjs",
     "agent:orographic-probe-cdp": "node scripts/agent/orographic-probe-cdp.mjs",
     "agent:reuse-localhost-tab": "node scripts/agent/reuse-localhost-tab.mjs",
     "agent:summarize-runtime-log": "node scripts/agent/summarize-runtime-log.mjs",
