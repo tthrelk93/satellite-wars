@@ -75,7 +75,8 @@ Completed phases:
 - `Phase 9`: numerical integrity and sensitivity diagnostics
 
 Current active phase:
-- `Phase 12`: root-cause closure and patch readiness, using the completed Phase 11 counterfactual findings as the last major causal screen
+- original upstream campaign complete through `Phase 12`
+- follow-on work should now use `weather-validation/reports/coupled-fix-proof-campaign.md`
 
 Revised execution order from this point forward:
 1. Treat `Phases 4-8` as completed causal narrowing layers:
@@ -706,6 +707,16 @@ Observed Phase 11 result:
 
 ## Phase 12: Root-Cause Closure And Patch Readiness
 
+Status:
+- complete on the current branch as the formal closure pass
+- closure report written to:
+  - `weather-validation/output/root-cause-closure-report.md`
+- closure result:
+  - patch readiness is **not closed**
+  - the bug behaves like a coupled multi-pathway failure rather than a single isolated lever
+  - follow-on work should use the new proof-first campaign in:
+    - `weather-validation/reports/coupled-fix-proof-campaign.md`
+
 Objective:
 - decide when we know enough to stop instrumenting and start patching
 
@@ -733,6 +744,17 @@ That report must answer:
 6. Which single module family should the next physics patch target first?
 
 If the campaign reaches Phase 12 successfully, the next patch should no longer be exploratory. It should be a direct intervention against the identified dominant causal chain.
+
+Observed Phase 12 result:
+- the original campaign succeeded at narrowing the bug, but not at producing a closure-ready single causal lever
+- the best current conclusion is:
+  - imported/background transport
+  - blocked erosion
+  - local large-scale maintenance
+  - secondary radiative support
+  all participate together
+- because no isolated counterfactual survived the guardrails, the next step is not “write the patch”
+- the next step is the proof-first coupled-fix campaign that starts with baseline reconciliation and then locates the exact failing module handoff
 
 ## Recommended order of implementation
 
