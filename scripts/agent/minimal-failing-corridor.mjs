@@ -737,3 +737,20 @@ export const _test = {
   buildBaselineFreezeReport,
   buildMinimalFailingCorridorSummary
 };
+
+export const _proof = {
+  repoRoot,
+  round,
+  mean,
+  sum,
+  metricAt,
+  suppressProcessOutput,
+  ensureHistoricalWorktree,
+  importBaselineModules,
+  createBaselineCore,
+  advanceSilently,
+  buildCorridorMask,
+  selectCorridorTarget,
+  cloneCoreFromSource,
+  runPreVerticalSequence
+};

@@ -123,3 +123,22 @@ test('microphysics records large-scale condensation and re-evaporation diagnosti
   assert.ok(state.saturationAdjustmentOmegaMassWeighted[0] > 0);
   assert.ok(Array.from(state.saturationAdjustmentCloudBirthByBandMass).some((value) => value > 0));
 });
+
+test('microphysics populates the upper-cloud handoff ledger and closes the upper-cloud budget', () => {
+  const state = setupState(248);
+  state.qv.fill(0.006);
+  state.qc.fill(0);
+  state.qi.fill(0);
+  state.qr.fill(0);
+  state.qs.fill(0);
+  state.qc[0] = 0.0012;
+  state.qv[0] = 0.02;
+  state.omega.fill(-0.2);
+
+  stepMicrophysics5({ dt: 900, state, params: { enableConvectiveOutcome: false } });
+
+  assert.ok(state.microphysicsUpperCloudInputMass[0] > 0);
+  assert.ok(state.microphysicsUpperCloudSaturationBirthMass[0] > 0);
+  assert.ok(state.microphysicsUpperCloudOutputMass[0] > 0);
+  assert.ok(Math.abs(state.microphysicsUpperCloudResidualMass[0]) < 1e-6);
+});

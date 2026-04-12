@@ -61,6 +61,13 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const importedAnvilPersistenceMass = makeArray(N);
   const carriedOverUpperCloudMass = makeArray(N);
   const weakErosionCloudSurvivalMass = makeArray(N);
+  const verticalUpperCloudInputMass = makeArray(N);
+  const verticalUpperCloudResolvedBirthMass = makeArray(N);
+  const verticalUpperCloudConvectiveBirthMass = makeArray(N);
+  const verticalUpperCloudCarrySurvivingMass = makeArray(N);
+  const verticalUpperCloudAppliedErosionMass = makeArray(N);
+  const verticalUpperCloudHandedToMicrophysicsMass = makeArray(N);
+  const verticalUpperCloudResidualMass = makeArray(N);
   const resolvedAscentCloudBirthAccumMass = makeArray(N);
   const saturationAdjustmentCloudBirthAccumMass = makeArray(N);
   const convectiveDetrainmentCloudBirthAccumMass = makeArray(N);
@@ -115,6 +122,14 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const microphysicsCloudToPrecipByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const cloudReevaporationByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const precipReevaporationByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const microphysicsUpperCloudInputMass = makeArray(N);
+  const microphysicsUpperCloudSaturationBirthMass = makeArray(N);
+  const microphysicsUpperCloudCloudReevaporationMass = makeArray(N);
+  const microphysicsUpperCloudPrecipReevaporationMass = makeArray(N);
+  const microphysicsUpperCloudSedimentationExportMass = makeArray(N);
+  const microphysicsUpperCloudCloudToPrecipMass = makeArray(N);
+  const microphysicsUpperCloudOutputMass = makeArray(N);
+  const microphysicsUpperCloudResidualMass = makeArray(N);
   const radiativePersistenceEquivalentByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const upperCloudShortwaveAbsorptionWm2 = makeArray(N);
   const upperCloudLongwaveRelaxationBoost = makeArray(N);
@@ -251,6 +266,13 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     importedAnvilPersistenceMass,
     carriedOverUpperCloudMass,
     weakErosionCloudSurvivalMass,
+    verticalUpperCloudInputMass,
+    verticalUpperCloudResolvedBirthMass,
+    verticalUpperCloudConvectiveBirthMass,
+    verticalUpperCloudCarrySurvivingMass,
+    verticalUpperCloudAppliedErosionMass,
+    verticalUpperCloudHandedToMicrophysicsMass,
+    verticalUpperCloudResidualMass,
     resolvedAscentCloudBirthAccumMass,
     saturationAdjustmentCloudBirthAccumMass,
     convectiveDetrainmentCloudBirthAccumMass,
@@ -305,6 +327,14 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     microphysicsCloudToPrecipByBandMass,
     cloudReevaporationByBandMass,
     precipReevaporationByBandMass,
+    microphysicsUpperCloudInputMass,
+    microphysicsUpperCloudSaturationBirthMass,
+    microphysicsUpperCloudCloudReevaporationMass,
+    microphysicsUpperCloudPrecipReevaporationMass,
+    microphysicsUpperCloudSedimentationExportMass,
+    microphysicsUpperCloudCloudToPrecipMass,
+    microphysicsUpperCloudOutputMass,
+    microphysicsUpperCloudResidualMass,
     radiativePersistenceEquivalentByBandMass,
     upperCloudShortwaveAbsorptionWm2,
     upperCloudLongwaveRelaxationBoost,

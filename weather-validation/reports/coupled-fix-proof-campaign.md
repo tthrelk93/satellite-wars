@@ -351,10 +351,48 @@ Exit criteria:
 - the first failing channel inside `stepVertical5` is named
 - the result survives the same minimal replay under at least one dt and one grid sensitivity variant
 
+Phase E1 result:
+- completed on `2026-04-12`
+- verification artifacts:
+  - [vertical-handoff-proof.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/vertical-handoff-proof.json)
+  - [vertical-handoff-proof.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/vertical-handoff-proof.md)
+- closure result:
+  - current target-cell combined closure stays between `0.99033` and `0.99536`
+  - historical target-cell combined closure stays at `1.0`
+  - sensitivity variants also stay above the closure bar:
+    - `dt_half`: min target closure `0.99523`, min corridor closure `0.99446`
+    - `grid_coarse`: min target closure `1.0`, min corridor closure `0.97744`
+- dominant baseline-pair finding:
+  - the largest vertical delta is **not** in-step cloud birth or erosion
+  - it is `inputMassKgM2`, immediately at `stepOffset = 0`
+  - the same is true for the paired microphysics handoff on the first step
+- first-step target-cell ledger:
+  - current vertical handoff:
+    - `inputMassKgM2 = 3.51914`
+    - `resolvedBirthMassKgM2 = 0.06594`
+    - `convectiveBirthMassKgM2 = 0`
+    - `handedToMicrophysicsMassKgM2 = 3.51914`
+    - `residualMassKgM2 = 0.06594`
+  - historical vertical handoff:
+    - all terms effectively `0`
+  - current microphysics handoff:
+    - `inputMassKgM2 = 3.51912`
+    - `cloudReevaporationMassKgM2 = 0.20322`
+    - `sedimentationExportMassKgM2 = 0.20415`
+    - `outputMassKgM2 = 3.09801`
+    - `residualMassKgM2 = 0`
+- current diagnosis after E1:
+  - the selected corridor is now budget-closed well enough for proof work
+  - the dominant failure is **preexisting upper cloud already present at vertical entry**
+  - `stepVertical5` is not primarily creating the bad corridor cloud in-step; it is handing forward cloud that is already there
+  - the main unresolved question for E2 is therefore upstream of the in-step birth logic:
+    - where that cloud is being supplied or retained before it reaches the vertical handoff
+    - and which exact module/function owns that supply-retention path
+
 ## Phase E2: Patch-Placement Proof
 
 Objective:
-- only after E0 and E1 close, turn the proven failing channel into an exact “where the fix goes” design before editing physics defaults
+- only after E0 and E1 close, turn the proven pre-handoff failure chain into an exact “where the fix goes” design before editing physics defaults
 
 Required deliverables:
 - exact file/function ownership
@@ -367,8 +405,8 @@ Expected outputs:
 - `patch-placement-proof.json`
 
 That proof must answer:
-1. Which function first fails to clear imported cloud?
-2. Which downstream function turns that failure into persistent local maintenance?
+1. Which function first supplies or preserves the excess upper cloud before it reaches `stepVertical5`?
+2. Which downstream function turns that incoming excess into persistent local maintenance?
 3. Which reinforcement path is secondary but must be co-edited so the first fix actually sticks?
 4. Which metrics must improve in 30-day and remain acceptable in 90-day?
 

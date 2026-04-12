@@ -183,3 +183,51 @@ test('stepVertical5 tracks imported upper-cloud persistence when cloud lingers w
   assert.ok(Array.from(state.carryOverUpperCloudEnteringByBandMass).some((value) => value > 0));
   assert.ok(Array.from(state.carryOverUpperCloudSurvivingByBandMass).some((value) => value > 0));
 });
+
+test('stepVertical5 populates the upper-cloud handoff ledger for a simple carried-cloud case', () => {
+  const sigmaHalf = new Float32Array([0, 0.3, 0.7, 1]);
+  const state = createState5({
+    grid: { count: 1 },
+    nz: 3,
+    sigmaHalf
+  });
+  const grid = {
+    nx: 1,
+    ny: 1,
+    latDeg: new Float32Array([26]),
+    invDx: new Float32Array([1]),
+    invDy: new Float32Array([1]),
+    cosLat: new Float32Array([1])
+  };
+
+  state.ps[0] = 100000;
+  state.pHalf[0] = 20000;
+  state.pHalf[1] = 35000;
+  state.pHalf[2] = 65000;
+  state.pHalf[3] = 100000;
+  state.pMid[0] = 27500;
+  state.pMid[1] = 50000;
+  state.pMid[2] = 82500;
+  state.theta.fill(290);
+  state.T.fill(270);
+  state.qv.fill(0.002);
+  state.qc[0] = 0.001;
+
+  stepVertical5({
+    dt: 1800,
+    grid,
+    state,
+    params: {
+      enableMixing: false,
+      enableConvection: false,
+      enableOmegaMassFix: false,
+      enableLargeScaleVerticalAdvection: false
+    }
+  });
+
+  assert.ok(state.verticalUpperCloudInputMass[0] > 0);
+  assert.equal(state.verticalUpperCloudResolvedBirthMass[0], 0);
+  assert.equal(state.verticalUpperCloudConvectiveBirthMass[0], 0);
+  assert.ok(state.verticalUpperCloudHandedToMicrophysicsMass[0] > 0);
+  assert.ok(Math.abs(state.verticalUpperCloudResidualMass[0]) < 1e-6);
+});

@@ -28,6 +28,23 @@ const saturationMixingRatio = (T, p) => {
 };
 
 const applyThetaLatent = (thetaVal, dq, latentHeat, Pi) => thetaVal + (latentHeat / Cp * dq) / Pi;
+const isUpperCloudSigma = (sigmaMid) => sigmaMid <= 0.55;
+const sumUpperCloudMassAtCell = (state, pHalf, sigmaHalf, nz, cellIndex, qFields = ['qc', 'qi', 'qr', 'qs']) => {
+  let upperCloudMass = 0;
+  for (let lev = 0; lev < nz; lev += 1) {
+    const sigmaMid = sigmaMidAtLevel(sigmaHalf, lev, nz);
+    if (!isUpperCloudSigma(sigmaMid)) continue;
+    const dp = pHalf[(lev + 1) * state.N + cellIndex] - pHalf[lev * state.N + cellIndex];
+    if (dp <= 0) continue;
+    let layerMixingRatio = 0;
+    for (const fieldName of qFields) {
+      const field = state[fieldName];
+      if (field?.length === state.N * nz) layerMixingRatio += Number(field[lev * state.N + cellIndex]) || 0;
+    }
+    upperCloudMass += layerMixingRatio * (dp / g);
+  }
+  return upperCloudMass;
+};
 
 const accumulateBandValue = (field, bandIndex, cell, cellCount, value, enabled = true) => {
   if (
@@ -134,12 +151,47 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   if (!state.precipReevaporationByBandMass || state.precipReevaporationByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
     state.precipReevaporationByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   }
+  if (!state.microphysicsUpperCloudInputMass || state.microphysicsUpperCloudInputMass.length !== N) {
+    state.microphysicsUpperCloudInputMass = new Float32Array(N);
+  }
+  if (!state.microphysicsUpperCloudSaturationBirthMass || state.microphysicsUpperCloudSaturationBirthMass.length !== N) {
+    state.microphysicsUpperCloudSaturationBirthMass = new Float32Array(N);
+  }
+  if (!state.microphysicsUpperCloudCloudReevaporationMass || state.microphysicsUpperCloudCloudReevaporationMass.length !== N) {
+    state.microphysicsUpperCloudCloudReevaporationMass = new Float32Array(N);
+  }
+  if (!state.microphysicsUpperCloudPrecipReevaporationMass || state.microphysicsUpperCloudPrecipReevaporationMass.length !== N) {
+    state.microphysicsUpperCloudPrecipReevaporationMass = new Float32Array(N);
+  }
+  if (!state.microphysicsUpperCloudSedimentationExportMass || state.microphysicsUpperCloudSedimentationExportMass.length !== N) {
+    state.microphysicsUpperCloudSedimentationExportMass = new Float32Array(N);
+  }
+  if (!state.microphysicsUpperCloudCloudToPrecipMass || state.microphysicsUpperCloudCloudToPrecipMass.length !== N) {
+    state.microphysicsUpperCloudCloudToPrecipMass = new Float32Array(N);
+  }
+  if (!state.microphysicsUpperCloudOutputMass || state.microphysicsUpperCloudOutputMass.length !== N) {
+    state.microphysicsUpperCloudOutputMass = new Float32Array(N);
+  }
+  if (!state.microphysicsUpperCloudResidualMass || state.microphysicsUpperCloudResidualMass.length !== N) {
+    state.microphysicsUpperCloudResidualMass = new Float32Array(N);
+  }
   state.largeScaleCondensationSource.fill(0);
   state.cloudReevaporationMass.fill(0);
   state.precipReevaporationMass.fill(0);
+  state.microphysicsUpperCloudSaturationBirthMass.fill(0);
+  state.microphysicsUpperCloudCloudReevaporationMass.fill(0);
+  state.microphysicsUpperCloudPrecipReevaporationMass.fill(0);
+  state.microphysicsUpperCloudSedimentationExportMass.fill(0);
+  state.microphysicsUpperCloudCloudToPrecipMass.fill(0);
+  state.microphysicsUpperCloudOutputMass.fill(0);
+  state.microphysicsUpperCloudResidualMass.fill(0);
   if (precipRate) precipRate.fill(0);
   if (precipRainRate) precipRainRate.fill(0);
   if (precipSnowRate) precipSnowRate.fill(0);
+
+  for (let k = 0; k < N; k += 1) {
+    state.microphysicsUpperCloudInputMass[k] = sumUpperCloudMassAtCell(state, pHalf, sigmaHalf, nz, k);
+  }
 
   const kappa = Rd / Cp;
   const iceDenom = Math.max(1e-6, Tfreeze - TiceFull);
@@ -267,6 +319,9 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
             const condMass = dq * massCell;
             const numericalBandIndex = findInstrumentationLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));
             state.largeScaleCondensationSource[k] += condMass;
+            if (isUpperCloudSigma(sigmaMidAtLevel(sigmaHalf, lev, nz))) {
+              state.microphysicsUpperCloudSaturationBirthMass[k] += condMass;
+            }
             state.saturationAdjustmentCloudBirthAccumMass[k] += condMass;
             state.saturationAdjustmentEventCount[k] += 1;
             state.saturationAdjustmentSupersaturationMassWeighted[k] += supersaturationFrac * condMass;
@@ -306,6 +361,10 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
           if (traceEnabled && massCell > 0) {
             if (bucket === 'cloud') state.cloudReevaporationMass[k] += dq * massCell;
             else if (bucket === 'precip') state.precipReevaporationMass[k] += dq * massCell;
+            if (isUpperCloudSigma(sigmaMidAtLevel(sigmaHalf, lev, nz))) {
+              if (bucket === 'cloud') state.microphysicsUpperCloudCloudReevaporationMass[k] += dq * massCell;
+              else if (bucket === 'precip') state.microphysicsUpperCloudPrecipReevaporationMass[k] += dq * massCell;
+            }
             if (bucket === 'cloud') state.cloudReevaporationByBandMass[cloudBirthBandOffset(cloudBirthBandIndex, k, N)] += dq * massCell;
             else if (bucket === 'precip') state.precipReevaporationByBandMass[cloudBirthBandOffset(cloudBirthBandIndex, k, N)] += dq * massCell;
           }
@@ -381,6 +440,9 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
 
       if (traceEnabled && massCell > 0 && cloudToPrecipMass > 0) {
         state.microphysicsCloudToPrecipByBandMass[cloudBirthBandOffset(cloudBirthBandIndex, k, N)] += cloudToPrecipMass * massCell;
+        if (isUpperCloudSigma(sigmaMidAtLevel(sigmaHalf, lev, nz))) {
+          state.microphysicsUpperCloudCloudToPrecipMass[k] += cloudToPrecipMass * massCell;
+        }
       }
 
       const numericalBandIndex = findInstrumentationLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));
@@ -428,17 +490,25 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         const mLev = dpLev / g;
         const massOut = qVal * mLev * fallFrac;
         if (massOut <= 0) continue;
+        const currentSigmaMid = sigmaMidAtLevel(sigmaHalf, lev, nz);
+        const currentInUpper = isUpperCloudSigma(currentSigmaMid);
         store[idx] = qVal - massOut / mLev;
         if (lev === nz - 1) {
           if (precipAccum) precipAccum[k] += massOut;
           if (rateOut) rateOut[k] += massOut * (3600 / dt);
           if (precipRate) precipRate[k] += massOut * (3600 / dt);
+          if (currentInUpper) state.microphysicsUpperCloudSedimentationExportMass[k] += massOut;
         } else {
           const dpBelow = pHalf[baseHalfBelow + k] - pHalf[baseHalfNext + k];
           if (dpBelow > 0) {
             const mBelow = dpBelow / g;
+            const belowSigmaMid = sigmaMidAtLevel(sigmaHalf, lev + 1, nz);
+            if (currentInUpper && !isUpperCloudSigma(belowSigmaMid)) {
+              state.microphysicsUpperCloudSedimentationExportMass[k] += massOut;
+            }
             store[base + N + k] += massOut / mBelow;
           } else {
+            if (currentInUpper) state.microphysicsUpperCloudSedimentationExportMass[k] += massOut;
             store[idx] += massOut / mLev;
           }
         }
@@ -455,6 +525,19 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
     if (qi[m] < 0) qi[m] = 0;
     if (qr[m] < 0) qr[m] = 0;
     if (qs[m] < 0) qs[m] = 0;
+  }
+
+  for (let k = 0; k < N; k += 1) {
+    const outputMass = sumUpperCloudMassAtCell(state, pHalf, sigmaHalf, nz, k);
+    state.microphysicsUpperCloudOutputMass[k] = outputMass;
+    state.microphysicsUpperCloudResidualMass[k] = (
+      (state.microphysicsUpperCloudInputMass[k] || 0)
+      + (state.microphysicsUpperCloudSaturationBirthMass[k] || 0)
+      - (state.microphysicsUpperCloudCloudReevaporationMass[k] || 0)
+      - (state.microphysicsUpperCloudPrecipReevaporationMass[k] || 0)
+      - (state.microphysicsUpperCloudSedimentationExportMass[k] || 0)
+      - outputMass
+    );
   }
 
   if (precipRate) {
