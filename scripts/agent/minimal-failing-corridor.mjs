@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { buildValidationDiagnostics } from '../../src/weather/validation/diagnostics.js';
 import { classifyNhDryBeltSector } from '../../src/weather/v2/sourceTracing5.js';
 import { applyHeadlessTerrainFixture } from './headless-terrain-fixture.mjs';
+import { advanceModelSecondsFully } from './advance-fully.mjs';
 import { _test as planetaryAuditTest } from './planetary-realism-audit.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -265,7 +266,7 @@ const createBaselineCore = async (modules) => suppressProcessOutput(async () => 
 });
 
 const advanceSilently = async (core, modelSeconds) => suppressProcessOutput(async () => {
-  core.advanceModelSeconds(modelSeconds);
+  advanceModelSecondsFully(core, modelSeconds);
 });
 
 const buildCorridorMask = (core, { sector, latMin, latMax }) => {

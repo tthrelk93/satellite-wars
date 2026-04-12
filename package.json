@@ -39,6 +39,7 @@
     "agent:prevertical-supply-vs-retention-counterfactuals": "node scripts/agent/prevertical-supply-vs-retention-counterfactuals.mjs",
     "agent:prevertical-reduced-order-experiments": "node scripts/agent/prevertical-reduced-order-experiments.mjs",
     "agent:prevertical-numerical-ownership-check": "node scripts/agent/prevertical-numerical-ownership-check.mjs",
+    "agent:prevertical-numerical-repair-audit": "node scripts/agent/prevertical-numerical-repair-audit.mjs",
     "agent:prevertical-variant-normalized-ownership": "node scripts/agent/prevertical-variant-normalized-ownership.mjs",
     "agent:orographic-probe-cdp": "node scripts/agent/orographic-probe-cdp.mjs",
     "agent:reuse-localhost-tab": "node scripts/agent/reuse-localhost-tab.mjs",

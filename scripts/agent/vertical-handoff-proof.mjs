@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import { _proof as corridorProof } from './minimal-failing-corridor.mjs';
 import { applyHeadlessTerrainFixture } from './headless-terrain-fixture.mjs';
+import { advanceModelSecondsFully } from './advance-fully.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -271,7 +272,9 @@ const runReplaySeries = async ({
   seed
 }) => {
   const core = await createConfiguredCore(modules, { nx, ny, dt, seed });
-  await corridorProof.advanceSilently(core, config.checkpointDay * 86400);
+  await corridorProof.suppressProcessOutput(async () => {
+    advanceModelSecondsFully(core, config.checkpointDay * 86400);
+  });
   const corridorIndices = corridorProof.buildCorridorMask(core, {
     sector: sectorKey,
     latMin: latBandDeg[0],

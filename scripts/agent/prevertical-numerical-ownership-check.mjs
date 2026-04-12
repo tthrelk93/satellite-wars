@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { execSync } from 'child_process';
 import { _proof as corridorProof } from './minimal-failing-corridor.mjs';
 import { applyHeadlessTerrainFixture } from './headless-terrain-fixture.mjs';
+import { advanceToModelDayFully } from './advance-fully.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,7 +79,7 @@ const createConfiguredCore = async (modules, variant) => corridorProof.suppressP
 
 const advanceToDay = async (core, day) => {
   await corridorProof.suppressProcessOutput(async () => {
-    core.advanceModelSeconds(day * 86400);
+    advanceToModelDayFully(core, day);
   });
 };
 

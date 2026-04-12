@@ -515,6 +515,34 @@ Result:
   - ownership family is stable after normalization
   - numerical repair is still needed, but mainly to preserve signal amplitude and replay comparability, not to rediscover a different owner
 
+### Focused numerical-repair phase
+
+Objective:
+- explain why `dt_half` collapsed the retained pre-vertical reservoir signal while the informative variants kept the same ownership family
+- repair harness semantics before trusting any new upstream patch proof
+
+Required artifact:
+- `prevertical-numerical-repair-audit.json`
+
+Status:
+- complete
+
+Artifacts:
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-numerical-repair-audit.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-numerical-repair-audit.json)
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-numerical-repair-audit.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-numerical-repair-audit.md)
+
+Result:
+- the primary numerical failure was in the proof harness, not yet in a proven physics owner flip
+- multiple upstream proof scripts were checkpointing by calling `advanceModelSeconds(day * 86400)` once
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js) caps a single advance call at `maxSteps = max(1000, ceil(86400 / dt) + 10)`
+- that means the old direct checkpoints silently under-advanced
+  - baseline `dt=1800`: `29.75` requested days became only `20.83333`
+  - `dt_half=900`: `29.75` requested days became only `10.41667`
+- `dt_half` looked uniquely unstable in part because it was reaching far less physical time before the cap stopped the run
+- the harness is now repaired to use chunked full advancement via [advance-fully.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/advance-fully.mjs)
+- consequence:
+  - pre-repair long-jump numerical ownership artifacts should be treated as stale until regenerated on the repaired harness
+
 ## Phase U6: Upstream Patch-Placement Proof
 
 Objective:
