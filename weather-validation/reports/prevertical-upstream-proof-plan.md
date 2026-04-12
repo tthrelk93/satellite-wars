@@ -392,6 +392,31 @@ Exit criteria:
 - at least one reduced experiment reproduces the ownership story
 - or we prove the bug requires full coupled behavior and can stop wasting time on reduced models
 
+Status:
+- complete
+
+Artifacts:
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-reduced-order-results.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-reduced-order-results.json)
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-reduced-order-results.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-reduced-order-results.md)
+
+Result:
+- U4 does reproduce the ownership story in reduced form
+- the no-transport column retains most of the target-cell excess after one local step
+  - target reproduction: `0.88033`
+  - corridor reproduction: `0.79509`
+- the east-Pacific sector curtain reproduces the full frozen pre-vertical excess without needing the rest of the globe
+  - target reproduction: `1.00004`
+  - corridor reproduction: `1.02582`
+- the advection-only curtain fails to reproduce the bug
+  - target reproduction: `0.10679`
+  - corridor reproduction: `0.09215`
+
+Decision:
+- the bug survives in a reduced local/sector setting
+- full-globe complexity is not required to reproduce the failing ownership story
+- transport alone is not sufficient in reduced order
+- the retained previous-step reservoir plus local maintenance remains the dominant mechanism
+
 ## Phase U5: Numerical Ownership Check
 
 Objective:
