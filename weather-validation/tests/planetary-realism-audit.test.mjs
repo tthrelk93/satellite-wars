@@ -626,6 +626,102 @@ test('buildMonthlyClimatology averages metrics and zonal profiles by month', () 
   assert.equal(monthly[0].profiles.series.convectiveMassFluxKgM2S[1], 0.025);
 });
 
+test('phase 10 reports preserve seasonal attribution stability and lag ranking', () => {
+  const makeSample = ({ targetDay, monthIndex, carry, largeScale, dryRatio, initMemory }) => ({
+    targetDay,
+    monthIndex,
+    metrics: {
+      subtropicalDryNorthRatio: dryRatio,
+      subtropicalRhNorthMeanFrac: 0.72 + carry * 0.02,
+      northDryBeltUpperCloudPathMeanKgM2: carry + largeScale + 0.2,
+      northDryBeltOceanPrecipMeanMmHr: 0.25 + carry * 0.05,
+      northDryBeltSourceNorthDryBeltOceanMeanKgM2: 0.8,
+      northDryBeltSourceLandRecyclingMeanKgM2: 0.2,
+      northDryBeltSourceTropicalOceanNorthMeanKgM2: 0.3,
+      northDryBeltSourceTropicalOceanSouthMeanKgM2: 0.1,
+      northDryBeltSourceNorthExtratropicalOceanMeanKgM2: 0.2,
+      northDryBeltSourceOtherOceanMeanKgM2: 0.1,
+      northDryBeltSourceInitializationMemoryMeanKgM2: initMemory,
+      northDryBeltSourceAtmosphericCarryoverMeanKgM2: carry * 8,
+      northDryBeltSourceNudgingInjectionMeanKgM2: 0.01,
+      northDryBeltSourceAnalysisInjectionMeanKgM2: 0,
+      northDryBeltCarriedOverUpperCloudMeanKgM2: carry,
+      northDryBeltImportedAnvilPersistenceMeanKgM2: carry * 0.35,
+      northDryBeltWeakErosionCloudSurvivalMeanKgM2: carry * 0.85,
+      northDryBeltLargeScaleCondensationMeanKgM2: largeScale,
+      northDryBeltResolvedAscentCloudBirthPotentialMeanKgM2: largeScale * 0.35,
+      northDryBeltConvectiveDetrainmentCloudSourceMeanKgM2: 0.01,
+      northDryBeltUpperCloudNetCloudRadiativeEffectMeanWm2: 8
+    },
+    upperCloudResidenceTracing: {
+      ageAttribution: {
+        northDryBeltStaleFrac: 0.88
+      },
+      erosionBudget: {
+        northDryBeltBlockedErosionFrac: 0.9
+      },
+      ventilation: {
+        north35UpperTroposphereImportMagnitudeKgM_1S: 3.6
+      }
+    },
+    thermodynamicSupportTracing: {
+      classification: {
+        radiationSupportScore: 0.2,
+        moistureSupportScore: 0.3
+      }
+    },
+    forcingOppositionTracing: {
+      northDryBelt: {
+        nudgingMoisteningMeanKgM2: 0.01,
+        analysisMoisteningMeanKgM2: 0,
+        nativeDryingSupportMeanKgM2: 10,
+        windOpposedDryingCorrectionMean: 50,
+        nudgingTargetQvMismatchMeanKgKg: 0.0005
+      }
+    },
+    numericalIntegrityTracing: {
+      northDryBelt: {
+        supersaturationClampMassMeanKgM2: 5,
+        verticalCflClampMassMeanKgM2: 100,
+        cloudLimiterMassMeanKgM2: 0,
+        negativeClipMassMeanKgM2: 0
+      }
+    },
+    stormSpilloverTracing: {
+      overall: {
+        regimes: {
+          persistent_zonal_background: { combinedContributionFrac: 0.86 },
+          synoptic_storm_leakage: { combinedContributionFrac: 0.02 },
+          tropical_spillover: { combinedContributionFrac: 0.01 },
+          subtropical_marine_deck_drizzle: { combinedContributionFrac: 0.11 }
+        }
+      }
+    }
+  });
+
+  const samples = [
+    makeSample({ targetDay: 15, monthIndex: 0, carry: 0.4, largeScale: 0.12, dryRatio: 0.82, initMemory: 0.5 }),
+    makeSample({ targetDay: 30, monthIndex: 1, carry: 0.55, largeScale: 0.14, dryRatio: 0.9, initMemory: 0.42 }),
+    makeSample({ targetDay: 45, monthIndex: 2, carry: 0.7, largeScale: 0.16, dryRatio: 0.98, initMemory: 0.34 }),
+    makeSample({ targetDay: 60, monthIndex: 3, carry: 0.85, largeScale: 0.18, dryRatio: 1.06, initMemory: 0.26 }),
+    makeSample({ targetDay: 75, monthIndex: 4, carry: 1.0, largeScale: 0.2, dryRatio: 1.14, initMemory: 0.18 }),
+    makeSample({ targetDay: 90, monthIndex: 5, carry: 1.15, largeScale: 0.22, dryRatio: 1.22, initMemory: 0.1 })
+  ];
+
+  const monthlyAttribution = planetaryAuditTest.buildMonthlyAttributionClimatology(samples);
+  const seasonalRanking = planetaryAuditTest.buildSeasonalRootCauseRanking(samples);
+  const lagAnalysis = planetaryAuditTest.buildAttributionLagAnalysis(samples);
+
+  assert.equal(monthlyAttribution.months[0].dominantFamily.key, 'importedCloudPersistence');
+  assert.equal(seasonalRanking.dominantAnnualFamily.key, 'importedCloudPersistence');
+  assert.equal(seasonalRanking.stability.stableAcrossMonthsPass, true);
+  assert.equal(seasonalRanking.rootCauseAssessment.ruledIn[0], 'Seasonal attribution stays anchored on Imported cloud persistence.');
+  assert.ok([
+    'importedCloudPersistenceScore',
+    'sourceAtmosphericCarryoverMeanKgM2'
+  ].includes(lagAnalysis.predictorRanking[0].predictorKey));
+});
+
 test('buildRealismGapReport ranks strongest moisture gaps first', () => {
   const gaps = planetaryAuditTest.buildRealismGapReport([
     {

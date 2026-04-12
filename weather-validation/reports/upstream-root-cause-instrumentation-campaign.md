@@ -591,6 +591,13 @@ Root-cause effect on the plan:
 
 ## Phase 10: Seasonal Memory And Hysteresis Diagnostics
 
+Status:
+- complete with the Phase 10 monthly attribution climatology, seasonal ranking, and lag-analysis pass
+- annual-mean attribution still ranks `importedCloudPersistence` first
+- but the seasonal result is not closed enough for patch readiness because `radiativeThermodynamicSupport` becomes the top family in multiple seasons and the dominant family is not stable enough month-to-month
+- helper forcing and storm leakage stay ruled out as dominant seasonal families
+- the next step is therefore causal proof in `Phase 11`, not direct patching
+
 Objective:
 - verify that the identified cause is not just a startup artifact or one-month transient
 
@@ -618,6 +625,24 @@ Rules out / confirms:
 
 Exit criteria:
 - the leading root-cause family is stable across `30`, `90`, and `365` day horizons
+
+Observed Phase 10 result:
+- annual mean still ranks imported cloud persistence first, ahead of radiative support:
+  - `importedCloudPersistence = 0.70618`
+  - `radiativeThermodynamicSupport = 0.69978`
+- but the seasonal dominance is not stable enough for closure:
+  - `dominantFamilyMonthCount = 5`
+  - `dominantFamilySeasonCount = 1`
+  - `stableAcrossMonthsPass = false`
+  - `stableAcrossSeasonsPass = false`
+- seasonal rankings still rule out helper forcing and storm leakage as dominant families
+- lag analysis now points most strongly at long-lag atmospheric carryover / imported-cloud predictors rather than startup memory or storm leakage
+
+Root-cause effect on the plan:
+- imported cloud persistence remains the leading annual explanation
+- radiative support is now confirmed as the main competing seasonal reinforcement pathway
+- no single family is seasonally stable enough yet to skip causal ablation
+- `Phase 11` now needs to test imported-cloud persistence and radiative-support pathways directly, while carrying Phase 9 numerical checks forward
 
 ## Phase 11: Controlled Ablation And Counterfactual Harness
 

@@ -116,6 +116,18 @@ const round = (value, digits = 3) => Number.isFinite(value) ? Number(value.toFix
 const toJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const roundSeries = (values, digits = 3) => values.map((value) => round(value, digits));
 const clamp01 = (value) => clamp(value, 0, 1);
+const meanDefined = (values) => {
+  const filtered = values.filter((value) => Number.isFinite(value));
+  return filtered.length ? mean(filtered) : null;
+};
+const normalizeScore = (value, scale) => Number.isFinite(value) && Number.isFinite(scale) && scale > 0
+  ? clamp01(value / scale)
+  : null;
+const safeRatio = (numerator, denominator, clampToUnit = false) => {
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || Math.abs(denominator) <= 1e-9) return null;
+  const value = numerator / denominator;
+  return clampToUnit ? clamp01(value) : value;
+};
 
 const stripKnownExtension = (filePath) => filePath.replace(/\.(json|md)$/i, '');
 
@@ -125,6 +137,22 @@ const dayToMonthIndex = (day) => {
 };
 
 const monthName = (monthIndex) => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][monthIndex] || `M${monthIndex + 1}`;
+const ROOT_CAUSE_FAMILY_METADATA = [
+  { key: 'importedCloudPersistence', label: 'Imported cloud persistence' },
+  { key: 'localLargeScaleMaintenance', label: 'Local large-scale maintenance' },
+  { key: 'radiativeThermodynamicSupport', label: 'Radiative/thermodynamic support' },
+  { key: 'stormLeakage', label: 'Storm leakage / spillover' },
+  { key: 'helperForcing', label: 'Helper forcing interference' },
+  { key: 'initializationMemory', label: 'Initialization memory' },
+  { key: 'numericalFragility', label: 'Numerical fragility' }
+];
+const ROOT_CAUSE_FAMILY_LABELS = Object.fromEntries(ROOT_CAUSE_FAMILY_METADATA.map((entry) => [entry.key, entry.label]));
+const SEASON_DEFS = [
+  { key: 'DJF', label: 'DJF', monthIndices: [11, 0, 1] },
+  { key: 'MAM', label: 'MAM', monthIndices: [2, 3, 4] },
+  { key: 'JJA', label: 'JJA', monthIndices: [5, 6, 7] },
+  { key: 'SON', label: 'SON', monthIndices: [8, 9, 10] }
+];
 
 export const buildSampleTargetsDays = (horizonList, cadenceDays) => {
   const targets = new Set(horizonList);
@@ -1577,6 +1605,408 @@ export const buildMonthlyClimatology = (samples) => {
   return months;
 };
 
+const computeTrackedSourceTotal = (metrics = {}) => (
+  (Number(metrics.northDryBeltSourceNorthDryBeltOceanMeanKgM2) || 0)
+  + (Number(metrics.northDryBeltSourceTropicalOceanNorthMeanKgM2) || 0)
+  + (Number(metrics.northDryBeltSourceTropicalOceanSouthMeanKgM2) || 0)
+  + (Number(metrics.northDryBeltSourceNorthExtratropicalOceanMeanKgM2) || 0)
+  + (Number(metrics.northDryBeltSourceLandRecyclingMeanKgM2) || 0)
+  + (Number(metrics.northDryBeltSourceOtherOceanMeanKgM2) || 0)
+  + (Number(metrics.northDryBeltSourceInitializationMemoryMeanKgM2) || 0)
+  + (Number(metrics.northDryBeltSourceAtmosphericCarryoverMeanKgM2) || 0)
+  + (Number(metrics.northDryBeltSourceNudgingInjectionMeanKgM2) || 0)
+  + (Number(metrics.northDryBeltSourceAnalysisInjectionMeanKgM2) || 0)
+);
+
+const sortFamilyScores = (scores = {}) => ROOT_CAUSE_FAMILY_METADATA
+  .map((entry) => ({
+    key: entry.key,
+    label: entry.label,
+    score: Number.isFinite(scores?.[entry.key]) ? round(scores[entry.key], 5) : null
+  }))
+  .filter((entry) => Number.isFinite(entry.score))
+  .sort((a, b) => (b.score || 0) - (a.score || 0));
+
+const buildSampleRootCauseScores = (sample = null) => {
+  const metrics = sample?.metrics || {};
+  const transport = sample?.transportTracing || null;
+  const upperCloud = sample?.upperCloudResidenceTracing || null;
+  const thermo = sample?.thermodynamicSupportTracing || null;
+  const forcing = sample?.forcingOppositionTracing || null;
+  const numerics = sample?.numericalIntegrityTracing || null;
+  const storms = sample?.stormSpilloverTracing || null;
+
+  const trackedSourceTotal = computeTrackedSourceTotal(metrics);
+  const localSource = (Number(metrics.northDryBeltSourceNorthDryBeltOceanMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltSourceLandRecyclingMeanKgM2) || 0);
+  const importedSource = Math.max(0, trackedSourceTotal - localSource);
+  const carryMass = (Number(metrics.northDryBeltCarriedOverUpperCloudMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltImportedAnvilPersistenceMeanKgM2) || 0);
+  const localCloudBirth = (Number(metrics.northDryBeltLargeScaleCondensationMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltResolvedAscentCloudBirthPotentialMeanKgM2) || 0)
+    + (Number(metrics.northDryBeltConvectiveDetrainmentCloudSourceMeanKgM2) || 0);
+  const totalTrackedCloud = carryMass + localCloudBirth;
+  const helperMoistening = (Number(forcing?.northDryBelt?.nudgingMoisteningMeanKgM2) || 0)
+    + (Number(forcing?.northDryBelt?.analysisMoisteningMeanKgM2) || 0);
+  const nativeDrying = Number(forcing?.northDryBelt?.nativeDryingSupportMeanKgM2) || 0;
+  const stormLeakageCombined = (Number(storms?.overall?.regimes?.synoptic_storm_leakage?.combinedContributionFrac) || 0)
+    + (Number(storms?.overall?.regimes?.tropical_spillover?.combinedContributionFrac) || 0);
+  const importMagnitude = Math.abs(Number(upperCloud?.ventilation?.north35UpperTroposphereImportMagnitudeKgM_1S) || 0);
+  const verticalCflMass = Number(numerics?.northDryBelt?.verticalCflClampMassMeanKgM2) || 0;
+  const limiterMass = (Number(numerics?.northDryBelt?.cloudLimiterMassMeanKgM2) || 0)
+    + (Number(numerics?.northDryBelt?.negativeClipMassMeanKgM2) || 0);
+
+  const scores = {
+    importedCloudPersistence: meanDefined([
+      safeRatio(importedSource, trackedSourceTotal, true),
+      safeRatio(carryMass, totalTrackedCloud, true),
+      upperCloud?.ageAttribution?.northDryBeltStaleFrac ?? null,
+      upperCloud?.erosionBudget?.northDryBeltBlockedErosionFrac ?? null,
+      normalizeScore(importMagnitude, 5)
+    ]),
+    localLargeScaleMaintenance: meanDefined([
+      safeRatio(localCloudBirth, totalTrackedCloud, true),
+      safeRatio(Number(metrics.northDryBeltLargeScaleCondensationMeanKgM2) || 0, totalTrackedCloud, true),
+      storms?.overall?.regimes?.persistent_zonal_background?.combinedContributionFrac ?? null
+    ]),
+    radiativeThermodynamicSupport: meanDefined([
+      thermo?.classification?.radiationSupportScore ?? null,
+      thermo?.classification?.moistureSupportScore ?? null,
+      normalizeScore(Math.abs(Number(metrics.northDryBeltUpperCloudNetCloudRadiativeEffectMeanWm2) || 0), 25)
+    ]),
+    stormLeakage: meanDefined([
+      stormLeakageCombined
+    ]),
+    helperForcing: meanDefined([
+      safeRatio(helperMoistening, nativeDrying + helperMoistening, true),
+      normalizeScore(Math.abs(Number(forcing?.northDryBelt?.windOpposedDryingCorrectionMean) || 0), 2000),
+      normalizeScore(Math.abs(Number(forcing?.northDryBelt?.nudgingTargetQvMismatchMeanKgKg) || 0), 0.01)
+    ]),
+    initializationMemory: safeRatio(
+      Number(metrics.northDryBeltSourceInitializationMemoryMeanKgM2) || 0,
+      trackedSourceTotal,
+      true
+    ),
+    numericalFragility: meanDefined([
+      normalizeScore(Number(numerics?.northDryBelt?.supersaturationClampMassMeanKgM2) || 0, 250),
+      normalizeScore(verticalCflMass, 100000),
+      normalizeScore(limiterMass, 1)
+    ])
+  };
+
+  const ranking = sortFamilyScores(scores);
+  return {
+    scores: Object.fromEntries(
+      ROOT_CAUSE_FAMILY_METADATA.map((entry) => [entry.key, Number.isFinite(scores[entry.key]) ? round(scores[entry.key], 5) : null])
+    ),
+    ranking,
+    dominantFamily: ranking[0] || null
+  };
+};
+
+export const buildMonthlyAttributionClimatology = (samples) => {
+  const months = Array.from({ length: 12 }, (_, monthIndex) => ({
+    monthIndex,
+    month: monthName(monthIndex),
+    sampleCount: 0,
+    sampleDays: [],
+    attributionMetrics: {},
+    familyScores: {},
+    ranking: [],
+    dominantFamily: null
+  }));
+  const metricKeys = [
+    'subtropicalDryNorthRatio',
+    'subtropicalRhNorthMeanFrac',
+    'northDryBeltSourceAtmosphericCarryoverMeanKgM2',
+    'northDryBeltSourceInitializationMemoryMeanKgM2',
+    'northDryBeltCarriedOverUpperCloudMeanKgM2',
+    'northDryBeltWeakErosionCloudSurvivalMeanKgM2',
+    'northDryBeltLargeScaleCondensationMeanKgM2',
+    'northDryBeltImportedAnvilPersistenceMeanKgM2',
+    'northDryBeltUpperCloudPathMeanKgM2'
+  ];
+
+  for (const sample of samples) {
+    const monthIndex = Number.isFinite(sample?.monthIndex) ? sample.monthIndex : dayToMonthIndex(sample?.targetDay || 0);
+    const bucket = months[monthIndex];
+    if (!bucket) continue;
+    const familySummary = buildSampleRootCauseScores(sample);
+    bucket.sampleCount += 1;
+    bucket.sampleDays.push(round(sample.targetDay, 2));
+    for (const key of metricKeys) {
+      if (!bucket.attributionMetrics[key]) bucket.attributionMetrics[key] = [];
+      if (Number.isFinite(sample?.metrics?.[key])) bucket.attributionMetrics[key].push(sample.metrics[key]);
+    }
+    for (const family of ROOT_CAUSE_FAMILY_METADATA) {
+      if (!bucket.familyScores[family.key]) bucket.familyScores[family.key] = [];
+      if (Number.isFinite(familySummary.scores[family.key])) bucket.familyScores[family.key].push(familySummary.scores[family.key]);
+    }
+  }
+
+  for (const month of months) {
+    month.sampleDays = month.sampleDays;
+    month.attributionMetrics = Object.fromEntries(
+      Object.entries(month.attributionMetrics).map(([key, values]) => [key, round(meanDefined(values), key.includes('KgM2S') || key.includes('KgM2') ? 5 : 3)])
+    );
+    month.familyScores = Object.fromEntries(
+      ROOT_CAUSE_FAMILY_METADATA.map((family) => [family.key, round(meanDefined(month.familyScores[family.key] || []), 5)])
+    );
+    month.ranking = sortFamilyScores(month.familyScores);
+    month.dominantFamily = month.ranking[0] || null;
+  }
+
+  return {
+    schema: 'satellite-wars.monthly-attribution-climatology.v1',
+    generatedAt: new Date().toISOString(),
+    months
+  };
+};
+
+export const buildSeasonalRootCauseRanking = (samples) => {
+  const monthly = buildMonthlyAttributionClimatology(samples).months;
+  const sampledMonths = monthly.filter((month) => month.sampleCount > 0);
+  const annualScores = Object.fromEntries(
+    ROOT_CAUSE_FAMILY_METADATA.map((family) => [
+      family.key,
+      round(meanDefined(sampledMonths.map((month) => month.familyScores?.[family.key])), 5)
+    ])
+  );
+  const annualRanking = sortFamilyScores(annualScores);
+  const dominantAnnualFamily = annualRanking[0] || null;
+  const seasons = SEASON_DEFS.map((season) => {
+    const members = season.monthIndices.map((monthIndex) => monthly[monthIndex]).filter((entry) => entry?.sampleCount > 0);
+    const familyScores = Object.fromEntries(
+      ROOT_CAUSE_FAMILY_METADATA.map((family) => [
+        family.key,
+        round(meanDefined(members.map((entry) => entry.familyScores?.[family.key])), 5)
+      ])
+    );
+    const ranking = sortFamilyScores(familyScores);
+    return {
+      seasonKey: season.key,
+      label: season.label,
+      monthIndices: season.monthIndices,
+      sampleCount: members.reduce((sum, entry) => sum + (entry.sampleCount || 0), 0),
+      familyScores,
+      ranking,
+      dominantFamily: ranking[0] || null,
+      metrics: {
+        subtropicalDryNorthRatio: round(meanDefined(members.map((entry) => entry.attributionMetrics?.subtropicalDryNorthRatio))),
+        northDryBeltSourceAtmosphericCarryoverMeanKgM2: round(meanDefined(members.map((entry) => entry.attributionMetrics?.northDryBeltSourceAtmosphericCarryoverMeanKgM2)), 5),
+        northDryBeltCarriedOverUpperCloudMeanKgM2: round(meanDefined(members.map((entry) => entry.attributionMetrics?.northDryBeltCarriedOverUpperCloudMeanKgM2)), 5),
+        northDryBeltWeakErosionCloudSurvivalMeanKgM2: round(meanDefined(members.map((entry) => entry.attributionMetrics?.northDryBeltWeakErosionCloudSurvivalMeanKgM2)), 5)
+      }
+    };
+  });
+
+  const dominantAnnualKey = dominantAnnualFamily?.key || null;
+  const dominantFamilyMonthCount = sampledMonths.filter((month) => month.dominantFamily?.key === dominantAnnualKey).length;
+  const dominantFamilySeasonCount = seasons.filter((season) => season.dominantFamily?.key === dominantAnnualKey).length;
+  let dominantFamilyTransitionCount = 0;
+  for (let index = 1; index < sampledMonths.length; index += 1) {
+    if ((sampledMonths[index - 1].dominantFamily?.key || null) !== (sampledMonths[index].dominantFamily?.key || null)) {
+      dominantFamilyTransitionCount += 1;
+    }
+  }
+
+  const stableAcrossMonthsPass = sampledMonths.length > 0
+    && dominantFamilyMonthCount / sampledMonths.length >= 0.6;
+  const stableAcrossSeasonsPass = seasons.filter((season) => season.sampleCount > 0).length > 0
+    && dominantFamilySeasonCount / Math.max(1, seasons.filter((season) => season.sampleCount > 0).length) >= 0.75;
+  const rootCauseAssessment = {
+    ruledIn: [],
+    ruledOut: [],
+    ambiguous: []
+  };
+  if (dominantAnnualKey && stableAcrossMonthsPass && stableAcrossSeasonsPass) {
+    rootCauseAssessment.ruledIn.push(`Seasonal attribution stays anchored on ${ROOT_CAUSE_FAMILY_LABELS[dominantAnnualKey]}.`);
+  } else {
+    rootCauseAssessment.ambiguous.push('No single root-cause family stays dominant enough across months and seasons yet.');
+  }
+  if (sampledMonths.every((month) => month.dominantFamily?.key !== 'helperForcing')) {
+    rootCauseAssessment.ruledOut.push('Helper forcing is not the dominant seasonal family.');
+  }
+  if (sampledMonths.every((month) => month.dominantFamily?.key !== 'stormLeakage')) {
+    rootCauseAssessment.ruledOut.push('Storm leakage is not the dominant seasonal family.');
+  }
+
+  return {
+    schema: 'satellite-wars.seasonal-root-cause-ranking.v1',
+    generatedAt: new Date().toISOString(),
+    months: sampledMonths.map((month) => ({
+      monthIndex: month.monthIndex,
+      month: month.month,
+      sampleCount: month.sampleCount,
+      dominantFamily: month.dominantFamily,
+      ranking: month.ranking.slice(0, 4)
+    })),
+    seasons,
+    annualMeanFamilyScores: annualScores,
+    annualRanking,
+    dominantAnnualFamily,
+    stability: {
+      sampledMonthCount: sampledMonths.length,
+      dominantFamilyMonthCount,
+      dominantFamilySeasonCount,
+      dominantFamilyTransitionCount,
+      stableAcrossMonthsPass,
+      stableAcrossSeasonsPass
+    },
+    rootCauseAssessment
+  };
+};
+
+const pearsonCorrelation = (xs, ys) => {
+  if (!Array.isArray(xs) || !Array.isArray(ys) || xs.length !== ys.length || xs.length < 3) return null;
+  const meanX = mean(xs);
+  const meanY = mean(ys);
+  let numerator = 0;
+  let sumSqX = 0;
+  let sumSqY = 0;
+  for (let index = 0; index < xs.length; index += 1) {
+    const dx = xs[index] - meanX;
+    const dy = ys[index] - meanY;
+    numerator += dx * dy;
+    sumSqX += dx * dx;
+    sumSqY += dy * dy;
+  }
+  const denominator = Math.sqrt(sumSqX * sumSqY);
+  return denominator > 0 ? numerator / denominator : null;
+};
+
+const findLagTargetSample = (samples, startIndex, lagDays) => {
+  const baseDay = Number(samples[startIndex]?.targetDay) || 0;
+  const targetDay = baseDay + lagDays;
+  let best = null;
+  for (let index = startIndex + 1; index < samples.length; index += 1) {
+    const candidate = samples[index];
+    if (!Number.isFinite(candidate?.targetDay) || candidate.targetDay < targetDay) continue;
+    const delta = candidate.targetDay - targetDay;
+    if (!best || delta < best.delta) best = { index, delta };
+  }
+  return best?.index ?? null;
+};
+
+export const buildAttributionLagAnalysis = (samples) => {
+  const orderedSamples = [...samples].filter((sample) => Number.isFinite(sample?.targetDay)).sort((a, b) => a.targetDay - b.targetDay);
+  const enriched = orderedSamples.map((sample) => ({
+    sample,
+    family: buildSampleRootCauseScores(sample)
+  }));
+  const predictorExtractors = {
+    importedCloudPersistenceScore: (entry) => entry.family.scores.importedCloudPersistence,
+    localLargeScaleMaintenanceScore: (entry) => entry.family.scores.localLargeScaleMaintenance,
+    radiativeThermodynamicSupportScore: (entry) => entry.family.scores.radiativeThermodynamicSupport,
+    stormLeakageScore: (entry) => entry.family.scores.stormLeakage,
+    helperForcingScore: (entry) => entry.family.scores.helperForcing,
+    initializationMemoryScore: (entry) => entry.family.scores.initializationMemory,
+    numericalFragilityScore: (entry) => entry.family.scores.numericalFragility,
+    sourceAtmosphericCarryoverMeanKgM2: (entry) => entry.sample.metrics?.northDryBeltSourceAtmosphericCarryoverMeanKgM2,
+    carriedOverUpperCloudMeanKgM2: (entry) => entry.sample.metrics?.northDryBeltCarriedOverUpperCloudMeanKgM2,
+    weakErosionCloudSurvivalMeanKgM2: (entry) => entry.sample.metrics?.northDryBeltWeakErosionCloudSurvivalMeanKgM2,
+    largeScaleCondensationMeanKgM2: (entry) => entry.sample.metrics?.northDryBeltLargeScaleCondensationMeanKgM2
+  };
+  const outcomeExtractors = {
+    subtropicalDryNorthRatio: (entry) => entry.sample.metrics?.subtropicalDryNorthRatio,
+    subtropicalRhNorthMeanFrac: (entry) => entry.sample.metrics?.subtropicalRhNorthMeanFrac,
+    northDryBeltUpperCloudPathMeanKgM2: (entry) => entry.sample.metrics?.northDryBeltUpperCloudPathMeanKgM2,
+    northDryBeltOceanPrecipMeanMmHr: (entry) => entry.sample.metrics?.northDryBeltOceanPrecipMeanMmHr
+  };
+  const lagDaysList = [15, 30, 45, 60, 90];
+  const lagPairs = [];
+  const predictorAbsCorrelation = new Map();
+
+  for (const lagDays of lagDaysList) {
+    for (const [predictorKey, predictorFn] of Object.entries(predictorExtractors)) {
+      for (const [outcomeKey, outcomeFn] of Object.entries(outcomeExtractors)) {
+        const laggedXs = [];
+        const laggedYs = [];
+        const cumulativeXs = [];
+        const cumulativeYs = [];
+        const actualLagDays = [];
+        for (let startIndex = 0; startIndex < enriched.length; startIndex += 1) {
+          const targetIndex = findLagTargetSample(enriched.map((entry) => entry.sample), startIndex, lagDays);
+          if (targetIndex == null) continue;
+          const predictorValue = predictorFn(enriched[startIndex]);
+          const outcomeValue = outcomeFn(enriched[targetIndex]);
+          if (!Number.isFinite(predictorValue) || !Number.isFinite(outcomeValue)) continue;
+          laggedXs.push(predictorValue);
+          laggedYs.push(outcomeValue);
+          const cumulativePredictor = meanDefined(
+            enriched.slice(0, startIndex + 1).map((entry) => predictorFn(entry)).filter((value) => Number.isFinite(value))
+          );
+          if (Number.isFinite(cumulativePredictor)) {
+            cumulativeXs.push(cumulativePredictor);
+            cumulativeYs.push(outcomeValue);
+          }
+          actualLagDays.push((enriched[targetIndex].sample.targetDay || 0) - (enriched[startIndex].sample.targetDay || 0));
+        }
+        const laggedCorrelation = pearsonCorrelation(laggedXs, laggedYs);
+        const cumulativeCorrelation = pearsonCorrelation(cumulativeXs, cumulativeYs);
+        const entry = {
+          lagDays,
+          predictorKey,
+          outcomeKey,
+          pairCount: laggedXs.length,
+          meanActualLagDays: round(meanDefined(actualLagDays), 2),
+          laggedCorrelation: round(laggedCorrelation, 5),
+          cumulativeCorrelation: round(cumulativeCorrelation, 5)
+        };
+        lagPairs.push(entry);
+        if (Number.isFinite(laggedCorrelation)) {
+          const current = predictorAbsCorrelation.get(predictorKey) || [];
+          current.push(Math.abs(laggedCorrelation));
+          predictorAbsCorrelation.set(predictorKey, current);
+        }
+        if (Number.isFinite(cumulativeCorrelation)) {
+          const current = predictorAbsCorrelation.get(predictorKey) || [];
+          current.push(Math.abs(cumulativeCorrelation));
+          predictorAbsCorrelation.set(predictorKey, current);
+        }
+      }
+    }
+  }
+
+  const strongestLaggedLinks = [...lagPairs]
+    .filter((entry) => Number.isFinite(entry.laggedCorrelation) || Number.isFinite(entry.cumulativeCorrelation))
+    .sort((a, b) => Math.max(Math.abs(b.laggedCorrelation || 0), Math.abs(b.cumulativeCorrelation || 0))
+      - Math.max(Math.abs(a.laggedCorrelation || 0), Math.abs(a.cumulativeCorrelation || 0)))
+    .slice(0, 12);
+
+  const predictorRanking = [...predictorAbsCorrelation.entries()]
+    .map(([predictorKey, values]) => ({
+      predictorKey,
+      label: ROOT_CAUSE_FAMILY_LABELS[predictorKey.replace(/Score$/, '')] || predictorKey,
+      meanAbsCorrelation: round(meanDefined(values), 5)
+    }))
+    .sort((a, b) => (b.meanAbsCorrelation || 0) - (a.meanAbsCorrelation || 0));
+
+  const dominantPredictor = predictorRanking[0] || null;
+  const rootCauseAssessment = {
+    ruledIn: [],
+    ruledOut: [],
+    ambiguous: []
+  };
+  if (dominantPredictor && dominantPredictor.predictorKey === 'importedCloudPersistenceScore') {
+    rootCauseAssessment.ruledIn.push('Imported cloud persistence is the strongest lagged predictor of later NH dry-belt wetness in the current sample set.');
+  } else if (dominantPredictor) {
+    rootCauseAssessment.ambiguous.push(`Lagged attribution currently ranks ${dominantPredictor.label} above imported cloud persistence.`);
+  }
+  if (!predictorRanking.some((entry) => entry.predictorKey === 'helperForcingScore' && (entry.meanAbsCorrelation || 0) > 0.3)) {
+    rootCauseAssessment.ruledOut.push('Helper forcing does not show up as a strong lagged predictor.');
+  }
+
+  return {
+    schema: 'satellite-wars.attribution-lag-analysis.v1',
+    generatedAt: new Date().toISOString(),
+    sampleCount: enriched.length,
+    strongestLaggedLinks,
+    predictorRanking,
+    rootCauseAssessment
+  };
+};
+
 const buildGapEntry = (warning, horizon) => {
   const metrics = horizon?.latest?.metrics || {};
   const seasonality = horizon?.seasonality || null;
@@ -2044,6 +2474,19 @@ const renderMarkdown = (summary) => {
     lines.push('');
   }
 
+  if (summary.seasonalRootCauseRanking?.dominantAnnualFamily) {
+    lines.push('## Seasonal Root-Cause Signal');
+    lines.push('');
+    lines.push(`- Dominant annual family: ${summary.seasonalRootCauseRanking.dominantAnnualFamily.label} (${summary.seasonalRootCauseRanking.dominantAnnualFamily.score})`);
+    lines.push(`- Stable across sampled months: ${summary.seasonalRootCauseRanking.stability?.stableAcrossMonthsPass}`);
+    lines.push(`- Stable across sampled seasons: ${summary.seasonalRootCauseRanking.stability?.stableAcrossSeasonsPass}`);
+    if (summary.attributionLagAnalysis?.predictorRanking?.length) {
+      const topPredictor = summary.attributionLagAnalysis.predictorRanking[0];
+      lines.push(`- Strongest lagged predictor: ${topPredictor.label} (${topPredictor.meanAbsCorrelation})`);
+    }
+    lines.push('');
+  }
+
   if (summary.artifacts) {
     lines.push('## Rich artifacts');
     lines.push('');
@@ -2106,6 +2549,15 @@ const renderMarkdown = (summary) => {
     }
     if (summary.artifacts.gridSensitivityJsonPath) {
       lines.push(`- Grid sensitivity JSON: ${summary.artifacts.gridSensitivityJsonPath}`);
+    }
+    if (summary.artifacts.monthlyAttributionClimatologyJsonPath) {
+      lines.push(`- Monthly attribution climatology JSON: ${summary.artifacts.monthlyAttributionClimatologyJsonPath}`);
+    }
+    if (summary.artifacts.seasonalRootCauseRankingJsonPath) {
+      lines.push(`- Seasonal root-cause ranking JSON: ${summary.artifacts.seasonalRootCauseRankingJsonPath}`);
+    }
+    if (summary.artifacts.attributionLagAnalysisJsonPath) {
+      lines.push(`- Attribution lag analysis JSON: ${summary.artifacts.attributionLagAnalysisJsonPath}`);
     }
     lines.push('');
   }
@@ -2187,6 +2639,9 @@ export async function main() {
     defaultNextPriorities.push('Broaden live verification and polished-performance re-audits now that the offline planetary realism gates are healthy.');
   }
   const monthlyClimatology = buildMonthlyClimatology(samples);
+  const monthlyAttributionClimatology = buildMonthlyAttributionClimatology(samples);
+  const seasonalRootCauseRanking = buildSeasonalRootCauseRanking(samples);
+  const attributionLagAnalysis = buildAttributionLagAnalysis(samples);
   const realismGaps = buildRealismGapReport(horizonSummaries);
   const latestSample = horizonSummaries[horizonSummaries.length - 1]?.latest || samples[samples.length - 1] || null;
   const moistureAttribution = buildMoistureAttributionReport(latestSample?.processMoistureBudget, latestSample?.metrics);
@@ -2300,7 +2755,10 @@ export async function main() {
     sectoralDryBeltRegimesJsonPath: `${artifactBase}-sectoral-dry-belt-regimes.json`,
     transientEddyLeakageSummaryJsonPath: `${artifactBase}-transient-eddy-leakage-summary.json`,
     dtSensitivityJsonPath: `${artifactBase}-dt-sensitivity.json`,
-    gridSensitivityJsonPath: `${artifactBase}-grid-sensitivity.json`
+    gridSensitivityJsonPath: `${artifactBase}-grid-sensitivity.json`,
+    monthlyAttributionClimatologyJsonPath: `${artifactBase}-monthly-attribution-climatology.json`,
+    seasonalRootCauseRankingJsonPath: `${artifactBase}-seasonal-root-cause-ranking.json`,
+    attributionLagAnalysisJsonPath: `${artifactBase}-attribution-lag-analysis.json`
   } : null;
   const summarySamples = samples.map((sample) => compactSampleForSummary(sample));
   const summaryHorizons = horizonSummaries.map((horizon) => ({
@@ -2309,7 +2767,7 @@ export async function main() {
   }));
 
   const summary = {
-    schema: 'satellite-wars.planetary-realism-audit.v2',
+    schema: 'satellite-wars.planetary-realism-audit.v3',
     generatedAt: new Date().toISOString(),
     overallPass,
     config: {
@@ -2326,6 +2784,7 @@ export async function main() {
     timings: timingByTarget,
     samples: summarySamples,
     monthlyClimatology,
+    monthlyAttributionClimatology,
     horizons: summaryHorizons,
     realismGaps,
     moistureAttribution,
@@ -2356,6 +2815,8 @@ export async function main() {
     transientEddyLeakageSummary,
     dtSensitivity,
     gridSensitivity,
+    seasonalRootCauseRanking,
+    attributionLagAnalysis,
     artifacts,
     defaultNextPriorities
   };
@@ -2414,6 +2875,9 @@ export async function main() {
     fs.writeFileSync(artifacts.transientEddyLeakageSummaryJsonPath, toJson(transientEddyLeakageSummary));
     fs.writeFileSync(artifacts.dtSensitivityJsonPath, toJson(dtSensitivity));
     fs.writeFileSync(artifacts.gridSensitivityJsonPath, toJson(gridSensitivity));
+    fs.writeFileSync(artifacts.monthlyAttributionClimatologyJsonPath, toJson(monthlyAttributionClimatology));
+    fs.writeFileSync(artifacts.seasonalRootCauseRankingJsonPath, toJson(seasonalRootCauseRanking));
+    fs.writeFileSync(artifacts.attributionLagAnalysisJsonPath, toJson(attributionLagAnalysis));
   }
   process.stdout.write(toJson(summary));
   return summary;
@@ -2433,6 +2897,9 @@ export const _test = {
   buildSampleTargetsDays,
   buildRunManifest,
   buildMonthlyClimatology,
+  buildMonthlyAttributionClimatology,
+  buildSeasonalRootCauseRanking,
+  buildAttributionLagAnalysis,
   buildRealismGapReport,
   buildTransportInterfaceBudgetReport,
   buildHadleyPartitionSummaryReport,

@@ -144,11 +144,16 @@ That annual report now writes:
 - `weather-validation/output/annual-planetary-realism.json`
 - `weather-validation/output/annual-planetary-realism.md`
 - `weather-validation/output/annual-planetary-realism-monthly-climatology.json`
+- `weather-validation/output/annual-planetary-realism-monthly-attribution-climatology.json`
+- `weather-validation/output/annual-planetary-realism-seasonal-root-cause-ranking.json`
+- `weather-validation/output/annual-planetary-realism-attribution-lag-analysis.json`
 - `weather-validation/output/annual-planetary-realism-sample-profiles.json`
 - `weather-validation/output/annual-planetary-realism-realism-gaps.json`
 
 Those artifacts are meant for follow-on tuning, not just pass/fail:
 - monthly climatology means for ITCZ placement/width, dry-belt humidity, subsidence drying, convective organization, and wind-belt structure
+- monthly attribution climatology and seasonal root-cause rankings so long-horizon runs tell you which causal family actually stays dominant
+- lag-analysis sidecars that show which upstream source/persistence signals best predict later dry-belt wetness and upper-cloud buildup
 - zonal profile traces at every sampled checkpoint so you can see where the moisture belts, cloud belts, and convective mass flux are misplaced
 - a ranked realism-gap report that turns the failing warnings into prioritized tuning targets
 
