@@ -1,0 +1,161 @@
+{
+  "schema": "satellite-wars.prevertical-ownership-contract.v1",
+  "purpose": "Freeze the exact proving target for upstream ownership phases after E0 and E1.",
+  "question": "For the frozen E0/E1 corridor, immediately before stepVertical5 on replay step 0, what fraction of excess upper cloud relative to the historical reference is attributable to previous-step residual carryover, current-step advection import, current-step local pre-vertical creation, and numerical residual?",
+  "corridor": {
+    "sectorKey": "eastPacific",
+    "latBandDeg": [
+      22,
+      35
+    ],
+    "grid": {
+      "nx": 48,
+      "ny": 24,
+      "dtSeconds": 1800
+    },
+    "checkpointDay": 29.75,
+    "targetDay": 30,
+    "windowSteps": 12,
+    "targetCell": {
+      "cellIndex": 390,
+      "rowIndex": 8,
+      "colIndex": 6,
+      "latDeg": 26.25,
+      "lonDeg": -131.25
+    }
+  },
+  "baselineRoots": {
+    "historical": {
+      "commit": "e6fea5801d97725ed659a9c731ceb20d9c85690c",
+      "root": "/tmp/sw-phase1-e6",
+      "role": "trusted-phase1-reference"
+    },
+    "discoveryCurrent": {
+      "commit": "246c99ad828f53e1a1d153c9c4a5555cc8be020f",
+      "root": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
+      "role": "e0-corridor-selection-reference"
+    },
+    "proofCurrent": {
+      "commit": "cc9676d64e3197f6fa5db6e3263b70a96b2e73a2",
+      "root": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
+      "role": "e1-budget-closed-reference"
+    }
+  },
+  "artifacts": {
+    "phaseE0": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase-e0-minimal-corridor.json",
+    "phaseE1": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/vertical-handoff-proof.json"
+  },
+  "frozenFacts": {
+    "discoveryMetrics": {
+      "historical": {
+        "subtropicalDryNorthRatio": 1.352,
+        "itczWidthDeg": 23.723
+      },
+      "current": {
+        "subtropicalDryNorthRatio": 1.698,
+        "itczWidthDeg": 27.197
+      }
+    },
+    "firstMaterialDivergence": {
+      "stepOffset": 0,
+      "simTimeSeconds": 1800000,
+      "topDeltas": [
+        {
+          "field": "upperCloudPathKgM2",
+          "delta": 3.51914
+        },
+        {
+          "field": "largeScaleCondensationSourceKgM2",
+          "delta": 1.77152
+        },
+        {
+          "field": "precipRateMmHr",
+          "delta": 1.4008
+        }
+      ]
+    },
+    "provingInstant": {
+      "stepOffset": 0,
+      "simTimeSeconds": 1801800,
+      "boundary": "pre-stepVertical5"
+    },
+    "currentVerticalTargetCell": {
+      "inputMassKgM2": 3.51914,
+      "resolvedBirthMassKgM2": 0.06594,
+      "convectiveBirthMassKgM2": 0,
+      "carrySurvivingMassKgM2": 3.51914,
+      "appliedErosionMassKgM2": 0,
+      "handedToMicrophysicsMassKgM2": 3.51914,
+      "residualMassKgM2": 0.06594,
+      "closureFrac": 0.99072
+    },
+    "historicalVerticalTargetCell": {
+      "inputMassKgM2": 0,
+      "resolvedBirthMassKgM2": 0,
+      "convectiveBirthMassKgM2": 0,
+      "carrySurvivingMassKgM2": 0,
+      "appliedErosionMassKgM2": 0,
+      "handedToMicrophysicsMassKgM2": 0,
+      "residualMassKgM2": 0,
+      "closureFrac": 1
+    },
+    "currentMicrophysicsTargetCell": {
+      "inputMassKgM2": 3.51912,
+      "cloudReevaporationMassKgM2": 0.20322,
+      "precipReevaporationMassKgM2": 0.01375,
+      "sedimentationExportMassKgM2": 0.20415,
+      "cloudToPrecipMassKgM2": 0.12656,
+      "outputMassKgM2": 3.09801,
+      "closureFrac": 1
+    },
+    "closure": {
+      "currentTargetCellCombinedClosureFrac": 0.99536,
+      "currentCorridorCombinedClosureFrac": 0.99653,
+      "historicalTargetCellCombinedClosureFrac": 1,
+      "historicalCorridorCombinedClosureFrac": 1
+    },
+    "sensitivity": [
+      {
+        "name": "dt_half",
+        "minTargetClosureFrac": 0.99523,
+        "minCorridorClosureFrac": 0.99446,
+        "dominantVerticalChannel": "handedToMicrophysicsMassKgM2",
+        "dominantChannelStable": true
+      },
+      {
+        "name": "grid_coarse",
+        "minTargetClosureFrac": 1,
+        "minCorridorClosureFrac": 0.97744,
+        "dominantVerticalChannel": "resolvedBirthMassKgM2",
+        "dominantChannelStable": true
+      }
+    ]
+  },
+  "ownershipBuckets": [
+    "previousStepResidualUpperCloud",
+    "currentStepAdvectedUpperCloud",
+    "currentStepLocalPreverticalBirth",
+    "numericalResidual"
+  ],
+  "lockedBoundaries": [
+    "endPreviousStepMicrophysics5",
+    "startCurrentStep",
+    "afterStepSurface2D5",
+    "afterStepRadiation2D5",
+    "afterWindUpdates",
+    "afterStepAdvection5",
+    "preStepVertical5"
+  ],
+  "parityRequirements": {
+    "traceDisabledPhysicalParity": true,
+    "proofReferenceCommit": "cc9676d64e3197f6fa5db6e3263b70a96b2e73a2",
+    "maxAllowedTargetCellPreverticalDriftKgM2": 0.0001
+  },
+  "closureGate": {
+    "minTargetCellBudgetClosureFrac": 0.99,
+    "minCorridorBudgetClosureFrac": 0.97,
+    "requirePrimaryOwner": true,
+    "maxSecondaryOwners": 1,
+    "requireFalsifiableNonOwnerExplanation": true
+  }
+}

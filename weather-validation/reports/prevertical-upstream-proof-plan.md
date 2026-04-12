@@ -131,6 +131,20 @@ Required artifact:
 Exit criteria:
 - every later phase measures the same target cell, corridor, checkpoint, and comparison pair
 
+Status:
+- complete
+
+Frozen artifacts:
+- [prevertical-ownership-contract.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/prevertical-ownership-contract.md)
+- [prevertical-ownership-contract.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/prevertical-ownership-contract.json)
+
+Important clarification:
+- the corridor itself is frozen from E0
+- the budget-closed proving instant is frozen from E1
+- the trusted historical reference remains `e6fea5801d97725ed659a9c731ceb20d9c85690c`
+- the active proof-reference current physics is frozen to `cc9676d64e3197f6fa5db6e3263b70a96b2e73a2`
+- later phases may add instrumentation on top of newer commits only if trace-disabled parity stays within the frozen E1 contract
+
 ## Phase U1: Boundary-Resolved Pre-Vertical Ledger
 
 Objective:
