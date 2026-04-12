@@ -260,6 +260,71 @@ const COUNTERFACTUAL_VARIANTS = [
   }
 ];
 const COUNTERFACTUAL_TOP_CANDIDATE_COUNT = 3;
+const COUNTERFACTUAL_VARIANT_BY_KEY = Object.fromEntries(COUNTERFACTUAL_VARIANTS.map((variant) => [variant.key, variant]));
+const COUPLED_COUNTERFACTUAL_BUNDLES = [
+  {
+    key: 'import_plus_erosion',
+    label: 'Import + erosion',
+    family: 'Coupled import / erosion bundle',
+    description: 'Reduce imported upper-cloud carryover while boosting blocked erosion in the NH dry belt.',
+    components: [
+      { key: 'transportImport', strengthScale: 0.65 },
+      { key: 'upperCloudErosion', strengthScale: 0.65 }
+    ]
+  },
+  {
+    key: 'erosion_plus_saturation_adjustment',
+    label: 'Erosion + saturation-adjustment maintenance',
+    family: 'Coupled erosion / maintenance bundle',
+    description: 'Boost upper-cloud erosion and weaken saturation-adjustment cloud maintenance together.',
+    components: [
+      { key: 'upperCloudErosion', strengthScale: 0.65 },
+      { key: 'saturationAdjustmentBirth', strengthScale: 0.65 }
+    ]
+  },
+  {
+    key: 'import_erosion_saturation_adjustment',
+    label: 'Import + erosion + saturation-adjustment maintenance',
+    family: 'Coupled import / erosion / maintenance bundle',
+    description: 'Reduce import, boost erosion, and weaken saturation-adjustment maintenance as a single chain intervention.',
+    components: [
+      { key: 'transportImport', strengthScale: 0.55 },
+      { key: 'upperCloudErosion', strengthScale: 0.55 },
+      { key: 'saturationAdjustmentBirth', strengthScale: 0.55 }
+    ]
+  },
+  {
+    key: 'erosion_plus_radiative_maintenance',
+    label: 'Erosion + radiative maintenance',
+    family: 'Coupled erosion / radiative-support bundle',
+    description: 'Boost upper-cloud erosion while reducing radiative cloud support.',
+    components: [
+      { key: 'upperCloudErosion', strengthScale: 0.65 },
+      { key: 'radiativeMaintenance', strengthScale: 0.65 }
+    ]
+  },
+  {
+    key: 'import_erosion_radiative_maintenance',
+    label: 'Import + erosion + radiative maintenance',
+    family: 'Coupled import / erosion / radiative-support bundle',
+    description: 'Reduce imported carryover, boost erosion, and weaken radiative maintenance together.',
+    components: [
+      { key: 'transportImport', strengthScale: 0.55 },
+      { key: 'upperCloudErosion', strengthScale: 0.55 },
+      { key: 'radiativeMaintenance', strengthScale: 0.55 }
+    ]
+  },
+  {
+    key: 'maintenance_plus_radiative_support',
+    label: 'Maintenance + radiative support',
+    family: 'Coupled maintenance / radiative-support bundle',
+    description: 'Weaken large-scale condensation maintenance and radiative persistence together.',
+    components: [
+      { key: 'saturationAdjustmentBirth', strengthScale: 0.65 },
+      { key: 'radiativeMaintenance', strengthScale: 0.65 }
+    ]
+  }
+];
 
 export const buildSampleTargetsDays = (horizonList, cadenceDays) => {
   const targets = new Set(horizonList);
@@ -3216,12 +3281,61 @@ const createCounterfactualAccumulator = (variant) => ({
   variantKey: variant.key,
   label: variant.label,
   family: variant.family,
-  strength: variant.strength,
+  strength: resolveVariantStrength(variant),
   affectedCellSteps: 0,
   removedVaporKgM2: 0,
   removedCloudKgM2: 0,
-  returnedCloudToVaporKgM2: 0
+  returnedCloudToVaporKgM2: 0,
+  componentSummaries: Object.fromEntries(
+    getVariantComponents(variant).map((component) => [
+      component.key,
+      {
+        key: component.key,
+        label: component.label,
+        strength: component.strength,
+        affectedCellSteps: 0,
+        removedVaporKgM2: 0,
+        removedCloudKgM2: 0,
+        returnedCloudToVaporKgM2: 0
+      }
+    ])
+  )
 });
+
+const getVariantComponents = (variant) => {
+  if (Array.isArray(variant?.components) && variant.components.length) {
+    return variant.components.map((component) => {
+      const base = COUNTERFACTUAL_VARIANT_BY_KEY[component.key] || {};
+      const baseStrength = Number.isFinite(component?.strength)
+        ? component.strength
+        : Number.isFinite(base?.strength)
+          ? base.strength * (Number.isFinite(component?.strengthScale) ? component.strengthScale : 1)
+          : Number.isFinite(component?.strengthScale)
+            ? component.strengthScale
+            : 0;
+      return {
+        key: component.key,
+        label: component.label || base.label || component.key,
+        family: base.family || variant.family,
+        description: base.description || variant.description,
+        strength: round(baseStrength, 5)
+      };
+    });
+  }
+  return [{
+    key: variant.key,
+    label: variant.label,
+    family: variant.family,
+    description: variant.description,
+    strength: Number.isFinite(variant?.strength) ? variant.strength : 0
+  }];
+};
+
+const resolveVariantStrength = (variant) => {
+  if (Number.isFinite(variant?.strength)) return variant.strength;
+  const components = getVariantComponents(variant).map((component) => component.strength).filter(Number.isFinite);
+  return components.length ? round(mean(components), 5) : null;
+};
 
 const removeTracerBackedVaporAtLevel = (state, idx, tracerFieldNames, removalFrac, layerAirMass) => {
   if (!Number.isFinite(removalFrac) || removalFrac <= 0 || !Number.isFinite(layerAirMass) || layerAirMass <= 0) return 0;
@@ -3283,7 +3397,7 @@ const removeColumnCloudMass = (state, k, levels, removalMassKgM2, returnToVaporF
   return { removedCloudKgM2, returnedVaporKgM2 };
 };
 
-const applyCounterfactualIntervention = (core, variant, context, accumulator) => {
+const applyCounterfactualComponent = (core, component, context, accumulator) => {
   const { state, grid } = core;
   const { N, nz, pHalf } = state;
   const {
@@ -3294,6 +3408,8 @@ const applyCounterfactualIntervention = (core, variant, context, accumulator) =>
     lowerLevels,
     cloudBirthLevels
   } = context;
+  const variantKey = component.key;
+  const variantStrength = component.strength;
   const tracerFieldsByVariant = {
     sourceMoisture: ['qvSourceNorthDryBeltOcean', 'qvSourceTropicalOceanNorth'],
     transportImport: ['qvSourceAtmosphericCarryover'],
@@ -3304,7 +3420,7 @@ const applyCounterfactualIntervention = (core, variant, context, accumulator) =>
     const dryWeight = nhDryBeltWeight[k] || 0;
     const oceanWeight = nhDryBeltOceanWeight[k] || 0;
     const importWeight = nhUpperImportWeight[k] || 0;
-    if (variant.key === 'sourceMoisture' && oceanWeight > 0) {
+    if (variantKey === 'sourceMoisture' && oceanWeight > 0) {
       for (const lev of lowerLevels) {
         const idx = lev * N + k;
         const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
@@ -3313,7 +3429,7 @@ const applyCounterfactualIntervention = (core, variant, context, accumulator) =>
           state,
           idx,
           tracerFieldsByVariant.sourceMoisture,
-          variant.strength * oceanWeight,
+          variantStrength * oceanWeight,
           layerAirMass
         );
         if (removedMass > 0) {
@@ -3323,7 +3439,7 @@ const applyCounterfactualIntervention = (core, variant, context, accumulator) =>
       }
       continue;
     }
-    if (variant.key === 'nudgingOpposition' && dryWeight > 0) {
+    if (variantKey === 'nudgingOpposition' && dryWeight > 0) {
       for (const lev of lowerLevels) {
         const idx = lev * N + k;
         const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
@@ -3332,7 +3448,7 @@ const applyCounterfactualIntervention = (core, variant, context, accumulator) =>
           state,
           idx,
           tracerFieldsByVariant.nudgingOpposition,
-          variant.strength * dryWeight,
+          variantStrength * dryWeight,
           layerAirMass
         );
         if (removedMass > 0) {
@@ -3347,9 +3463,9 @@ const applyCounterfactualIntervention = (core, variant, context, accumulator) =>
     let levels = upperLevels;
     let returnToVaporFrac = 0;
 
-    switch (variant.key) {
+    switch (variantKey) {
       case 'transportImport': {
-        removalBudgetKgM2 = (Number(state.carriedOverUpperCloudMass?.[k]) || 0) * variant.strength * importWeight;
+        removalBudgetKgM2 = (Number(state.carriedOverUpperCloudMass?.[k]) || 0) * variantStrength * importWeight;
         if (importWeight > 0) {
           for (const lev of upperLevels) {
             const idx = lev * N + k;
@@ -3359,7 +3475,7 @@ const applyCounterfactualIntervention = (core, variant, context, accumulator) =>
               state,
               idx,
               tracerFieldsByVariant.transportImport,
-              variant.strength * importWeight * 0.6,
+              variantStrength * importWeight * 0.6,
               layerAirMass
             );
             if (removedMass > 0) {
@@ -3371,21 +3487,21 @@ const applyCounterfactualIntervention = (core, variant, context, accumulator) =>
         break;
       }
       case 'resolvedAscentBirth':
-        removalBudgetKgM2 = (Number(state.resolvedAscentCloudBirthPotential?.[k]) || 0) * variant.strength * dryWeight;
+        removalBudgetKgM2 = (Number(state.resolvedAscentCloudBirthPotential?.[k]) || 0) * variantStrength * dryWeight;
         levels = cloudBirthLevels;
         returnToVaporFrac = 1;
         break;
       case 'saturationAdjustmentBirth':
-        removalBudgetKgM2 = (Number(state.largeScaleCondensationSource?.[k]) || 0) * variant.strength * dryWeight;
+        removalBudgetKgM2 = (Number(state.largeScaleCondensationSource?.[k]) || 0) * variantStrength * dryWeight;
         levels = cloudBirthLevels;
         returnToVaporFrac = 1;
         break;
       case 'upperCloudErosion':
-        removalBudgetKgM2 = (Number(state.upperCloudBlockedErosionMass?.[k]) || 0) * variant.strength * dryWeight;
+        removalBudgetKgM2 = (Number(state.upperCloudBlockedErosionMass?.[k]) || 0) * variantStrength * dryWeight;
         break;
       case 'radiativeMaintenance': {
         const supportFrac = clamp01(Math.abs(Number(state.upperCloudNetCloudRadiativeEffectWm2?.[k]) || 0) / 40);
-        removalBudgetKgM2 = (Number(state.upperCloudPath?.[k]) || 0) * supportFrac * variant.strength * dryWeight;
+        removalBudgetKgM2 = (Number(state.upperCloudPath?.[k]) || 0) * supportFrac * variantStrength * dryWeight;
         break;
       }
       default:
@@ -3398,6 +3514,27 @@ const applyCounterfactualIntervention = (core, variant, context, accumulator) =>
       accumulator.removedCloudKgM2 += removal.removedCloudKgM2;
       accumulator.returnedCloudToVaporKgM2 += removal.returnedVaporKgM2;
       accumulator.affectedCellSteps += 1;
+    }
+  }
+};
+
+const applyCounterfactualIntervention = (core, variant, context, accumulator) => {
+  for (const component of getVariantComponents(variant)) {
+    const componentAccumulator = accumulator.componentSummaries?.[component.key] || accumulator;
+    const componentBefore = componentAccumulator === accumulator
+      ? null
+      : {
+          affectedCellSteps: componentAccumulator.affectedCellSteps,
+          removedVaporKgM2: componentAccumulator.removedVaporKgM2,
+          removedCloudKgM2: componentAccumulator.removedCloudKgM2,
+          returnedCloudToVaporKgM2: componentAccumulator.returnedCloudToVaporKgM2
+        };
+    applyCounterfactualComponent(core, component, context, componentAccumulator);
+    if (componentAccumulator !== accumulator && componentBefore) {
+      accumulator.affectedCellSteps += componentAccumulator.affectedCellSteps - componentBefore.affectedCellSteps;
+      accumulator.removedVaporKgM2 += componentAccumulator.removedVaporKgM2 - componentBefore.removedVaporKgM2;
+      accumulator.removedCloudKgM2 += componentAccumulator.removedCloudKgM2 - componentBefore.removedCloudKgM2;
+      accumulator.returnedCloudToVaporKgM2 += componentAccumulator.returnedCloudToVaporKgM2 - componentBefore.returnedCloudToVaporKgM2;
     }
   }
 };
@@ -3472,6 +3609,8 @@ const runCounterfactualVariant = async ({
   configSnapshot
 }) => {
   const startedAt = Date.now();
+  const components = getVariantComponents(variant);
+  const resolvedStrength = resolveVariantStrength(variant);
   const core = new WeatherCore5({ nx: variantNx, ny: variantNy, dt: variantDtSeconds, seed });
   await core._initPromise;
   applyCoreConfigSnapshot(core, configSnapshot);
@@ -3484,7 +3623,8 @@ const runCounterfactualVariant = async ({
     label: variant.label,
     family: variant.family,
     description: variant.description,
-    strength: variant.strength,
+    strength: resolvedStrength,
+    components,
     nx: variantNx,
     ny: variantNy,
     dtSeconds: variantDtSeconds,
@@ -3495,7 +3635,18 @@ const runCounterfactualVariant = async ({
       ...interventionSummary,
       removedVaporKgM2: round(interventionSummary.removedVaporKgM2, 5),
       removedCloudKgM2: round(interventionSummary.removedCloudKgM2, 5),
-      returnedCloudToVaporKgM2: round(interventionSummary.returnedCloudToVaporKgM2, 5)
+      returnedCloudToVaporKgM2: round(interventionSummary.returnedCloudToVaporKgM2, 5),
+      componentSummaries: Object.fromEntries(
+        Object.entries(interventionSummary.componentSummaries || {}).map(([key, summary]) => [key, {
+          key: summary.key,
+          label: summary.label,
+          strength: round(summary.strength, 5),
+          affectedCellSteps: summary.affectedCellSteps,
+          removedVaporKgM2: round(summary.removedVaporKgM2, 5),
+          removedCloudKgM2: round(summary.removedCloudKgM2, 5),
+          returnedCloudToVaporKgM2: round(summary.returnedCloudToVaporKgM2, 5)
+        }])
+      )
     },
     latest
   };
@@ -3611,6 +3762,128 @@ export const buildRootCauseCandidateRankingReport = (counterfactualReport = null
     closureReadyPass: Boolean(primaryCandidate?.directionalImprovementPass && primaryCandidate?.directionalSensitivityPass !== false),
     ranking,
     rootCauseAssessment
+  };
+};
+
+export const buildCoupledCounterfactualMatrixReport = ({
+  baselineSample = null,
+  targetDay = null,
+  bundles = [],
+  sensitivityVariantsByKey = {}
+} = {}) => {
+  const entries = bundles.map((bundle) => {
+    const improvement = buildCounterfactualImprovement(baselineSample, bundle.latest);
+    const sensitivityVariants = (sensitivityVariantsByKey?.[bundle.key] || []).map((entry) => ({
+      scenarioKey: entry.scenarioKey,
+      scenarioLabel: entry.scenarioLabel,
+      improvement: entry.improvement,
+      storyComparison: entry.storyComparison
+    }));
+    const tolerableSensitivityPass = sensitivityVariants.length
+      ? sensitivityVariants.every((entry) => (entry.improvement?.directionalImprovementScore || 0) > -0.05 && entry.storyComparison?.stable !== false)
+      : null;
+    return {
+      key: bundle.key,
+      label: bundle.label,
+      family: bundle.family,
+      description: bundle.description,
+      strength: bundle.strength,
+      components: bundle.components || [],
+      elapsedMs: bundle.elapsedMs,
+      metrics: {
+        subtropicalDryNorthRatio: bundle.latest?.metrics?.subtropicalDryNorthRatio ?? null,
+        subtropicalRhNorthMeanFrac: bundle.latest?.metrics?.subtropicalRhNorthMeanFrac ?? null,
+        northDryBeltUpperCloudPathMeanKgM2: bundle.latest?.metrics?.northDryBeltUpperCloudPathMeanKgM2 ?? null,
+        northDryBeltCarriedOverUpperCloudMeanKgM2: bundle.latest?.metrics?.northDryBeltCarriedOverUpperCloudMeanKgM2 ?? null,
+        northDryBeltLargeScaleCondensationMeanKgM2: bundle.latest?.metrics?.northDryBeltLargeScaleCondensationMeanKgM2 ?? null
+      },
+      interventionSummary: bundle.interventionSummary,
+      improvement,
+      sensitivity: {
+        tolerableSensitivityPass,
+        variants: sensitivityVariants
+      }
+    };
+  }).sort((a, b) => (b.improvement?.directionalImprovementScore || -Infinity) - (a.improvement?.directionalImprovementScore || -Infinity));
+
+  const topBundles = entries.slice(0, COUNTERFACTUAL_TOP_CANDIDATE_COUNT).map((entry) => ({
+    key: entry.key,
+    label: entry.label,
+    components: entry.components?.map((component) => component.key) || [],
+    directionalImprovementScore: entry.improvement?.directionalImprovementScore ?? null,
+    dryRatioImprovement: entry.improvement?.dryRatioImprovement ?? null,
+    directionalImprovementPass: entry.improvement?.directionalImprovementPass ?? false,
+    tolerableSensitivityPass: entry.sensitivity?.tolerableSensitivityPass ?? null
+  }));
+
+  return {
+    schema: 'satellite-wars.coupled-counterfactual-matrix.v1',
+    generatedAt: new Date().toISOString(),
+    targetDay,
+    baselineMetrics: baselineSample ? {
+      subtropicalDryNorthRatio: baselineSample.metrics?.subtropicalDryNorthRatio ?? null,
+      subtropicalRhNorthMeanFrac: baselineSample.metrics?.subtropicalRhNorthMeanFrac ?? null,
+      northDryBeltUpperCloudPathMeanKgM2: baselineSample.metrics?.northDryBeltUpperCloudPathMeanKgM2 ?? null,
+      northDryBeltCarriedOverUpperCloudMeanKgM2: baselineSample.metrics?.northDryBeltCarriedOverUpperCloudMeanKgM2 ?? null,
+      northDryBeltLargeScaleCondensationMeanKgM2: baselineSample.metrics?.northDryBeltLargeScaleCondensationMeanKgM2 ?? null
+    } : null,
+    bundles: entries,
+    topBundles
+  };
+};
+
+export const buildCoupledCounterfactualRankingReport = (matrixReport = null) => {
+  const bundles = Array.isArray(matrixReport?.bundles) ? matrixReport.bundles : [];
+  const ranking = bundles.map((entry, index) => ({
+    rank: index + 1,
+    key: entry.key,
+    label: entry.label,
+    components: entry.components?.map((component) => component.key) || [],
+    directionalImprovementScore: entry.improvement?.directionalImprovementScore ?? null,
+    dryRatioImprovement: entry.improvement?.dryRatioImprovement ?? null,
+    directionalImprovementPass: entry.improvement?.directionalImprovementPass ?? false,
+    tolerableSensitivityPass: entry.sensitivity?.tolerableSensitivityPass ?? null
+  }));
+  const stablePositive = ranking.filter((entry) => entry.directionalImprovementPass && entry.tolerableSensitivityPass !== false);
+  const bestBundle = stablePositive[0] || ranking[0] || null;
+  const rootCauseAssessment = {
+    ruledIn: [],
+    ruledOut: [],
+    ambiguous: []
+  };
+  if (bestBundle && bestBundle.directionalImprovementPass && bestBundle.tolerableSensitivityPass !== false) {
+    rootCauseAssessment.ruledIn.push(`${bestBundle.label} is the strongest coupled bundle with positive dry-belt improvement and tolerable sensitivity behavior.`);
+  } else {
+    rootCauseAssessment.ambiguous.push('No coupled bundle yet clears the Phase D exit gate across both guardrails and sensitivity behavior.');
+  }
+  ranking
+    .filter((entry) => (entry.directionalImprovementScore || -Infinity) < 0)
+    .forEach((entry) => rootCauseAssessment.ruledOut.push(`${entry.label} regressed the coupled directional score under the current Phase D matrix.`));
+  return {
+    schema: 'satellite-wars.coupled-counterfactual-ranking.v1',
+    generatedAt: new Date().toISOString(),
+    bestBundle,
+    exitCriteriaPass: Boolean(bestBundle?.directionalImprovementPass && bestBundle?.tolerableSensitivityPass !== false),
+    ranking,
+    rootCauseAssessment
+  };
+};
+
+export const buildCoupledCounterfactualGuardrailsReport = (matrixReport = null) => {
+  const bundles = Array.isArray(matrixReport?.bundles) ? matrixReport.bundles : [];
+  const guardrailSummary = bundles.map((entry) => ({
+    key: entry.key,
+    label: entry.label,
+    components: entry.components?.map((component) => component.key) || [],
+    guardrails: entry.improvement?.guardrails || null,
+    directionalImprovementPass: entry.improvement?.directionalImprovementPass ?? false,
+    tolerableSensitivityPass: entry.sensitivity?.tolerableSensitivityPass ?? null
+  }));
+  return {
+    schema: 'satellite-wars.coupled-counterfactual-guardrails.v1',
+    generatedAt: new Date().toISOString(),
+    bundles: guardrailSummary,
+    exitCriteriaPass: guardrailSummary.some((entry) => entry.directionalImprovementPass && entry.tolerableSensitivityPass !== false)
   };
 };
 
@@ -3842,6 +4115,14 @@ const renderMarkdown = (summary) => {
     lines.push('');
   }
 
+  if (summary.coupledCounterfactualRanking?.bestBundle) {
+    lines.push('## Coupled Counterfactual Matrix');
+    lines.push('');
+    lines.push(`- Best coupled bundle: ${summary.coupledCounterfactualRanking.bestBundle.label} (${summary.coupledCounterfactualRanking.bestBundle.directionalImprovementScore})`);
+    lines.push(`- Exit criteria pass: ${summary.coupledCounterfactualRanking.exitCriteriaPass}`);
+    lines.push('');
+  }
+
   if (summary.artifacts) {
     lines.push('## Rich artifacts');
     lines.push('');
@@ -3928,6 +4209,15 @@ const renderMarkdown = (summary) => {
     }
     if (summary.artifacts.rootCauseCandidateRankingJsonPath) {
       lines.push(`- Root-cause candidate ranking JSON: ${summary.artifacts.rootCauseCandidateRankingJsonPath}`);
+    }
+    if (summary.artifacts.coupledCounterfactualMatrixJsonPath) {
+      lines.push(`- Coupled counterfactual matrix JSON: ${summary.artifacts.coupledCounterfactualMatrixJsonPath}`);
+    }
+    if (summary.artifacts.coupledCounterfactualRankingJsonPath) {
+      lines.push(`- Coupled counterfactual ranking JSON: ${summary.artifacts.coupledCounterfactualRankingJsonPath}`);
+    }
+    if (summary.artifacts.coupledCounterfactualGuardrailsJsonPath) {
+      lines.push(`- Coupled counterfactual guardrails JSON: ${summary.artifacts.coupledCounterfactualGuardrailsJsonPath}`);
     }
     lines.push('');
   }
@@ -4094,6 +4384,9 @@ export async function main() {
   }
   let counterfactualPathwaySensitivity = null;
   let rootCauseCandidateRanking = null;
+  let coupledCounterfactualMatrix = null;
+  let coupledCounterfactualRanking = null;
+  let coupledCounterfactualGuardrails = null;
   if (!observerEffectAudit && counterfactuals && baselineCounterfactualSample && Number.isFinite(counterfactualTargetDay)) {
     const baselineCounterfactualVariants = await Promise.all(
       COUNTERFACTUAL_VARIANTS.map((variant) => runCounterfactualVariant({
@@ -4186,6 +4479,73 @@ export async function main() {
       sensitivityVariantsByKey
     });
     rootCauseCandidateRanking = buildRootCauseCandidateRankingReport(counterfactualPathwaySensitivity);
+
+    const coupledSensitivityScenarios = [
+      {
+        scenarioKey: 'dt_half',
+        scenarioLabel: 'DT half',
+        nx: dtSensitivityVariants[0]?.nx,
+        ny: dtSensitivityVariants[0]?.ny,
+        dtSeconds: dtSensitivityVariants[0]?.dtSeconds,
+        baselineSample: dtSensitivityVariants[0]?.latest || null
+      },
+      {
+        scenarioKey: 'grid_coarse',
+        scenarioLabel: 'Grid coarse',
+        nx: gridSensitivityVariants[0]?.nx,
+        ny: gridSensitivityVariants[0]?.ny,
+        dtSeconds: gridSensitivityVariants[0]?.dtSeconds,
+        baselineSample: gridSensitivityVariants[0]?.latest || null
+      }
+    ].filter((entry) => entry.baselineSample && Number.isFinite(entry.nx) && Number.isFinite(entry.ny) && Number.isFinite(entry.dtSeconds));
+
+    const baselineCoupledVariants = await Promise.all(
+      COUPLED_COUNTERFACTUAL_BUNDLES.map((bundle) => runCounterfactualVariant({
+        variant: bundle,
+        variantName: `${bundle.key}_baseline`,
+        variantNx: nx,
+        variantNy: ny,
+        variantDtSeconds: dt,
+        targetDay: counterfactualTargetDay,
+        configSnapshot
+      }))
+    );
+    const coupledSensitivityRunsFlat = await Promise.all(
+      COUPLED_COUNTERFACTUAL_BUNDLES.flatMap((bundle) => coupledSensitivityScenarios.map((scenario) => runCounterfactualVariant({
+        variant: bundle,
+        variantName: `${bundle.key}_${scenario.scenarioKey}`,
+        variantNx: scenario.nx,
+        variantNy: scenario.ny,
+        variantDtSeconds: scenario.dtSeconds,
+        targetDay: counterfactualTargetDay,
+        configSnapshot
+      }).then((result) => ({
+        ...result,
+        scenarioKey: scenario.scenarioKey,
+        scenarioLabel: scenario.scenarioLabel,
+        baselineSample: scenario.baselineSample
+      }))))
+    );
+    const coupledSensitivityVariantsByKey = Object.fromEntries(
+      baselineCoupledVariants.map((variant) => [variant.key, []])
+    );
+    for (const result of coupledSensitivityRunsFlat) {
+      if (!coupledSensitivityVariantsByKey[result.key]) coupledSensitivityVariantsByKey[result.key] = [];
+      coupledSensitivityVariantsByKey[result.key].push({
+        scenarioKey: result.scenarioKey,
+        scenarioLabel: result.scenarioLabel,
+        improvement: buildCounterfactualImprovement(result.baselineSample, result.latest),
+        storyComparison: compareAttributionStory(result.baselineSample, result.latest)
+      });
+    }
+    coupledCounterfactualMatrix = buildCoupledCounterfactualMatrixReport({
+      baselineSample: baselineCounterfactualSample,
+      targetDay: counterfactualTargetDay,
+      bundles: baselineCoupledVariants,
+      sensitivityVariantsByKey: coupledSensitivityVariantsByKey
+    });
+    coupledCounterfactualRanking = buildCoupledCounterfactualRankingReport(coupledCounterfactualMatrix);
+    coupledCounterfactualGuardrails = buildCoupledCounterfactualGuardrailsReport(coupledCounterfactualMatrix);
   }
   const checkpointDay = sampleTargetsDays.find((day) => day > 0 && day < sampleTargetsDays[sampleTargetsDays.length - 1])
     || sampleTargetsDays[Math.max(0, Math.floor(sampleTargetsDays.length / 2))] || null;
@@ -4273,6 +4633,9 @@ export async function main() {
     attributionLagAnalysisJsonPath: `${artifactBase}-attribution-lag-analysis.json`,
     counterfactualPathwaySensitivityJsonPath: `${artifactBase}-counterfactual-pathway-sensitivity.json`,
     rootCauseCandidateRankingJsonPath: `${artifactBase}-root-cause-candidate-ranking.json`,
+    coupledCounterfactualMatrixJsonPath: `${artifactBase}-coupled-counterfactual-matrix.json`,
+    coupledCounterfactualRankingJsonPath: `${artifactBase}-coupled-counterfactual-ranking.json`,
+    coupledCounterfactualGuardrailsJsonPath: `${artifactBase}-coupled-counterfactual-guardrails.json`,
     observerEffectBaselineDiffJsonPath: `${artifactBase}-observer-effect-baseline-diff.json`,
     observerEffectBaselineDiffMdPath: `${artifactBase}-observer-effect-baseline-diff.md`,
     observerEffectModuleOrderParityJsonPath: `${artifactBase}-observer-effect-module-order-parity.json`
@@ -4342,6 +4705,9 @@ export async function main() {
     attributionLagAnalysis,
     counterfactualPathwaySensitivity,
     rootCauseCandidateRanking,
+    coupledCounterfactualMatrix,
+    coupledCounterfactualRanking,
+    coupledCounterfactualGuardrails,
     observerEffectBaselineDiff,
     observerEffectModuleOrderParity,
     artifacts,
@@ -4413,6 +4779,9 @@ export async function main() {
     fs.writeFileSync(artifacts.attributionLagAnalysisJsonPath, toJson(attributionLagAnalysis));
     fs.writeFileSync(artifacts.counterfactualPathwaySensitivityJsonPath, toJson(counterfactualPathwaySensitivity));
     fs.writeFileSync(artifacts.rootCauseCandidateRankingJsonPath, toJson(rootCauseCandidateRanking));
+    fs.writeFileSync(artifacts.coupledCounterfactualMatrixJsonPath, toJson(coupledCounterfactualMatrix));
+    fs.writeFileSync(artifacts.coupledCounterfactualRankingJsonPath, toJson(coupledCounterfactualRanking));
+    fs.writeFileSync(artifacts.coupledCounterfactualGuardrailsJsonPath, toJson(coupledCounterfactualGuardrails));
     if (observerEffectBaselineDiff) {
       fs.writeFileSync(artifacts.observerEffectBaselineDiffJsonPath, toJson(observerEffectBaselineDiff));
       fs.writeFileSync(artifacts.observerEffectBaselineDiffMdPath, renderObserverEffectBaselineDiffMarkdown(observerEffectBaselineDiff));
@@ -4444,6 +4813,11 @@ export const _test = {
   buildAttributionLagAnalysis,
   buildCounterfactualPathwaySensitivityReport,
   buildRootCauseCandidateRankingReport,
+  buildCoupledCounterfactualMatrixReport,
+  buildCoupledCounterfactualRankingReport,
+  buildCoupledCounterfactualGuardrailsReport,
+  buildCounterfactualImprovement,
+  compareAttributionStory,
   buildObserverEffectBaselineDiffReport,
   buildObserverEffectModuleOrderParityReport,
   renderObserverEffectBaselineDiffMarkdown,
@@ -4461,6 +4835,9 @@ export const _test = {
   buildCorridorStepSliceAttributionReport,
   buildCorridorModuleToggleDeltasReport,
   runPhaseCCorridorReplay,
+  runCounterfactualVariant,
+  runSensitivityVariant,
+  COUPLED_COUNTERFACTUAL_BUNDLES,
   cloneConfigSnapshot,
   buildUpperCloudResidenceReport,
   buildUpperCloudErosionBudgetReport,

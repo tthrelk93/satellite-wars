@@ -240,6 +240,32 @@ Exit criteria:
   - preserved ITCZ/trades/westerlies
   - tolerable sensitivity behavior
 
+Phase D result:
+- completed on `2026-04-11`
+- targeted verification artifacts:
+  - `/tmp/phaseD-targeted-coupled-counterfactual-matrix.json`
+  - `/tmp/phaseD-targeted-coupled-counterfactual-ranking.json`
+  - `/tmp/phaseD-targeted-coupled-counterfactual-guardrails.json`
+- verification scope:
+  - all six coupled bundles screened at the 30-day quick baseline
+  - the top three baseline bundles rerun on `dt_half` and `grid_coarse`
+- selected sensitivity leaders:
+  - `import_erosion_saturation_adjustment`
+  - `import_plus_erosion`
+  - `import_erosion_radiative_maintenance`
+- strongest bundle:
+  - `import_erosion_saturation_adjustment`
+  - `dryRatioImprovement = 0.161`
+  - `directionalImprovementScore = -0.09711`
+  - `exitCriteriaPass = false`
+- key failure mode:
+  - every screened bundle preserved south subsidence plus trades/westerlies, but all of them failed the `itczWidthPass` guardrail
+  - the leading coupled bundle also lost attribution stability under both `dt_half` and `grid_coarse`
+- current diagnosis after Phase D:
+  - a coupled vertical-path intervention can move the north dry-belt ratio in the right direction
+  - but the present bundle family still “fixes” the dry belt by re-broadening the ITCZ and changing the causal story too much
+  - that is enough to move on to Phase E, but not enough to justify a production physics patch yet
+
 ## Phase E: Patch-Placement Proof
 
 Objective:

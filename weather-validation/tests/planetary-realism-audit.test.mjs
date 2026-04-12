@@ -1043,6 +1043,140 @@ test('phase 11 counterfactual ranking surfaces stable causal candidates', () => 
   assert.ok(rankingReport.rootCauseAssessment.ruledOut.some((line) => line.includes('Source moisture ablation')));
 });
 
+test('phase D coupled counterfactual reports rank stable guardrail-safe bundles', () => {
+  const baselineSample = {
+    metrics: {
+      subtropicalDryNorthRatio: 1.1,
+      subtropicalRhNorthMeanFrac: 0.86,
+      northDryBeltUpperCloudPathMeanKgM2: 0.35,
+      northDryBeltCarriedOverUpperCloudMeanKgM2: 0.28,
+      northDryBeltLargeScaleCondensationMeanKgM2: 0.14,
+      itczWidthDeg: 23.6,
+      subtropicalSubsidenceSouthMean: 0.038,
+      tropicalTradesNorthU10Ms: -0.7,
+      tropicalTradesSouthU10Ms: -0.5,
+      midlatitudeWesterliesNorthU10Ms: 1.1,
+      midlatitudeWesterliesSouthU10Ms: 0.9
+    }
+  };
+  const bundles = [
+    {
+      key: 'import_erosion_saturation_adjustment',
+      label: 'Import + erosion + saturation-adjustment maintenance',
+      family: 'Coupled vertical maintenance',
+      description: 'Reduce imported cloud persistence, improve erosion, and soften maintenance rebound together.',
+      strength: 0.55,
+      components: [
+        { key: 'upperImport', label: 'Upper import throttle' },
+        { key: 'upperCloudErosion', label: 'Upper-cloud erosion boost' },
+        { key: 'saturationAdjustmentBirth', label: 'Saturation-adjustment clamp' }
+      ],
+      elapsedMs: 2100,
+      interventionSummary: {
+        removedCloudKgM2: 0.12,
+        removedVaporKgM2: 0.01,
+        returnedCloudToVaporKgM2: 0.03
+      },
+      latest: {
+        metrics: {
+          subtropicalDryNorthRatio: 0.93,
+          subtropicalRhNorthMeanFrac: 0.8,
+          northDryBeltUpperCloudPathMeanKgM2: 0.18,
+          northDryBeltCarriedOverUpperCloudMeanKgM2: 0.14,
+          northDryBeltLargeScaleCondensationMeanKgM2: 0.09,
+          itczWidthDeg: 23.4,
+          subtropicalSubsidenceSouthMean: 0.041,
+          tropicalTradesNorthU10Ms: -0.73,
+          tropicalTradesSouthU10Ms: -0.52,
+          midlatitudeWesterliesNorthU10Ms: 1.05,
+          midlatitudeWesterliesSouthU10Ms: 0.86
+        }
+      }
+    },
+    {
+      key: 'maintenance_plus_radiative_support',
+      label: 'Maintenance + radiative support',
+      family: 'Coupled local maintenance',
+      description: 'Attack maintenance without touching import.',
+      strength: 0.65,
+      components: [
+        { key: 'saturationAdjustmentBirth', label: 'Saturation-adjustment clamp' },
+        { key: 'radiativeMaintenance', label: 'Radiative maintenance reduction' }
+      ],
+      elapsedMs: 1900,
+      interventionSummary: {
+        removedCloudKgM2: 0.04,
+        removedVaporKgM2: 0,
+        returnedCloudToVaporKgM2: 0.01
+      },
+      latest: {
+        metrics: {
+          subtropicalDryNorthRatio: 1.08,
+          subtropicalRhNorthMeanFrac: 0.85,
+          northDryBeltUpperCloudPathMeanKgM2: 0.3,
+          northDryBeltCarriedOverUpperCloudMeanKgM2: 0.24,
+          northDryBeltLargeScaleCondensationMeanKgM2: 0.13,
+          itczWidthDeg: 24.2,
+          subtropicalSubsidenceSouthMean: 0.029,
+          tropicalTradesNorthU10Ms: -0.12,
+          tropicalTradesSouthU10Ms: -0.18,
+          midlatitudeWesterliesNorthU10Ms: 0.19,
+          midlatitudeWesterliesSouthU10Ms: 0.15
+        }
+      }
+    }
+  ];
+
+  const matrix = planetaryAuditTest.buildCoupledCounterfactualMatrixReport({
+    baselineSample,
+    targetDay: 30,
+    bundles,
+    sensitivityVariantsByKey: {
+      import_erosion_saturation_adjustment: [
+        {
+          scenarioKey: 'dt_half',
+          scenarioLabel: 'DT half',
+          improvement: {
+            dryRatioImprovement: 0.14,
+            directionalImprovementScore: 0.49
+          },
+          storyComparison: { stable: true }
+        },
+        {
+          scenarioKey: 'grid_coarse',
+          scenarioLabel: 'Grid coarse',
+          improvement: {
+            dryRatioImprovement: 0.11,
+            directionalImprovementScore: 0.33
+          },
+          storyComparison: { stable: true }
+        }
+      ],
+      maintenance_plus_radiative_support: [
+        {
+          scenarioKey: 'dt_half',
+          scenarioLabel: 'DT half',
+          improvement: {
+            dryRatioImprovement: -0.02,
+            directionalImprovementScore: -0.12
+          },
+          storyComparison: { stable: false }
+        }
+      ]
+    }
+  });
+  const ranking = planetaryAuditTest.buildCoupledCounterfactualRankingReport(matrix);
+  const guardrails = planetaryAuditTest.buildCoupledCounterfactualGuardrailsReport(matrix);
+
+  assert.equal(matrix.topBundles[0].key, 'import_erosion_saturation_adjustment');
+  assert.equal(matrix.bundles[0].sensitivity.tolerableSensitivityPass, true);
+  assert.equal(ranking.bestBundle.key, 'import_erosion_saturation_adjustment');
+  assert.equal(ranking.exitCriteriaPass, true);
+  assert.equal(guardrails.exitCriteriaPass, true);
+  assert.equal(guardrails.bundles[0].guardrails.itczWidthPass, true);
+  assert.ok(ranking.rootCauseAssessment.ruledOut.some((line) => line.includes('Maintenance + radiative support')));
+});
+
 test('phase A observer-effect reports distinguish baseline drift from tracing variants', () => {
   const trustedBaseline = {
     artifactPath: '/tmp/trusted-phase1.json',
