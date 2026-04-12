@@ -448,6 +448,43 @@ Exit criteria:
 If this phase fails:
 - the next step is numerical-model repair, not physics repair
 
+Status:
+- complete
+
+Artifacts:
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-numerical-ownership-check.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-numerical-ownership-check.json)
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-numerical-ownership-check.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-numerical-ownership-check.md)
+
+Result:
+- U5 failed its exit criteria
+  - `sameTargetOwnerPass = false`
+  - `sameCorridorOwnerPass = false`
+  - `sameFirstBoundaryPass = false`
+  - `sameRetentionDecisionPass = false`
+  - `exitCriteriaPass = false`
+- baseline remains the original story
+  - first material boundary: `endPreviousStepMicrophysics5`
+  - target owner: `previousStepResidualUpperCloud`
+  - retention decision: `retention-dominant`
+- `dt_half` does not preserve that story
+  - first material boundary: `null`
+  - target owner: `currentStepAdvectedUpperCloud`
+  - retention decision: `coupled`
+- `grid_coarse` keeps the early boundary but loses a clean target/corridor owner and retention conclusion
+  - first material boundary: `endPreviousStepMicrophysics5`
+  - target owner magnitude collapses to `0`
+  - retention decision: `coupled`
+- `grid_dense` keeps the early boundary and corridor owner, but the target-cell owner flips
+  - first material boundary: `endPreviousStepMicrophysics5`
+  - target owner: `currentStepAdvectedUpperCloud`
+  - corridor owner: `previousStepResidualUpperCloud`
+  - retention decision: `retention-dominant`
+
+Decision:
+- the current ownership story is not yet numerically stable enough for upstream patch placement
+- the best baseline narrative still points at previous-step residual retention, but the owner/decision do not survive dt/grid variants cleanly
+- per the U5 contract, the next honest step is numerical-model repair or variant-normalized ownership targeting before any physics patch proof
+
 ## Phase U6: Upstream Patch-Placement Proof
 
 Objective:
