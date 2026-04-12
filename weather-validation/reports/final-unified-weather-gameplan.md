@@ -109,9 +109,10 @@ More precisely:
 - all upstream proof through U5 is complete
 - the numerical harness has been repaired
 - the ownership story is now stable after normalization
-- the next live step is **U6: upstream patch-placement proof**
+- U6 is now complete
+- the next live step is **Phase 1B: implement the first minimal corrective patch**
 
-This is the last proof phase before we resume the original climate-improvement roadmap in earnest.
+This means the last proof phase is behind us, and we can move into the first evidence-backed physics patch.
 
 ### Current proven facts we should build on
 
@@ -127,9 +128,14 @@ This is the last proof phase before we resume the original climate-improvement r
 - `previousStepResidualUpperCloud`
 5. The stable first break is:
 - `endPreviousStepMicrophysics5`
-6. Transport still matters, but mainly as amplification.
-7. Full-globe complexity is not required to reproduce the mechanism.
-8. The earlier `dt_half` instability was heavily contaminated by a harness bug and has now been repaired.
+6. The first corrective patch now has a proven placement:
+- primary owner: `stepVertical5`
+- secondary downstream support: `stepMicrophysics5`
+7. The dominant proved failure mode is:
+- retained previous-step carryover surviving the vertical handoff with effectively zero applied erosion
+8. Transport still matters, but mainly as amplification.
+9. Full-globe complexity is not required to reproduce the mechanism.
+10. The earlier `dt_half` instability was heavily contaminated by a harness bug and has now been repaired.
 
 ## Final Unified Phase Plan
 
@@ -160,6 +166,18 @@ Exit criteria:
   - provenance ownership
   - reduced-order replay
   - normalized numerical rerun
+
+Status:
+- complete
+
+Outcome:
+- patch location proved in [prevertical-patch-placement-proof.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-patch-placement-proof.md)
+- first owner: [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js) `stepVertical5`
+- downstream support only: [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js) `stepMicrophysics5`
+- proved signature:
+  - previous-step residual carryover must fall first
+  - current-step advection must stay secondary
+  - the patch is wrong if it mainly changes downstream cleanup without reducing the post-vertical carryover handoff
 
 #### Phase 1B: Implement The First Minimal Corrective Patch
 

@@ -588,6 +588,32 @@ Exit criteria:
 - one predicted ledger signature
 - one explicit falsification rule for why the patch would be considered wrong
 
+Status:
+- complete
+
+Artifacts:
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-patch-placement-proof.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-patch-placement-proof.json)
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-patch-placement-proof.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-patch-placement-proof.md)
+
+Result:
+- the first corrective patch now has a proven placement:
+  - primary owner: `stepVertical5`
+  - secondary downstream support: `stepMicrophysics5`
+- the decisive evidence is not a historical swap win; it is the combined proof stack:
+  - U2 keeps `previousStepResidualUpperCloud` as the dominant owner
+  - U4 reproduces the bug without full-globe transport
+  - repaired normalized U5 keeps the same owner and first boundary
+  - frozen E1 shows `stepVertical5` passing `100%` of target-cell carryover forward with:
+    - `appliedErosionMassKgM2 = 0`
+    - `resolvedBirthMassKgM2 = 0.06594`
+    - `convectiveBirthMassKgM2 = 0`
+  - frozen E1 also shows `stepMicrophysics5` only removes `11.97%` of that target-cell upper-cloud input before the reservoir exits the step
+- conclusion:
+  - the first patch belongs in the carryover / erosion handoff inside [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+  - [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js) remains a secondary support lane, but not the first ownership target
+- falsification rule:
+  - this placement is wrong if a patch mainly lowers current-step advection or downstream microphysics cleanup while leaving the previous-step post-vertical carryover handoff materially unchanged
+
 ## What the next fix should look like
 
 A valid fix should not be described as:
@@ -598,7 +624,7 @@ A valid fix should not be described as:
 A valid fix should be described as:
 - “reduce **current-step upper-cloud import in `advect5.js`** into the frozen corridor by changing X”
 - or “reduce **previous-step residual upper-cloud carryover leaving `microphysics5.js`** by changing Y”
-- or “reduce **coupled residual-plus-import persistence** by coordinated edits in A and B”
+- or, for the now-proven owner, “reduce **previous-step retained carryover surviving `stepVertical5`** by changing the carryover / erosion handoff in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js) while leaving current-step advection secondary”
 
 The proof must predict:
 - which pre-vertical ledger term will drop
@@ -610,7 +636,9 @@ The proof must predict:
 If the evidence says:
 
 - `previous-step residual` dominates and survives reduced-order column tests:
-  - patch belongs first in previous-step retention logic, likely [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+  - patch belongs first in previous-step carryover retention logic
+  - after U6, that first target is now the carryover / erosion path in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+  - [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js) remains secondary support only if the first vertical patch still leaves too much residual output
 
 - `current-step advected import` dominates and advection-only curtain reproduces it:
   - patch belongs first in [advect5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/advect5.js) or in the wind field owner that feeds it
@@ -623,10 +651,14 @@ If the evidence says:
 
 ## Bottom line
 
-The next step is not “try another cloud tweak.”
+The upstream ownership proof is now closed enough to patch responsibly.
 
-The next step is to **prove upstream ownership of the excess pre-vertical cloud reservoir**. If we execute U0-U6 thoroughly, we should be able to say:
-- exactly which module first owns the bug
-- exactly which secondary module keeps it alive
-- exactly what the first patch should change
-- exactly how that patch should show up in the ledger before we trust any 30-day climate win
+We can now say:
+- the first ownership target is the carryover / erosion handoff in `stepVertical5`
+- the main support path underneath it is `stepMicrophysics5`
+- the first patch should reduce retained carryover surviving the previous-step vertical handoff
+- that patch should show up first as a drop in the previous-step residual term, not as a drop in current-step advection
+
+The next step is Phase 1B:
+- implement the smallest corrective patch in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- then re-run the proof stack before trusting any 30-day climate win
