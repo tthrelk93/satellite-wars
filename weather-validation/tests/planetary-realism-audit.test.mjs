@@ -1150,3 +1150,85 @@ test('phase A observer-effect reports distinguish baseline drift from tracing va
   assert.equal(parityReport.parity.every((entry) => entry.sameOrderAsReference), true);
   assert.ok(markdown.includes('Observer-Effect Baseline Diff'));
 });
+
+test('phase B cloud-transition reports surface the first persistent module and sector split', () => {
+  const sample = {
+    targetDay: 30,
+    cloudTransitionLedgerTracing: {
+      summary: {
+        attributedUpperCloudPathChangeFrac: 0.972,
+        firstPersistentProblemModule: 'stepVertical5',
+        dominantPersistentModule: 'stepVertical5',
+        persistentScoreByModule: {
+          stepAdvection5: 0.02,
+          stepVertical5: 0.19,
+          stepMicrophysics5: 0.08,
+          stepRadiation2D5: 0.03
+        }
+      },
+      modules: {
+        stepVertical5: {
+          bands: {
+            upperTroposphere: {
+              actualNetCloudDeltaMeanKgM2: 0.041,
+              attributedCoverageFrac: 0.981,
+              transitions: {
+                importedCloudEntering: 0.11,
+                importedCloudSurvivingUnchanged: 0.094,
+                cloudErodedAway: 0.021,
+                cloudConvertedIntoLocalCondensationSupport: 0.056,
+                unattributedResidual: 0.002
+              }
+            }
+          }
+        }
+      },
+      sectoral: {
+        stepVertical5: {
+          eastPacific: {
+            bands: {
+              upperTroposphere: {
+                actualNetCloudDeltaMeanKgM2: 0.055,
+                transitions: {
+                  importedCloudSurvivingUnchanged: 0.12
+                }
+              }
+            }
+          }
+        }
+      },
+      cells: [
+        {
+          cellIndex: 42,
+          latDeg: 22.5,
+          lonDeg: -131.25,
+          sectorKey: 'eastPacific',
+          modules: {
+            stepVertical5: {
+              upperTroposphere: {
+                netCloudDeltaKgM2: 0.08,
+                transitions: {
+                  importedCloudSurvivingUnchanged: 0.12
+                }
+              }
+            }
+          }
+        }
+      ],
+      rootCauseAssessment: {
+        ruledIn: ['The first module that turns imported cloud into persistent problem cloud is stepVertical5.'],
+        ruledOut: [],
+        ambiguous: []
+      }
+    }
+  };
+
+  const full = planetaryAuditTest.buildCloudTransitionLedgerReport(sample);
+  const summary = planetaryAuditTest.buildCloudTransitionLedgerSummaryReport(sample);
+  const sector = planetaryAuditTest.buildCloudTransitionLedgerSectorSplitReport(sample);
+
+  assert.equal(full.summary.firstPersistentProblemModule, 'stepVertical5');
+  assert.equal(full.modules.stepVertical5.bands.upperTroposphere.transitions.importedCloudSurvivingUnchanged, 0.094);
+  assert.equal(summary.summary.attributedUpperCloudPathChangeFrac, 0.972);
+  assert.equal(sector.sectoral.stepVertical5.eastPacific.bands.upperTroposphere.transitions.importedCloudSurvivingUnchanged, 0.12);
+});

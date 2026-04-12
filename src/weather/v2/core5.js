@@ -18,6 +18,12 @@ import { loadAnalysisDataset } from './analysisLoader.js';
 import { stepAnalysisIncrement5 } from './analysisIncrement5.js';
 import { stepNudging5 } from './nudging5.js';
 import {
+  CLOUD_BIRTH_LEVEL_BANDS,
+  CLOUD_BIRTH_LEVEL_BAND_COUNT,
+  cloudBirthBandOffset,
+  sigmaMidAtLevel as cloudBirthSigmaMidAtLevel
+} from './cloudBirthTracing5.js';
+import {
   buildVerticalLayout,
   computeGeopotentialHeightByPressure,
   createSigmaHalfLevels,
@@ -155,6 +161,48 @@ const createConservationModuleAccumulator = (moduleName) => ({
   }
 });
 
+const CLOUD_TRANSITION_LEDGER_MODULES = new Set([
+  'stepAdvection5',
+  'stepVertical5',
+  'stepMicrophysics5',
+  'stepRadiation2D5'
+]);
+const CLOUD_TRANSITION_LEDGER_TRANSITIONS = [
+  { key: 'importedCloudEntering', label: 'Imported cloud entering' },
+  { key: 'importedCloudSurvivingUnchanged', label: 'Imported cloud surviving unchanged' },
+  { key: 'cloudErodedAway', label: 'Cloud eroded away' },
+  { key: 'cloudConvertedIntoLocalCondensationSupport', label: 'Cloud converted into local condensation support' },
+  { key: 'cloudConvertedIntoPrecipSupport', label: 'Cloud converted into precip support' },
+  { key: 'cloudLostToReevaporation', label: 'Cloud lost to re-evaporation' },
+  { key: 'cloudKeptAliveByRadiativePersistence', label: 'Cloud kept alive by radiative persistence' },
+  { key: 'advectiveExportLoss', label: 'Advective export loss' },
+  { key: 'unattributedResidual', label: 'Unattributed residual' }
+];
+
+const createCloudTransitionLedgerModuleAccumulator = (moduleName, cellCount) => ({
+  module: moduleName,
+  callCount: 0,
+  sampledModelSeconds: 0,
+  netCloudDeltaByBandCell: new Float64Array(cellCount * CLOUD_BIRTH_LEVEL_BAND_COUNT),
+  transitions: Object.fromEntries(
+    CLOUD_TRANSITION_LEDGER_TRANSITIONS.map(({ key }) => [key, new Float64Array(cellCount * CLOUD_BIRTH_LEVEL_BAND_COUNT)])
+  )
+});
+
+const createCloudTransitionLedgerAccumulator = (cellCount) => ({
+  schema: 'satellite-wars.cloud-transition-ledger.v1',
+  sampleCount: 0,
+  sampledModelSeconds: 0,
+  bandDefinitions: CLOUD_BIRTH_LEVEL_BANDS.map((band) => ({ ...band })),
+  transitionDefinitions: CLOUD_TRANSITION_LEDGER_TRANSITIONS.map((transition) => ({ ...transition })),
+  modules: Object.fromEntries(
+    Array.from(CLOUD_TRANSITION_LEDGER_MODULES).map((moduleName) => [
+      moduleName,
+      createCloudTransitionLedgerModuleAccumulator(moduleName, cellCount)
+    ])
+  )
+});
+
 const VERTICAL_CLOUD_BIRTH_TRACE_FIELDS = [
   'resolvedAscentCloudBirthAccumMass',
   'saturationAdjustmentCloudBirthAccumMass',
@@ -171,6 +219,8 @@ const VERTICAL_CLOUD_BIRTH_TRACE_FIELDS = [
   'convectiveDetrainmentCloudBirthByBandMass',
   'carryOverUpperCloudEnteringByBandMass',
   'carryOverUpperCloudSurvivingByBandMass',
+  'advectedCloudImportByBandMass',
+  'advectedCloudExportByBandMass',
   'prevUpperCloudBandMass',
   'upperCloudResidenceTimeSeconds',
   'upperCloudTimeSinceLocalBirthSeconds',
@@ -205,6 +255,10 @@ const VERTICAL_CLOUD_BIRTH_TRACE_FIELDS = [
   'upperCloudPotentialErosionByBandMass',
   'upperCloudAppliedErosionByBandMass',
   'upperCloudBlockedErosionByBandMass',
+  'microphysicsCloudToPrecipByBandMass',
+  'cloudReevaporationByBandMass',
+  'precipReevaporationByBandMass',
+  'radiativePersistenceEquivalentByBandMass',
   'upperCloudShortwaveAbsorptionWm2',
   'upperCloudLongwaveRelaxationBoost',
   'upperCloudRadiativePersistenceSupportWm2',
@@ -660,6 +714,7 @@ export class WeatherCore5 {
     this._updateHydrostatic();
     this.resetVerticalCloudBirthTracingDiagnostics();
     this.resetClimateProcessDiagnostics();
+    this.resetCloudTransitionLedger();
     this.resetConservationDiagnostics();
     this.resetModuleTimingDiagnostics();
     this.setInstrumentationMode(instrumentationMode);
@@ -731,6 +786,7 @@ export class WeatherCore5 {
     this._updateHydrostatic();
     this.resetVerticalCloudBirthTracingDiagnostics();
     this.resetClimateProcessDiagnostics();
+    this.resetCloudTransitionLedger();
     this.resetConservationDiagnostics();
     this.resetModuleTimingDiagnostics();
   }
@@ -746,6 +802,10 @@ export class WeatherCore5 {
 
   resetClimateProcessDiagnostics() {
     this._climateProcessBudget = createProcessBudgetAccumulator();
+  }
+
+  resetCloudTransitionLedger() {
+    this._cloudTransitionLedger = createCloudTransitionLedgerAccumulator(this.state?.N || 0);
   }
 
   getClimateProcessBudgetSummary() {
@@ -779,6 +839,30 @@ export class WeatherCore5 {
       regimeSummary.fractionOfTrackedMicrophysicsPrecip = totalRegimePrecip > 0
         ? regimeSummary.surfacePrecipDeltaMm / totalRegimePrecip
         : null;
+    }
+    return summary;
+  }
+
+  getCloudTransitionLedgerRaw() {
+    if (!this._cloudTransitionLedger) {
+      return createCloudTransitionLedgerAccumulator(this.state?.N || 0);
+    }
+    const summary = {
+      ...this._cloudTransitionLedger,
+      bandDefinitions: this._cloudTransitionLedger.bandDefinitions.map((band) => ({ ...band })),
+      transitionDefinitions: this._cloudTransitionLedger.transitionDefinitions.map((transition) => ({ ...transition })),
+      modules: {}
+    };
+    for (const [moduleName, moduleSummary] of Object.entries(this._cloudTransitionLedger.modules || {})) {
+      summary.modules[moduleName] = {
+        module: moduleSummary.module,
+        callCount: moduleSummary.callCount,
+        sampledModelSeconds: moduleSummary.sampledModelSeconds,
+        netCloudDeltaByBandCell: Float64Array.from(moduleSummary.netCloudDeltaByBandCell || []),
+        transitions: Object.fromEntries(
+          Object.entries(moduleSummary.transitions || {}).map(([key, field]) => [key, Float64Array.from(field || [])])
+        )
+      };
     }
     return summary;
   }
@@ -1357,6 +1441,132 @@ export class WeatherCore5 {
     };
   }
 
+  _copyCloudTransitionBandField(field) {
+    return field instanceof Float32Array && field.length === this.state.N * CLOUD_BIRTH_LEVEL_BAND_COUNT
+      ? Float64Array.from(field)
+      : new Float64Array(this.state.N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
+
+  _captureCloudTransitionSnapshot(moduleName) {
+    const { N, nz, pHalf, qc, qi, qr, qs } = this.state;
+    const cloudPathByBand = new Float64Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+    const precipPathByBand = new Float64Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+    for (let lev = 0; lev < nz; lev += 1) {
+      const sigmaMid = cloudBirthSigmaMidAtLevel(this.sigmaHalf, lev, nz);
+      const bandIndex = CLOUD_BIRTH_LEVEL_BANDS.findIndex((band) => sigmaMid >= band.minSigma && sigmaMid < band.maxSigma);
+      const resolvedBandIndex = bandIndex >= 0 ? bandIndex : CLOUD_BIRTH_LEVEL_BANDS.length - 1;
+      const base = lev * N;
+      for (let k = 0; k < N; k += 1) {
+        const idx = base + k;
+        const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+        if (!(dp > 0)) continue;
+        const layerMassKgM2 = dp / 9.80665;
+        const offset = cloudBirthBandOffset(resolvedBandIndex, k, N);
+        const precipMixingRatio = (qr?.[idx] || 0) + (qs?.[idx] || 0);
+        const cloudMixingRatio = (qc?.[idx] || 0) + (qi?.[idx] || 0) + precipMixingRatio;
+        cloudPathByBand[offset] += cloudMixingRatio * layerMassKgM2;
+        precipPathByBand[offset] += precipMixingRatio * layerMassKgM2;
+      }
+    }
+    const snapshot = {
+      cloudPathByBand,
+      precipPathByBand
+    };
+    if (moduleName === 'stepVertical5') {
+      snapshot.carryOverUpperCloudEnteringByBandMass = this._copyCloudTransitionBandField(this.state.carryOverUpperCloudEnteringByBandMass);
+      snapshot.carryOverUpperCloudSurvivingByBandMass = this._copyCloudTransitionBandField(this.state.carryOverUpperCloudSurvivingByBandMass);
+      snapshot.resolvedAscentCloudBirthByBandMass = this._copyCloudTransitionBandField(this.state.resolvedAscentCloudBirthByBandMass);
+      snapshot.convectiveDetrainmentCloudBirthByBandMass = this._copyCloudTransitionBandField(this.state.convectiveDetrainmentCloudBirthByBandMass);
+      snapshot.upperCloudAppliedErosionByBandMass = this._copyCloudTransitionBandField(this.state.upperCloudAppliedErosionByBandMass);
+    }
+    if (moduleName === 'stepMicrophysics5') {
+      snapshot.saturationAdjustmentCloudBirthByBandMass = this._copyCloudTransitionBandField(this.state.saturationAdjustmentCloudBirthByBandMass);
+      snapshot.microphysicsCloudToPrecipByBandMass = this._copyCloudTransitionBandField(this.state.microphysicsCloudToPrecipByBandMass);
+      snapshot.cloudReevaporationByBandMass = this._copyCloudTransitionBandField(this.state.cloudReevaporationByBandMass);
+      snapshot.precipReevaporationByBandMass = this._copyCloudTransitionBandField(this.state.precipReevaporationByBandMass);
+    }
+    return snapshot;
+  }
+
+  _accumulateCloudTransitionLedger(moduleName, beforeSnapshot, afterSnapshot, sampledDtSeconds) {
+    if (!this._cloudTransitionLedger || !beforeSnapshot || !afterSnapshot) return;
+    const moduleLedger = this._cloudTransitionLedger.modules[moduleName];
+    if (!moduleLedger) return;
+    moduleLedger.callCount += 1;
+    moduleLedger.sampledModelSeconds += sampledDtSeconds;
+    const bandSize = this.state.N * CLOUD_BIRTH_LEVEL_BAND_COUNT;
+    const addTransition = (transitionKey, index, value) => {
+      if (!Number.isFinite(value) || value === 0) return;
+      moduleLedger.transitions[transitionKey][index] += value;
+    };
+    const diffFieldAt = (afterField, beforeField, index) => (
+      (afterField?.[index] || 0) - (beforeField?.[index] || 0)
+    );
+    for (let index = 0; index < bandSize; index += 1) {
+      const netCloudDelta = (afterSnapshot.cloudPathByBand?.[index] || 0) - (beforeSnapshot.cloudPathByBand?.[index] || 0);
+      moduleLedger.netCloudDeltaByBandCell[index] += netCloudDelta;
+      let accountedDelta = 0;
+
+      if (moduleName === 'stepAdvection5') {
+        const importedCloudEntering = Math.max(0, netCloudDelta);
+        const advectiveExportLoss = Math.max(0, -netCloudDelta);
+        addTransition('importedCloudEntering', index, importedCloudEntering);
+        addTransition('advectiveExportLoss', index, advectiveExportLoss);
+        accountedDelta = importedCloudEntering - advectiveExportLoss;
+      } else if (moduleName === 'stepVertical5') {
+        const importedCloudEntering = diffFieldAt(afterSnapshot.carryOverUpperCloudEnteringByBandMass, beforeSnapshot.carryOverUpperCloudEnteringByBandMass, index);
+        const importedCloudSurvivingUnchanged = diffFieldAt(afterSnapshot.carryOverUpperCloudSurvivingByBandMass, beforeSnapshot.carryOverUpperCloudSurvivingByBandMass, index);
+        const cloudErodedAway = diffFieldAt(afterSnapshot.upperCloudAppliedErosionByBandMass, beforeSnapshot.upperCloudAppliedErosionByBandMass, index);
+        const cloudConvertedIntoLocalCondensationSupport =
+          diffFieldAt(afterSnapshot.resolvedAscentCloudBirthByBandMass, beforeSnapshot.resolvedAscentCloudBirthByBandMass, index)
+          + diffFieldAt(afterSnapshot.convectiveDetrainmentCloudBirthByBandMass, beforeSnapshot.convectiveDetrainmentCloudBirthByBandMass, index);
+        addTransition('importedCloudEntering', index, importedCloudEntering);
+        addTransition('importedCloudSurvivingUnchanged', index, importedCloudSurvivingUnchanged);
+        addTransition('cloudErodedAway', index, cloudErodedAway);
+        addTransition('cloudConvertedIntoLocalCondensationSupport', index, cloudConvertedIntoLocalCondensationSupport);
+        accountedDelta = cloudConvertedIntoLocalCondensationSupport - cloudErodedAway;
+      } else if (moduleName === 'stepMicrophysics5') {
+        const cloudConvertedIntoLocalCondensationSupport = diffFieldAt(
+          afterSnapshot.saturationAdjustmentCloudBirthByBandMass,
+          beforeSnapshot.saturationAdjustmentCloudBirthByBandMass,
+          index
+        );
+        const cloudConvertedIntoPrecipSupport = diffFieldAt(
+          afterSnapshot.microphysicsCloudToPrecipByBandMass,
+          beforeSnapshot.microphysicsCloudToPrecipByBandMass,
+          index
+        );
+        const cloudLostToReevaporation = diffFieldAt(
+          afterSnapshot.cloudReevaporationByBandMass,
+          beforeSnapshot.cloudReevaporationByBandMass,
+          index
+        ) + diffFieldAt(
+          afterSnapshot.precipReevaporationByBandMass,
+          beforeSnapshot.precipReevaporationByBandMass,
+          index
+        );
+        addTransition('cloudConvertedIntoLocalCondensationSupport', index, cloudConvertedIntoLocalCondensationSupport);
+        addTransition('cloudConvertedIntoPrecipSupport', index, cloudConvertedIntoPrecipSupport);
+        addTransition('cloudLostToReevaporation', index, cloudLostToReevaporation);
+        accountedDelta = cloudConvertedIntoLocalCondensationSupport - cloudLostToReevaporation;
+      } else if (moduleName === 'stepRadiation2D5') {
+        const cell = index % this.state.N;
+        const bandIndex = Math.floor(index / this.state.N);
+        const sigmaWeight = bandIndex === 3 ? 1 : bandIndex === 2 ? 0.35 : bandIndex === 1 ? 0.1 : 0.05;
+        const supportFrac = Math.max(0, Math.min(1, (this.state.upperCloudRadiativePersistenceSupportWm2?.[cell] || 0) / 80));
+        const cloudKeptAliveByRadiativePersistence = Math.min(
+          beforeSnapshot.cloudPathByBand?.[index] || 0,
+          afterSnapshot.cloudPathByBand?.[index] || 0
+        ) * supportFrac * sigmaWeight * (sampledDtSeconds / 86400);
+        addTransition('cloudKeptAliveByRadiativePersistence', index, cloudKeptAliveByRadiativePersistence);
+        accountedDelta = 0;
+      }
+
+      const residual = netCloudDelta - accountedDelta;
+      addTransition('unattributedResidual', index, residual);
+    }
+  }
+
   _classifyTrackedPrecipRegime(latDeg, cellIndex) {
     const latAbs = Math.abs(latDeg);
     const convOrg = this.state.convectiveOrganization?.[cellIndex] || 0;
@@ -1614,14 +1824,20 @@ export class WeatherCore5 {
     if (shouldSampleClimateBudget && this._climateProcessBudget) {
       this._climateProcessBudget.sampledModelSeconds += dt;
     }
+    if (shouldSampleClimateBudget && this._cloudTransitionLedger) {
+      this._cloudTransitionLedger.sampleCount += 1;
+      this._cloudTransitionLedger.sampledModelSeconds += dt;
+    }
     if (shouldSampleClimateBudget && this._conservationBudget) {
       this._conservationBudget.sampledModelSeconds += dt;
     }
     const runWithDiagnostics = (name, fn, { sampledDtSeconds = dt } = {}) => {
       const collectBudget = shouldSampleClimateBudget && PROCESS_BUDGET_MODULES.has(name);
+      const collectCloudTransitionLedger = shouldSampleClimateBudget && CLOUD_TRANSITION_LEDGER_MODULES.has(name);
       const collectConservation = shouldSampleClimateBudget && CONSERVATION_SAMPLE_MODULES.has(name);
       const beforeLog = shouldLogModules ? logger.buildProcessSnapshot(this) : null;
       const beforeBudget = collectBudget ? this._captureClimateProcessBudgetSnapshot(name === 'stepMicrophysics5') : null;
+      const beforeCloudTransition = collectCloudTransitionLedger ? this._captureCloudTransitionSnapshot(name) : null;
       const beforeConservation = collectConservation ? this._captureConservationSnapshot() : null;
       const startedAt = Date.now();
       fn();
@@ -1633,6 +1849,9 @@ export class WeatherCore5 {
       }
       if (collectBudget) {
         this._accumulateClimateProcessBudget(name, beforeBudget, sampledDtSeconds);
+      }
+      if (collectCloudTransitionLedger) {
+        this._accumulateCloudTransitionLedger(name, beforeCloudTransition, this._captureCloudTransitionSnapshot(name), sampledDtSeconds);
       }
       if (collectConservation) {
         this._accumulateConservationBudget(name, beforeConservation, sampledDtSeconds);

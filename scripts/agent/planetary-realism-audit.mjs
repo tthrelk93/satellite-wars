@@ -784,6 +784,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     transportTracing,
     verticalCloudBirthTracing,
     upperCloudResidenceTracing,
+    cloudTransitionLedgerTracing,
     thermodynamicSupportTracing,
     forcingOppositionTracing,
     numericalIntegrityTracing,
@@ -1071,6 +1072,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     transportTracing: transportTracing || null,
     verticalCloudBirthTracing: verticalCloudBirthTracing || null,
     upperCloudResidenceTracing: upperCloudResidenceTracing || null,
+    cloudTransitionLedgerTracing: cloudTransitionLedgerTracing || null,
     thermodynamicSupportTracing: thermodynamicSupportTracing || null,
     forcingOppositionTracing: forcingOppositionTracing || null,
     numericalIntegrityTracing: numericalIntegrityTracing || null,
@@ -1468,6 +1470,31 @@ export const buildDryBeltCloudOriginMatrixReport = (latestSample = null) => ({
   originMatrix: latestSample?.verticalCloudBirthTracing?.originMatrix || null
 });
 
+export const buildCloudTransitionLedgerReport = (latestSample = null) => ({
+  schema: 'satellite-wars.cloud-transition-ledger.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  summary: latestSample?.cloudTransitionLedgerTracing?.summary || null,
+  modules: latestSample?.cloudTransitionLedgerTracing?.modules || null,
+  cells: latestSample?.cloudTransitionLedgerTracing?.cells || null,
+  rootCauseAssessment: latestSample?.cloudTransitionLedgerTracing?.rootCauseAssessment || null
+});
+
+export const buildCloudTransitionLedgerSummaryReport = (latestSample = null) => ({
+  schema: 'satellite-wars.cloud-transition-ledger-summary.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  summary: latestSample?.cloudTransitionLedgerTracing?.summary || null,
+  rootCauseAssessment: latestSample?.cloudTransitionLedgerTracing?.rootCauseAssessment || null
+});
+
+export const buildCloudTransitionLedgerSectorSplitReport = (latestSample = null) => ({
+  schema: 'satellite-wars.cloud-transition-ledger-sector-split.v1',
+  generatedAt: new Date().toISOString(),
+  targetDay: latestSample?.targetDay ?? null,
+  sectoral: latestSample?.cloudTransitionLedgerTracing?.sectoral || null
+});
+
 const compactVerticalCloudBirthSummary = (sample = null) => {
   if (!sample?.verticalCloudBirthTracing) return null;
   return {
@@ -1514,6 +1541,19 @@ const compactUpperCloudResidenceSummary = (sample = null) => {
       north35UpperTroposphereImportMagnitudeKgM_1S: sample.upperCloudResidenceTracing?.ventilation?.north35UpperTroposphereImportMagnitudeKgM_1S ?? null
     },
     rootCauseAssessment: sample.upperCloudResidenceTracing?.rootCauseAssessment || null
+  };
+};
+
+const compactCloudTransitionLedgerSummary = (sample = null) => {
+  if (!sample?.cloudTransitionLedgerTracing) return null;
+  return {
+    attributedUpperCloudPathChangeFrac: sample.cloudTransitionLedgerTracing?.summary?.attributedUpperCloudPathChangeFrac ?? null,
+    netCloudChangeClosureFrac: sample.cloudTransitionLedgerTracing?.summary?.netCloudChangeClosureFrac ?? null,
+    totalAbsAttributedTransitionMeanKgM2: sample.cloudTransitionLedgerTracing?.summary?.totalAbsAttributedTransitionMeanKgM2 ?? null,
+    firstPersistentProblemModule: sample.cloudTransitionLedgerTracing?.summary?.firstPersistentProblemModule ?? null,
+    dominantPersistentModule: sample.cloudTransitionLedgerTracing?.summary?.dominantPersistentModule ?? null,
+    persistentScoreByModule: sample.cloudTransitionLedgerTracing?.summary?.persistentScoreByModule || null,
+    rootCauseAssessment: sample.cloudTransitionLedgerTracing?.rootCauseAssessment || null
   };
 };
 
@@ -1726,6 +1766,7 @@ const compactSampleForSummary = (sample = null) => {
     transportTracing,
     verticalCloudBirthTracing,
     upperCloudResidenceTracing,
+    cloudTransitionLedgerTracing,
     thermodynamicSupportTracing,
     forcingOppositionTracing,
     numericalIntegrityTracing,
@@ -1737,6 +1778,7 @@ const compactSampleForSummary = (sample = null) => {
     transportTracingSummary: compactTransportSummary(sample),
     verticalCloudBirthTracingSummary: compactVerticalCloudBirthSummary(sample),
     upperCloudResidenceTracingSummary: compactUpperCloudResidenceSummary(sample),
+    cloudTransitionLedgerTracingSummary: compactCloudTransitionLedgerSummary(sample),
     thermodynamicSupportTracingSummary: compactThermodynamicSupportSummary(sample),
     forcingOppositionTracingSummary: compactForcingOppositionSummary(sample),
     numericalIntegrityTracingSummary: compactNumericalIntegritySummary(sample),
@@ -3394,6 +3436,9 @@ export async function main() {
   const verticalCloudBirthAttribution = buildVerticalCloudBirthAttributionReport(latestSample);
   const verticalCloudBirthHistograms = buildVerticalCloudBirthHistogramsReport(latestSample);
   const dryBeltCloudOriginMatrix = buildDryBeltCloudOriginMatrixReport(latestSample);
+  const cloudTransitionLedger = buildCloudTransitionLedgerReport(latestSample);
+  const cloudTransitionLedgerSummary = buildCloudTransitionLedgerSummaryReport(latestSample);
+  const cloudTransitionLedgerSectorSplit = buildCloudTransitionLedgerSectorSplitReport(latestSample);
   const upperCloudResidence = buildUpperCloudResidenceReport(latestSample);
   const upperCloudErosionBudget = buildUpperCloudErosionBudgetReport(latestSample);
   const upperCloudVentilationSummary = buildUpperCloudVentilationSummaryReport(latestSample);
@@ -3621,6 +3666,9 @@ export async function main() {
     verticalCloudBirthAttributionJsonPath: `${artifactBase}-vertical-cloud-birth-attribution.json`,
     verticalCloudBirthHistogramsJsonPath: `${artifactBase}-vertical-cloud-birth-histograms.json`,
     dryBeltCloudOriginMatrixJsonPath: `${artifactBase}-dry-belt-cloud-origin-matrix.json`,
+    cloudTransitionLedgerJsonPath: `${artifactBase}-cloud-transition-ledger.json`,
+    cloudTransitionLedgerSummaryJsonPath: `${artifactBase}-cloud-transition-ledger-summary.json`,
+    cloudTransitionLedgerSectorSplitJsonPath: `${artifactBase}-cloud-transition-ledger-sector-split.json`,
     upperCloudResidenceJsonPath: `${artifactBase}-upper-cloud-residence.json`,
     upperCloudErosionBudgetJsonPath: `${artifactBase}-upper-cloud-erosion-budget.json`,
     upperCloudVentilationSummaryJsonPath: `${artifactBase}-upper-cloud-ventilation-summary.json`,
@@ -3685,6 +3733,9 @@ export async function main() {
     verticalCloudBirthAttribution,
     verticalCloudBirthHistograms,
     dryBeltCloudOriginMatrix,
+    cloudTransitionLedger,
+    cloudTransitionLedgerSummary,
+    cloudTransitionLedgerSectorSplit,
     upperCloudResidence,
     upperCloudErosionBudget,
     upperCloudVentilationSummary,
@@ -3749,6 +3800,9 @@ export async function main() {
     fs.writeFileSync(artifacts.verticalCloudBirthAttributionJsonPath, toJson(verticalCloudBirthAttribution));
     fs.writeFileSync(artifacts.verticalCloudBirthHistogramsJsonPath, toJson(verticalCloudBirthHistograms));
     fs.writeFileSync(artifacts.dryBeltCloudOriginMatrixJsonPath, toJson(dryBeltCloudOriginMatrix));
+    fs.writeFileSync(artifacts.cloudTransitionLedgerJsonPath, toJson(cloudTransitionLedger));
+    fs.writeFileSync(artifacts.cloudTransitionLedgerSummaryJsonPath, toJson(cloudTransitionLedgerSummary));
+    fs.writeFileSync(artifacts.cloudTransitionLedgerSectorSplitJsonPath, toJson(cloudTransitionLedgerSectorSplit));
     fs.writeFileSync(artifacts.upperCloudResidenceJsonPath, toJson(upperCloudResidence));
     fs.writeFileSync(artifacts.upperCloudErosionBudgetJsonPath, toJson(upperCloudErosionBudget));
     fs.writeFileSync(artifacts.upperCloudVentilationSummaryJsonPath, toJson(upperCloudVentilationSummary));
@@ -3810,6 +3864,9 @@ export const _test = {
   buildVerticalCloudBirthAttributionReport,
   buildVerticalCloudBirthHistogramsReport,
   buildDryBeltCloudOriginMatrixReport,
+  buildCloudTransitionLedgerReport,
+  buildCloudTransitionLedgerSummaryReport,
+  buildCloudTransitionLedgerSectorSplitReport,
   buildUpperCloudResidenceReport,
   buildUpperCloudErosionBudgetReport,
   buildUpperCloudVentilationSummaryReport,

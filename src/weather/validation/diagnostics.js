@@ -5,7 +5,7 @@ import {
   SURFACE_MOISTURE_SOURCE_TRACERS,
   classifyNhDryBeltSector
 } from '../v2/sourceTracing5.js';
-import { CLOUD_BIRTH_LEVEL_BANDS } from '../v2/cloudBirthTracing5.js';
+import { CLOUD_BIRTH_LEVEL_BANDS, cloudBirthBandOffset } from '../v2/cloudBirthTracing5.js';
 import { INSTRUMENTATION_LEVEL_BANDS } from '../v2/instrumentationBands5.js';
 
 const EPS = 1e-6;
@@ -227,6 +227,15 @@ const computeVerticallyIntegratedFlux = (state, componentField, tracerSelector) 
 const arrayOrZeros = (arrLike, length) => Array.from(arrLike || new Float32Array(length));
 const sliceBandField = (field, bandIndex, cellCount) => {
   if (!(field instanceof Float32Array) || field.length !== cellCount * INSTRUMENTATION_LEVEL_BANDS.length) {
+    return new Float32Array(cellCount);
+  }
+  return field.subarray(bandIndex * cellCount, (bandIndex + 1) * cellCount);
+};
+const sliceCloudBirthBandField = (field, bandIndex, cellCount) => {
+  if (
+    !(field instanceof Float32Array || field instanceof Float64Array)
+    || field.length !== cellCount * CLOUD_BIRTH_LEVEL_BANDS.length
+  ) {
     return new Float32Array(cellCount);
   }
   return field.subarray(bandIndex * cellCount, (bandIndex + 1) * cellCount);
@@ -991,6 +1000,233 @@ const buildUpperCloudResidenceTracing = (state, grid, transportTracing = null) =
     ventilation: {
       ...upperCloudVentilation,
       regimePersistence
+    },
+    rootCauseAssessment
+  };
+};
+
+const buildCloudTransitionLedgerTracing = (core, state, grid) => {
+  const rawLedger = typeof core?.getCloudTransitionLedgerRaw === 'function'
+    ? core.getCloudTransitionLedgerRaw()
+    : null;
+  if (!rawLedger || !state || !grid) return null;
+
+  const { nx, ny } = grid;
+  const latitudesDeg = Array.from(grid.latDeg || []);
+  const longitudesDeg = Array.from(grid.lonDeg || []);
+  const rowWeights = makeRowWeights(latitudesDeg);
+  const stateLandMask = Array.from(state.landMask || new Uint8Array(state.N));
+  const transitionKeys = (rawLedger.transitionDefinitions || []).map((entry) => entry.key);
+  const dryBeltCells = [];
+  let totalAbsNet = 0;
+  let totalAbsAccounted = 0;
+  let totalAbsResidual = 0;
+  const persistentScoreByModule = {};
+
+  const summarizeBandMeans = (field, bandIndex, predicate = null) => {
+    const bandField = sliceCloudBirthBandField(field, bandIndex, state.N);
+    if (!predicate) {
+      return Number(weightedFieldBandMean(bandField, nx, ny, latitudesDeg, rowWeights, 15, 35).toFixed(5));
+    }
+    return Number(
+      weightedFieldBandMeanWithFilter(
+        bandField,
+        nx,
+        ny,
+        latitudesDeg,
+        longitudesDeg,
+        rowWeights,
+        15,
+        35,
+        predicate
+      ).toFixed(5)
+    );
+  };
+
+  const modules = Object.fromEntries(
+    Object.entries(rawLedger.modules || {}).map(([moduleName, moduleSummary]) => {
+      const bands = Object.fromEntries(
+        CLOUD_BIRTH_LEVEL_BANDS.map((band, bandIndex) => {
+          const transitions = Object.fromEntries(
+            transitionKeys.map((transitionKey) => [
+              transitionKey,
+              summarizeBandMeans(moduleSummary.transitions?.[transitionKey], bandIndex)
+            ])
+          );
+          const actualNetCloudDeltaMeanKgM2 = summarizeBandMeans(moduleSummary.netCloudDeltaByBandCell, bandIndex);
+          const residualMeanKgM2 = transitions.unattributedResidual || 0;
+          const grossAttributedMeanKgM2 = Object.entries(transitions)
+            .reduce((sum, [transitionKey, value]) => sum + (transitionKey === 'unattributedResidual' ? 0 : Math.abs(value || 0)), 0);
+          const attributedCoverageFrac = grossAttributedMeanKgM2 + Math.abs(residualMeanKgM2) > EPS
+            ? Number((grossAttributedMeanKgM2 / Math.max(EPS, grossAttributedMeanKgM2 + Math.abs(residualMeanKgM2))).toFixed(5))
+            : 1;
+          const netCloudChangeClosureFrac = Math.abs(actualNetCloudDeltaMeanKgM2) > EPS
+            ? Number((1 - (Math.abs(residualMeanKgM2) / Math.max(EPS, Math.abs(actualNetCloudDeltaMeanKgM2)))).toFixed(5))
+            : 1;
+          totalAbsNet += Math.abs(actualNetCloudDeltaMeanKgM2);
+          totalAbsAccounted += grossAttributedMeanKgM2;
+          totalAbsResidual += Math.abs(residualMeanKgM2);
+          return [band.key, {
+            label: band.label,
+            minSigma: band.minSigma,
+            maxSigma: band.maxSigma,
+            actualNetCloudDeltaMeanKgM2,
+            attributedCoverageFrac,
+            netCloudChangeClosureFrac,
+            transitions
+          }];
+        })
+      );
+
+      const upperBand = bands.upperTroposphere || null;
+      const midBand = bands.midTroposphere || null;
+      persistentScoreByModule[moduleName] = Number(((
+        (upperBand?.transitions?.importedCloudSurvivingUnchanged || 0)
+        + (upperBand?.transitions?.cloudConvertedIntoLocalCondensationSupport || 0)
+        + (midBand?.transitions?.importedCloudSurvivingUnchanged || 0)
+        + (midBand?.transitions?.cloudConvertedIntoLocalCondensationSupport || 0)
+        + (upperBand?.transitions?.cloudKeptAliveByRadiativePersistence || 0)
+        - (upperBand?.transitions?.cloudErodedAway || 0)
+        - (upperBand?.transitions?.cloudLostToReevaporation || 0)
+        - (midBand?.transitions?.cloudErodedAway || 0)
+        - (midBand?.transitions?.cloudLostToReevaporation || 0)
+      )).toFixed(5));
+
+      return [moduleName, {
+        module: moduleName,
+        callCount: moduleSummary.callCount || 0,
+        sampledModelSeconds: moduleSummary.sampledModelSeconds || 0,
+        bands
+      }];
+    })
+  );
+
+  const sectoral = Object.fromEntries(
+    Object.keys(modules).map((moduleName) => [
+      moduleName,
+      Object.fromEntries(
+        NH_DRY_BELT_SOURCE_SECTORS.map(({ key, label }) => [
+          key,
+          {
+            label,
+            bands: Object.fromEntries(
+              CLOUD_BIRTH_LEVEL_BANDS.map((band, bandIndex) => [
+                band.key,
+                {
+                  label: band.label,
+                  actualNetCloudDeltaMeanKgM2: summarizeBandMeans(
+                    rawLedger.modules?.[moduleName]?.netCloudDeltaByBandCell,
+                    bandIndex,
+                    ({ idx, lonDeg }) => classifyNhDryBeltSector({ lonDeg, isLand: stateLandMask[idx] === 1 }) === key
+                  ),
+                  transitions: Object.fromEntries(
+                    transitionKeys.map((transitionKey) => [
+                      transitionKey,
+                      summarizeBandMeans(
+                        rawLedger.modules?.[moduleName]?.transitions?.[transitionKey],
+                        bandIndex,
+                        ({ idx, lonDeg }) => classifyNhDryBeltSector({ lonDeg, isLand: stateLandMask[idx] === 1 }) === key
+                      )
+                    ])
+                  )
+                }
+              ])
+            )
+          }
+        ])
+      )
+    ])
+  );
+
+  for (let row = 0; row < ny; row += 1) {
+    const latDeg = latitudesDeg[row];
+    if (latDeg < 15 || latDeg > 35) continue;
+    for (let i = 0; i < nx; i += 1) {
+      const idx = row * nx + i;
+      const isLand = stateLandMask[idx] === 1;
+      const sectorKey = classifyNhDryBeltSector({ lonDeg: longitudesDeg[i], isLand });
+      const cellModules = {};
+      for (const [moduleName, moduleSummary] of Object.entries(rawLedger.modules || {})) {
+        const bandEntries = {};
+        for (let bandIndex = 0; bandIndex < CLOUD_BIRTH_LEVEL_BANDS.length; bandIndex += 1) {
+          const offset = cloudBirthBandOffset(bandIndex, idx, state.N);
+          const netCloudDeltaKgM2 = Number((moduleSummary.netCloudDeltaByBandCell?.[offset] || 0).toFixed(5));
+          const transitions = Object.fromEntries(
+            transitionKeys.map((transitionKey) => [
+              transitionKey,
+              Number((moduleSummary.transitions?.[transitionKey]?.[offset] || 0).toFixed(5))
+            ])
+          );
+          const hasSignal = Math.abs(netCloudDeltaKgM2) > 1e-5 || Object.values(transitions).some((value) => Math.abs(value) > 1e-5);
+          if (!hasSignal) continue;
+          bandEntries[CLOUD_BIRTH_LEVEL_BANDS[bandIndex].key] = {
+            label: CLOUD_BIRTH_LEVEL_BANDS[bandIndex].label,
+            netCloudDeltaKgM2,
+            transitions
+          };
+        }
+        if (Object.keys(bandEntries).length) {
+          cellModules[moduleName] = bandEntries;
+        }
+      }
+      if (Object.keys(cellModules).length) {
+        dryBeltCells.push({
+          cellIndex: idx,
+          latDeg: Number(latDeg.toFixed(3)),
+          lonDeg: Number(longitudesDeg[i].toFixed(3)),
+          isLand,
+          sectorKey,
+          modules: cellModules
+        });
+      }
+    }
+  }
+
+  const coverageFrac = totalAbsAccounted + totalAbsResidual > EPS
+    ? Number((totalAbsAccounted / Math.max(EPS, totalAbsAccounted + totalAbsResidual)).toFixed(5))
+    : 1;
+  const netClosureCoverageFrac = totalAbsNet > EPS
+    ? Number((1 - (totalAbsResidual / Math.max(EPS, totalAbsNet))).toFixed(5))
+    : 1;
+  const persistenceModuleOrder = ['stepVertical5', 'stepMicrophysics5', 'stepRadiation2D5'];
+  const firstPersistentProblemModule = persistenceModuleOrder.find((moduleName) => (persistentScoreByModule[moduleName] || 0) > 0.01) || null;
+  const dominantPersistentModule = Object.entries(persistentScoreByModule)
+    .sort((a, b) => (b[1] || 0) - (a[1] || 0))[0]?.[0] || null;
+  const rootCauseAssessment = { ruledIn: [], ruledOut: [], ambiguous: [] };
+  if (coverageFrac >= 0.95) {
+    rootCauseAssessment.ruledIn.push('Phase B attributes at least 95% of NH dry-belt upper-cloud-path change to explicit module-local transitions.');
+  } else {
+    rootCauseAssessment.ambiguous.push('Phase B still leaves too much NH dry-belt upper-cloud-path change unattributed.');
+  }
+  if (firstPersistentProblemModule) {
+    rootCauseAssessment.ruledIn.push(`The first module that turns imported cloud into persistent problem cloud is ${firstPersistentProblemModule}.`);
+  } else {
+    rootCauseAssessment.ambiguous.push('No single early module yet clears the persistence threshold on the current ledger.');
+  }
+  if ((persistentScoreByModule.stepVertical5 || 0) > Math.max(persistentScoreByModule.stepMicrophysics5 || 0, persistentScoreByModule.stepRadiation2D5 || 0) + 0.01) {
+    rootCauseAssessment.ruledIn.push('Vertical-path carryover survival and local maintenance dominate over downstream reinforcement.');
+  } else {
+    rootCauseAssessment.ambiguous.push('Vertical and downstream maintenance still remain close enough that the first hard failure is not unique.');
+  }
+
+  return {
+    schema: 'satellite-wars.cloud-transition-ledger-tracing.v1',
+    bandDefinitions: CLOUD_BIRTH_LEVEL_BANDS.map((band) => ({ ...band })),
+    transitionDefinitions: rawLedger.transitionDefinitions || [],
+    modules,
+    sectoral,
+    cells: dryBeltCells,
+    summary: {
+      attributedUpperCloudPathChangeFrac: coverageFrac,
+      netCloudChangeClosureFrac: netClosureCoverageFrac,
+      totalAbsAttributedTransitionMeanKgM2: Number(totalAbsAccounted.toFixed(5)),
+      totalAbsNetCloudDeltaMeanKgM2: Number(totalAbsNet.toFixed(5)),
+      totalAbsResidualMeanKgM2: Number(totalAbsResidual.toFixed(5)),
+      firstPersistentProblemModule,
+      dominantPersistentModule,
+      persistentScoreByModule: Object.fromEntries(
+        Object.entries(persistentScoreByModule).map(([key, value]) => [key, Number((value || 0).toFixed(5))])
+      )
     },
     rootCauseAssessment
   };
@@ -1846,6 +2082,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
   const transportTracing = buildTransportTracing(state, grid);
   const verticalCloudBirthTracing = buildVerticalCloudBirthTracing(state, grid);
   const upperCloudResidenceTracing = buildUpperCloudResidenceTracing(state, grid, transportTracing);
+  const cloudTransitionLedgerTracing = buildCloudTransitionLedgerTracing(core, state, grid);
   const thermodynamicSupportTracing = buildThermodynamicSupportTracing(state, grid, upperCloudResidenceTracing, {
     boundaryLayerRhFrac,
     lowerTroposphericRhFrac,
@@ -1992,6 +2229,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     transportTracing,
     verticalCloudBirthTracing,
     upperCloudResidenceTracing,
+    cloudTransitionLedgerTracing,
     thermodynamicSupportTracing,
     forcingOppositionTracing,
     numericalIntegrityTracing,

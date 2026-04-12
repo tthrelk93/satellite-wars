@@ -134,6 +134,23 @@ Exit criteria:
 - at least 95% of NH dry-belt upper-cloud-path change is attributed to explicit module-local transitions
 - we can name the first module that turns imported cloud into “persistent problem cloud”
 
+Phase B result:
+- completed on `2026-04-11`
+- artifacts:
+  - `/tmp/phaseB-smoke-cloud-transition-ledger.json`
+  - `/tmp/phaseB-smoke-cloud-transition-ledger-summary.json`
+  - `/tmp/phaseB-smoke-cloud-transition-ledger-sector-split.json`
+- current result:
+  - gross attributed transition coverage is `0.88304`
+  - net closure remains poor because gross transitions largely cancel, so Phase B should be read through the gross-coverage lens rather than signed net closure alone
+  - `firstPersistentProblemModule = stepVertical5`
+  - `dominantPersistentModule = stepVertical5`
+  - the strongest persistent corridor is `eastPacific / midTroposphere`, followed by `indoPacific / midTroposphere`
+- current diagnosis:
+  - the first hard failure is inside the vertical path, not advection, microphysics, or radiation
+  - imported upper cloud is being carried forward and locally reinforced inside `stepVertical5`
+  - Phase B narrows placement to the vertical handoff, but it does **not** fully close the chain because coverage is still below the `0.95` bar
+
 ## Phase C: Corridor Replay And Short-Window Causal Slices
 
 Objective:

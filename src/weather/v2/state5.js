@@ -76,6 +76,8 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const convectiveDetrainmentCloudBirthByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const carryOverUpperCloudEnteringByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const carryOverUpperCloudSurvivingByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const advectedCloudImportByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const advectedCloudExportByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const prevUpperCloudBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const upperCloudResidenceTimeSeconds = makeArray(N);
   const upperCloudTimeSinceLocalBirthSeconds = makeArray(N);
@@ -110,6 +112,10 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const upperCloudPotentialErosionByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const upperCloudAppliedErosionByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const upperCloudBlockedErosionByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const microphysicsCloudToPrecipByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const cloudReevaporationByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const precipReevaporationByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  const radiativePersistenceEquivalentByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   const upperCloudShortwaveAbsorptionWm2 = makeArray(N);
   const upperCloudLongwaveRelaxationBoost = makeArray(N);
   const upperCloudRadiativePersistenceSupportWm2 = makeArray(N);
@@ -260,6 +266,8 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     convectiveDetrainmentCloudBirthByBandMass,
     carryOverUpperCloudEnteringByBandMass,
     carryOverUpperCloudSurvivingByBandMass,
+    advectedCloudImportByBandMass,
+    advectedCloudExportByBandMass,
     prevUpperCloudBandMass,
     upperCloudResidenceTimeSeconds,
     upperCloudTimeSinceLocalBirthSeconds,
@@ -294,6 +302,10 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     upperCloudPotentialErosionByBandMass,
     upperCloudAppliedErosionByBandMass,
     upperCloudBlockedErosionByBandMass,
+    microphysicsCloudToPrecipByBandMass,
+    cloudReevaporationByBandMass,
+    precipReevaporationByBandMass,
+    radiativePersistenceEquivalentByBandMass,
     upperCloudShortwaveAbsorptionWm2,
     upperCloudLongwaveRelaxationBoost,
     upperCloudRadiativePersistenceSupportWm2,

@@ -125,6 +125,15 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   if (!state.saturationAdjustmentCloudBirthByBandMass || state.saturationAdjustmentCloudBirthByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
     state.saturationAdjustmentCloudBirthByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   }
+  if (!state.microphysicsCloudToPrecipByBandMass || state.microphysicsCloudToPrecipByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.microphysicsCloudToPrecipByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
+  if (!state.cloudReevaporationByBandMass || state.cloudReevaporationByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.cloudReevaporationByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
+  if (!state.precipReevaporationByBandMass || state.precipReevaporationByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.precipReevaporationByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
   state.largeScaleCondensationSource.fill(0);
   state.cloudReevaporationMass.fill(0);
   state.precipReevaporationMass.fill(0);
@@ -149,6 +158,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
       const p = Math.max(pTop, pMid[idx]);
       const dpCell = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
       const massCell = dpCell > 0 ? dpCell / g : 0;
+      const cloudBirthBandIndex = findCloudBirthLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));
       const Pi = Math.pow(p / p0, kappa);
       const Tcell = Number.isFinite(Tstate?.[idx]) ? Tstate[idx] : theta[idx] * Pi;
       const qsat = saturationMixingRatio(Tcell, p);
@@ -240,6 +250,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
       let qrVal = qr[idx];
       let qsVal = qs[idx];
       let thetaVal = theta[idx];
+      let cloudToPrecipMass = 0;
 
       const applyLatentCap = (dq, latentHeat) => {
         if (dThetaCapEff <= 0) return dq;
@@ -268,8 +279,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
             state.saturationAdjustmentOmegaMassWeighted[k] += ascentMagnitudePaS * condMass;
             if (ascentMagnitudePaS <= 0.08) state.weakAscentCloudBirthAccumMass[k] += condMass;
             if (ascentMagnitudePaS >= 0.18) state.strongAscentCloudBirthAccumMass[k] += condMass;
-            const bandIndex = findCloudBirthLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));
-            state.saturationAdjustmentCloudBirthByBandMass[cloudBirthBandOffset(bandIndex, k, N)] += condMass;
+            state.saturationAdjustmentCloudBirthByBandMass[cloudBirthBandOffset(cloudBirthBandIndex, k, N)] += condMass;
           }
           if (iceFrac > 0.5) {
             qiVal += dq;
@@ -296,6 +306,8 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
           if (traceEnabled && massCell > 0) {
             if (bucket === 'cloud') state.cloudReevaporationMass[k] += dq * massCell;
             else if (bucket === 'precip') state.precipReevaporationMass[k] += dq * massCell;
+            if (bucket === 'cloud') state.cloudReevaporationByBandMass[cloudBirthBandOffset(cloudBirthBandIndex, k, N)] += dq * massCell;
+            else if (bucket === 'precip') state.precipReevaporationByBandMass[cloudBirthBandOffset(cloudBirthBandIndex, k, N)] += dq * massCell;
           }
           thetaVal = applyThetaLatent(thetaVal, -dq, latentHeat, Pi);
           return [storeVal - dq, dq];
@@ -345,6 +357,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         const dqAccrete = Math.min(qcVal - dqAuto, qcVal * qrVal * kAccreteRain * dt * precipEff);
         qcVal -= dqAuto + dqAccrete;
         qrVal += dqAuto + dqAccrete;
+        cloudToPrecipMass += dqAuto + dqAccrete;
       }
 
       if (qiVal > 0) {
@@ -355,6 +368,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         const dqAgg = Math.min(qiVal - dqAuto, qiVal * fracAgg);
         qiVal -= dqAuto + dqAgg;
         qsVal += dqAuto + dqAgg;
+        cloudToPrecipMass += dqAuto + dqAgg;
       }
 
       if (qcVal > 0 && qsVal > 0 && iceFrac > 0.25) {
@@ -362,6 +376,11 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         qcVal -= dqRime;
         qsVal += dqRime;
         thetaVal = applyThetaLatent(thetaVal, dqRime, Lf, Pi);
+        cloudToPrecipMass += dqRime;
+      }
+
+      if (traceEnabled && massCell > 0 && cloudToPrecipMass > 0) {
+        state.microphysicsCloudToPrecipByBandMass[cloudBirthBandOffset(cloudBirthBandIndex, k, N)] += cloudToPrecipMass * massCell;
       }
 
       const numericalBandIndex = findInstrumentationLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));

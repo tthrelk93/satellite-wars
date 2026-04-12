@@ -1,5 +1,11 @@
 import { cosZenith } from '../solar.js';
 import { Cp, Rd, g } from '../constants.js';
+import {
+  CLOUD_BIRTH_LEVEL_BAND_COUNT,
+  cloudBirthBandOffset,
+  findCloudBirthLevelBandIndex,
+  sigmaMidAtLevel
+} from './cloudBirthTracing5.js';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
@@ -79,6 +85,9 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
   }
   if (!state.surfaceCloudShortwaveShieldingWm2 || state.surfaceCloudShortwaveShieldingWm2.length !== N) {
     state.surfaceCloudShortwaveShieldingWm2 = new Float32Array(N);
+  }
+  if (!state.radiativePersistenceEquivalentByBandMass || state.radiativePersistenceEquivalentByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.radiativePersistenceEquivalentByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   }
   state.upperCloudShortwaveAbsorptionWm2.fill(0);
   state.upperCloudLongwaveRelaxationBoost.fill(0);
@@ -206,6 +215,21 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
         state.upperCloudCloudyLwCoolingWm2[k] = upperCloudyLwCoolingSum;
         state.upperCloudLwCloudEffectWm2[k] = upperLwCloudEffectSum;
         state.upperCloudNetCloudRadiativeEffectWm2[k] = upperSwAbsLayerSum + upperLwCloudEffectSum;
+        const supportFrac = clamp01(Math.max(0, state.upperCloudRadiativePersistenceSupportWm2[k]) / 80);
+        if (supportFrac > 0) {
+          for (let lev = 0; lev < nz; lev += 1) {
+            const idx = lev * N + k;
+            const sigmaMid = sigmaMidAtLevel(state.sigmaHalf, lev, nz);
+            const bandIndex = findCloudBirthLevelBandIndex(sigmaMid);
+            const bandWeight = sigmaMid <= 0.35 ? 1 : sigmaMid <= 0.65 ? 0.35 : 0.1;
+            if (bandWeight <= 0) continue;
+            const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+            if (!(dp > 0)) continue;
+            const cloudMass = ((qc[idx] || 0) + (qi[idx] || 0) + (state.qr?.[idx] || 0) + (state.qs?.[idx] || 0)) * (dp / g);
+            if (cloudMass <= 0) continue;
+            state.radiativePersistenceEquivalentByBandMass[cloudBirthBandOffset(bandIndex, k, N)] += cloudMass * supportFrac * bandWeight * (dt / 86400);
+          }
+        }
       }
     }
   }

@@ -1,5 +1,10 @@
 import { SURFACE_MOISTURE_SOURCE_FIELDS } from './sourceTracing5.js';
 import {
+  CLOUD_BIRTH_LEVEL_BAND_COUNT,
+  cloudBirthBandOffset,
+  findCloudBirthLevelBandIndex
+} from './cloudBirthTracing5.js';
+import {
   INSTRUMENTATION_LEVEL_BAND_COUNT,
   findInstrumentationLevelBandIndex,
   instrumentationBandOffset,
@@ -33,11 +38,24 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
 
   const { nx, ny, invDx, invDy, sinLat, latDeg, polarWeight, cellLonDeg } = grid;
   const { N, nz, u, v, theta, qv, qc, qi, qr } = state;
+  const qs = state.qs;
   const { tmpU, tmpV, tmp3D, rowA, rowB } = scratch;
   if (!tmpU || !tmpV || !tmp3D || !rowA || !rowB) return;
+  if (!state.advectedCloudImportByBandMass || state.advectedCloudImportByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.advectedCloudImportByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
+  if (!state.advectedCloudExportByBandMass || state.advectedCloudExportByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
+    state.advectedCloudExportByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
+  }
 
   const degToRad = Math.PI / 180;
   const lonCellRad = cellLonDeg * degToRad;
+  const cloudBefore = traceEnabled ? new Float32Array(state.SZ) : null;
+  if (cloudBefore) {
+    for (let idx = 0; idx < state.SZ; idx += 1) {
+      cloudBefore[idx] = (qc[idx] || 0) + (qi[idx] || 0) + (qr[idx] || 0) + (qs?.[idx] || 0);
+    }
+  }
 
   const advectScalar = (src) => {
     for (let lev = 0; lev < nz; lev++) {
@@ -205,6 +223,28 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
         applyFilter(qc, base, j, passes);
         applyFilter(qi, base, j, passes);
         applyFilter(qr, base, j, passes);
+      }
+    }
+  }
+
+  if (cloudBefore && state.pHalf) {
+    for (let lev = 0; lev < nz; lev += 1) {
+      const sigmaMid = sigmaMidAtLevel(state.sigmaHalf, lev, nz);
+      const bandIndex = findCloudBirthLevelBandIndex(sigmaMid);
+      if (bandIndex < 0) continue;
+      const base = lev * N;
+      for (let k = 0; k < N; k += 1) {
+        const idx = base + k;
+        const beforeCloud = cloudBefore[idx] || 0;
+        const afterCloud = (qc[idx] || 0) + (qi[idx] || 0) + (qr[idx] || 0) + (qs?.[idx] || 0);
+        const deltaCloud = afterCloud - beforeCloud;
+        if (deltaCloud === 0) continue;
+        const dp = state.pHalf[(lev + 1) * N + k] - state.pHalf[lev * N + k];
+        if (!(dp > 0)) continue;
+        const deltaMass = Math.abs(deltaCloud) * (dp / 9.80665);
+        const offset = cloudBirthBandOffset(bandIndex, k, N);
+        if (deltaCloud > 0) state.advectedCloudImportByBandMass[offset] += deltaMass;
+        else state.advectedCloudExportByBandMass[offset] += deltaMass;
       }
     }
   }
