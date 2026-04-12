@@ -316,6 +316,37 @@ Exit criteria:
 What this phase should decide:
 - who actually owns the excess upper cloud: prior-step reservoir, current-step import, or both
 
+Status:
+- complete
+
+Artifacts:
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-supply-vs-retention-counterfactuals.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-supply-vs-retention-counterfactuals.json)
+- [/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-supply-vs-retention-counterfactuals.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/prevertical-supply-vs-retention-counterfactuals.md)
+
+Result:
+- U3 resolves the supply-vs-retention question as `retention-dominant`
+- baseline frozen excess at the proving instant:
+  - target cell: `3.51912 kg/m²`
+  - corridor band: `6.58165 kg/m²`
+- removing the current corridor reservoir before advection clears almost all of the excess
+  - target reduction: `0.97165`
+  - corridor reduction: `0.96919`
+- disabling corridor advection does not clear the target-cell excess
+  - target reduction: `-0.01744`
+  - corridor reduction: `0.07185`
+- current carryover under historical flow still reproduces and even slightly over-reproduces the excess
+  - target reproduction: `1.06931`
+  - corridor reproduction: `1.12835`
+- current flow acting on the historical reservoir produces no excess at all
+  - target reproduction: `0`
+  - corridor reproduction: `0`
+
+Decision:
+- the primary owner is the inherited previous-step upper-cloud reservoir
+- current-step advection is not the source path required to create the excess reservoir
+- advection remains a secondary spatial amplifier, but not the deciding owner
+- the next phase should treat the bug as a **retention / under-clearance** problem, not an advection-generation problem
+
 ## Phase U4: Reduced-Order Reference Experiments
 
 Objective:
