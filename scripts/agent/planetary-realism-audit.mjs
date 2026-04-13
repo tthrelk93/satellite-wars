@@ -68,6 +68,7 @@ let counterfactuals = null;
 let instrumentationMode = 'full';
 let observerEffectAudit = false;
 let trustedBaselinePath = null;
+let carryInputOverrideMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -103,6 +104,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg === '--no-counterfactuals') counterfactuals = false;
   else if (arg === '--instrumentation-mode' && argv[i + 1]) instrumentationMode = argv[++i];
   else if (arg.startsWith('--instrumentation-mode=')) instrumentationMode = arg.slice('--instrumentation-mode='.length);
+  else if (arg === '--carry-input-override' && argv[i + 1]) carryInputOverrideMode = argv[++i];
+  else if (arg.startsWith('--carry-input-override=')) carryInputOverrideMode = arg.slice('--carry-input-override='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--trusted-baseline' && argv[i + 1]) trustedBaselinePath = path.resolve(argv[++i]);
   else if (arg.startsWith('--trusted-baseline=')) trustedBaselinePath = path.resolve(arg.slice('--trusted-baseline='.length));
@@ -126,6 +129,11 @@ instrumentationMode = instrumentationMode === 'disabled'
   : instrumentationMode === 'noop'
     ? 'noop'
     : 'full';
+carryInputOverrideMode = carryInputOverrideMode === 'off'
+  ? 'off'
+  : carryInputOverrideMode === 'on'
+    ? 'on'
+    : 'default';
 
 const effectiveReportBase = outPath || mdOutPath ? null : (reportBase || defaultReportBase);
 
@@ -538,6 +546,7 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
     seed,
     sampleEveryDays,
     horizonsDays,
+    carryInputOverrideMode,
     instrumentationMode: core.getInstrumentationMode ? core.getInstrumentationMode() : instrumentationMode,
     sampleTargetsDays,
     targetSeconds: targetsSeconds,
@@ -4312,6 +4321,8 @@ export async function main() {
   const targetsSeconds = sampleTargetsDays.map((day) => day * SECONDS_PER_DAY);
   const core = new WeatherCore5({ nx, ny, dt, seed, instrumentationMode });
   await core._initPromise;
+  if (carryInputOverrideMode === 'off') core.vertParams.enableCarryInputDominanceOverride = false;
+  else if (carryInputOverrideMode === 'on') core.vertParams.enableCarryInputDominanceOverride = true;
   const terrainFallback = applyHeadlessTerrainFixture(core);
   const configSnapshot = cloneConfigSnapshot(core);
   const { samples, timingByTarget, horizonSummaries } = advanceAndSampleCore({ core, sampleTargetsDays });

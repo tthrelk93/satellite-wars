@@ -336,6 +336,42 @@ Exit criteria:
 - one dominant rebound/compensation pathway is identified
 - the next physics patch targets that pathway instead of further tuning the carry-input override
 
+Status:
+- complete
+- see [phase1e-proof-vs-climate-delta-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1e-proof-vs-climate-delta-attribution.md)
+- important outcome:
+  - an apples-to-apples `patch off` vs `patch on` compare on the same instrumented branch does **not** show the live override as the main cause of the degraded 30-day climate
+  - `patch on` is slightly better than `patch off`, but both remain far worse than the older kept Phase 1 baseline
+  - the dominant residual compensation path is best described as a coupled:
+    - large-scale condensation maintenance
+    - humidification / precipitation rebound
+  - imported-anvil persistence and weak-erosion survival drop in the `patch on` state, so they are no longer the first physics lever to attack on the live branch
+
+### Phase 1F: Maintenance-Loop Patch Design
+
+Objective:
+- design the next physics intervention against the residual coupled maintenance loop proved in Phase 1E
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [radiation2d.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/radiation2d.js)
+
+Required proof questions:
+- where does the added `northDryBeltLargeScaleCondensationMeanKgM2` come from after the pre-vertical reservoir is reduced?
+- what boundary-layer or mid-tropospheric humidification path keeps feeding that maintenance loop?
+- how much of the remaining wet bias is local maintenance versus large-scale circulation structure already present in the current branch?
+
+Exit criteria:
+- one precise patch target against the maintenance loop
+- predicted signature in:
+  - large-scale condensation
+  - boundary-layer / mid-tropospheric RH
+  - ITCZ width
+  - dry-belt ratios
+  - westerly guardrails
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

@@ -47,6 +47,7 @@
     "agent:phase1b-implementation-alignment-proof": "node scripts/agent/phase1b-implementation-alignment-proof.mjs",
     "agent:phase1b-live-replay-reconciliation": "node scripts/agent/phase1b-live-replay-reconciliation.mjs",
     "agent:phase1b-next-boundary-ownership-proof": "node scripts/agent/phase1b-next-boundary-ownership-proof.mjs",
+    "agent:phase1e-proof-vs-climate-delta-attribution": "node scripts/agent/phase1e-proof-vs-climate-delta-attribution.mjs",
     "agent:orographic-probe-cdp": "node scripts/agent/orographic-probe-cdp.mjs",
     "agent:reuse-localhost-tab": "node scripts/agent/reuse-localhost-tab.mjs",
     "agent:summarize-runtime-log": "node scripts/agent/summarize-runtime-log.mjs",

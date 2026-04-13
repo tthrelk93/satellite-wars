@@ -135,6 +135,11 @@ Keep:
 Do not assume:
 - that a stronger, weaker, or more narrowly triggered local carryover-clear patch will solve the climate gate
 
+Important update from Phase 1E:
+- the apples-to-apples current-branch compare in [phase1e-proof-vs-climate-delta-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1e-proof-vs-climate-delta-attribution.md) shows the `patch on` state is actually slightly better than the `patch off` state on the same instrumented branch
+- so the carry-input patch is not the primary cause of the branch’s bad 30-day climate
+- the deeper residual blocker is the current branch’s coupled maintenance loop, not the local override alone
+
 ## Next Phase
 
 The next phase should be a 30-day delta-attribution campaign between:
