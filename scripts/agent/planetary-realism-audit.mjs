@@ -109,6 +109,7 @@ for (let i = 0; i < argv.length; i += 1) {
 }
 
 const presetConfig = PLANETARY_PRESETS[preset] || PLANETARY_PRESETS.quick;
+const runDeepProofDiagnosticsByDefault = preset !== 'quick';
 nx = Number.isFinite(nx) && nx > 0 ? nx : presetConfig.nx;
 ny = Number.isFinite(ny) && ny > 0 ? ny : presetConfig.ny;
 dt = Number.isFinite(dt) && dt > 0 ? dt : presetConfig.dt;
@@ -117,8 +118,9 @@ horizonsDays = Array.isArray(horizonsDays) && horizonsDays.length
   ? [...new Set(horizonsDays.filter((value) => Number.isFinite(value) && value > 0))].sort((a, b) => a - b)
   : presetConfig.horizonsDays.slice();
 if (!Number.isFinite(seed)) seed = 12345;
-if (reproCheck == null) reproCheck = preset === 'quick';
-if (counterfactuals == null) counterfactuals = preset === 'quick';
+if (reproCheck == null) reproCheck = runDeepProofDiagnosticsByDefault;
+if (counterfactuals == null) counterfactuals = runDeepProofDiagnosticsByDefault;
+const runDeepProofDiagnostics = preset !== 'quick' || reproCheck === true || counterfactuals === true;
 instrumentationMode = instrumentationMode === 'disabled'
   ? 'disabled'
   : instrumentationMode === 'noop'
@@ -4300,7 +4302,7 @@ export async function main() {
   let corridorReplayCatalog = null;
   let corridorStepSliceAttribution = null;
   let corridorModuleToggleDeltas = null;
-  if (!observerEffectAudit && phaseCSample && Number.isFinite(phaseCTargetDay)) {
+  if (runDeepProofDiagnostics && !observerEffectAudit && phaseCSample && Number.isFinite(phaseCTargetDay)) {
     const phaseCReplay = await runPhaseCCorridorReplay({
       configSnapshot,
       latestSample: phaseCSample,
@@ -4334,7 +4336,7 @@ export async function main() {
     || sampleTargetsDays[0];
   const baselineSensitivitySample = samples.find((sample) => sample.targetDay === sensitivityTargetDay) || latestSample;
   const baselineCounterfactualSample = samples.find((sample) => sample.targetDay === counterfactualTargetDay) || latestSample;
-  if (!observerEffectAudit) {
+  if (runDeepProofDiagnostics && !observerEffectAudit) {
     dtSensitivityVariants = await Promise.all([
       runSensitivityVariant({
         variantName: 'dt_half',
