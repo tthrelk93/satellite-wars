@@ -205,6 +205,25 @@ What that means:
 - the next subphase is **implementation-alignment proof**
 - we now need to make the real [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js) patch reproduce the synthetic propagation-proof signature at the exact frozen boundary
 
+Status:
+- implementation-alignment proof is now complete in [phase1b-implementation-alignment-proof.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1b-implementation-alignment-proof.md)
+- the live patch must reproduce this frozen target-cell signature:
+  - `verticalUpperCloudCarrySurvivingMassKgM2: 4.56883 -> 0.06879`
+  - `verticalUpperCloudHandedToMicrophysicsMassKgM2: 4.56883 -> 0.06879`
+  - `verticalUpperCloudAppliedErosionMassKgM2: 0 -> 4.56883`
+  - `upperCloudPathKgM2: 4.63762 -> 0.06879`
+- while keeping these essentially stable:
+  - `verticalUpperCloudInputMassKgM2`
+  - `verticalUpperCloudResolvedBirthMassKgM2`
+  - `verticalUpperCloudConvectiveBirthMassKgM2`
+  - `lowLevelOmegaEffectiveDiagPaS`
+  - `lowLevelMoistureConvergenceDiagS_1`
+  - weak-engine convective support terms
+
+Next subphase:
+- **Phase 1B.3: alignment-constrained vertical patch**
+- the patch must fire on the fresh-state corridor envelope proved in the alignment report, not on stale persistent proxies
+
 #### Phase 1C: Re-verify The Proof Stack After The Patch
 
 Required reruns:
