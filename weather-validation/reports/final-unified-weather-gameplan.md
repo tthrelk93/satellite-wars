@@ -193,6 +193,18 @@ Exit criteria:
 - proof harness improves in the predicted direction
 - no contradiction against the Phase 1A predicted signature
 
+Current status:
+- the first two live Phase 1B implementations were rejected
+- the new propagation proof in [phase1b-propagation-proof.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1b-propagation-proof.md) shows why:
+  - a true current-step carryover-clear correction *does* survive to the next replay boundary
+  - the failed patch did **not** fail because the signal was immediately rebuilt by same-step microphysics
+  - it failed because the implementation never actually realized the intended owner reduction in the live replay chain
+
+What that means:
+- the next subphase is no longer “prove propagation”
+- the next subphase is **implementation-alignment proof**
+- we now need to make the real [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js) patch reproduce the synthetic propagation-proof signature at the exact frozen boundary
+
 #### Phase 1C: Re-verify The Proof Stack After The Patch
 
 Required reruns:
