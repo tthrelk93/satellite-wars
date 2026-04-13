@@ -47,6 +47,18 @@ const sumUpperCloudMassAtCell = (state, pHalf, sigmaHalf, nz, cellIndex, qFields
   }
   return upperCloudMass;
 };
+const scaleUpperCloudMassAtCell = (state, sigmaHalf, nz, cellIndex, keepFrac) => {
+  const boundedKeepFrac = clamp01(keepFrac);
+  for (let lev = 0; lev < nz; lev += 1) {
+    const sigmaMid = sigmaMidAtLevel(sigmaHalf, lev, nz);
+    if (!isUpperCloudSigma(sigmaMid)) continue;
+    const idx = lev * state.N + cellIndex;
+    state.qc[idx] *= boundedKeepFrac;
+    state.qi[idx] *= boundedKeepFrac;
+    state.qr[idx] *= boundedKeepFrac;
+    state.qs[idx] *= boundedKeepFrac;
+  }
+};
 const VERTICAL_ALLOWED_PARAMS = new Set([
   'enableMixing',
   'enableConvection',
@@ -112,6 +124,13 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'subtropicalSubsidenceBottomSigma',
   'subtropicalSubsidenceCrossHemiFloorFrac',
   'subtropicalSubsidenceWeakHemiBoost',
+  'enableCarryInputDominanceOverride',
+  'carryInputSubtropicalSuppressionMin',
+  'carryInputOrganizedSupportMax',
+  'carryInputPotentialMax',
+  'carryInputDominanceMin',
+  'carryInputMinResidualMassKgM2',
+  'carryInputClearFrac',
   'eps',
   'debugConservation'
 ]);
@@ -225,6 +244,13 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     subtropicalSubsidenceBottomSigma = 0.85,
     subtropicalSubsidenceCrossHemiFloorFrac = 0.45,
     subtropicalSubsidenceWeakHemiBoost = 0.0,
+    enableCarryInputDominanceOverride = true,
+    carryInputSubtropicalSuppressionMin = 0.74243,
+    carryInputOrganizedSupportMax = 0.22504,
+    carryInputPotentialMax = 0.24341,
+    carryInputDominanceMin = 0.93785,
+    carryInputMinResidualMassKgM2 = 3.40503,
+    carryInputClearFrac = 1.0,
 
     // Numerical/heating
     eps = 1e-12
@@ -246,6 +272,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.lowLevelMoistureConvergence || state.lowLevelMoistureConvergence.length !== N) state.lowLevelMoistureConvergence = new Float32Array(N);
   if (!state.lowLevelOmegaEffective || state.lowLevelOmegaEffective.length !== N) state.lowLevelOmegaEffective = new Float32Array(N);
   if (!state.subtropicalSubsidenceDrying || state.subtropicalSubsidenceDrying.length !== N) state.subtropicalSubsidenceDrying = new Float32Array(N);
+  if (!state._freshPotentialTarget || state._freshPotentialTarget.length !== N) state._freshPotentialTarget = new Float32Array(N);
+  if (!state._freshOrganizedSupport || state._freshOrganizedSupport.length !== N) state._freshOrganizedSupport = new Float32Array(N);
+  if (!state._freshSubtropicalSuppression || state._freshSubtropicalSuppression.length !== N) state._freshSubtropicalSuppression = new Float32Array(N);
   if (!state.resolvedAscentCloudBirthPotential || state.resolvedAscentCloudBirthPotential.length !== N) state.resolvedAscentCloudBirthPotential = new Float32Array(N);
   if (!state.upperCloudPath || state.upperCloudPath.length !== N) state.upperCloudPath = new Float32Array(N);
   if (!state.importedAnvilPersistenceMass || state.importedAnvilPersistenceMass.length !== N) state.importedAnvilPersistenceMass = new Float32Array(N);
@@ -328,6 +357,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const lowLevelMoistureConvergence = state.lowLevelMoistureConvergence;
   const lowLevelOmegaEffective = state.lowLevelOmegaEffective;
   const subtropicalSubsidenceDrying = state.subtropicalSubsidenceDrying;
+  const freshPotentialTargetDiag = state._freshPotentialTarget;
+  const freshOrganizedSupportDiag = state._freshOrganizedSupport;
+  const freshSubtropicalSuppressionDiag = state._freshSubtropicalSuppression;
   const resolvedAscentCloudBirthPotential = state.resolvedAscentCloudBirthPotential;
   const upperCloudPath = state.upperCloudPath;
   const importedAnvilPersistenceMass = state.importedAnvilPersistenceMass;
@@ -392,6 +424,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   lowLevelMoistureConvergence.fill(0);
   lowLevelOmegaEffective.fill(0);
   subtropicalSubsidenceDrying.fill(0);
+  freshPotentialTargetDiag.fill(0);
+  freshOrganizedSupportDiag.fill(0);
+  freshSubtropicalSuppressionDiag.fill(0);
   resolvedAscentCloudBirthPotential.fill(0);
   upperCloudPath.fill(0);
   importedAnvilPersistenceMass.fill(0);
@@ -1046,6 +1081,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           * (0.84 + 0.24 * tropicalCore)
           * (1 - 0.62 * subtropicalSuppression)
       );
+      freshPotentialTargetDiag[k] = potentialTarget;
+      freshOrganizedSupportDiag[k] = organizedSupport;
+      freshSubtropicalSuppressionDiag[k] = subtropicalSuppression;
       const potentialPrev = convectivePotential[k];
       const potentialTau = potentialTarget >= potentialPrev ? convPotentialGrowTau : convPotentialDecayTau;
       const potentialAlpha = 1 - Math.exp(-dt / Math.max(potentialTau, eps));
@@ -1363,6 +1401,34 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     };
   }
 
+  if (enableCarryInputDominanceOverride) {
+    for (let k = 0; k < N; k += 1) {
+      const actualInputMass = verticalUpperCloudInputMass[k] || 0;
+      if (!(actualInputMass >= carryInputMinResidualMassKgM2)) continue;
+      if ((freshPotentialTargetDiag[k] || 0) > carryInputPotentialMax) continue;
+      if ((freshOrganizedSupportDiag[k] || 0) > carryInputOrganizedSupportMax) continue;
+      if ((freshSubtropicalSuppressionDiag[k] || 0) < carryInputSubtropicalSuppressionMin) continue;
+
+      const upperCloudMass = sumUpperCloudMassAtCell(state, pHalf, sigmaHalf, nz, k);
+      if (!(upperCloudMass > 0)) continue;
+      const explicitBirthMass =
+        Math.max(0, verticalUpperCloudResolvedBirthMass[k] || 0)
+        + Math.max(0, verticalUpperCloudConvectiveBirthMass[k] || 0);
+      const carrySurvivingEstimate = clamp(
+        Math.min(actualInputMass, Math.max(0, upperCloudMass - explicitBirthMass)),
+        0,
+        actualInputMass
+      );
+      const carryInputDominance = actualInputMass > eps ? carrySurvivingEstimate / actualInputMass : 0;
+      if (carryInputDominance < carryInputDominanceMin) continue;
+
+      const removalMass = upperCloudMass * clamp01(carryInputClearFrac);
+      if (!(removalMass > 0)) continue;
+      const keepFrac = Math.max(0, (upperCloudMass - removalMass) / Math.max(upperCloudMass, eps));
+      scaleUpperCloudMassAtCell(state, sigmaHalf, nz, k, keepFrac);
+    }
+  }
+
   if (!state._prevUpperCloudPath || state._prevUpperCloudPath.length !== N) {
     state._prevUpperCloudPath = new Float32Array(N);
   }
@@ -1476,8 +1542,14 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     upperCloudRegenerationAccumMass[k] += regenerationMass;
     upperCloudOscillatoryAccumMass[k] += oscillatoryMass;
     const actualInputMass = verticalUpperCloudInputMass[k] || 0;
-    verticalUpperCloudCarrySurvivingMass[k] = actualInputMass;
-    verticalUpperCloudAppliedErosionMass[k] = 0;
+    const survivingCarryMass = clamp(
+      Math.min(actualInputMass, Math.max(0, upperCloudMass - resolvedBirthMass - convectiveBirthMass)),
+      0,
+      actualInputMass
+    );
+    const handoffAppliedErosionMass = Math.max(0, actualInputMass - survivingCarryMass);
+    verticalUpperCloudCarrySurvivingMass[k] = survivingCarryMass;
+    verticalUpperCloudAppliedErosionMass[k] = handoffAppliedErosionMass;
     verticalUpperCloudHandedToMicrophysicsMass[k] = upperCloudMass;
     verticalUpperCloudResidualMass[k] = (
       actualInputMass
@@ -1509,6 +1581,10 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     }
     carryOverUpperCloudEnteringAccumMass[k] += enteringMass;
     carryOverUpperCloudSurvivingAccumMass[k] += survivingMass;
+    upperCloudAppliedErosionMass[k] += handoffAppliedErosionMass;
+    upperCloudBlockedErosionMass[k] = Math.max(0, upperCloudBlockedErosionMass[k] - handoffAppliedErosionMass);
+    upperCloudAppliedErosionAccumMass[k] += handoffAppliedErosionMass;
+    upperCloudBlockedErosionAccumMass[k] = Math.max(0, upperCloudBlockedErosionAccumMass[k] - handoffAppliedErosionMass);
     prevUpperCloudPath[k] = upperCloudMass;
   }
 

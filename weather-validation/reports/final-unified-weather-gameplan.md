@@ -250,6 +250,20 @@ Current next subphase:
 - explicit anti-pattern:
   - do not key the next patch primarily off post-handoff `carriedOverUpperCloudMassKgM2`
 
+Status update:
+- the live-state-aligned patch is now implemented in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- the exact live handoff improves materially:
+  - `verticalUpperCloudCarrySurvivingMassKgM2: 4.56883 -> 2.34753`
+  - `verticalUpperCloudHandedToMicrophysicsMassKgM2: 4.56883 -> 2.39787`
+- the new next-boundary proof is complete in [phase1b-next-boundary-ownership-proof.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1b-next-boundary-ownership-proof.md)
+- that proof shows the reduced handoff survives to the next owned boundary:
+  - target next-boundary owned reservoir: `4.30116 -> 2.19312`
+  - corridor next-boundary owned reservoir reduction: `3.39527 kg/m²`
+  - target reduction survival fraction: `0.94901`
+
+Next subphase:
+- **Phase 1C: re-run the remaining proof stack on the kept patch, then move into the climate gate**
+
 #### Phase 1C: Re-verify The Proof Stack After The Patch
 
 Required reruns:

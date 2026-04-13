@@ -580,10 +580,12 @@ const main = async () => {
 
 const isMain = Boolean(process.argv[1]) && path.resolve(process.argv[1]) === __filename;
 if (isMain) {
-  await main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+  await main()
+    .then(() => process.exit(0))
+    .catch((error) => {
+      console.error(error);
+      process.exit(1);
+    });
 }
 
 export const _test = {
