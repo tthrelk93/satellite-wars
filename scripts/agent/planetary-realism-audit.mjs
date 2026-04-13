@@ -1158,6 +1158,12 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     importedAnvilPersistenceMassKgM2,
     carriedOverUpperCloudMassKgM2,
     weakErosionCloudSurvivalMassKgM2,
+    carryInputOverrideHitCount,
+    carryInputOverrideRemovedMassKgM2,
+    carryInputOverrideInputMassKgM2,
+    carryInputOverrideAccumHitCount,
+    carryInputOverrideAccumRemovedMassKgM2,
+    carryInputOverrideAccumInputMassKgM2,
     upperCloudPathKgM2,
     boundaryLayerRhFrac,
     midTroposphericRhFrac,
@@ -1220,6 +1226,11 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalImportedAnvilPersistence = zonalMean(importedAnvilPersistenceMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalCarriedOverUpperCloud = zonalMean(carriedOverUpperCloudMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalWeakErosionCloudSurvival = zonalMean(weakErosionCloudSurvivalMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalCarryInputOverrideHitCount = zonalMean(carryInputOverrideHitCount || new Array(nx * ny).fill(0), nx, ny);
+  const zonalCarryInputOverrideRemovedMass = zonalMean(carryInputOverrideRemovedMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalCarryInputOverrideAccumHitCount = zonalMean(carryInputOverrideAccumHitCount || new Array(nx * ny).fill(0), nx, ny);
+  const zonalCarryInputOverrideAccumRemovedMass = zonalMean(carryInputOverrideAccumRemovedMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalCarryInputOverrideAccumInputMass = zonalMean(carryInputOverrideAccumInputMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalUpperCloudPath = zonalMean(upperCloudPathKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalBoundaryLayerRh = zonalMean(boundaryLayerRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalMidTroposphereRh = zonalMean(midTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
@@ -1279,6 +1290,30 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const northDryBeltCloudReevaporation = weightedBandMean(zonalCloudReevaporation, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const northDryBeltPrecipReevaporation = weightedBandMean(zonalPrecipReevaporation, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const northDryBeltUpperCloudPath = weightedBandMean(zonalUpperCloudPath, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const northDryBeltCarryInputOverrideHitMean = weightedBandMean(zonalCarryInputOverrideHitCount, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltCarryInputOverrideHitMean = weightedBandMean(zonalCarryInputOverrideHitCount, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northTransitionCarryInputOverrideHitMean = weightedBandMean(zonalCarryInputOverrideHitCount, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionCarryInputOverrideHitMean = weightedBandMean(zonalCarryInputOverrideHitCount, latitudesDeg, rowWeights, -22, -12);
+  const northDryBeltCarryInputOverrideRemovedMean = weightedBandMean(zonalCarryInputOverrideRemovedMass, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltCarryInputOverrideRemovedMean = weightedBandMean(zonalCarryInputOverrideRemovedMass, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northTransitionCarryInputOverrideRemovedMean = weightedBandMean(zonalCarryInputOverrideRemovedMass, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionCarryInputOverrideRemovedMean = weightedBandMean(zonalCarryInputOverrideRemovedMass, latitudesDeg, rowWeights, -22, -12);
+  const northDryBeltCarryInputOverrideAccumHitMean = weightedBandMean(zonalCarryInputOverrideAccumHitCount, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltCarryInputOverrideAccumHitMean = weightedBandMean(zonalCarryInputOverrideAccumHitCount, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northTransitionCarryInputOverrideAccumHitMean = weightedBandMean(zonalCarryInputOverrideAccumHitCount, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionCarryInputOverrideAccumHitMean = weightedBandMean(zonalCarryInputOverrideAccumHitCount, latitudesDeg, rowWeights, -22, -12);
+  const northDryBeltCarryInputOverrideAccumRemovedMean = weightedBandMean(zonalCarryInputOverrideAccumRemovedMass, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltCarryInputOverrideAccumRemovedMean = weightedBandMean(zonalCarryInputOverrideAccumRemovedMass, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northTransitionCarryInputOverrideAccumRemovedMean = weightedBandMean(zonalCarryInputOverrideAccumRemovedMass, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionCarryInputOverrideAccumRemovedMean = weightedBandMean(zonalCarryInputOverrideAccumRemovedMass, latitudesDeg, rowWeights, -22, -12);
+  const northDryBeltCarryInputOverrideAccumInputMean = weightedBandMean(zonalCarryInputOverrideAccumInputMass, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltCarryInputOverrideAccumInputMean = weightedBandMean(zonalCarryInputOverrideAccumInputMass, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northDryBeltCarryInputOverrideAccumRemovalFrac = northDryBeltCarryInputOverrideAccumInputMean > 1e-6
+    ? northDryBeltCarryInputOverrideAccumRemovedMean / northDryBeltCarryInputOverrideAccumInputMean
+    : 0;
+  const southDryBeltCarryInputOverrideAccumRemovalFrac = southDryBeltCarryInputOverrideAccumInputMean > 1e-6
+    ? southDryBeltCarryInputOverrideAccumRemovedMean / southDryBeltCarryInputOverrideAccumInputMean
+    : 0;
   const northDryBeltLandPrecip = weightedFieldBandMean(precipRateMmHr, nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
   const northDryBeltOceanPrecip = weightedFieldBandMean(precipRateMmHr, nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
   const northDryBeltLandRh = weightedFieldBandMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
@@ -1419,6 +1454,24 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       northDryBeltWeakErosionCloudSurvivalMeanKgM2: round(northDryBeltWeakErosionCloudSurvival, 5),
       northDryBeltLandWeakErosionCloudSurvivalMeanKgM2: round(northDryBeltLandWeakErosionCloudSurvival, 5),
       northDryBeltOceanWeakErosionCloudSurvivalMeanKgM2: round(northDryBeltOceanWeakErosionCloudSurvival, 5),
+      northDryBeltCarryInputOverrideHitMean: round(northDryBeltCarryInputOverrideHitMean, 5),
+      southDryBeltCarryInputOverrideHitMean: round(southDryBeltCarryInputOverrideHitMean, 5),
+      northTransitionCarryInputOverrideHitMean: round(northTransitionCarryInputOverrideHitMean, 5),
+      southTransitionCarryInputOverrideHitMean: round(southTransitionCarryInputOverrideHitMean, 5),
+      northDryBeltCarryInputOverrideRemovedMeanKgM2: round(northDryBeltCarryInputOverrideRemovedMean, 5),
+      southDryBeltCarryInputOverrideRemovedMeanKgM2: round(southDryBeltCarryInputOverrideRemovedMean, 5),
+      northTransitionCarryInputOverrideRemovedMeanKgM2: round(northTransitionCarryInputOverrideRemovedMean, 5),
+      southTransitionCarryInputOverrideRemovedMeanKgM2: round(southTransitionCarryInputOverrideRemovedMean, 5),
+      northDryBeltCarryInputOverrideAccumHitMean: round(northDryBeltCarryInputOverrideAccumHitMean, 5),
+      southDryBeltCarryInputOverrideAccumHitMean: round(southDryBeltCarryInputOverrideAccumHitMean, 5),
+      northTransitionCarryInputOverrideAccumHitMean: round(northTransitionCarryInputOverrideAccumHitMean, 5),
+      southTransitionCarryInputOverrideAccumHitMean: round(southTransitionCarryInputOverrideAccumHitMean, 5),
+      northDryBeltCarryInputOverrideAccumRemovedMeanKgM2: round(northDryBeltCarryInputOverrideAccumRemovedMean, 5),
+      southDryBeltCarryInputOverrideAccumRemovedMeanKgM2: round(southDryBeltCarryInputOverrideAccumRemovedMean, 5),
+      northTransitionCarryInputOverrideAccumRemovedMeanKgM2: round(northTransitionCarryInputOverrideAccumRemovedMean, 5),
+      southTransitionCarryInputOverrideAccumRemovedMeanKgM2: round(southTransitionCarryInputOverrideAccumRemovedMean, 5),
+      northDryBeltCarryInputOverrideAccumRemovalFrac: round(northDryBeltCarryInputOverrideAccumRemovalFrac, 5),
+      southDryBeltCarryInputOverrideAccumRemovalFrac: round(southDryBeltCarryInputOverrideAccumRemovalFrac, 5),
       northDryBeltCloudReevaporationMeanKgM2: round(northDryBeltCloudReevaporation, 5),
       northDryBeltPrecipReevaporationMeanKgM2: round(northDryBeltPrecipReevaporation, 5),
       northDryBeltUpperCloudPathMeanKgM2: round(northDryBeltUpperCloudPath, 5),
@@ -1519,6 +1572,10 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         importedAnvilPersistenceMassKgM2: roundSeries(zonalImportedAnvilPersistence, 5),
         carriedOverUpperCloudMassKgM2: roundSeries(zonalCarriedOverUpperCloud, 5),
         weakErosionCloudSurvivalMassKgM2: roundSeries(zonalWeakErosionCloudSurvival, 5),
+        carryInputOverrideHitCount: roundSeries(zonalCarryInputOverrideHitCount, 5),
+        carryInputOverrideRemovedMassKgM2: roundSeries(zonalCarryInputOverrideRemovedMass, 5),
+        carryInputOverrideAccumHitCount: roundSeries(zonalCarryInputOverrideAccumHitCount, 5),
+        carryInputOverrideAccumRemovedMassKgM2: roundSeries(zonalCarryInputOverrideAccumRemovedMass, 5),
         upperCloudPathKgM2: roundSeries(zonalUpperCloudPath, 5),
         upperCloudClearSkyLwCoolingWm2: roundSeries(zonalUpperCloudClearSkyLwCooling, 5),
         upperCloudCloudyLwCoolingWm2: roundSeries(zonalUpperCloudCloudyLwCooling, 5),

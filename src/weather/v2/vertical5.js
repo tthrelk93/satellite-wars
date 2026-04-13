@@ -287,6 +287,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.verticalUpperCloudAppliedErosionMass || state.verticalUpperCloudAppliedErosionMass.length !== N) state.verticalUpperCloudAppliedErosionMass = new Float32Array(N);
   if (!state.verticalUpperCloudHandedToMicrophysicsMass || state.verticalUpperCloudHandedToMicrophysicsMass.length !== N) state.verticalUpperCloudHandedToMicrophysicsMass = new Float32Array(N);
   if (!state.verticalUpperCloudResidualMass || state.verticalUpperCloudResidualMass.length !== N) state.verticalUpperCloudResidualMass = new Float32Array(N);
+  if (!state.carryInputOverrideHitCount || state.carryInputOverrideHitCount.length !== N) state.carryInputOverrideHitCount = new Float32Array(N);
+  if (!state.carryInputOverrideRemovedMass || state.carryInputOverrideRemovedMass.length !== N) state.carryInputOverrideRemovedMass = new Float32Array(N);
+  if (!state.carryInputOverrideInputMass || state.carryInputOverrideInputMass.length !== N) state.carryInputOverrideInputMass = new Float32Array(N);
+  if (!state.carryInputOverrideAccumHitCount || state.carryInputOverrideAccumHitCount.length !== N) state.carryInputOverrideAccumHitCount = new Float32Array(N);
+  if (!state.carryInputOverrideAccumRemovedMass || state.carryInputOverrideAccumRemovedMass.length !== N) state.carryInputOverrideAccumRemovedMass = new Float32Array(N);
+  if (!state.carryInputOverrideAccumInputMass || state.carryInputOverrideAccumInputMass.length !== N) state.carryInputOverrideAccumInputMass = new Float32Array(N);
   if (!state.resolvedAscentCloudBirthAccumMass || state.resolvedAscentCloudBirthAccumMass.length !== N) state.resolvedAscentCloudBirthAccumMass = new Float32Array(N);
   if (!state.convectiveDetrainmentCloudBirthAccumMass || state.convectiveDetrainmentCloudBirthAccumMass.length !== N) state.convectiveDetrainmentCloudBirthAccumMass = new Float32Array(N);
   if (!state.carryOverUpperCloudEnteringAccumMass || state.carryOverUpperCloudEnteringAccumMass.length !== N) state.carryOverUpperCloudEnteringAccumMass = new Float32Array(N);
@@ -372,6 +378,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const verticalUpperCloudAppliedErosionMass = state.verticalUpperCloudAppliedErosionMass;
   const verticalUpperCloudHandedToMicrophysicsMass = state.verticalUpperCloudHandedToMicrophysicsMass;
   const verticalUpperCloudResidualMass = state.verticalUpperCloudResidualMass;
+  const carryInputOverrideHitCount = state.carryInputOverrideHitCount;
+  const carryInputOverrideRemovedMass = state.carryInputOverrideRemovedMass;
+  const carryInputOverrideInputMass = state.carryInputOverrideInputMass;
+  const carryInputOverrideAccumHitCount = state.carryInputOverrideAccumHitCount;
+  const carryInputOverrideAccumRemovedMass = state.carryInputOverrideAccumRemovedMass;
+  const carryInputOverrideAccumInputMass = state.carryInputOverrideAccumInputMass;
   const resolvedAscentCloudBirthAccumMass = state.resolvedAscentCloudBirthAccumMass;
   const convectiveDetrainmentCloudBirthAccumMass = state.convectiveDetrainmentCloudBirthAccumMass;
   const carryOverUpperCloudEnteringAccumMass = state.carryOverUpperCloudEnteringAccumMass;
@@ -439,6 +451,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   verticalUpperCloudAppliedErosionMass.fill(0);
   verticalUpperCloudHandedToMicrophysicsMass.fill(0);
   verticalUpperCloudResidualMass.fill(0);
+  carryInputOverrideHitCount.fill(0);
+  carryInputOverrideRemovedMass.fill(0);
+  carryInputOverrideInputMass.fill(0);
   upperCloudFreshBornMass.fill(0);
   upperCloudRecentlyImportedMass.fill(0);
   upperCloudStaleMass.fill(0);
@@ -1426,6 +1441,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       if (!(removalMass > 0)) continue;
       const keepFrac = Math.max(0, (upperCloudMass - removalMass) / Math.max(upperCloudMass, eps));
       scaleUpperCloudMassAtCell(state, sigmaHalf, nz, k, keepFrac);
+      carryInputOverrideHitCount[k] += 1;
+      carryInputOverrideRemovedMass[k] += removalMass;
+      carryInputOverrideInputMass[k] += actualInputMass;
+      carryInputOverrideAccumHitCount[k] += 1;
+      carryInputOverrideAccumRemovedMass[k] += removalMass;
+      carryInputOverrideAccumInputMass[k] += actualInputMass;
     }
   }
 

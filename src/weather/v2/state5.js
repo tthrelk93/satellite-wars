@@ -68,6 +68,12 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const verticalUpperCloudAppliedErosionMass = makeArray(N);
   const verticalUpperCloudHandedToMicrophysicsMass = makeArray(N);
   const verticalUpperCloudResidualMass = makeArray(N);
+  const carryInputOverrideHitCount = makeArray(N);
+  const carryInputOverrideRemovedMass = makeArray(N);
+  const carryInputOverrideInputMass = makeArray(N);
+  const carryInputOverrideAccumHitCount = makeArray(N);
+  const carryInputOverrideAccumRemovedMass = makeArray(N);
+  const carryInputOverrideAccumInputMass = makeArray(N);
   const resolvedAscentCloudBirthAccumMass = makeArray(N);
   const saturationAdjustmentCloudBirthAccumMass = makeArray(N);
   const convectiveDetrainmentCloudBirthAccumMass = makeArray(N);
@@ -273,6 +279,12 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     verticalUpperCloudAppliedErosionMass,
     verticalUpperCloudHandedToMicrophysicsMass,
     verticalUpperCloudResidualMass,
+    carryInputOverrideHitCount,
+    carryInputOverrideRemovedMass,
+    carryInputOverrideInputMass,
+    carryInputOverrideAccumHitCount,
+    carryInputOverrideAccumRemovedMass,
+    carryInputOverrideAccumInputMass,
     resolvedAscentCloudBirthAccumMass,
     saturationAdjustmentCloudBirthAccumMass,
     convectiveDetrainmentCloudBirthAccumMass,

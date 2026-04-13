@@ -276,6 +276,14 @@ Exit criteria:
 - the same corridor no longer shows the same owned excess reservoir
 - no new owner replaces it immediately
 
+Status:
+- mostly complete
+- the proof reruns remain supportive:
+  - owned target-cell mass at `endPreviousStepMicrophysics5` falls materially
+  - the stable owner remains `previousStepResidualUpperCloud`
+  - normalized numerical ownership still passes
+- but the reduced-order story is less clean than before and now leans toward `requires-full-globe`
+
 #### Phase 1D: Climate Gate On The Patched Physics
 
 Run:
@@ -294,6 +302,39 @@ Required metrics:
 Exit criteria:
 - better than the current kept dry-belt baseline
 - no major ITCZ/trades/westerlies regression
+
+Status:
+- failed on the current kept `stepVertical5` patch
+- see [phase1c-proof-vs-climate-mismatch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1c-proof-vs-climate-mismatch.md)
+- key result:
+  - the upstream owned reservoir improves in proof space
+  - the 30-day climate degrades sharply in full-run space
+  - this patch family is not climate-viable by simple narrowing or softening
+
+### Phase 1E: Proof-vs-Climate Delta Attribution
+
+Objective:
+- explain the compensation path that turns a local reservoir win into a worse 30-day climate
+
+Primary files:
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+
+Required outputs:
+- baseline-vs-patched 30-day delta report
+- latitude-band cloud and precipitation response comparison
+- compensation ranking across:
+  - large-scale condensation
+  - imported anvil persistence
+  - weak-erosion cloud survival
+  - radiative maintenance
+  - circulation and wind response
+
+Exit criteria:
+- one dominant rebound/compensation pathway is identified
+- the next physics patch targets that pathway instead of further tuning the carry-input override
 
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
