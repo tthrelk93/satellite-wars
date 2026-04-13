@@ -45,6 +45,7 @@
     "agent:phase1b-exact-corridor-support-proof": "node scripts/agent/phase1b-exact-corridor-support-proof.mjs",
     "agent:phase1b-propagation-proof": "node scripts/agent/phase1b-propagation-proof.mjs",
     "agent:phase1b-implementation-alignment-proof": "node scripts/agent/phase1b-implementation-alignment-proof.mjs",
+    "agent:phase1b-live-replay-reconciliation": "node scripts/agent/phase1b-live-replay-reconciliation.mjs",
     "agent:orographic-probe-cdp": "node scripts/agent/orographic-probe-cdp.mjs",
     "agent:reuse-localhost-tab": "node scripts/agent/reuse-localhost-tab.mjs",
     "agent:summarize-runtime-log": "node scripts/agent/summarize-runtime-log.mjs",

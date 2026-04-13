@@ -224,6 +224,32 @@ Next subphase:
 - **Phase 1B.3: alignment-constrained vertical patch**
 - the patch must fire on the fresh-state corridor envelope proved in the alignment report, not on stale persistent proxies
 
+Status update:
+- the first alignment-constrained live patch attempt was rejected
+- the follow-up reconciliation phase is now complete in [phase1b-live-replay-reconciliation.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1b-live-replay-reconciliation.md)
+- that reconciliation proved:
+  - the old support-family trigger shape is still broadly right
+  - the old mass contract is stale
+  - the exact live handoff no longer exposes the retained reservoir through `carriedOverUpperCloudMassKgM2`
+  - at the real live handoff the key state is:
+    - `verticalUpperCloudInputMassKgM2 = 4.56883`
+    - `verticalUpperCloudCarrySurvivingMassKgM2 = 4.56883`
+    - `verticalUpperCloudHandedToMicrophysicsMassKgM2 = 4.56883`
+    - `carriedOverUpperCloudMassKgM2 = 0`
+  - so the next patch must key off **carry-surviving-to-input dominance**, not post-handoff `carriedOverUpperCloudMass` dominance
+
+Current next subphase:
+- **Phase 1B.4: live-state-aligned vertical patch**
+- use the patch design in [phase1b-live-replay-patch-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1b-live-replay-patch-design.md)
+- required live trigger family:
+  - `freshSubtropicalSuppression >= 0.74243`
+  - `freshOrganizedSupport <= 0.22504`
+  - `freshPotentialTarget <= 0.24341`
+  - `verticalCarryInputDominance >= 0.95`
+  - `previousStepResidualUpperCloudMinKgM2 >= 4.40574`
+- explicit anti-pattern:
+  - do not key the next patch primarily off post-handoff `carriedOverUpperCloudMassKgM2`
+
 #### Phase 1C: Re-verify The Proof Stack After The Patch
 
 Required reruns:
