@@ -847,6 +847,43 @@ Exit criteria:
 - same-branch attribution cleanly identifies the dominant residual carrier after the bridge is turned on
 - the next patch lane is specific enough that we can change one mechanism instead of broadening circulation tuning again
 
+Result:
+- complete
+- see [phase1t-omega-to-jet-recovery-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1t-omega-to-jet-recovery-attribution.md)
+- the dominant residual failure is now:
+  - `equatorward_absorption_before_jet_band`
+- same-branch bridge evidence says:
+  - `northTransitionLowLevelOmegaEffectiveDeltaPaS = 0.00208`
+  - `northDryBeltLowLevelOmegaEffectiveDeltaPaS = 0.0014`
+  - `midlatitudeWesterliesNorthDeltaMs = 0`
+- the day-30 profile deltas show why:
+  - NH jet-band `wind10mU` delta is effectively `0`
+  - NH jet-band `stormTrackIndex` delta is effectively `0`
+  - dry-belt-core `largeScaleCondensation` decreases, but tropical-shoulder `largeScaleCondensation` increases
+
+Conclusion:
+- the current bridge does create a real subtropical omega response
+- but that response is being absorbed too far equatorward, before it reaches the `30-56°N` jet pathway
+- this is not yet a true downstream jet-recovery failure; it is mainly a placement problem in the bridge lane
+
+### Phase 1U: Jet-Band Placement Patch Design
+
+Objective:
+- redesign the omega bridge so a capped share of the proven drying response projects into the same-hemisphere `30-45°N` transition / jet-entry lane instead of being absorbed in the NH dry-belt core and tropical shoulder
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+
+Design rule:
+- keep the Phase 1S bridge diagnostics and runtime toggle
+- do not simply raise bridge amplitude everywhere
+- shift the response poleward and guardrail-first, with caps that prevent more ITCZ broadening or dry-belt rewetting
+
+Exit criteria:
+- same-branch `off -> on` compare produces a non-zero positive NH jet-band wind or storm-track response
+- the bridge still improves NH transition / dry-belt omega without giving back the kept Phase 1K and Phase 1M wins
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
