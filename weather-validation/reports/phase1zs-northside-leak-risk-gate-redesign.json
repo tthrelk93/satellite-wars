@@ -1,0 +1,188 @@
+{
+  "schema": "satellite-wars.phase1zs-northside-leak-risk-gate-redesign.v1",
+  "generatedAt": "2026-04-14T17:10:29.394Z",
+  "paths": {
+    "offPath": "/tmp/phase1zs-off.json",
+    "onPath": "/tmp/phase1zs-on.json",
+    "phase1zrPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zr-northside-leak-penalty-admission-attribution.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zs-northside-leak-risk-gate-redesign.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zs-northside-leak-risk-gate-redesign.json"
+  },
+  "verdict": "northside_gate_live_with_south_mirror_regression",
+  "keepPatch": false,
+  "nextPhase": "Phase 1ZT: South Mirror Rebound Attribution",
+  "recommendation": "Keep the redesigned northside leak gate available behind the runtime toggle, but do not enable it by default. It successfully activates the NH source lane and reduces the north fanout path, but the full 30-day climate screen regresses through a south-mirror rebound.",
+  "phase1zrContext": {
+    "verdict": "supported_subset_risk_below_gate",
+    "nextPhase": "Phase 1ZS: Northside Leak Risk Gate Redesign"
+  },
+  "metrics": {
+    "itczWidthDeg": 0.007,
+    "subtropicalDryNorthRatio": 0.002,
+    "subtropicalDrySouthRatio": 0.002,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": -0.00514,
+    "midlatitudeWesterliesNorthU10Ms": 0
+  },
+  "slices": {
+    "northEdge": {
+      "off": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.1083,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00072
+      },
+      "on": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.10148,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00057
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": -0.00682,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": -0.00015
+      }
+    },
+    "northSource": {
+      "off": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.13552,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      },
+      "on": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.11169,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0.06225,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0.45833,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0.16907,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": -0.02383,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0.06225,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0.45833,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0.16907,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      }
+    },
+    "northSpillover": {
+      "off": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.11945,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      },
+      "on": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.10948,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": -0.00997,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      }
+    },
+    "northDryBeltCore": {
+      "off": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.12644,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      },
+      "on": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.12633,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": -0.00011,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      }
+    },
+    "southEdge": {
+      "off": {
+        "latitudeDeg": -3.75,
+        "largeScaleCondensationSourceKgM2": 0.05851,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00054
+      },
+      "on": {
+        "latitudeDeg": -3.75,
+        "largeScaleCondensationSourceKgM2": 0.0616,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00054
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0.00309,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      }
+    },
+    "southSource": {
+      "off": {
+        "latitudeDeg": -11.25,
+        "largeScaleCondensationSourceKgM2": 0.10715,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      },
+      "on": {
+        "latitudeDeg": -11.25,
+        "largeScaleCondensationSourceKgM2": 0.13363,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0.12808,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0.02648,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+        "equatorialEdgeNorthsideLeakRiskDiagFrac": 0.12808,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0
+      }
+    }
+  },
+  "designContract": {
+    "keep": [
+      "keep the supported-source-normalized northside leak gate logic available behind the patch toggle",
+      "keep the bilateral equatorial-edge subsidence guard geometry and south-edge stabilization plumbing"
+    ],
+    "change": [
+      "attribute why the improved NH source suppression is paired with a south-mirror rebound at -3.75° and -11.25°",
+      "treat the next problem as a bilateral balance / cross-equatorial compensation problem, not another northside admission miss"
+    ]
+  }
+}

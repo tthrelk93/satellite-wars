@@ -6,6 +6,7 @@ import {
   computeProjectedOmegaBridgeCellPaS,
   computeDryingOmegaBridgeSourceSupport,
   computeDryingOmegaBridgeTargetWeight,
+  computeEquatorialEdgeNorthsideLeakAdmissionRiskFrac,
   computeEquatorialEdgeNorthsideLeakPenaltyFrac,
   computeEquatorialEdgeNorthsideLeakRiskFrac,
   computeEquatorialEdgeNorthsideLeakSourceWindowFrac,
@@ -747,14 +748,10 @@ test('computeEquatorialEdgeNorthsideLeakPenaltyFrac only trims NH source rows wi
   assert.equal(
     computeEquatorialEdgeNorthsideLeakPenaltyFrac({
       enabled: false,
-      latDeg: 11.25,
-      lat0: 9,
-      lat1: 13,
-      subtropicalBand: 0.7,
-      neutralToSubsidingSupport: 0.8,
-      existingOmegaPaS: 0.16,
-      risk0: 0.55,
-      risk1: 0.8,
+      sourceWindow: 0.45833,
+      admissionRisk: 0.3689,
+      risk0: 0.32,
+      risk1: 0.5,
       maxFrac: 0.28
     }),
     0
@@ -762,42 +759,30 @@ test('computeEquatorialEdgeNorthsideLeakPenaltyFrac only trims NH source rows wi
 
   const sourceCore = computeEquatorialEdgeNorthsideLeakPenaltyFrac({
     enabled: true,
-    latDeg: 11.25,
-    lat0: 9,
-    lat1: 13,
-    subtropicalBand: 0.7,
-    neutralToSubsidingSupport: 0.8,
-    existingOmegaPaS: 0.16,
-    risk0: 0.55,
-    risk1: 0.8,
+    sourceWindow: 0.45833,
+    admissionRisk: 0.3689,
+    risk0: 0.32,
+    risk1: 0.5,
     maxFrac: 0.28
   });
   const southMirror = computeEquatorialEdgeNorthsideLeakPenaltyFrac({
     enabled: true,
-    latDeg: -11.25,
-    lat0: 9,
-    lat1: 13,
-    subtropicalBand: 0.7,
-    neutralToSubsidingSupport: 0.8,
-    existingOmegaPaS: 0.16,
-    risk0: 0.55,
-    risk1: 0.8,
+    sourceWindow: 0,
+    admissionRisk: 0.3689,
+    risk0: 0.32,
+    risk1: 0.5,
     maxFrac: 0.28
   });
   const outsideLane = computeEquatorialEdgeNorthsideLeakPenaltyFrac({
     enabled: true,
-    latDeg: 18.75,
-    lat0: 9,
-    lat1: 13,
-    subtropicalBand: 0.7,
-    neutralToSubsidingSupport: 0.8,
-    existingOmegaPaS: 0.16,
-    risk0: 0.55,
-    risk1: 0.8,
+    sourceWindow: 0,
+    admissionRisk: 0.2,
+    risk0: 0.32,
+    risk1: 0.5,
     maxFrac: 0.28
   });
 
-  assert.ok(sourceCore > 0.15);
+  assert.ok(sourceCore > 0.015);
   assert.equal(southMirror, 0);
   assert.equal(outsideLane, 0);
 });
@@ -843,6 +828,22 @@ test('computeEquatorialEdgeNorthsideLeakRiskFrac stays below threshold when live
 
   assert.ok(weakRisk < 0.55);
   assert.ok(strongRisk > weakRisk);
+});
+
+test('computeEquatorialEdgeNorthsideLeakAdmissionRiskFrac normalizes leak risk by the active source subset', () => {
+  const normalized = computeEquatorialEdgeNorthsideLeakAdmissionRiskFrac({
+    enabled: true,
+    sourceWindow: 0.45833,
+    fanoutRisk: 0.16908
+  });
+  const noWindow = computeEquatorialEdgeNorthsideLeakAdmissionRiskFrac({
+    enabled: true,
+    sourceWindow: 0,
+    fanoutRisk: 0.16908
+  });
+
+  assert.ok(Math.abs(normalized - 0.3689) < 1e-4);
+  assert.equal(noWindow, 0);
 });
 
 test('equatorial-edge guard windows are mirrored by absolute latitude rather than NH-only shoulder geometry', () => {

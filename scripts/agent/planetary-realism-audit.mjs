@@ -1313,6 +1313,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     equatorialEdgeSubsidenceGuardAppliedDiagPaS,
     equatorialEdgeNorthsideLeakSourceWindowDiagFrac,
     equatorialEdgeNorthsideLeakRiskDiagFrac,
+    equatorialEdgeNorthsideLeakAdmissionRiskDiagFrac,
     equatorialEdgeNorthsideLeakPenaltyDiagFrac,
     subtropicalSourceDriverDiagFrac,
     subtropicalSourceDriverFloorDiagFrac,
@@ -1413,6 +1414,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalEquatorialEdgeSubsidenceGuardApplied = zonalMean(equatorialEdgeSubsidenceGuardAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
   const zonalEquatorialEdgeNorthsideLeakSourceWindow = zonalMean(equatorialEdgeNorthsideLeakSourceWindowDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalEquatorialEdgeNorthsideLeakRisk = zonalMean(equatorialEdgeNorthsideLeakRiskDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalEquatorialEdgeNorthsideLeakAdmissionRisk = zonalMean(equatorialEdgeNorthsideLeakAdmissionRiskDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalEquatorialEdgeNorthsideLeakPenalty = zonalMean(equatorialEdgeNorthsideLeakPenaltyDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
@@ -2174,6 +2176,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         equatorialEdgeSubsidenceGuardAppliedDiagPaS: roundSeries(zonalEquatorialEdgeSubsidenceGuardApplied, 5),
         equatorialEdgeNorthsideLeakSourceWindowDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakSourceWindow, 5),
         equatorialEdgeNorthsideLeakRiskDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakRisk, 5),
+        equatorialEdgeNorthsideLeakAdmissionRiskDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakAdmissionRisk, 5),
         equatorialEdgeNorthsideLeakPenaltyDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakPenalty, 5),
         freshSubtropicalBandDiagFrac: roundSeries(zonalMean(freshSubtropicalBandDiagFrac || new Array(nx * ny).fill(0), nx, ny), 5),
         freshShoulderLatitudeWindowDiagFrac: roundSeries(zonalFreshShoulderLatitudeWindow, 5),

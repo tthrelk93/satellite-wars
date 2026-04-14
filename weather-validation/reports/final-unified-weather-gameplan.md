@@ -1520,6 +1520,16 @@ Status:
   - this is an admission-threshold / gate-shape miss, not a wiring bug
 - next active phase: `Phase 1ZS: Northside Leak Risk Gate Redesign`
 
+Status:
+- complete in [phase1zs-northside-leak-risk-gate-redesign.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zs-northside-leak-risk-gate-redesign.md)
+- verdict: `northside_gate_live_with_south_mirror_regression`
+- key conclusions:
+  - the redesigned gate does become live on the `11.25°N` source lane
+  - north-side target lanes improve: `3.75°N`, `11.25°N`, and `18.75°N` all reduce condensation
+  - but the 30-day climate screen still fails because the south mirror regresses at `-3.75°` and `-11.25°`
+  - the next problem is bilateral rebound attribution, not northside gate admission anymore
+- next active phase: `Phase 1ZT: South Mirror Rebound Attribution`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

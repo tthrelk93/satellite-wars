@@ -79,6 +79,7 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const equatorialEdgeSubsidenceGuardAppliedDiag = makeArray(N);
   const equatorialEdgeNorthsideLeakSourceWindowDiag = makeArray(N);
   const equatorialEdgeNorthsideLeakRiskDiag = makeArray(N);
+  const equatorialEdgeNorthsideLeakAdmissionRiskDiag = makeArray(N);
   const equatorialEdgeNorthsideLeakPenaltyDiag = makeArray(N);
   const subtropicalSourceDriverDiag = makeArray(N);
   const subtropicalSourceDriverFloorDiag = makeArray(N);
@@ -359,6 +360,7 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     equatorialEdgeSubsidenceGuardAppliedDiag,
     equatorialEdgeNorthsideLeakSourceWindowDiag,
     equatorialEdgeNorthsideLeakRiskDiag,
+    equatorialEdgeNorthsideLeakAdmissionRiskDiag,
     equatorialEdgeNorthsideLeakPenaltyDiag,
     subtropicalSourceDriverDiag,
     subtropicalSourceDriverFloorDiag,
