@@ -534,6 +534,11 @@ export class WeatherCore5 {
       subtropicalSubsidenceBottomSigma: 0.85,
       subtropicalSubsidenceCrossHemiFloorFrac: 0.58,
       subtropicalSubsidenceWeakHemiBoost: 0.35,
+      enableCirculationReboundContainment: true,
+      circulationReboundContainmentScale: 1.35,
+      circulationReboundOrganizationScale: 0.6,
+      circulationReboundActivityScale: 0.35,
+      circulationReboundSourceScale: 0.75,
       eps: 1e-12,
       debugConservation: false
     };

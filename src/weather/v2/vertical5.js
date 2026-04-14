@@ -59,6 +59,62 @@ const scaleUpperCloudMassAtCell = (state, sigmaHalf, nz, cellIndex, keepFrac) =>
     state.qs[idx] *= boundedKeepFrac;
   }
 };
+const computeCirculationReboundContainment = ({
+  enabled,
+  tropicalCore,
+  subtropicalBand,
+  subtropicalSuppression,
+  neutralToSubsidingSupport,
+  organizedSupport,
+  potentialTarget,
+  containmentScale,
+  organizationScale,
+  activityScale,
+  sourceScale
+}) => {
+  if (!enabled) {
+    return {
+      support: 0,
+      organizationSuppressFrac: 0,
+      activitySuppressFrac: 0,
+      sourceSuppressFrac: 0
+    };
+  }
+  const transitionEnvelope = clamp01(
+    subtropicalBand * (1 - smoothstep(0.82, 0.98, tropicalCore))
+  );
+  if (transitionEnvelope <= 0) {
+    return {
+      support: 0,
+      organizationSuppressFrac: 0,
+      activitySuppressFrac: 0,
+      sourceSuppressFrac: 0
+    };
+  }
+  const weakEngineSupport = clamp01(
+    0.55 * (1 - organizedSupport) +
+    0.45 * (1 - potentialTarget)
+  );
+  const support = clamp01(
+    transitionEnvelope * (
+      0.42 * subtropicalSuppression +
+      0.28 * neutralToSubsidingSupport +
+      0.2 * weakEngineSupport +
+      0.1 * (1 - tropicalCore)
+    )
+  );
+  const appliedSupport = clamp01(support * containmentScale);
+  return {
+    support,
+    organizationSuppressFrac: clamp01(appliedSupport * organizationScale),
+    activitySuppressFrac: clamp01(appliedSupport * activityScale),
+    sourceSuppressFrac: clamp01(
+      appliedSupport
+      * (0.7 + 0.3 * neutralToSubsidingSupport)
+      * sourceScale
+    )
+  };
+};
 const VERTICAL_ALLOWED_PARAMS = new Set([
   'enableMixing',
   'enableConvection',
@@ -124,6 +180,11 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'subtropicalSubsidenceBottomSigma',
   'subtropicalSubsidenceCrossHemiFloorFrac',
   'subtropicalSubsidenceWeakHemiBoost',
+  'enableCirculationReboundContainment',
+  'circulationReboundContainmentScale',
+  'circulationReboundOrganizationScale',
+  'circulationReboundActivityScale',
+  'circulationReboundSourceScale',
   'enableCarryInputDominanceOverride',
   'carryInputSubtropicalSuppressionMin',
   'carryInputOrganizedSupportMax',
@@ -244,6 +305,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     subtropicalSubsidenceBottomSigma = 0.85,
     subtropicalSubsidenceCrossHemiFloorFrac = 0.45,
     subtropicalSubsidenceWeakHemiBoost = 0.0,
+    enableCirculationReboundContainment = true,
+    circulationReboundContainmentScale = 1.35,
+    circulationReboundOrganizationScale = 0.6,
+    circulationReboundActivityScale = 0.35,
+    circulationReboundSourceScale = 0.75,
     enableCarryInputDominanceOverride = true,
     carryInputSubtropicalSuppressionMin = 0.74243,
     carryInputOrganizedSupportMax = 0.22504,
@@ -278,6 +344,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.freshSubtropicalBandDiag || state.freshSubtropicalBandDiag.length !== N) state.freshSubtropicalBandDiag = new Float32Array(N);
   if (!state.freshNeutralToSubsidingSupportDiag || state.freshNeutralToSubsidingSupportDiag.length !== N) state.freshNeutralToSubsidingSupportDiag = new Float32Array(N);
   if (!state.freshRhMidSupportDiag || state.freshRhMidSupportDiag.length !== N) state.freshRhMidSupportDiag = new Float32Array(N);
+  if (!state.circulationReboundContainmentDiag || state.circulationReboundContainmentDiag.length !== N) state.circulationReboundContainmentDiag = new Float32Array(N);
+  if (!state.circulationReboundActivitySuppressionDiag || state.circulationReboundActivitySuppressionDiag.length !== N) state.circulationReboundActivitySuppressionDiag = new Float32Array(N);
+  if (!state.circulationReboundSourceSuppressionDiag || state.circulationReboundSourceSuppressionDiag.length !== N) state.circulationReboundSourceSuppressionDiag = new Float32Array(N);
   if (!state._freshPotentialTarget || state._freshPotentialTarget.length !== N) state._freshPotentialTarget = new Float32Array(N);
   if (!state._freshOrganizedSupport || state._freshOrganizedSupport.length !== N) state._freshOrganizedSupport = new Float32Array(N);
   if (!state._freshSubtropicalSuppression || state._freshSubtropicalSuppression.length !== N) state._freshSubtropicalSuppression = new Float32Array(N);
@@ -375,6 +444,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const freshSubtropicalBandPublicDiag = state.freshSubtropicalBandDiag;
   const freshNeutralToSubsidingSupportPublicDiag = state.freshNeutralToSubsidingSupportDiag;
   const freshRhMidSupportPublicDiag = state.freshRhMidSupportDiag;
+  const circulationReboundContainmentDiag = state.circulationReboundContainmentDiag;
+  const circulationReboundActivitySuppressionDiag = state.circulationReboundActivitySuppressionDiag;
+  const circulationReboundSourceSuppressionDiag = state.circulationReboundSourceSuppressionDiag;
   const freshPotentialTargetDiag = state._freshPotentialTarget;
   const freshOrganizedSupportDiag = state._freshOrganizedSupport;
   const freshSubtropicalSuppressionDiag = state._freshSubtropicalSuppression;
@@ -454,6 +526,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   freshSubtropicalBandPublicDiag.fill(0);
   freshNeutralToSubsidingSupportPublicDiag.fill(0);
   freshRhMidSupportPublicDiag.fill(0);
+  circulationReboundContainmentDiag.fill(0);
+  circulationReboundActivitySuppressionDiag.fill(0);
+  circulationReboundSourceSuppressionDiag.fill(0);
   freshPotentialTargetDiag.fill(0);
   freshOrganizedSupportDiag.fill(0);
   freshSubtropicalSuppressionDiag.fill(0);
@@ -1123,6 +1198,22 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       freshPotentialTargetDiag[k] = potentialTarget;
       freshOrganizedSupportDiag[k] = organizedSupport;
       freshSubtropicalSuppressionDiag[k] = subtropicalSuppression;
+      const circulationReboundContainment = computeCirculationReboundContainment({
+        enabled: enableCirculationReboundContainment,
+        tropicalCore,
+        subtropicalBand,
+        subtropicalSuppression,
+        neutralToSubsidingSupport,
+        organizedSupport,
+        potentialTarget,
+        containmentScale: circulationReboundContainmentScale,
+        organizationScale: circulationReboundOrganizationScale,
+        activityScale: circulationReboundActivityScale,
+        sourceScale: circulationReboundSourceScale
+      });
+      circulationReboundContainmentDiag[k] = circulationReboundContainment.support;
+      circulationReboundActivitySuppressionDiag[k] = circulationReboundContainment.activitySuppressFrac;
+      circulationReboundSourceSuppressionDiag[k] = circulationReboundContainment.sourceSuppressFrac;
       const potentialPrev = convectivePotential[k];
       const potentialTau = potentialTarget >= potentialPrev ? convPotentialGrowTau : convPotentialDecayTau;
       const potentialAlpha = 1 - Math.exp(-dt / Math.max(potentialTau, eps));
@@ -1141,7 +1232,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           0.28 * moistureConvergenceSupport +
           0.22 * persistentOrganizationSupport +
           0.12 * tropicalCore * Math.max(convectivePotential[k], moistureConvergenceSupport)
-        ) * (0.84 + 0.32 * tropicalCore) * (1 - 0.82 * subtropicalSuppression)
+        ) * (0.84 + 0.32 * tropicalCore)
+          * (1 - 0.82 * subtropicalSuppression)
+          * (1 - circulationReboundContainment.organizationSuppressFrac)
       );
       const organizationDecayScale = subtropicalSuppression > 0.15 && organizationTarget < organizationPrev
         ? 0.55
@@ -1164,6 +1257,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         (0.35 * activityPotential + 0.65 * activityOrganization)
         * (0.92 + 0.16 * tropicalCore)
         * (1 - 0.4 * subtropicalSuppression)
+        * (1 - circulationReboundContainment.activitySuppressFrac)
       );
       const hasSupport = activity > 0
         && (qvSupport > 0.08 || rhSupport > 0.08)
@@ -1187,8 +1281,10 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       convectiveMassFlux[k] = massSurface > 0 && dt > 0 ? (mu * massSurface) / dt : 0;
       convMassFluxWeightedSum += convectiveMassFlux[k] * columnWeight;
       const convMassFluxSupport = smoothstep(0.0005, 0.02, convectiveMassFlux[k]);
-      rowConvectiveSource[rowIndex] += 0.95 * Math.pow(convectiveOrganization[k], 1.1) * (0.85 + 0.15 * tropicalCore)
-        + 0.75 * convMassFluxSupport;
+      rowConvectiveSource[rowIndex] += (
+        0.95 * Math.pow(convectiveOrganization[k], 1.1) * (0.85 + 0.15 * tropicalCore)
+        + 0.75 * convMassFluxSupport
+      ) * (1 - circulationReboundContainment.sourceSuppressFrac);
       if (mu <= 1e-6 || massSurface <= 0) continue;
 
       const entrainEff = clamp(

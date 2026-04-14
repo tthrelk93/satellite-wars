@@ -70,6 +70,7 @@ let observerEffectAudit = false;
 let trustedBaselinePath = null;
 let carryInputOverrideMode = 'default';
 let softLiveGatePatchMode = 'default';
+let circulationReboundPatchMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -109,6 +110,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--carry-input-override=')) carryInputOverrideMode = arg.slice('--carry-input-override='.length);
   else if (arg === '--soft-live-gate-patch' && argv[i + 1]) softLiveGatePatchMode = argv[++i];
   else if (arg.startsWith('--soft-live-gate-patch=')) softLiveGatePatchMode = arg.slice('--soft-live-gate-patch='.length);
+  else if (arg === '--circulation-rebound-patch' && argv[i + 1]) circulationReboundPatchMode = argv[++i];
+  else if (arg.startsWith('--circulation-rebound-patch=')) circulationReboundPatchMode = arg.slice('--circulation-rebound-patch='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--trusted-baseline' && argv[i + 1]) trustedBaselinePath = path.resolve(argv[++i]);
   else if (arg.startsWith('--trusted-baseline=')) trustedBaselinePath = path.resolve(arg.slice('--trusted-baseline='.length));
@@ -140,6 +143,11 @@ carryInputOverrideMode = carryInputOverrideMode === 'off'
 softLiveGatePatchMode = softLiveGatePatchMode === 'off'
   ? 'off'
   : softLiveGatePatchMode === 'on'
+    ? 'on'
+    : 'default';
+circulationReboundPatchMode = circulationReboundPatchMode === 'off'
+  ? 'off'
+  : circulationReboundPatchMode === 'on'
     ? 'on'
     : 'default';
 
@@ -556,6 +564,7 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
     horizonsDays,
     carryInputOverrideMode,
     softLiveGatePatchMode,
+    circulationReboundPatchMode,
     instrumentationMode: core.getInstrumentationMode ? core.getInstrumentationMode() : instrumentationMode,
     sampleTargetsDays,
     targetSeconds: targetsSeconds,
@@ -1233,6 +1242,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     freshSubtropicalBandDiagFrac,
     freshNeutralToSubsidingSupportDiagFrac,
     freshRhMidSupportDiagFrac,
+    circulationReboundContainmentDiagFrac,
+    circulationReboundActivitySuppressionDiagFrac,
+    circulationReboundSourceSuppressionDiagFrac,
     surfaceEvapPotentialRateMmHr,
     surfaceEvapTransferCoeff,
     surfaceEvapWindSpeedMs,
@@ -1572,6 +1584,17 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     landMask,
     'ocean'
   );
+  const zonalCirculationReboundContainment = zonalMean(circulationReboundContainmentDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalCirculationReboundActivitySuppression = zonalMean(circulationReboundActivitySuppressionDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalCirculationReboundSourceSuppression = zonalMean(circulationReboundSourceSuppressionDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const northTransitionCirculationReboundContainmentMean = weightedBandMean(zonalCirculationReboundContainment, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionCirculationReboundContainmentMean = weightedBandMean(zonalCirculationReboundContainment, latitudesDeg, rowWeights, -22, -12);
+  const northDryBeltCirculationReboundContainmentMean = weightedBandMean(zonalCirculationReboundContainment, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltCirculationReboundContainmentMean = weightedBandMean(zonalCirculationReboundContainment, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northTransitionCirculationReboundActivitySuppressionMean = weightedBandMean(zonalCirculationReboundActivitySuppression, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionCirculationReboundActivitySuppressionMean = weightedBandMean(zonalCirculationReboundActivitySuppression, latitudesDeg, rowWeights, -22, -12);
+  const northTransitionCirculationReboundSourceSuppressionMean = weightedBandMean(zonalCirculationReboundSourceSuppression, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionCirculationReboundSourceSuppressionMean = weightedBandMean(zonalCirculationReboundSourceSuppression, latitudesDeg, rowWeights, -22, -12);
   const northDryBeltLandResolvedAscentCloudBirthPotential = weightedFieldBandMean(resolvedAscentCloudBirthPotentialKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
   const northDryBeltOceanResolvedAscentCloudBirthPotential = weightedFieldBandMean(resolvedAscentCloudBirthPotentialKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
   const northDryBeltLandImportedAnvilPersistence = weightedFieldBandMean(importedAnvilPersistenceMassKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
@@ -1736,6 +1759,14 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       northDryBeltOceanSoftLiveGateAscentModulationMeanFrac: round(northDryBeltOceanSoftLiveGateAscentModulationMean, 5),
       northDryBeltSoftLiveGateAppliedSuppressionMeanKgM2: round(northDryBeltSoftLiveGateAppliedSuppressionMass, 5),
       northDryBeltOceanSoftLiveGateAppliedSuppressionMeanKgM2: round(northDryBeltOceanSoftLiveGateAppliedSuppressionMass, 5),
+      northTransitionCirculationReboundContainmentMeanFrac: round(northTransitionCirculationReboundContainmentMean, 5),
+      southTransitionCirculationReboundContainmentMeanFrac: round(southTransitionCirculationReboundContainmentMean, 5),
+      northDryBeltCirculationReboundContainmentMeanFrac: round(northDryBeltCirculationReboundContainmentMean, 5),
+      southDryBeltCirculationReboundContainmentMeanFrac: round(southDryBeltCirculationReboundContainmentMean, 5),
+      northTransitionCirculationReboundActivitySuppressionMeanFrac: round(northTransitionCirculationReboundActivitySuppressionMean, 5),
+      southTransitionCirculationReboundActivitySuppressionMeanFrac: round(southTransitionCirculationReboundActivitySuppressionMean, 5),
+      northTransitionCirculationReboundSourceSuppressionMeanFrac: round(northTransitionCirculationReboundSourceSuppressionMean, 5),
+      southTransitionCirculationReboundSourceSuppressionMeanFrac: round(southTransitionCirculationReboundSourceSuppressionMean, 5),
       northDryBeltConvectiveDetrainmentCloudSourceMeanKgM2: round(northDryBeltConvectiveDetrainment, 5),
       northDryBeltImportedAnvilPersistenceMeanKgM2: round(northDryBeltImportedAnvilPersistence, 5),
       northDryBeltLandImportedAnvilPersistenceMeanKgM2: round(northDryBeltLandImportedAnvilPersistence, 5),
@@ -4606,6 +4637,8 @@ export async function main() {
   await core._initPromise;
   if (carryInputOverrideMode === 'off') core.vertParams.enableCarryInputDominanceOverride = false;
   else if (carryInputOverrideMode === 'on') core.vertParams.enableCarryInputDominanceOverride = true;
+  if (circulationReboundPatchMode === 'off') core.vertParams.enableCirculationReboundContainment = false;
+  else if (circulationReboundPatchMode === 'on') core.vertParams.enableCirculationReboundContainment = true;
   if (softLiveGatePatchMode === 'off') core.microParams.enableSoftLiveStateMaintenanceSuppression = false;
   else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
   const terrainFallback = applyHeadlessTerrainFixture(core);

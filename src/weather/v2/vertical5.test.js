@@ -285,3 +285,85 @@ test('stepVertical5 clears a stale subtropical carry-dominant upper-cloud reserv
   assert.ok(state.verticalUpperCloudHandedToMicrophysicsMass[0] < 0.1);
   assert.ok(state.verticalUpperCloudAppliedErosionMass[0] > 4.4);
 });
+
+test('stepVertical5 circulation rebound containment suppresses a weak off-equatorial transition lane', () => {
+  const sigmaHalf = new Float32Array([0, 0.35, 0.7, 1]);
+  const buildCase = () => {
+    const state = createState5({
+      grid: { count: 3 },
+      nz: 3,
+      sigmaHalf
+    });
+    const grid = {
+      nx: 3,
+      ny: 1,
+      latDeg: new Float32Array([24]),
+      invDx: new Float32Array([1]),
+      invDy: new Float32Array([1]),
+      cosLat: new Float32Array([1])
+    };
+    for (let i = 0; i < 3; i += 1) {
+      state.ps[i] = 100000;
+      state.pHalf[i] = 20000;
+      state.pHalf[3 + i] = 35000;
+      state.pHalf[6 + i] = 65000;
+      state.pHalf[9 + i] = 100000;
+      state.pMid[i] = 27500;
+      state.pMid[3 + i] = 50000;
+      state.pMid[6 + i] = 82500;
+      state.theta[i] = 288;
+      state.theta[3 + i] = 296;
+      state.theta[6 + i] = 304;
+      state.qv[i] = 0.0015;
+      state.qv[3 + i] = 0.0075;
+      state.qv[6 + i] = 0.018;
+      state.T[i] = 242;
+      state.T[3 + i] = 276;
+      state.T[6 + i] = 300;
+    }
+    state.u.fill(0);
+    state.v.fill(0);
+    state.u[6] = 1;
+    state.u[7] = 0;
+    state.u[8] = -1;
+    state.convectivePotential[1] = 0.22;
+    state.convectiveOrganization[1] = 0.18;
+    return { state, grid };
+  };
+
+  const offCase = buildCase();
+  stepVertical5({
+    dt: 1800,
+    grid: offCase.grid,
+    state: offCase.state,
+    params: {
+      enableMixing: false,
+      enableConvectiveMixing: false,
+      enableConvection: true,
+      enableOmegaMassFix: false,
+      enableLargeScaleVerticalAdvection: false,
+      enableCirculationReboundContainment: false
+    }
+  });
+
+  const onCase = buildCase();
+  stepVertical5({
+    dt: 1800,
+    grid: onCase.grid,
+    state: onCase.state,
+    params: {
+      enableMixing: false,
+      enableConvectiveMixing: false,
+      enableConvection: true,
+      enableOmegaMassFix: false,
+      enableLargeScaleVerticalAdvection: false,
+      enableCirculationReboundContainment: true
+    }
+  });
+
+  assert.ok(onCase.state.circulationReboundContainmentDiag[1] > 0.05);
+  assert.ok(onCase.state.circulationReboundActivitySuppressionDiag[1] > 0);
+  assert.ok(onCase.state.circulationReboundSourceSuppressionDiag[1] > 0);
+  assert.ok(onCase.state.convectiveOrganization[1] < offCase.state.convectiveOrganization[1]);
+  assert.ok(onCase.state.convectiveMassFlux[1] <= offCase.state.convectiveMassFlux[1]);
+});

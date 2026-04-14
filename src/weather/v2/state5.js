@@ -59,6 +59,9 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const freshSubtropicalBandDiag = makeArray(N);
   const freshNeutralToSubsidingSupportDiag = makeArray(N);
   const freshRhMidSupportDiag = makeArray(N);
+  const circulationReboundContainmentDiag = makeArray(N);
+  const circulationReboundActivitySuppressionDiag = makeArray(N);
+  const circulationReboundSourceSuppressionDiag = makeArray(N);
   const resolvedAscentCloudBirthPotential = makeArray(N);
   const largeScaleCondensationSource = makeArray(N);
   const cloudReevaporationMass = makeArray(N);
@@ -302,6 +305,9 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     freshSubtropicalBandDiag,
     freshNeutralToSubsidingSupportDiag,
     freshRhMidSupportDiag,
+    circulationReboundContainmentDiag,
+    circulationReboundActivitySuppressionDiag,
+    circulationReboundSourceSuppressionDiag,
     resolvedAscentCloudBirthPotential,
     largeScaleCondensationSource,
     cloudReevaporationMass,

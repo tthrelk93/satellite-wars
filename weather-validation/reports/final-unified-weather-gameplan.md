@@ -580,6 +580,32 @@ Exit criteria:
 - do not lose the Phase 1K marine-maintenance win in `northDryBeltOceanLargeScaleCondensationMeanKgM2`
 - keep the next design focused on circulation / transition partition, not another isolated local dry-belt suppressor
 
+Result:
+- keep the Phase 1M patch as a supportive win, but do not count the circulation lane as closed
+- same-branch `off -> on` at day 30:
+  - `itczWidthDeg`: `25.874 -> 25.834`
+  - `subtropicalDryNorthRatio`: `1.524 -> 1.515`
+  - `subtropicalDrySouthRatio`: `1.194 -> 1.192`
+  - `midlatitudeWesterliesNorthU10Ms`: `0.531 -> 0.531`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2`: `0.1526 -> 0.14647`
+- read: off-equatorial transition leakage is now a proved secondary lever, but NH westerly recovery is still the unresolved blocker
+
+See:
+- [phase1m-circulation-rebound-lane.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1m-circulation-rebound-lane.md)
+
+### Phase 1N: Return-Flow Rebound Attribution
+
+Objective:
+- explain why the kept transition-lane suppression improves width and dry-belt ratios a bit but still does not restore NH westerlies
+
+Primary files:
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+
+Exit criteria:
+- identify the remaining return-flow / jet-response mismatch that stays after Phase 1M
+- produce a narrower circulation-facing patch design instead of more transition-occupancy tuning
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
