@@ -95,19 +95,19 @@ function buildBandDiagnostics(offSample, onSample) {
   return outputs;
 }
 
-function nextPhaseForVerdict(verdict) {
+function nextPhaseForVerdict(verdict, nextPhaseNumber = '1X') {
   switch (verdict) {
     case 'projected_share_unapplied_before_transition_entry':
-      return 'Phase 1X: Projected-Share Application Repair';
+      return `Phase ${nextPhaseNumber}: Projected-Share Application Repair`;
     case 'vertical_depth_failure':
-      return 'Phase 1X: Vertical-Depth Bridge Patch Design';
+      return `Phase ${nextPhaseNumber}: Vertical-Depth Bridge Patch Design`;
     case 'latitudinal_target_placement_failure':
-      return 'Phase 1X: Poleward Target Reweight Design';
+      return `Phase ${nextPhaseNumber}: Poleward Target Reweight Design`;
     case 'equatorward_condensation_absorption':
-      return 'Phase 1X: Equatorward Absorption Guard Design';
+      return `Phase ${nextPhaseNumber}: Equatorward Absorption Guard Design`;
     case 'true_downstream_jet_response_failure':
     default:
-      return 'Phase 1X: Transition-To-Jet Coupling Design';
+      return `Phase ${nextPhaseNumber}: Transition-To-Jet Coupling Design`;
   }
 }
 
@@ -133,7 +133,8 @@ export function buildPhase1WTransitionOmegaCarrierAttribution({
   onMetrics,
   offSample,
   onSample,
-  paths
+  paths,
+  nextPhaseNumber = '1X'
 }) {
   const bands = buildBandDiagnostics(offSample, onSample);
   const jetFlatScore = mean(
@@ -238,7 +239,7 @@ export function buildPhase1WTransitionOmegaCarrierAttribution({
   ].sort((a, b) => (b.score || 0) - (a.score || 0));
 
   const verdict = ranking[0]?.key || 'projected_share_unapplied_before_transition_entry';
-  const nextPhase = nextPhaseForVerdict(verdict);
+  const nextPhase = nextPhaseForVerdict(verdict, nextPhaseNumber);
 
   return {
     schema: 'satellite-wars.phase1w-transition-omega-carrier-attribution.v1',
@@ -275,9 +276,15 @@ export function buildPhase1WTransitionOmegaCarrierAttribution({
   };
 }
 
-export function renderPhase1WReport(summary) {
+function inferReportTitle(reportPath) {
+  const base = path.basename(reportPath || '');
+  if (base.includes('phase1x')) return '# Phase 1X Projected-Share Application Repair';
+  return '# Phase 1W Transition-Omega Carrier Attribution';
+}
+
+export function renderPhase1WReport(summary, reportPath = '') {
   const lines = [
-    '# Phase 1W Transition-Omega Carrier Attribution',
+    inferReportTitle(reportPath),
     '',
     '## Scope',
     '',
@@ -343,6 +350,7 @@ function parseArgs(argv) {
 
 function main() {
   const args = parseArgs(process.argv);
+  const nextPhaseNumber = path.basename(args.reportPath).includes('phase1x') ? '1Y' : '1X';
   const baseline = readJson(args.baselinePath);
   const offAudit = readJson(args.offPath);
   const onAudit = readJson(args.onPath);
@@ -352,6 +360,7 @@ function main() {
     onMetrics: latestMetrics(onAudit),
     offSample: latestSample(offAudit),
     onSample: latestSample(onAudit),
+    nextPhaseNumber,
     paths: {
       baselinePath: args.baselinePath,
       offPath: args.offPath,
@@ -360,7 +369,7 @@ function main() {
   });
   fs.mkdirSync(path.dirname(args.reportPath), { recursive: true });
   fs.mkdirSync(path.dirname(args.jsonPath), { recursive: true });
-  fs.writeFileSync(args.reportPath, renderPhase1WReport(summary));
+  fs.writeFileSync(args.reportPath, renderPhase1WReport(summary, args.reportPath));
   fs.writeFileSync(args.jsonPath, `${JSON.stringify(summary, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 }

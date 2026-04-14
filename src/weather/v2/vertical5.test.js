@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createState5 } from './state5.js';
 import {
   computeDryingOmegaBridgePaS,
+  computeProjectedOmegaBridgeCellPaS,
   computeDryingOmegaBridgeSourceSupport,
   computeDryingOmegaBridgeTargetWeight,
   computeTransitionReturnFlowCouplingFrac,
@@ -555,4 +556,36 @@ test('computeDryingOmegaBridgeTargetWeight focuses on weak-engine 30-45N targets
   assert.ok(targetCore > 0.3);
   assert.ok(strongEngine < targetCore);
   assert.equal(outsideTarget, 0);
+});
+
+test('computeProjectedOmegaBridgeCellPaS redistributes a capped projected share into live target rows', () => {
+  assert.equal(
+    computeProjectedOmegaBridgeCellPaS({
+      enabled: false,
+      budgetPaS: 0.004,
+      targetWeight: 0.5,
+      totalTargetWeight: 1,
+      projectedMaxPaS: 0.006
+    }),
+    0
+  );
+
+  const active = computeProjectedOmegaBridgeCellPaS({
+    enabled: true,
+    budgetPaS: 0.004,
+    targetWeight: 0.5,
+    totalTargetWeight: 1,
+    projectedMaxPaS: 0.006
+  });
+  const capped = computeProjectedOmegaBridgeCellPaS({
+    enabled: true,
+    budgetPaS: 0.02,
+    targetWeight: 0.8,
+    totalTargetWeight: 1,
+    projectedMaxPaS: 0.006
+  });
+
+  assert.ok(active > 0);
+  assert.equal(active, 0.002);
+  assert.equal(capped, 0.006);
 });

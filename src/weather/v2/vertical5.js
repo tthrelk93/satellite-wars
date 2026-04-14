@@ -205,6 +205,21 @@ export const computeDryingOmegaBridgeTargetWeight = ({
       * existingDescentTaper
   );
 };
+export const computeProjectedOmegaBridgeCellPaS = ({
+  enabled,
+  budgetPaS,
+  targetWeight,
+  totalTargetWeight,
+  projectedMaxPaS
+}) => {
+  if (!enabled) return 0;
+  if (!(budgetPaS > 0) || !(targetWeight > 0) || !(totalTargetWeight > 1e-12)) return 0;
+  return clamp(
+    budgetPaS * (targetWeight / totalTargetWeight),
+    0,
+    projectedMaxPaS
+  );
+};
 const VERTICAL_ALLOWED_PARAMS = new Set([
   'enableMixing',
   'enableConvection',
@@ -1790,6 +1805,64 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             theta[idx] += subtropicalSubsidenceThetaStepK * dryFrac * (0.65 + 0.55 * layerWeight);
           }
           subsidenceDryingWeightedSum += dryDriver * cosLat[j];
+        }
+      }
+
+      projectedOmegaBridgeTargetWeight.fill(0);
+      nhProjectedOmegaBridgeTargetWeightByX.fill(0);
+      shProjectedOmegaBridgeTargetWeightByX.fill(0);
+      for (let j = 0; j < ny; j++) {
+        const lat = latDeg[j];
+        const latAbs = Math.abs(lat);
+        if (latAbs < dryingOmegaBridgeTargetLat0 - 2 || latAbs > dryingOmegaBridgeTargetLat1 + 2) continue;
+        const row = j * nx;
+        for (let i = 0; i < nx; i++) {
+          const k = row + i;
+          const targetWeight = computeDryingOmegaBridgeTargetWeight({
+            enabled: enableDryingOmegaBridge,
+            latAbs,
+            targetLat0: dryingOmegaBridgeTargetLat0,
+            targetLat1: dryingOmegaBridgeTargetLat1,
+            organizedSupport: convectiveOrganization[k],
+            convectivePotential: convectivePotential[k],
+            neutralToSubsidingSupport: freshNeutralToSubsidingSupportPublicDiag[k] || 0,
+            existingOmegaPaS: lowLevelOmegaEffective[k]
+          });
+          projectedOmegaBridgeTargetWeight[k] = targetWeight;
+          if (targetWeight > 0) {
+            if (lat >= 0) nhProjectedOmegaBridgeTargetWeightByX[i] += targetWeight;
+            else shProjectedOmegaBridgeTargetWeightByX[i] += targetWeight;
+          }
+        }
+      }
+
+      for (let j = 0; j < ny; j++) {
+        const lat = latDeg[j];
+        const latAbs = Math.abs(lat);
+        if (latAbs < dryingOmegaBridgeTargetLat0 - 2 || latAbs > dryingOmegaBridgeTargetLat1 + 2) continue;
+        const row = j * nx;
+        for (let i = 0; i < nx; i++) {
+          const k = row + i;
+          const targetWeight = projectedOmegaBridgeTargetWeight[k] || 0;
+          if (!(targetWeight > 0)) continue;
+          const hemiBudgetByX = lat >= 0 ? nhProjectedOmegaBridgeBudgetByX : shProjectedOmegaBridgeBudgetByX;
+          const hemiTargetWeightByX = lat >= 0 ? nhProjectedOmegaBridgeTargetWeightByX : shProjectedOmegaBridgeTargetWeightByX;
+          const totalBudget = hemiBudgetByX[i] || 0;
+          const totalTargetWeight = hemiTargetWeightByX[i] || 0;
+          if (!(totalBudget > 0) || !(totalTargetWeight > eps)) continue;
+          const projectedOmegaBridgePaS = computeProjectedOmegaBridgeCellPaS({
+            enabled: enableDryingOmegaBridge,
+            budgetPaS: totalBudget,
+            targetWeight,
+            totalTargetWeight,
+            projectedMaxPaS: dryingOmegaBridgeProjectedMaxPaS
+          });
+          if (!(projectedOmegaBridgePaS > 0)) continue;
+          dryingOmegaBridgeProjectedAppliedDiag[k] += projectedOmegaBridgePaS;
+          dryingOmegaBridgeAppliedDiag[k] += projectedOmegaBridgePaS;
+          lowLevelOmegaEffective[k] += projectedOmegaBridgePaS;
+          omega[levS * N + k] += projectedOmegaBridgePaS;
+          if (levS > 0) omega[(levS - 1) * N + k] += projectedOmegaBridgePaS * 0.35;
         }
       }
     }

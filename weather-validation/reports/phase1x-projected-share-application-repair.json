@@ -1,0 +1,213 @@
+{
+  "schema": "satellite-wars.phase1w-transition-omega-carrier-attribution.v1",
+  "generatedAt": "2026-04-14T06:48:22.227Z",
+  "paths": {
+    "baselinePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-hadley-second-pass-restore-v4.json",
+    "offPath": "/tmp/phase1x-off.json",
+    "onPath": "/tmp/phase1x-on.json"
+  },
+  "verdict": "equatorward_condensation_absorption",
+  "nextPhase": "Phase 1Y: Equatorward Absorption Guard Design",
+  "baselineGap": {
+    "itczWidthDeg": {
+      "baseline": 23.646,
+      "current": 25.839,
+      "delta": 2.193
+    },
+    "subtropicalDryNorthRatio": {
+      "baseline": 1.1,
+      "current": 1.517,
+      "delta": 0.417
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "baseline": 1.192,
+      "current": 0.531,
+      "delta": -0.661
+    }
+  },
+  "offOnCompare": {
+    "itczWidthDeg": {
+      "off": 25.834,
+      "on": 25.839,
+      "delta": 0.005
+    },
+    "subtropicalDryNorthRatio": {
+      "off": 1.515,
+      "on": 1.517,
+      "delta": 0.002
+    },
+    "subtropicalDrySouthRatio": {
+      "off": 1.192,
+      "on": 1.194,
+      "delta": 0.002
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "off": 0.531,
+      "on": 0.531,
+      "delta": 0
+    }
+  },
+  "bandDiagnostics": {
+    "tropicalShoulderNorth": {
+      "label": "Tropical shoulder (3-18.75N)",
+      "localBridgeOnPaS": 0.00068,
+      "projectedBridgeOnPaS": 0,
+      "totalBridgeOnPaS": 0.00068,
+      "localBridgeDeltaPaS": 0.00068,
+      "projectedBridgeDeltaPaS": 0,
+      "totalBridgeDeltaPaS": 0.00068,
+      "lowerOmegaDeltaPaS": 0.00006,
+      "midOmegaDeltaPaS": 0.00008,
+      "upperOmegaDeltaPaS": 0.00004,
+      "wind10mUDeltaMs": 0,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": 0.01365
+    },
+    "equatorwardLeakNorth": {
+      "label": "Equatorward leak window (18-22N)",
+      "localBridgeOnPaS": 0.00205,
+      "projectedBridgeOnPaS": 0,
+      "totalBridgeOnPaS": 0.00205,
+      "localBridgeDeltaPaS": 0.00205,
+      "projectedBridgeDeltaPaS": 0,
+      "totalBridgeDeltaPaS": 0.00205,
+      "lowerOmegaDeltaPaS": 0.00022,
+      "midOmegaDeltaPaS": 0.0002,
+      "upperOmegaDeltaPaS": 0.00008,
+      "wind10mUDeltaMs": 0,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": -0.00009
+    },
+    "sourceCoreNorth": {
+      "label": "Source core (20-30N)",
+      "localBridgeOnPaS": 0.00063,
+      "projectedBridgeOnPaS": 0,
+      "totalBridgeOnPaS": 0.00063,
+      "localBridgeDeltaPaS": 0.00063,
+      "projectedBridgeDeltaPaS": 0,
+      "totalBridgeDeltaPaS": 0.00063,
+      "lowerOmegaDeltaPaS": -0.00017,
+      "midOmegaDeltaPaS": -0.00022,
+      "upperOmegaDeltaPaS": -0.00013,
+      "wind10mUDeltaMs": 0,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": -0.00972
+    },
+    "targetEntryEquatorwardNorth": {
+      "label": "Target entry equatorward half (30-37.5N)",
+      "localBridgeOnPaS": 0.00038,
+      "projectedBridgeOnPaS": 0.00065,
+      "totalBridgeOnPaS": 0.00103,
+      "localBridgeDeltaPaS": 0.00038,
+      "projectedBridgeDeltaPaS": 0.00065,
+      "totalBridgeDeltaPaS": 0.00103,
+      "lowerOmegaDeltaPaS": -0.00087,
+      "midOmegaDeltaPaS": -0.00111,
+      "upperOmegaDeltaPaS": -0.0007,
+      "wind10mUDeltaMs": 0,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": -0.00029
+    },
+    "targetEntryPolewardNorth": {
+      "label": "Target entry poleward half (37.5-45N)",
+      "localBridgeOnPaS": 0,
+      "projectedBridgeOnPaS": 0.00053,
+      "totalBridgeOnPaS": 0.00053,
+      "localBridgeDeltaPaS": 0,
+      "projectedBridgeDeltaPaS": 0.00053,
+      "totalBridgeDeltaPaS": 0.00053,
+      "lowerOmegaDeltaPaS": 0.00022,
+      "midOmegaDeltaPaS": 0.00025,
+      "upperOmegaDeltaPaS": 0.00011,
+      "wind10mUDeltaMs": 0,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": -0.00009
+    },
+    "targetEntryNorth": {
+      "label": "Target entry (30-45N)",
+      "localBridgeOnPaS": 0.00019,
+      "projectedBridgeOnPaS": 0.00059,
+      "totalBridgeOnPaS": 0.00078,
+      "localBridgeDeltaPaS": 0.00019,
+      "projectedBridgeDeltaPaS": 0.00059,
+      "totalBridgeDeltaPaS": 0.00078,
+      "lowerOmegaDeltaPaS": -0.00033,
+      "midOmegaDeltaPaS": -0.00043,
+      "upperOmegaDeltaPaS": -0.00029,
+      "wind10mUDeltaMs": 0,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": -0.00019
+    },
+    "jetBandNorth": {
+      "label": "Jet band (41.25-56.25N)",
+      "localBridgeOnPaS": 0,
+      "projectedBridgeOnPaS": 0.00018,
+      "totalBridgeOnPaS": 0.00018,
+      "localBridgeDeltaPaS": 0,
+      "projectedBridgeDeltaPaS": 0.00018,
+      "totalBridgeDeltaPaS": 0.00018,
+      "lowerOmegaDeltaPaS": 0.00026,
+      "midOmegaDeltaPaS": 0.00035,
+      "upperOmegaDeltaPaS": 0.00025,
+      "wind10mUDeltaMs": 0,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": -0.00005
+    }
+  },
+  "ranking": [
+    {
+      "key": "equatorward_condensation_absorption",
+      "label": "A remaining equatorward condensation sink absorbs the carrier before jet entry",
+      "score": 0.75,
+      "evidence": {
+        "tropicalShoulderCondensationDeltaKgM2": 0.01365,
+        "sourceCoreCondensationDeltaKgM2": -0.00972,
+        "targetEntryLowerOmegaDeltaPaS": -0.00033
+      }
+    },
+    {
+      "key": "true_downstream_jet_response_failure",
+      "label": "Carrier reaches the transition and jet-entry structure, but wind recovery still fails downstream",
+      "score": 0.71875,
+      "evidence": {
+        "targetEntryProjectedBridgeOnPaS": 0.00059,
+        "targetEntryMidOmegaDeltaPaS": -0.00043,
+        "jetBandMidOmegaDeltaPaS": 0.00035,
+        "jetBandWindDeltaMs": 0
+      }
+    },
+    {
+      "key": "vertical_depth_failure",
+      "label": "Carrier reaches the target lane but stays too shallow vertically",
+      "score": 0.625,
+      "evidence": {
+        "targetEntryProjectedBridgeOnPaS": 0.00059,
+        "targetEntryLowerOmegaDeltaPaS": -0.00033,
+        "targetEntryMidOmegaDeltaPaS": -0.00043,
+        "jetBandMidOmegaDeltaPaS": 0.00035
+      }
+    },
+    {
+      "key": "latitudinal_target_placement_failure",
+      "label": "Carrier reaches the target lane but lands too far equatorward inside it",
+      "score": 0.54615,
+      "evidence": {
+        "equatorwardLeakProjectedBridgeOnPaS": 0,
+        "targetEntryEquatorwardProjectedBridgeOnPaS": 0.00065,
+        "targetEntryPolewardProjectedBridgeOnPaS": 0.00053
+      }
+    },
+    {
+      "key": "projected_share_unapplied_before_transition_entry",
+      "label": "Projected bridge share never becomes a live target-lane carrier",
+      "score": 0.4075,
+      "evidence": {
+        "sourceCoreLocalBridgeOnPaS": 0.00063,
+        "targetEntryProjectedBridgeOnPaS": 0.00059,
+        "targetPolewardProjectedBridgeOnPaS": 0.00053,
+        "jetBandWindDeltaMs": 0
+      }
+    }
+  ],
+  "recommendation": "The projected bridge is live, but an equatorward condensation sink is still soaking up the response before jet entry. Add an absorption guard before building downstream coupling."
+}

@@ -1009,6 +1009,48 @@ Exit criteria:
 - target-entry lower- or mid-tropospheric omega improves relative to `off`
 - the patch stays guardrail-first and does not increase total bridge amplitude before proving placement
 
+Status:
+- completed
+
+Result:
+- the projected-share repair succeeded as a live carrier repair
+- target-entry `30-45°N` projected bridge is now non-zero: `0.00059 Pa/s`
+- target-entry poleward-half `37.5-45°N` projected bridge is also non-zero: `0.00053 Pa/s`
+- jet-band `41.25-56.25°N` projected bridge is now non-zero: `0.00018 Pa/s`
+- the old dominant failure `projected_share_unapplied_before_transition_entry` is no longer first-ranked
+- the new dominant residual is `equatorward_condensation_absorption`
+- guardrails did not improve yet:
+  - `itczWidthDeg: 25.834 -> 25.839`
+  - `subtropicalDryNorthRatio: 1.515 -> 1.517`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+
+Patch contract for the next lane:
+- keep the repaired projected-share deposition path in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- keep the current diagnostics and runtime toggle
+- stop treating missing projected deposition as the blocker
+- next work should guard against equatorward tropical-shoulder absorption before adding more downstream coupling
+
+### Phase 1Y: Equatorward Absorption Guard Design
+
+Objective:
+- explain and then reduce the remaining equatorward condensation sink that absorbs the now-live projected bridge before transition-entry omega can become wind recovery
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+
+Questions to resolve:
+- why does tropical-shoulder `3-18.75°N` condensation increase by `+0.01365 kg/m²` when the projected bridge is enabled?
+- why does target-entry projected bridge coexist with slightly worse target-entry lower/mid omega?
+- what narrow guard can reduce equatorward absorption without undoing the kept Phase `1K`, `1M`, and Phase `1X` bridge wins?
+
+Exit criteria:
+- tropical-shoulder condensation rebound is materially reduced in same-branch `off/on`
+- target-entry lower- or mid-tropospheric omega no longer regresses relative to `off`
+- the guard stays narrow and does not increase total bridge amplitude first
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
