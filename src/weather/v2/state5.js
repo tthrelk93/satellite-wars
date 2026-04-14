@@ -74,6 +74,9 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const dryingOmegaBridgeAppliedDiag = makeArray(N);
   const dryingOmegaBridgeLocalAppliedDiag = makeArray(N);
   const dryingOmegaBridgeProjectedAppliedDiag = makeArray(N);
+  const equatorialEdgeSubsidenceGuardSourceSupportDiag = makeArray(N);
+  const equatorialEdgeSubsidenceGuardTargetWeightDiag = makeArray(N);
+  const equatorialEdgeSubsidenceGuardAppliedDiag = makeArray(N);
   const subtropicalSourceDriverDiag = makeArray(N);
   const subtropicalSourceDriverFloorDiag = makeArray(N);
   const subtropicalLocalHemiSourceDiag = makeArray(N);
@@ -348,6 +351,9 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     dryingOmegaBridgeAppliedDiag,
     dryingOmegaBridgeLocalAppliedDiag,
     dryingOmegaBridgeProjectedAppliedDiag,
+    equatorialEdgeSubsidenceGuardSourceSupportDiag,
+    equatorialEdgeSubsidenceGuardTargetWeightDiag,
+    equatorialEdgeSubsidenceGuardAppliedDiag,
     subtropicalSourceDriverDiag,
     subtropicalSourceDriverFloorDiag,
     subtropicalLocalHemiSourceDiag,

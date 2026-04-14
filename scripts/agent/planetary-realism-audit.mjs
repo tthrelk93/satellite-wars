@@ -75,6 +75,7 @@ let shoulderGuardFateMode = 'retain';
 let circulationReboundPatchMode = 'default';
 let returnFlowCouplingPatchMode = 'default';
 let dryingOmegaBridgePatchMode = 'default';
+let equatorialEdgeSubsidenceGuardPatchMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -124,6 +125,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--return-flow-coupling-patch=')) returnFlowCouplingPatchMode = arg.slice('--return-flow-coupling-patch='.length);
   else if (arg === '--drying-omega-bridge-patch' && argv[i + 1]) dryingOmegaBridgePatchMode = argv[++i];
   else if (arg.startsWith('--drying-omega-bridge-patch=')) dryingOmegaBridgePatchMode = arg.slice('--drying-omega-bridge-patch='.length);
+  else if (arg === '--equatorial-edge-subsidence-guard-patch' && argv[i + 1]) equatorialEdgeSubsidenceGuardPatchMode = argv[++i];
+  else if (arg.startsWith('--equatorial-edge-subsidence-guard-patch=')) equatorialEdgeSubsidenceGuardPatchMode = arg.slice('--equatorial-edge-subsidence-guard-patch='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--trusted-baseline' && argv[i + 1]) trustedBaselinePath = path.resolve(argv[++i]);
   else if (arg.startsWith('--trusted-baseline=')) trustedBaselinePath = path.resolve(arg.slice('--trusted-baseline='.length));
@@ -170,6 +173,11 @@ shoulderGuardFateMode = shoulderGuardFateMode === 'sink_export'
 circulationReboundPatchMode = circulationReboundPatchMode === 'off'
   ? 'off'
   : circulationReboundPatchMode === 'on'
+    ? 'on'
+    : 'default';
+equatorialEdgeSubsidenceGuardPatchMode = equatorialEdgeSubsidenceGuardPatchMode === 'off'
+  ? 'off'
+  : equatorialEdgeSubsidenceGuardPatchMode === 'on'
     ? 'on'
     : 'default';
 
@@ -589,6 +597,7 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
     shoulderAbsorptionGuardPatchMode,
     shoulderGuardFateMode,
     circulationReboundPatchMode,
+    equatorialEdgeSubsidenceGuardPatchMode,
     instrumentationMode: core.getInstrumentationMode ? core.getInstrumentationMode() : instrumentationMode,
     sampleTargetsDays,
     targetSeconds: targetsSeconds,
@@ -1295,6 +1304,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     dryingOmegaBridgeAppliedDiagPaS,
     dryingOmegaBridgeLocalAppliedDiagPaS,
     dryingOmegaBridgeProjectedAppliedDiagPaS,
+    equatorialEdgeSubsidenceGuardSourceSupportDiagFrac,
+    equatorialEdgeSubsidenceGuardTargetWeightDiagFrac,
+    equatorialEdgeSubsidenceGuardAppliedDiagPaS,
     subtropicalSourceDriverDiagFrac,
     subtropicalSourceDriverFloorDiagFrac,
     subtropicalLocalHemiSourceDiagFrac,
@@ -1389,6 +1401,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalLowLevelOmegaEffective = zonalMean(lowLevelOmegaEffectivePaS || new Array(nx * ny).fill(0), nx, ny);
   const zonalDryingOmegaBridgeLocalApplied = zonalMean(dryingOmegaBridgeLocalAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
   const zonalDryingOmegaBridgeProjectedApplied = zonalMean(dryingOmegaBridgeProjectedAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
+  const zonalEquatorialEdgeSubsidenceGuardSourceSupport = zonalMean(equatorialEdgeSubsidenceGuardSourceSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalEquatorialEdgeSubsidenceGuardTargetWeight = zonalMean(equatorialEdgeSubsidenceGuardTargetWeightDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalEquatorialEdgeSubsidenceGuardApplied = zonalMean(equatorialEdgeSubsidenceGuardAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSurfaceEvap = zonalMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny);
@@ -2144,6 +2159,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         dryingOmegaBridgeAppliedPaS: roundSeries(zonalDryingOmegaBridgeApplied, 5),
         dryingOmegaBridgeLocalAppliedPaS: roundSeries(zonalDryingOmegaBridgeLocalApplied, 5),
         dryingOmegaBridgeProjectedAppliedPaS: roundSeries(zonalDryingOmegaBridgeProjectedApplied, 5),
+        equatorialEdgeSubsidenceGuardSourceSupportDiagFrac: roundSeries(zonalEquatorialEdgeSubsidenceGuardSourceSupport, 5),
+        equatorialEdgeSubsidenceGuardTargetWeightDiagFrac: roundSeries(zonalEquatorialEdgeSubsidenceGuardTargetWeight, 5),
+        equatorialEdgeSubsidenceGuardAppliedDiagPaS: roundSeries(zonalEquatorialEdgeSubsidenceGuardApplied, 5),
         freshShoulderLatitudeWindowDiagFrac: roundSeries(zonalFreshShoulderLatitudeWindow, 5),
         freshShoulderEquatorialEdgeWindowDiagFrac: roundSeries(zonalFreshShoulderEquatorialEdgeWindow, 5),
         freshShoulderInnerWindowDiagFrac: roundSeries(zonalFreshShoulderInnerWindow, 5),
@@ -4917,6 +4935,8 @@ export async function main() {
   else if (returnFlowCouplingPatchMode === 'on') core.vertParams.enableTransitionReturnFlowCoupling = true;
   if (dryingOmegaBridgePatchMode === 'off') core.vertParams.enableDryingOmegaBridge = false;
   else if (dryingOmegaBridgePatchMode === 'on') core.vertParams.enableDryingOmegaBridge = true;
+  if (equatorialEdgeSubsidenceGuardPatchMode === 'off') core.vertParams.enableEquatorialEdgeSubsidenceGuard = false;
+  else if (equatorialEdgeSubsidenceGuardPatchMode === 'on') core.vertParams.enableEquatorialEdgeSubsidenceGuard = true;
   if (softLiveGatePatchMode === 'off') core.microParams.enableSoftLiveStateMaintenanceSuppression = false;
   else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
   if (shoulderAbsorptionGuardPatchMode === 'off') core.microParams.enableShoulderAbsorptionGuard = false;

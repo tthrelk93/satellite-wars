@@ -1399,6 +1399,27 @@ Status:
   - the `11.25°N`, `18.75°N`, and `33.75°N` kept wins remain intact
 - next active phase: `Phase 1ZL: Equatorial-Edge Subsidence Guard Design`
 
+#### Phase 1ZL: Equatorial-Edge Subsidence Guard Patch
+
+Objective:
+- test whether a small vertical/core omega guard can preserve the drying response and stop the `±3.75°` edge lanes from absorbing displaced condensation
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [phase1zl-equatorial-edge-subsidence-guard-patch.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/phase1zl-equatorial-edge-subsidence-guard-patch.mjs)
+
+Status:
+- complete in [phase1zl-equatorial-edge-subsidence-guard-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zl-equatorial-edge-subsidence-guard-patch.md)
+- verdict: `north_only_partial_guard_activation`
+- keep patch: `false`
+- key conclusions:
+  - the guard only activates along the northern source/target pair: `11.25°N -> 3.75°N`
+  - the southern mirror stays silent, so the bilateral residual from Phase 1ZK is not actually addressed
+  - `3.75°N` still gets wetter even with small applied guard omega
+  - the main 30-day guardrails are flat-to-worse, so this is not a keepable default patch
+- next active phase: `Phase 1ZM: Bilateral Equatorial-Edge Source Redesign`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

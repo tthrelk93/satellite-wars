@@ -220,6 +220,56 @@ export const computeProjectedOmegaBridgeCellPaS = ({
     projectedMaxPaS
   );
 };
+export const computeEquatorialEdgeSubsidenceGuardSourceSupport = ({
+  enabled,
+  latAbs,
+  sourceLat0,
+  sourceLat1,
+  innerShoulderWindow,
+  subtropicalBand,
+  neutralToSubsidingSupport,
+  existingOmegaPaS
+}) => {
+  if (!enabled) return 0;
+  const sourceWindow = smoothstep(sourceLat0 - 2, sourceLat0 + 2, latAbs)
+    * (1 - smoothstep(sourceLat1 - 2, sourceLat1 + 2, latAbs));
+  const localDescentSupport = smoothstep(0.04, 0.18, Math.max(0, existingOmegaPaS));
+  return clamp01(
+    sourceWindow
+      * clamp01(innerShoulderWindow)
+      * (0.45 + 0.55 * clamp01(subtropicalBand))
+      * (0.4 + 0.6 * clamp01(neutralToSubsidingSupport))
+      * localDescentSupport
+  );
+};
+export const computeEquatorialEdgeSubsidenceGuardTargetWeight = ({
+  enabled,
+  latAbs,
+  targetLat0,
+  targetLat1,
+  edgeWindow,
+  edgeGateSupport,
+  organizedSupport,
+  convectivePotential,
+  existingOmegaPaS
+}) => {
+  if (!enabled) return 0;
+  const targetWindow = smoothstep(targetLat0 - 1.5, targetLat0 + 1.5, latAbs)
+    * (1 - smoothstep(targetLat1 - 1.5, targetLat1 + 1.5, latAbs));
+  const weakEngineSupport = clamp01(
+    0.6 * (1 - clamp01(organizedSupport)) +
+    0.4 * (1 - clamp01(convectivePotential))
+  );
+  const missingEdgeSupport = 1 - clamp01(edgeGateSupport);
+  const existingDescentTaper = 1 - smoothstep(0.08, 0.2, Math.max(0, existingOmegaPaS));
+  return clamp01(
+    targetWindow
+      * clamp01(edgeWindow)
+      * weakEngineSupport
+      * (0.55 + 0.45 * missingEdgeSupport)
+      * existingDescentTaper
+  );
+};
 const VERTICAL_ALLOWED_PARAMS = new Set([
   'enableMixing',
   'enableConvection',
@@ -308,6 +358,13 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'dryingOmegaBridgeEquatorwardLeakLat0',
   'dryingOmegaBridgeEquatorwardLeakLat1',
   'dryingOmegaBridgeProjectedMaxPaS',
+  'enableEquatorialEdgeSubsidenceGuard',
+  'equatorialEdgeSubsidenceGuardMaxPaS',
+  'equatorialEdgeSubsidenceGuardSourceLat0',
+  'equatorialEdgeSubsidenceGuardSourceLat1',
+  'equatorialEdgeSubsidenceGuardTargetLat0',
+  'equatorialEdgeSubsidenceGuardTargetLat1',
+  'equatorialEdgeSubsidenceGuardProjectedMaxPaS',
   'enableCarryInputDominanceOverride',
   'carryInputSubtropicalSuppressionMin',
   'carryInputOrganizedSupportMax',
@@ -451,6 +508,13 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     dryingOmegaBridgeEquatorwardLeakLat0 = 18,
     dryingOmegaBridgeEquatorwardLeakLat1 = 22,
     dryingOmegaBridgeProjectedMaxPaS = 0.006,
+    enableEquatorialEdgeSubsidenceGuard = false,
+    equatorialEdgeSubsidenceGuardMaxPaS = 0.007,
+    equatorialEdgeSubsidenceGuardSourceLat0 = 8,
+    equatorialEdgeSubsidenceGuardSourceLat1 = 14,
+    equatorialEdgeSubsidenceGuardTargetLat0 = 2,
+    equatorialEdgeSubsidenceGuardTargetLat1 = 6,
+    equatorialEdgeSubsidenceGuardProjectedMaxPaS = 0.0035,
     enableCarryInputDominanceOverride = true,
     carryInputSubtropicalSuppressionMin = 0.74243,
     carryInputOrganizedSupportMax = 0.22504,
@@ -497,6 +561,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.circulationReboundSuppressedSourceDiag || state.circulationReboundSuppressedSourceDiag.length !== N) state.circulationReboundSuppressedSourceDiag = new Float32Array(N);
   if (!state.circulationReturnFlowOpportunityDiag || state.circulationReturnFlowOpportunityDiag.length !== N) state.circulationReturnFlowOpportunityDiag = new Float32Array(N);
   if (!state.circulationReturnFlowCouplingAppliedDiag || state.circulationReturnFlowCouplingAppliedDiag.length !== N) state.circulationReturnFlowCouplingAppliedDiag = new Float32Array(N);
+  if (!state.dryingOmegaBridgeAppliedDiag || state.dryingOmegaBridgeAppliedDiag.length !== N) state.dryingOmegaBridgeAppliedDiag = new Float32Array(N);
+  if (!state.dryingOmegaBridgeLocalAppliedDiag || state.dryingOmegaBridgeLocalAppliedDiag.length !== N) state.dryingOmegaBridgeLocalAppliedDiag = new Float32Array(N);
+  if (!state.dryingOmegaBridgeProjectedAppliedDiag || state.dryingOmegaBridgeProjectedAppliedDiag.length !== N) state.dryingOmegaBridgeProjectedAppliedDiag = new Float32Array(N);
+  if (!state.equatorialEdgeSubsidenceGuardSourceSupportDiag || state.equatorialEdgeSubsidenceGuardSourceSupportDiag.length !== N) state.equatorialEdgeSubsidenceGuardSourceSupportDiag = new Float32Array(N);
+  if (!state.equatorialEdgeSubsidenceGuardTargetWeightDiag || state.equatorialEdgeSubsidenceGuardTargetWeightDiag.length !== N) state.equatorialEdgeSubsidenceGuardTargetWeightDiag = new Float32Array(N);
+  if (!state.equatorialEdgeSubsidenceGuardAppliedDiag || state.equatorialEdgeSubsidenceGuardAppliedDiag.length !== N) state.equatorialEdgeSubsidenceGuardAppliedDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverDiag || state.subtropicalSourceDriverDiag.length !== N) state.subtropicalSourceDriverDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverFloorDiag || state.subtropicalSourceDriverFloorDiag.length !== N) state.subtropicalSourceDriverFloorDiag = new Float32Array(N);
   if (!state.subtropicalLocalHemiSourceDiag || state.subtropicalLocalHemiSourceDiag.length !== N) state.subtropicalLocalHemiSourceDiag = new Float32Array(N);
@@ -615,6 +685,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const dryingOmegaBridgeAppliedDiag = state.dryingOmegaBridgeAppliedDiag;
   const dryingOmegaBridgeLocalAppliedDiag = state.dryingOmegaBridgeLocalAppliedDiag;
   const dryingOmegaBridgeProjectedAppliedDiag = state.dryingOmegaBridgeProjectedAppliedDiag;
+  const equatorialEdgeSubsidenceGuardSourceSupportDiag = state.equatorialEdgeSubsidenceGuardSourceSupportDiag;
+  const equatorialEdgeSubsidenceGuardTargetWeightDiag = state.equatorialEdgeSubsidenceGuardTargetWeightDiag;
+  const equatorialEdgeSubsidenceGuardAppliedDiag = state.equatorialEdgeSubsidenceGuardAppliedDiag;
   const subtropicalSourceDriverDiag = state.subtropicalSourceDriverDiag;
   const subtropicalSourceDriverFloorDiag = state.subtropicalSourceDriverFloorDiag;
   const subtropicalLocalHemiSourceDiag = state.subtropicalLocalHemiSourceDiag;
@@ -710,6 +783,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   dryingOmegaBridgeAppliedDiag.fill(0);
   dryingOmegaBridgeLocalAppliedDiag.fill(0);
   dryingOmegaBridgeProjectedAppliedDiag.fill(0);
+  equatorialEdgeSubsidenceGuardSourceSupportDiag.fill(0);
+  equatorialEdgeSubsidenceGuardTargetWeightDiag.fill(0);
+  equatorialEdgeSubsidenceGuardAppliedDiag.fill(0);
   subtropicalSourceDriverDiag.fill(0);
   subtropicalSourceDriverFloorDiag.fill(0);
   subtropicalLocalHemiSourceDiag.fill(0);
@@ -1725,6 +1801,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const projectedOmegaBridgeTargetWeight = new Float32Array(N);
       const nhProjectedOmegaBridgeTargetWeightByX = new Float32Array(nx);
       const shProjectedOmegaBridgeTargetWeightByX = new Float32Array(nx);
+      const nhEquatorialEdgeSubsidenceGuardBudgetByX = new Float32Array(nx);
+      const shEquatorialEdgeSubsidenceGuardBudgetByX = new Float32Array(nx);
+      const equatorialEdgeSubsidenceGuardTargetWeight = new Float32Array(N);
+      const nhEquatorialEdgeSubsidenceGuardTargetWeightByX = new Float32Array(nx);
+      const shEquatorialEdgeSubsidenceGuardTargetWeightByX = new Float32Array(nx);
 
       for (let j = 0; j < ny; j++) {
         const lat = latDeg[j];
@@ -1902,6 +1983,97 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           lowLevelOmegaEffective[k] += projectedOmegaBridgePaS;
           omega[levS * N + k] += projectedOmegaBridgePaS;
           if (levS > 0) omega[(levS - 1) * N + k] += projectedOmegaBridgePaS * 0.35;
+        }
+      }
+
+      for (let j = 0; j < ny; j++) {
+        const lat = latDeg[j];
+        const latAbs = Math.abs(lat);
+        if (latAbs < equatorialEdgeSubsidenceGuardSourceLat0 - 2 || latAbs > equatorialEdgeSubsidenceGuardSourceLat1 + 2) continue;
+        const row = j * nx;
+        for (let i = 0; i < nx; i++) {
+          const k = row + i;
+          const equatorialEdgeSourceSupport = computeEquatorialEdgeSubsidenceGuardSourceSupport({
+            enabled: enableEquatorialEdgeSubsidenceGuard,
+            latAbs,
+            sourceLat0: equatorialEdgeSubsidenceGuardSourceLat0,
+            sourceLat1: equatorialEdgeSubsidenceGuardSourceLat1,
+            innerShoulderWindow: freshShoulderInnerWindowPublicDiag[k] || 0,
+            subtropicalBand: freshSubtropicalBandPublicDiag[k] || 0,
+            neutralToSubsidingSupport: freshNeutralToSubsidingSupportPublicDiag[k] || 0,
+            existingOmegaPaS: lowLevelOmegaEffective[k]
+          });
+          equatorialEdgeSubsidenceGuardSourceSupportDiag[k] = equatorialEdgeSourceSupport;
+          if (equatorialEdgeSourceSupport <= 0) continue;
+          const weakEngineSupport = clamp01(
+            0.6 * (1 - clamp01(convectiveOrganization[k])) +
+            0.4 * (1 - clamp01(convectivePotential[k]))
+          );
+          const sourceBudgetPaS = equatorialEdgeSubsidenceGuardMaxPaS
+            * equatorialEdgeSourceSupport
+            * weakEngineSupport;
+          if (!(sourceBudgetPaS > 0)) continue;
+          if (lat >= 0) nhEquatorialEdgeSubsidenceGuardBudgetByX[i] += sourceBudgetPaS;
+          else shEquatorialEdgeSubsidenceGuardBudgetByX[i] += sourceBudgetPaS;
+        }
+      }
+
+      equatorialEdgeSubsidenceGuardTargetWeight.fill(0);
+      nhEquatorialEdgeSubsidenceGuardTargetWeightByX.fill(0);
+      shEquatorialEdgeSubsidenceGuardTargetWeightByX.fill(0);
+      for (let j = 0; j < ny; j++) {
+        const lat = latDeg[j];
+        const latAbs = Math.abs(lat);
+        if (latAbs < equatorialEdgeSubsidenceGuardTargetLat0 - 2 || latAbs > equatorialEdgeSubsidenceGuardTargetLat1 + 2) continue;
+        const row = j * nx;
+        for (let i = 0; i < nx; i++) {
+          const k = row + i;
+          const targetWeight = computeEquatorialEdgeSubsidenceGuardTargetWeight({
+            enabled: enableEquatorialEdgeSubsidenceGuard,
+            latAbs,
+            targetLat0: equatorialEdgeSubsidenceGuardTargetLat0,
+            targetLat1: equatorialEdgeSubsidenceGuardTargetLat1,
+            edgeWindow: freshShoulderEquatorialEdgeWindowPublicDiag[k] || 0,
+            edgeGateSupport: freshShoulderEquatorialEdgeGateSupportPublicDiag[k] || 0,
+            organizedSupport: convectiveOrganization[k],
+            convectivePotential: convectivePotential[k],
+            existingOmegaPaS: lowLevelOmegaEffective[k]
+          });
+          equatorialEdgeSubsidenceGuardTargetWeight[k] = targetWeight;
+          equatorialEdgeSubsidenceGuardTargetWeightDiag[k] = targetWeight;
+          if (targetWeight > 0) {
+            if (lat >= 0) nhEquatorialEdgeSubsidenceGuardTargetWeightByX[i] += targetWeight;
+            else shEquatorialEdgeSubsidenceGuardTargetWeightByX[i] += targetWeight;
+          }
+        }
+      }
+
+      for (let j = 0; j < ny; j++) {
+        const lat = latDeg[j];
+        const latAbs = Math.abs(lat);
+        if (latAbs < equatorialEdgeSubsidenceGuardTargetLat0 - 2 || latAbs > equatorialEdgeSubsidenceGuardTargetLat1 + 2) continue;
+        const row = j * nx;
+        for (let i = 0; i < nx; i++) {
+          const k = row + i;
+          const targetWeight = equatorialEdgeSubsidenceGuardTargetWeight[k] || 0;
+          if (!(targetWeight > 0)) continue;
+          const hemiBudgetByX = lat >= 0 ? nhEquatorialEdgeSubsidenceGuardBudgetByX : shEquatorialEdgeSubsidenceGuardBudgetByX;
+          const hemiTargetWeightByX = lat >= 0 ? nhEquatorialEdgeSubsidenceGuardTargetWeightByX : shEquatorialEdgeSubsidenceGuardTargetWeightByX;
+          const totalBudget = hemiBudgetByX[i] || 0;
+          const totalTargetWeight = hemiTargetWeightByX[i] || 0;
+          if (!(totalBudget > 0) || !(totalTargetWeight > eps)) continue;
+          const guardPaS = computeProjectedOmegaBridgeCellPaS({
+            enabled: enableEquatorialEdgeSubsidenceGuard,
+            budgetPaS: totalBudget,
+            targetWeight,
+            totalTargetWeight,
+            projectedMaxPaS: equatorialEdgeSubsidenceGuardProjectedMaxPaS
+          });
+          if (!(guardPaS > 0)) continue;
+          equatorialEdgeSubsidenceGuardAppliedDiag[k] += guardPaS;
+          lowLevelOmegaEffective[k] += guardPaS;
+          omega[levS * N + k] += guardPaS;
+          if (levS > 0) omega[(levS - 1) * N + k] += guardPaS * 0.35;
         }
       }
     }

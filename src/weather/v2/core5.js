@@ -557,6 +557,13 @@ export class WeatherCore5 {
       dryingOmegaBridgeEquatorwardLeakLat0: 18,
       dryingOmegaBridgeEquatorwardLeakLat1: 22,
       dryingOmegaBridgeProjectedMaxPaS: 0.006,
+      enableEquatorialEdgeSubsidenceGuard: false,
+      equatorialEdgeSubsidenceGuardMaxPaS: 0.007,
+      equatorialEdgeSubsidenceGuardSourceLat0: 8,
+      equatorialEdgeSubsidenceGuardSourceLat1: 14,
+      equatorialEdgeSubsidenceGuardTargetLat0: 2,
+      equatorialEdgeSubsidenceGuardTargetLat1: 6,
+      equatorialEdgeSubsidenceGuardProjectedMaxPaS: 0.0035,
       eps: 1e-12,
       debugConservation: false
     };

@@ -6,6 +6,8 @@ import {
   computeProjectedOmegaBridgeCellPaS,
   computeDryingOmegaBridgeSourceSupport,
   computeDryingOmegaBridgeTargetWeight,
+  computeEquatorialEdgeSubsidenceGuardSourceSupport,
+  computeEquatorialEdgeSubsidenceGuardTargetWeight,
   computeTransitionReturnFlowCouplingFrac,
   stepVertical5
 } from './vertical5.js';
@@ -630,6 +632,112 @@ test('computeDryingOmegaBridgeTargetWeight focuses on weak-engine 30-45N targets
 
   assert.ok(targetCore > 0.3);
   assert.ok(strongEngine < targetCore);
+  assert.equal(outsideTarget, 0);
+});
+
+test('computeEquatorialEdgeSubsidenceGuardSourceSupport favors inner-shoulder source rows with descent', () => {
+  assert.equal(
+    computeEquatorialEdgeSubsidenceGuardSourceSupport({
+      enabled: false,
+      latAbs: 11.25,
+      sourceLat0: 8,
+      sourceLat1: 14,
+      innerShoulderWindow: 1,
+      subtropicalBand: 0.7,
+      neutralToSubsidingSupport: 0.8,
+      existingOmegaPaS: 0.16
+    }),
+    0
+  );
+
+  const sourceCore = computeEquatorialEdgeSubsidenceGuardSourceSupport({
+    enabled: true,
+    latAbs: 11.25,
+    sourceLat0: 8,
+    sourceLat1: 14,
+    innerShoulderWindow: 1,
+    subtropicalBand: 0.7,
+    neutralToSubsidingSupport: 0.8,
+    existingOmegaPaS: 0.16
+  });
+  const noInnerLane = computeEquatorialEdgeSubsidenceGuardSourceSupport({
+    enabled: true,
+    latAbs: 11.25,
+    sourceLat0: 8,
+    sourceLat1: 14,
+    innerShoulderWindow: 0,
+    subtropicalBand: 0.7,
+    neutralToSubsidingSupport: 0.8,
+    existingOmegaPaS: 0.16
+  });
+  const outsideSource = computeEquatorialEdgeSubsidenceGuardSourceSupport({
+    enabled: true,
+    latAbs: 18.75,
+    sourceLat0: 8,
+    sourceLat1: 14,
+    innerShoulderWindow: 1,
+    subtropicalBand: 0.7,
+    neutralToSubsidingSupport: 0.8,
+    existingOmegaPaS: 0.16
+  });
+
+  assert.ok(sourceCore > 0.5);
+  assert.equal(noInnerLane, 0);
+  assert.ok(outsideSource < 0.1);
+});
+
+test('computeEquatorialEdgeSubsidenceGuardTargetWeight focuses on weakly supported 3-6 degree edge lanes', () => {
+  assert.equal(
+    computeEquatorialEdgeSubsidenceGuardTargetWeight({
+      enabled: false,
+      latAbs: 3.75,
+      targetLat0: 2,
+      targetLat1: 6,
+      edgeWindow: 1,
+      edgeGateSupport: 0,
+      organizedSupport: 0.25,
+      convectivePotential: 0.3,
+      existingOmegaPaS: 0.1
+    }),
+    0
+  );
+
+  const targetEdge = computeEquatorialEdgeSubsidenceGuardTargetWeight({
+    enabled: true,
+    latAbs: 3.75,
+    targetLat0: 2,
+    targetLat1: 6,
+    edgeWindow: 1,
+    edgeGateSupport: 0,
+    organizedSupport: 0.25,
+    convectivePotential: 0.3,
+    existingOmegaPaS: 0.1
+  });
+  const supportedEdge = computeEquatorialEdgeSubsidenceGuardTargetWeight({
+    enabled: true,
+    latAbs: 3.75,
+    targetLat0: 2,
+    targetLat1: 6,
+    edgeWindow: 1,
+    edgeGateSupport: 0.9,
+    organizedSupport: 0.25,
+    convectivePotential: 0.3,
+    existingOmegaPaS: 0.1
+  });
+  const outsideTarget = computeEquatorialEdgeSubsidenceGuardTargetWeight({
+    enabled: true,
+    latAbs: 11.25,
+    targetLat0: 2,
+    targetLat1: 6,
+    edgeWindow: 0,
+    edgeGateSupport: 0,
+    organizedSupport: 0.25,
+    convectivePotential: 0.3,
+    existingOmegaPaS: 0.1
+  });
+
+  assert.ok(targetEdge > 0.4);
+  assert.ok(supportedEdge < targetEdge);
   assert.equal(outsideTarget, 0);
 });
 
