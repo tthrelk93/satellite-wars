@@ -1530,6 +1530,15 @@ Status:
   - the next problem is bilateral rebound attribution, not northside gate admission anymore
 - next active phase: `Phase 1ZT: South Mirror Rebound Attribution`
 
+Status:
+- complete in [phase1zt-south-mirror-rebound-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zt-south-mirror-rebound-attribution.md)
+- verdict: `cross_equatorial_compensation_without_local_recharge`
+- key conclusions:
+  - the south rebound is not mainly a local TCW/RH/omega recharge story
+  - the strongest live signal is a small cross-equatorial vapor-flux rebalance paired with reduced tropical-shoulder condensation
+  - this looks like bilateral compensation after NH suppression, not a local south selector bug
+- next active phase: `Phase 1ZU: Bilateral Balance Patch Design`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

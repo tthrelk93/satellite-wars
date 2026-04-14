@@ -1,0 +1,179 @@
+{
+  "schema": "satellite-wars.phase1zt-south-mirror-rebound-attribution.v1",
+  "generatedAt": "2026-04-14T17:14:19.438Z",
+  "paths": {
+    "offPath": "/tmp/phase1zs-off.json",
+    "onPath": "/tmp/phase1zs-on.json",
+    "phase1zsPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zs-northside-leak-risk-gate-redesign.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zt-south-mirror-rebound-attribution.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zt-south-mirror-rebound-attribution.json"
+  },
+  "verdict": "cross_equatorial_compensation_without_local_recharge",
+  "nextPhase": "Phase 1ZU: Bilateral Balance Patch Design",
+  "recommendation": "Do not chase this with another local south humidity or omega patch. The south mirror rebound looks like a cross-equatorial compensation path after the NH source lane is suppressed, so the next step should be a bilateral balance design in the vertical/core lane.",
+  "phase1zsContext": {
+    "verdict": "northside_gate_live_with_south_mirror_regression",
+    "keepPatch": false
+  },
+  "scores": {
+    "humidificationSignal": 0.02,
+    "omegaSignal": 0.00022
+  },
+  "metrics": {
+    "itczWidthDeg": 0.007,
+    "subtropicalDryNorthRatio": 0.002,
+    "subtropicalDrySouthRatio": 0.002,
+    "crossEquatorialVaporFluxNorthKgM_1S": -0.21439,
+    "tropicalShoulderLargeScaleCondensationMeanKgM2": -0.01354,
+    "equatorialPrecipMeanMmHr": -0.001
+  },
+  "slices": {
+    "southSource": {
+      "off": {
+        "latitudeDeg": -11.25,
+        "largeScaleCondensationSourceKgM2": 0.10715,
+        "totalColumnWaterKgM2": 36.559,
+        "boundaryLayerRhFrac": 0.669,
+        "midTroposphericRhFrac": 0.554,
+        "lowerTroposphericOmegaPaS": -0.0928,
+        "resolvedAscentCloudBirthPotentialKgM2": 0.03185,
+        "precipRateMmHr": 0.152,
+        "cloudTotalFraction": 0.755
+      },
+      "on": {
+        "latitudeDeg": -11.25,
+        "largeScaleCondensationSourceKgM2": 0.13363,
+        "totalColumnWaterKgM2": 36.557,
+        "boundaryLayerRhFrac": 0.668,
+        "midTroposphericRhFrac": 0.554,
+        "lowerTroposphericOmegaPaS": -0.09264,
+        "resolvedAscentCloudBirthPotentialKgM2": 0.03186,
+        "precipRateMmHr": 0.152,
+        "cloudTotalFraction": 0.755
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0.02648,
+        "totalColumnWaterKgM2": -0.002,
+        "boundaryLayerRhFrac": -0.001,
+        "midTroposphericRhFrac": 0,
+        "lowerTroposphericOmegaPaS": 0.00016,
+        "resolvedAscentCloudBirthPotentialKgM2": 0.00001,
+        "precipRateMmHr": 0,
+        "cloudTotalFraction": 0
+      }
+    },
+    "southEdge": {
+      "off": {
+        "latitudeDeg": -3.75,
+        "largeScaleCondensationSourceKgM2": 0.05851,
+        "totalColumnWaterKgM2": 38.439,
+        "boundaryLayerRhFrac": 0.57,
+        "midTroposphericRhFrac": 0.41,
+        "lowerTroposphericOmegaPaS": 0.1468,
+        "resolvedAscentCloudBirthPotentialKgM2": 0.02492,
+        "precipRateMmHr": 0.103,
+        "cloudTotalFraction": 0.778
+      },
+      "on": {
+        "latitudeDeg": -3.75,
+        "largeScaleCondensationSourceKgM2": 0.0616,
+        "totalColumnWaterKgM2": 38.431,
+        "boundaryLayerRhFrac": 0.57,
+        "midTroposphericRhFrac": 0.41,
+        "lowerTroposphericOmegaPaS": 0.14686,
+        "resolvedAscentCloudBirthPotentialKgM2": 0.02494,
+        "precipRateMmHr": 0.103,
+        "cloudTotalFraction": 0.778
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0.00309,
+        "totalColumnWaterKgM2": -0.008,
+        "boundaryLayerRhFrac": 0,
+        "midTroposphericRhFrac": 0,
+        "lowerTroposphericOmegaPaS": 0.00006,
+        "resolvedAscentCloudBirthPotentialKgM2": 0.00002,
+        "precipRateMmHr": 0,
+        "cloudTotalFraction": 0
+      }
+    },
+    "northSource": {
+      "off": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.13552,
+        "totalColumnWaterKgM2": 43.212,
+        "boundaryLayerRhFrac": 0.547,
+        "midTroposphericRhFrac": 0.406,
+        "lowerTroposphericOmegaPaS": 0.17391,
+        "resolvedAscentCloudBirthPotentialKgM2": 0.02394,
+        "precipRateMmHr": 0.156,
+        "cloudTotalFraction": 0.788
+      },
+      "on": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.11169,
+        "totalColumnWaterKgM2": 43.212,
+        "boundaryLayerRhFrac": 0.547,
+        "midTroposphericRhFrac": 0.406,
+        "lowerTroposphericOmegaPaS": 0.17392,
+        "resolvedAscentCloudBirthPotentialKgM2": 0.02388,
+        "precipRateMmHr": 0.156,
+        "cloudTotalFraction": 0.788
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": -0.02383,
+        "totalColumnWaterKgM2": 0,
+        "boundaryLayerRhFrac": 0,
+        "midTroposphericRhFrac": 0,
+        "lowerTroposphericOmegaPaS": 0.00001,
+        "resolvedAscentCloudBirthPotentialKgM2": -0.00006,
+        "precipRateMmHr": 0,
+        "cloudTotalFraction": 0
+      }
+    },
+    "northEdge": {
+      "off": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.1083,
+        "totalColumnWaterKgM2": 43.866,
+        "boundaryLayerRhFrac": 0.544,
+        "midTroposphericRhFrac": 0.442,
+        "lowerTroposphericOmegaPaS": 0.12466,
+        "resolvedAscentCloudBirthPotentialKgM2": 0.02185,
+        "precipRateMmHr": 0.14,
+        "cloudTotalFraction": 0.824
+      },
+      "on": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.10148,
+        "totalColumnWaterKgM2": 43.865,
+        "boundaryLayerRhFrac": 0.544,
+        "midTroposphericRhFrac": 0.442,
+        "lowerTroposphericOmegaPaS": 0.12464,
+        "resolvedAscentCloudBirthPotentialKgM2": 0.02187,
+        "precipRateMmHr": 0.139,
+        "cloudTotalFraction": 0.824
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": -0.00682,
+        "totalColumnWaterKgM2": -0.001,
+        "boundaryLayerRhFrac": 0,
+        "midTroposphericRhFrac": 0,
+        "lowerTroposphericOmegaPaS": -0.00002,
+        "resolvedAscentCloudBirthPotentialKgM2": 0.00002,
+        "precipRateMmHr": -0.001,
+        "cloudTotalFraction": 0
+      }
+    }
+  },
+  "designContract": {
+    "keep": [
+      "keep the northside supported-source-normalized leak gate available behind the runtime toggle",
+      "keep the bilateral equatorial-edge geometry and existing south-edge guard plumbing"
+    ],
+    "change": [
+      "design the next patch around bilateral balance / cross-equatorial compensation rather than local south humidification",
+      "treat the south rebound as a remote response to NH suppression because local TCW, RH, omega, cloud, and precipitation barely move",
+      "avoid a south-only local sink until a bilateral balance lane has been tested"
+    ]
+  }
+}
