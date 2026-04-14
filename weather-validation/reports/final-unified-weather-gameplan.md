@@ -1165,6 +1165,32 @@ Exit criteria:
 - target-entry shoulder-guard application falls to zero
 - same-branch `off/on` still preserves or improves ITCZ width and the dry-belt ratios
 
+Status:
+- complete in [phase1zb-latitude-aware-shoulder-guard-redesign.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zb-latitude-aware-shoulder-guard-redesign.md)
+- selector placement is now correct:
+  - `3.75°N` shoulder candidate/application is live again
+  - `33.75°N` target-entry candidate/application is zero
+- but the lane is not climate-safe yet:
+  - `itczWidthDeg`: `25.834 -> 25.89`
+  - `subtropicalDryNorthRatio`: `1.515 -> 1.527`
+  - `subtropicalDrySouthRatio`: `1.192 -> 1.197`
+  - tropical shoulder core condensation still rises by `+0.01603 kg/m²`
+
+### Phase 1ZC: Shoulder Guard Reintegration Audit
+
+Objective:
+- explain why the corrected latitude-aware selector now targets the right cells but still worsens the 30-day climate when enabled
+
+Primary files:
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js) only if the reintegration bug is upstream
+
+Questions to answer:
+- is the redesigned shoulder lane now overdamping the `11.25°N` shoulder while leaving a compensating humidification path elsewhere in the tropical shoulder?
+- is the residual rebound now an amplitude / spread problem inside the corrected selector, or a downstream adjustment response outside the selector?
+- can we narrow the live shoulder application without reintroducing the old `33.75°N` false-positive?
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

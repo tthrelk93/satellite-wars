@@ -494,6 +494,24 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               1
             )
           : 0;
+        const freshShoulderLatitudeWindow = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              Number.isFinite(state.freshShoulderLatitudeWindowDiag?.[k])
+                ? state.freshShoulderLatitudeWindowDiag[k]
+                : 0,
+              0,
+              1
+            )
+          : 0;
+        const freshShoulderTargetEntryExclusion = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              Number.isFinite(state.freshShoulderTargetEntryExclusionDiag?.[k])
+                ? state.freshShoulderTargetEntryExclusionDiag[k]
+                : 0,
+              0,
+              1
+            )
+          : 0;
         const freshNeutralToSubsidingSupport = enableConvectiveOutcome && isOceanColumn
           ? clamp(
               Number.isFinite(state.freshNeutralToSubsidingSupportDiag?.[k])
@@ -614,8 +632,8 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
           : 0;
         const shoulderBandWindowSupport = enableConvectiveOutcome && isOceanColumn
           ? clamp(
-              smoothstep(0.04, 0.22, freshSubtropicalBand)
-                * (1 - smoothstep(0.56, 0.82, freshSubtropicalBand)),
+              freshShoulderLatitudeWindow
+                * (1 - freshShoulderTargetEntryExclusion),
               0,
               1
             )

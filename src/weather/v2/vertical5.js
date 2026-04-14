@@ -483,6 +483,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.freshOrganizedSupportDiag || state.freshOrganizedSupportDiag.length !== N) state.freshOrganizedSupportDiag = new Float32Array(N);
   if (!state.freshSubtropicalSuppressionDiag || state.freshSubtropicalSuppressionDiag.length !== N) state.freshSubtropicalSuppressionDiag = new Float32Array(N);
   if (!state.freshSubtropicalBandDiag || state.freshSubtropicalBandDiag.length !== N) state.freshSubtropicalBandDiag = new Float32Array(N);
+  if (!state.freshShoulderLatitudeWindowDiag || state.freshShoulderLatitudeWindowDiag.length !== N) state.freshShoulderLatitudeWindowDiag = new Float32Array(N);
+  if (!state.freshShoulderTargetEntryExclusionDiag || state.freshShoulderTargetEntryExclusionDiag.length !== N) state.freshShoulderTargetEntryExclusionDiag = new Float32Array(N);
   if (!state.freshNeutralToSubsidingSupportDiag || state.freshNeutralToSubsidingSupportDiag.length !== N) state.freshNeutralToSubsidingSupportDiag = new Float32Array(N);
   if (!state.freshRhMidSupportDiag || state.freshRhMidSupportDiag.length !== N) state.freshRhMidSupportDiag = new Float32Array(N);
   if (!state.circulationReboundContainmentDiag || state.circulationReboundContainmentDiag.length !== N) state.circulationReboundContainmentDiag = new Float32Array(N);
@@ -593,6 +595,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const freshOrganizedSupportPublicDiag = state.freshOrganizedSupportDiag;
   const freshSubtropicalSuppressionPublicDiag = state.freshSubtropicalSuppressionDiag;
   const freshSubtropicalBandPublicDiag = state.freshSubtropicalBandDiag;
+  const freshShoulderLatitudeWindowPublicDiag = state.freshShoulderLatitudeWindowDiag;
+  const freshShoulderTargetEntryExclusionPublicDiag = state.freshShoulderTargetEntryExclusionDiag;
   const freshNeutralToSubsidingSupportPublicDiag = state.freshNeutralToSubsidingSupportDiag;
   const freshRhMidSupportPublicDiag = state.freshRhMidSupportDiag;
   const circulationReboundContainmentDiag = state.circulationReboundContainmentDiag;
@@ -1358,6 +1362,18 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         ? smoothstep(subtropicalSubsidenceLat0 - 5, subtropicalSubsidenceLat0 + 2, latAbs)
             * (1 - smoothstep(subtropicalSubsidenceLat1 - 4, subtropicalSubsidenceLat1 + 2, latAbs))
         : 0;
+      const shoulderLatitudeWindow = latDeg
+        ? clamp01(
+            smoothstep(1.5, 3.5, latDeg[rowIndex])
+              * (1 - smoothstep(11.5, 14.5, latDeg[rowIndex]))
+          )
+        : 0;
+      const shoulderTargetEntryExclusion = latDeg
+        ? clamp01(
+            smoothstep(28, 33, latDeg[rowIndex])
+              * (1 - smoothstep(45, 50, latDeg[rowIndex]))
+          )
+        : 0;
       const organizedSupport = clamp01(
         0.5 * moistureConvergenceSupport +
         0.35 * ascentSupport +
@@ -1383,6 +1399,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       freshPotentialTargetPublicDiag[k] = potentialTarget;
       freshOrganizedSupportPublicDiag[k] = organizedSupport;
       freshSubtropicalSuppressionPublicDiag[k] = subtropicalSuppression;
+      freshShoulderLatitudeWindowPublicDiag[k] = shoulderLatitudeWindow;
+      freshShoulderTargetEntryExclusionPublicDiag[k] = shoulderTargetEntryExclusion;
       freshPotentialTargetDiag[k] = potentialTarget;
       freshOrganizedSupportDiag[k] = organizedSupport;
       freshSubtropicalSuppressionDiag[k] = subtropicalSuppression;

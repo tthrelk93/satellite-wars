@@ -1266,6 +1266,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     freshOrganizedSupportDiagFrac,
     freshSubtropicalSuppressionDiagFrac,
     freshSubtropicalBandDiagFrac,
+    freshShoulderLatitudeWindowDiagFrac,
+    freshShoulderTargetEntryExclusionDiagFrac,
     freshNeutralToSubsidingSupportDiagFrac,
     freshRhMidSupportDiagFrac,
     circulationReboundContainmentDiagFrac,
@@ -1325,6 +1327,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalMaintenanceCandidateMass = zonalMean(saturationAdjustmentMaintenanceCandidateMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalMaintenancePotentialSuppressedMass = zonalMean(saturationAdjustmentMaintenancePotentialSuppressedMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalMaintenanceCandidateHitCount = zonalMean(saturationAdjustmentMaintenanceCandidateEventCount || new Array(nx * ny).fill(0), nx, ny);
+  const zonalFreshShoulderLatitudeWindow = zonalMean(freshShoulderLatitudeWindowDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalFreshShoulderTargetEntryExclusion = zonalMean(freshShoulderTargetEntryExclusionDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalShoulderGuardCandidateMass = zonalMean(saturationAdjustmentShoulderGuardCandidateMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalShoulderGuardPotentialSuppressedMass = zonalMean(saturationAdjustmentShoulderGuardPotentialSuppressedMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalShoulderGuardHitCount = zonalMean(saturationAdjustmentShoulderGuardEventCount || new Array(nx * ny).fill(0), nx, ny);
@@ -2119,6 +2123,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         dryingOmegaBridgeAppliedPaS: roundSeries(zonalDryingOmegaBridgeApplied, 5),
         dryingOmegaBridgeLocalAppliedPaS: roundSeries(zonalDryingOmegaBridgeLocalApplied, 5),
         dryingOmegaBridgeProjectedAppliedPaS: roundSeries(zonalDryingOmegaBridgeProjectedApplied, 5),
+        freshShoulderLatitudeWindowDiagFrac: roundSeries(zonalFreshShoulderLatitudeWindow, 5),
+        freshShoulderTargetEntryExclusionDiagFrac: roundSeries(zonalFreshShoulderTargetEntryExclusion, 5),
         surfaceEvapRateMmHr: roundSeries(zonalSurfaceEvap),
         surfaceEvapPotentialRateMmHr: roundSeries(zonalSurfaceEvapPotential),
         surfaceCloudShortwaveShieldingWm2: roundSeries(zonalSurfaceCloudShielding, 5),

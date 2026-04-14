@@ -2233,6 +2233,8 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     freshOrganizedSupportDiagFrac: arrayOrZeros(state.freshOrganizedSupportDiag, state.N),
     freshSubtropicalSuppressionDiagFrac: arrayOrZeros(state.freshSubtropicalSuppressionDiag, state.N),
     freshSubtropicalBandDiagFrac: arrayOrZeros(state.freshSubtropicalBandDiag, state.N),
+    freshShoulderLatitudeWindowDiagFrac: arrayOrZeros(state.freshShoulderLatitudeWindowDiag, state.N),
+    freshShoulderTargetEntryExclusionDiagFrac: arrayOrZeros(state.freshShoulderTargetEntryExclusionDiag, state.N),
     freshNeutralToSubsidingSupportDiagFrac: arrayOrZeros(state.freshNeutralToSubsidingSupportDiag, state.N),
     freshRhMidSupportDiagFrac: arrayOrZeros(state.freshRhMidSupportDiag, state.N),
     circulationReboundContainmentDiagFrac: arrayOrZeros(state.circulationReboundContainmentDiag, state.N),

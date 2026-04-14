@@ -294,6 +294,8 @@ test('microphysics shoulder absorption guard suppresses bridge-silent tropical s
     state.subtropicalSubsidenceDrying[0] = 0.0;
     state.freshSubtropicalSuppressionDiag[0] = 0.12;
     state.freshSubtropicalBandDiag[0] = 0.18;
+    state.freshShoulderLatitudeWindowDiag[0] = 1;
+    state.freshShoulderTargetEntryExclusionDiag[0] = 0;
     state.freshNeutralToSubsidingSupportDiag[0] = 0.62;
     state.freshOrganizedSupportDiag[0] = 0.16;
     state.freshRhMidSupportDiag[0] = 0.9;
@@ -330,6 +332,60 @@ test('microphysics shoulder absorption guard suppresses bridge-silent tropical s
   assert.ok(patchOn.saturationAdjustmentShoulderGuardCandidateMass[0] > 0);
   assert.ok(patchOn.saturationAdjustmentShoulderGuardBridgeSilenceMassWeighted[0] > 0);
   assert.ok(patchOn.saturationAdjustmentShoulderGuardBandWindowMassWeighted[0] > 0);
+});
+
+test('microphysics shoulder absorption guard excludes target-entry columns when the latitude-aware exclusion is active', () => {
+  const makeState = (targetEntryExclusion) => {
+    const state = setupState(279);
+    state.qv.fill(0.002);
+    state.qc.fill(0);
+    state.qi.fill(0);
+    state.qr.fill(0);
+    state.qs.fill(0);
+    state.landMask[0] = 0;
+    state.convectiveOrganization[0] = 0.05;
+    state.convectiveMassFlux[0] = 2e-4;
+    state.convectiveAnvilSource[0] = 0.02;
+    state.subtropicalSubsidenceDrying[0] = 0.0;
+    state.freshSubtropicalSuppressionDiag[0] = 0.12;
+    state.freshSubtropicalBandDiag[0] = 0.18;
+    state.freshShoulderLatitudeWindowDiag[0] = 1;
+    state.freshShoulderTargetEntryExclusionDiag[0] = targetEntryExclusion;
+    state.freshNeutralToSubsidingSupportDiag[0] = 0.62;
+    state.freshOrganizedSupportDiag[0] = 0.16;
+    state.freshRhMidSupportDiag[0] = 0.9;
+    state.dryingOmegaBridgeAppliedDiag[0] = 0;
+    state.omega.fill(0.06);
+    state.qv[1] = 0.011;
+    return state;
+  };
+
+  const shoulderLane = makeState(0);
+  const targetEntryLane = makeState(1);
+
+  stepMicrophysics5({
+    dt: 900,
+    state: shoulderLane,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: false,
+      enableShoulderAbsorptionGuard: true
+    }
+  });
+  stepMicrophysics5({
+    dt: 900,
+    state: targetEntryLane,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: false,
+      enableShoulderAbsorptionGuard: true
+    }
+  });
+
+  assert.ok(shoulderLane.saturationAdjustmentShoulderGuardCandidateMass[0] > 0);
+  assert.ok(shoulderLane.saturationAdjustmentShoulderGuardAppliedSuppressionMass[0] > 0);
+  assert.equal(targetEntryLane.saturationAdjustmentShoulderGuardCandidateMass[0], 0);
+  assert.equal(targetEntryLane.saturationAdjustmentShoulderGuardAppliedSuppressionMass[0], 0);
 });
 
 test('microphysics populates the upper-cloud handoff ledger and closes the upper-cloud budget', () => {

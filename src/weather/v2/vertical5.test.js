@@ -293,6 +293,68 @@ test('stepVertical5 clears a stale subtropical carry-dominant upper-cloud reserv
   assert.ok(state.verticalUpperCloudAppliedErosionMass[0] > 4.4);
 });
 
+test('stepVertical5 precomputes a latitude-aware shoulder window and target-entry exclusion', () => {
+  const sigmaHalf = new Float32Array([0, 0.35, 0.7, 1]);
+  const state = createState5({
+    grid: { count: 4 },
+    nz: 3,
+    sigmaHalf
+  });
+  const grid = {
+    nx: 1,
+    ny: 4,
+    latDeg: new Float32Array([3.75, 11.25, 26.25, 33.75]),
+    invDx: new Float32Array([1, 1, 1, 1]),
+    invDy: new Float32Array([1, 1, 1, 1]),
+    cosLat: new Float32Array([1, 1, 1, 1])
+  };
+
+  for (let cell = 0; cell < 4; cell += 1) {
+    state.ps[cell] = 100000;
+    state.pHalf[cell] = 20000;
+    state.pHalf[4 + cell] = 35000;
+    state.pHalf[8 + cell] = 65000;
+    state.pHalf[12 + cell] = 100000;
+    state.pMid[cell] = 27500;
+    state.pMid[4 + cell] = 50000;
+    state.pMid[8 + cell] = 82500;
+    state.theta[cell] = 286;
+    state.theta[4 + cell] = 295;
+    state.theta[8 + cell] = 302;
+    state.qv[cell] = 0.0012;
+    state.qv[4 + cell] = 0.006;
+    state.qv[8 + cell] = 0.014;
+    state.T[cell] = 246;
+    state.T[4 + cell] = 276;
+    state.T[8 + cell] = 299;
+  }
+  state.u.fill(0);
+  state.v.fill(0);
+  state.omega.fill(0.04);
+
+  stepVertical5({
+    dt: 1800,
+    grid,
+    state,
+    params: {
+      enableMixing: false,
+      enableConvectiveMixing: false,
+      enableConvection: true,
+      enableOmegaMassFix: false,
+      enableLargeScaleVerticalAdvection: false
+    }
+  });
+
+  assert.ok(state.freshShoulderLatitudeWindowDiag[0] > 0.9);
+  assert.ok(state.freshShoulderLatitudeWindowDiag[1] > 0.9);
+  assert.equal(state.freshShoulderLatitudeWindowDiag[2], 0);
+  assert.equal(state.freshShoulderLatitudeWindowDiag[3], 0);
+  assert.equal(state.freshShoulderTargetEntryExclusionDiag[0], 0);
+  assert.equal(state.freshShoulderTargetEntryExclusionDiag[1], 0);
+  assert.equal(state.freshShoulderTargetEntryExclusionDiag[2], 0);
+  assert.ok(state.freshShoulderTargetEntryExclusionDiag[3] > 0.9);
+});
+
 test('stepVertical5 circulation rebound containment suppresses a weak off-equatorial transition lane', () => {
   const sigmaHalf = new Float32Array([0, 0.35, 0.7, 1]);
   const buildCase = () => {

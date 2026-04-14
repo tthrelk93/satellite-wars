@@ -57,6 +57,8 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const freshOrganizedSupportDiag = makeArray(N);
   const freshSubtropicalSuppressionDiag = makeArray(N);
   const freshSubtropicalBandDiag = makeArray(N);
+  const freshShoulderLatitudeWindowDiag = makeArray(N);
+  const freshShoulderTargetEntryExclusionDiag = makeArray(N);
   const freshNeutralToSubsidingSupportDiag = makeArray(N);
   const freshRhMidSupportDiag = makeArray(N);
   const circulationReboundContainmentDiag = makeArray(N);
@@ -323,6 +325,8 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     freshOrganizedSupportDiag,
     freshSubtropicalSuppressionDiag,
     freshSubtropicalBandDiag,
+    freshShoulderLatitudeWindowDiag,
+    freshShoulderTargetEntryExclusionDiag,
     freshNeutralToSubsidingSupportDiag,
     freshRhMidSupportDiag,
     circulationReboundContainmentDiag,
