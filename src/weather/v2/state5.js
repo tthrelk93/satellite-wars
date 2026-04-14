@@ -130,6 +130,13 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted = makeArray(N);
   const saturationAdjustmentSoftLiveGateAscentModulationMassWeighted = makeArray(N);
   const saturationAdjustmentSoftLiveGateAppliedSuppressionMass = makeArray(N);
+  const saturationAdjustmentShoulderGuardCandidateMass = makeArray(N);
+  const saturationAdjustmentShoulderGuardPotentialSuppressedMass = makeArray(N);
+  const saturationAdjustmentShoulderGuardEventCount = new Uint32Array(N);
+  const saturationAdjustmentShoulderGuardBridgeSilenceMassWeighted = makeArray(N);
+  const saturationAdjustmentShoulderGuardBandWindowMassWeighted = makeArray(N);
+  const saturationAdjustmentShoulderGuardSelectorSupportMassWeighted = makeArray(N);
+  const saturationAdjustmentShoulderGuardAppliedSuppressionMass = makeArray(N);
   const weakAscentCloudBirthAccumMass = makeArray(N);
   const strongAscentCloudBirthAccumMass = makeArray(N);
   const resolvedAscentCloudBirthByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
@@ -389,6 +396,13 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted,
     saturationAdjustmentSoftLiveGateAscentModulationMassWeighted,
     saturationAdjustmentSoftLiveGateAppliedSuppressionMass,
+    saturationAdjustmentShoulderGuardCandidateMass,
+    saturationAdjustmentShoulderGuardPotentialSuppressedMass,
+    saturationAdjustmentShoulderGuardEventCount,
+    saturationAdjustmentShoulderGuardBridgeSilenceMassWeighted,
+    saturationAdjustmentShoulderGuardBandWindowMassWeighted,
+    saturationAdjustmentShoulderGuardSelectorSupportMassWeighted,
+    saturationAdjustmentShoulderGuardAppliedSuppressionMass,
     weakAscentCloudBirthAccumMass,
     strongAscentCloudBirthAccumMass,
     resolvedAscentCloudBirthByBandMass,

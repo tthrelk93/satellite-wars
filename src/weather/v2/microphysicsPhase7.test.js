@@ -279,6 +279,59 @@ test('microphysics soft live-state maintenance patch suppresses selected marine 
   );
 });
 
+test('microphysics shoulder absorption guard suppresses bridge-silent tropical shoulder condensation when enabled', () => {
+  const makeState = () => {
+    const state = setupState(279);
+    state.qv.fill(0.002);
+    state.qc.fill(0);
+    state.qi.fill(0);
+    state.qr.fill(0);
+    state.qs.fill(0);
+    state.landMask[0] = 0;
+    state.convectiveOrganization[0] = 0.05;
+    state.convectiveMassFlux[0] = 2e-4;
+    state.convectiveAnvilSource[0] = 0.02;
+    state.subtropicalSubsidenceDrying[0] = 0.0;
+    state.freshSubtropicalSuppressionDiag[0] = 0.12;
+    state.freshSubtropicalBandDiag[0] = 0.18;
+    state.freshNeutralToSubsidingSupportDiag[0] = 0.62;
+    state.freshOrganizedSupportDiag[0] = 0.16;
+    state.freshRhMidSupportDiag[0] = 0.9;
+    state.dryingOmegaBridgeAppliedDiag[0] = 0;
+    state.omega.fill(0.06);
+    state.qv[1] = 0.011;
+    return state;
+  };
+
+  const patchOff = makeState();
+  const patchOn = makeState();
+
+  stepMicrophysics5({
+    dt: 900,
+    state: patchOff,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: false,
+      enableShoulderAbsorptionGuard: false
+    }
+  });
+  stepMicrophysics5({
+    dt: 900,
+    state: patchOn,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: false,
+      enableShoulderAbsorptionGuard: true
+    }
+  });
+
+  assert.ok(patchOn.largeScaleCondensationSource[0] < patchOff.largeScaleCondensationSource[0]);
+  assert.ok(patchOn.saturationAdjustmentShoulderGuardAppliedSuppressionMass[0] > 0);
+  assert.ok(patchOn.saturationAdjustmentShoulderGuardCandidateMass[0] > 0);
+  assert.ok(patchOn.saturationAdjustmentShoulderGuardBridgeSilenceMassWeighted[0] > 0);
+  assert.ok(patchOn.saturationAdjustmentShoulderGuardBandWindowMassWeighted[0] > 0);
+});
+
 test('microphysics populates the upper-cloud handoff ledger and closes the upper-cloud budget', () => {
   const state = setupState(248);
   state.qv.fill(0.006);

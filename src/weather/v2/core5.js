@@ -598,6 +598,9 @@ export class WeatherCore5 {
       enableSoftLiveStateMaintenanceSuppression: true,
       softLiveStateMaintenanceSuppressionScale: 2.0,
       softLiveStateMaintenanceSuppressionMaxFrac: 0.4,
+      enableShoulderAbsorptionGuard: false,
+      shoulderAbsorptionGuardScale: 1.6,
+      shoulderAbsorptionGuardMaxFrac: 0.2,
       terrainLeeWarmRainSuppress: 0.9,
       dThetaMaxMicroPerStepConv: 2.5,
       enable: true

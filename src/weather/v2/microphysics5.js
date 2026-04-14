@@ -129,6 +129,9 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
     enableSoftLiveStateMaintenanceSuppression = false,
     softLiveStateMaintenanceSuppressionScale = 2.0,
     softLiveStateMaintenanceSuppressionMaxFrac = 0.4,
+    enableShoulderAbsorptionGuard = false,
+    shoulderAbsorptionGuardScale = 1.6,
+    shoulderAbsorptionGuardMaxFrac = 0.2,
     enable = true
   } = params;
   if (!enable) return;
@@ -233,6 +236,27 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   if (!state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass || state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass.length !== N) {
     state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass = new Float32Array(N);
   }
+  if (!state.saturationAdjustmentShoulderGuardCandidateMass || state.saturationAdjustmentShoulderGuardCandidateMass.length !== N) {
+    state.saturationAdjustmentShoulderGuardCandidateMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentShoulderGuardPotentialSuppressedMass || state.saturationAdjustmentShoulderGuardPotentialSuppressedMass.length !== N) {
+    state.saturationAdjustmentShoulderGuardPotentialSuppressedMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentShoulderGuardEventCount || state.saturationAdjustmentShoulderGuardEventCount.length !== N) {
+    state.saturationAdjustmentShoulderGuardEventCount = new Uint32Array(N);
+  }
+  if (!state.saturationAdjustmentShoulderGuardBridgeSilenceMassWeighted || state.saturationAdjustmentShoulderGuardBridgeSilenceMassWeighted.length !== N) {
+    state.saturationAdjustmentShoulderGuardBridgeSilenceMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentShoulderGuardBandWindowMassWeighted || state.saturationAdjustmentShoulderGuardBandWindowMassWeighted.length !== N) {
+    state.saturationAdjustmentShoulderGuardBandWindowMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentShoulderGuardSelectorSupportMassWeighted || state.saturationAdjustmentShoulderGuardSelectorSupportMassWeighted.length !== N) {
+    state.saturationAdjustmentShoulderGuardSelectorSupportMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentShoulderGuardAppliedSuppressionMass || state.saturationAdjustmentShoulderGuardAppliedSuppressionMass.length !== N) {
+    state.saturationAdjustmentShoulderGuardAppliedSuppressionMass = new Float32Array(N);
+  }
   if (!state.weakAscentCloudBirthAccumMass || state.weakAscentCloudBirthAccumMass.length !== N) {
     state.weakAscentCloudBirthAccumMass = new Float32Array(N);
   }
@@ -304,6 +328,13 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   state.saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted.fill(0);
   state.saturationAdjustmentSoftLiveGateAscentModulationMassWeighted.fill(0);
   state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass.fill(0);
+  state.saturationAdjustmentShoulderGuardCandidateMass.fill(0);
+  state.saturationAdjustmentShoulderGuardPotentialSuppressedMass.fill(0);
+  state.saturationAdjustmentShoulderGuardEventCount.fill(0);
+  state.saturationAdjustmentShoulderGuardBridgeSilenceMassWeighted.fill(0);
+  state.saturationAdjustmentShoulderGuardBandWindowMassWeighted.fill(0);
+  state.saturationAdjustmentShoulderGuardSelectorSupportMassWeighted.fill(0);
+  state.saturationAdjustmentShoulderGuardAppliedSuppressionMass.fill(0);
   state.microphysicsUpperCloudSaturationBirthMass.fill(0);
   state.microphysicsUpperCloudCloudReevaporationMass.fill(0);
   state.microphysicsUpperCloudPrecipReevaporationMass.fill(0);
@@ -575,6 +606,49 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               SUBTROPICAL_MAINTENANCE_DIAG.suppressMax
             )
           : 0;
+        const dryingOmegaBridgeApplied = enableConvectiveOutcome && isOceanColumn
+          ? Math.max(0, Number.isFinite(state.dryingOmegaBridgeAppliedDiag?.[k]) ? state.dryingOmegaBridgeAppliedDiag[k] : 0)
+          : 0;
+        const shoulderBridgeSilenceSupport = enableConvectiveOutcome && isOceanColumn
+          ? 1 - smoothstep(5e-5, 3.5e-4, dryingOmegaBridgeApplied)
+          : 0;
+        const shoulderBandWindowSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              smoothstep(0.04, 0.22, freshSubtropicalBand)
+                * (1 - smoothstep(0.56, 0.82, freshSubtropicalBand)),
+              0,
+              1
+            )
+          : 0;
+        const shoulderAscentModulation = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              0.45
+                + 0.4 * weakAscentSupport
+                + 0.15 * Math.max(freshNeutralToSubsidingSupport, weakAscentSupport),
+              0.45,
+              1
+            )
+          : 0;
+        const shoulderSelectorSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              shoulderBridgeSilenceSupport
+                * shoulderBandWindowSupport
+                * weakEngineSupport
+                * marginalSupersaturationSupport
+                * shoulderAscentModulation
+                * (1 - 0.6 * freshOrganizedSupport),
+              0,
+              1
+            )
+          : 0;
+        const shoulderGuardSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              SUBTROPICAL_MAINTENANCE_DIAG.suppressMax
+                * shoulderSelectorSupport,
+              0,
+              SUBTROPICAL_MAINTENANCE_DIAG.suppressMax
+            )
+          : 0;
         const dqRaw = applyLatentCap(qvVal - qsat, iceFrac > 0.5 ? Ls : Lv);
         const softLiveGateSuppressionFrac = enableSoftLiveStateMaintenanceSuppression
           && isOceanColumn
@@ -585,7 +659,20 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               softLiveStateMaintenanceSuppressionMaxFrac
             )
           : 0;
-        const dqSuppressed = dqRaw * softLiveGateSuppressionFrac;
+        const shoulderGuardSuppressionFrac = enableShoulderAbsorptionGuard
+          && isOceanColumn
+          && shoulderSelectorSupport >= SUBTROPICAL_MAINTENANCE_DIAG.supportThreshold
+          ? clamp(
+              shoulderGuardSupport * shoulderAbsorptionGuardScale,
+              0,
+              shoulderAbsorptionGuardMaxFrac
+            )
+          : 0;
+        const combinedSuppressionFrac = Math.max(softLiveGateSuppressionFrac, shoulderGuardSuppressionFrac);
+        const effectiveShoulderGuardSuppressionFrac = shoulderGuardSuppressionFrac >= softLiveGateSuppressionFrac
+          ? shoulderGuardSuppressionFrac
+          : 0;
+        const dqSuppressed = dqRaw * combinedSuppressionFrac;
         let dq = dqRaw - dqSuppressed;
         if (dq > 0) {
           qvVal -= dq;
@@ -593,6 +680,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
             const condMass = dq * massCell;
             const condMassRaw = dqRaw * massCell;
             const condSuppressedMass = dqSuppressed * massCell;
+            const condShoulderSuppressedMass = dqRaw * effectiveShoulderGuardSuppressionFrac * massCell;
             const numericalBandIndex = findInstrumentationLevelBandIndex(sigmaMid);
             state.largeScaleCondensationSource[k] += condMass;
             if (isOceanColumn) {
@@ -628,6 +716,15 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               state.saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted[k] += softLiveGateSelectorSupport * condMassRaw;
               state.saturationAdjustmentSoftLiveGateAscentModulationMassWeighted[k] += softLiveGateAscentModulation * condMassRaw;
               state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass[k] += condSuppressedMass;
+            }
+            if (shoulderSelectorSupport >= SUBTROPICAL_MAINTENANCE_DIAG.supportThreshold) {
+              state.saturationAdjustmentShoulderGuardCandidateMass[k] += condMassRaw;
+              state.saturationAdjustmentShoulderGuardPotentialSuppressedMass[k] += condMassRaw * shoulderGuardSupport;
+              state.saturationAdjustmentShoulderGuardEventCount[k] += 1;
+              state.saturationAdjustmentShoulderGuardBridgeSilenceMassWeighted[k] += shoulderBridgeSilenceSupport * condMassRaw;
+              state.saturationAdjustmentShoulderGuardBandWindowMassWeighted[k] += shoulderBandWindowSupport * condMassRaw;
+              state.saturationAdjustmentShoulderGuardSelectorSupportMassWeighted[k] += shoulderSelectorSupport * condMassRaw;
+              state.saturationAdjustmentShoulderGuardAppliedSuppressionMass[k] += condShoulderSuppressedMass;
             }
             if (isUpperCloudSigma(sigmaMid)) {
               state.microphysicsUpperCloudSaturationBirthMass[k] += condMass;

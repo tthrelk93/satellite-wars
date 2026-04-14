@@ -70,6 +70,7 @@ let observerEffectAudit = false;
 let trustedBaselinePath = null;
 let carryInputOverrideMode = 'default';
 let softLiveGatePatchMode = 'default';
+let shoulderAbsorptionGuardPatchMode = 'default';
 let circulationReboundPatchMode = 'default';
 let returnFlowCouplingPatchMode = 'default';
 let dryingOmegaBridgePatchMode = 'default';
@@ -112,6 +113,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--carry-input-override=')) carryInputOverrideMode = arg.slice('--carry-input-override='.length);
   else if (arg === '--soft-live-gate-patch' && argv[i + 1]) softLiveGatePatchMode = argv[++i];
   else if (arg.startsWith('--soft-live-gate-patch=')) softLiveGatePatchMode = arg.slice('--soft-live-gate-patch='.length);
+  else if (arg === '--shoulder-absorption-guard-patch' && argv[i + 1]) shoulderAbsorptionGuardPatchMode = argv[++i];
+  else if (arg.startsWith('--shoulder-absorption-guard-patch=')) shoulderAbsorptionGuardPatchMode = arg.slice('--shoulder-absorption-guard-patch='.length);
   else if (arg === '--circulation-rebound-patch' && argv[i + 1]) circulationReboundPatchMode = argv[++i];
   else if (arg.startsWith('--circulation-rebound-patch=')) circulationReboundPatchMode = arg.slice('--circulation-rebound-patch='.length);
   else if (arg === '--return-flow-coupling-patch' && argv[i + 1]) returnFlowCouplingPatchMode = argv[++i];
@@ -149,6 +152,11 @@ carryInputOverrideMode = carryInputOverrideMode === 'off'
 softLiveGatePatchMode = softLiveGatePatchMode === 'off'
   ? 'off'
   : softLiveGatePatchMode === 'on'
+    ? 'on'
+    : 'default';
+shoulderAbsorptionGuardPatchMode = shoulderAbsorptionGuardPatchMode === 'off'
+  ? 'off'
+  : shoulderAbsorptionGuardPatchMode === 'on'
     ? 'on'
     : 'default';
 circulationReboundPatchMode = circulationReboundPatchMode === 'off'
@@ -570,6 +578,7 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
     horizonsDays,
     carryInputOverrideMode,
     softLiveGatePatchMode,
+    shoulderAbsorptionGuardPatchMode,
     circulationReboundPatchMode,
     instrumentationMode: core.getInstrumentationMode ? core.getInstrumentationMode() : instrumentationMode,
     sampleTargetsDays,
@@ -1212,6 +1221,13 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted,
     saturationAdjustmentSoftLiveGateAscentModulationMassWeighted,
     saturationAdjustmentSoftLiveGateAppliedSuppressionMassKgM2,
+    saturationAdjustmentShoulderGuardCandidateMassKgM2,
+    saturationAdjustmentShoulderGuardPotentialSuppressedMassKgM2,
+    saturationAdjustmentShoulderGuardEventCount,
+    saturationAdjustmentShoulderGuardBridgeSilenceMassWeighted,
+    saturationAdjustmentShoulderGuardBandWindowMassWeighted,
+    saturationAdjustmentShoulderGuardSelectorSupportMassWeighted,
+    saturationAdjustmentShoulderGuardAppliedSuppressionMassKgM2,
     cloudReevaporationMassKgM2,
     precipReevaporationMassKgM2,
     importedAnvilPersistenceMassKgM2,
@@ -1309,6 +1325,13 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalMaintenanceCandidateMass = zonalMean(saturationAdjustmentMaintenanceCandidateMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalMaintenancePotentialSuppressedMass = zonalMean(saturationAdjustmentMaintenancePotentialSuppressedMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalMaintenanceCandidateHitCount = zonalMean(saturationAdjustmentMaintenanceCandidateEventCount || new Array(nx * ny).fill(0), nx, ny);
+  const zonalShoulderGuardCandidateMass = zonalMean(saturationAdjustmentShoulderGuardCandidateMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalShoulderGuardPotentialSuppressedMass = zonalMean(saturationAdjustmentShoulderGuardPotentialSuppressedMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalShoulderGuardHitCount = zonalMean(saturationAdjustmentShoulderGuardEventCount || new Array(nx * ny).fill(0), nx, ny);
+  const zonalShoulderGuardBridgeSilence = zonalMean(saturationAdjustmentShoulderGuardBridgeSilenceMassWeighted || new Array(nx * ny).fill(0), nx, ny);
+  const zonalShoulderGuardBandWindow = zonalMean(saturationAdjustmentShoulderGuardBandWindowMassWeighted || new Array(nx * ny).fill(0), nx, ny);
+  const zonalShoulderGuardSelectorSupport = zonalMean(saturationAdjustmentShoulderGuardSelectorSupportMassWeighted || new Array(nx * ny).fill(0), nx, ny);
+  const zonalShoulderGuardAppliedSuppression = zonalMean(saturationAdjustmentShoulderGuardAppliedSuppressionMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalCloudReevaporation = zonalMean(cloudReevaporationMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalPrecipReevaporation = zonalMean(precipReevaporationMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalImportedAnvilPersistence = zonalMean(importedAnvilPersistenceMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
@@ -1619,6 +1642,81 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     landMask,
     'ocean'
   );
+  const tropicalShoulderLargeScaleCondensationMean = weightedBandMean(zonalLargeScaleCondensation, latitudesDeg, rowWeights, 3, 18.75);
+  const tropicalShoulderCoreLargeScaleCondensationMean = weightedBandMean(zonalLargeScaleCondensation, latitudesDeg, rowWeights, 3, 12);
+  const tropicalShoulderCoreShoulderGuardCandidateMass = weightedBandMean(zonalShoulderGuardCandidateMass, latitudesDeg, rowWeights, 3, 12);
+  const tropicalShoulderCoreOceanShoulderGuardCandidateMass = weightedFieldBandMean(
+    saturationAdjustmentShoulderGuardCandidateMassKgM2 || new Array(nx * ny).fill(0),
+    nx,
+    ny,
+    latitudesDeg,
+    rowWeights,
+    3,
+    12,
+    landMask,
+    'ocean'
+  );
+  const tropicalShoulderCoreShoulderGuardPotentialSuppressedMass = weightedBandMean(zonalShoulderGuardPotentialSuppressedMass, latitudesDeg, rowWeights, 3, 12);
+  const tropicalShoulderCoreOceanShoulderGuardPotentialSuppressedMass = weightedFieldBandMean(
+    saturationAdjustmentShoulderGuardPotentialSuppressedMassKgM2 || new Array(nx * ny).fill(0),
+    nx,
+    ny,
+    latitudesDeg,
+    rowWeights,
+    3,
+    12,
+    landMask,
+    'ocean'
+  );
+  const tropicalShoulderCoreShoulderGuardHitMean = weightedBandMean(zonalShoulderGuardHitCount, latitudesDeg, rowWeights, 3, 12);
+  const tropicalShoulderCoreOceanShoulderGuardHitMean = weightedFieldBandMean(
+    saturationAdjustmentShoulderGuardEventCount || new Array(nx * ny).fill(0),
+    nx,
+    ny,
+    latitudesDeg,
+    rowWeights,
+    3,
+    12,
+    landMask,
+    'ocean'
+  );
+  const tropicalShoulderCoreOceanShoulderGuardBridgeSilenceMean = (
+    weightedFieldBandMean(saturationAdjustmentShoulderGuardBridgeSilenceMassWeighted || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, 3, 12, landMask, 'ocean')
+    / Math.max(1e-6, tropicalShoulderCoreOceanShoulderGuardCandidateMass)
+  );
+  const tropicalShoulderCoreOceanShoulderGuardBandWindowMean = (
+    weightedFieldBandMean(saturationAdjustmentShoulderGuardBandWindowMassWeighted || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, 3, 12, landMask, 'ocean')
+    / Math.max(1e-6, tropicalShoulderCoreOceanShoulderGuardCandidateMass)
+  );
+  const tropicalShoulderCoreOceanShoulderGuardSelectorSupportMean = (
+    weightedFieldBandMean(saturationAdjustmentShoulderGuardSelectorSupportMassWeighted || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, 3, 12, landMask, 'ocean')
+    / Math.max(1e-6, tropicalShoulderCoreOceanShoulderGuardCandidateMass)
+  );
+  const tropicalShoulderCoreShoulderGuardAppliedSuppressionMass = weightedBandMean(zonalShoulderGuardAppliedSuppression, latitudesDeg, rowWeights, 3, 12);
+  const tropicalShoulderCoreOceanShoulderGuardAppliedSuppressionMass = weightedFieldBandMean(
+    saturationAdjustmentShoulderGuardAppliedSuppressionMassKgM2 || new Array(nx * ny).fill(0),
+    nx,
+    ny,
+    latitudesDeg,
+    rowWeights,
+    3,
+    12,
+    landMask,
+    'ocean'
+  );
+  const sourceCoreOceanShoulderGuardAppliedSuppressionMass = weightedFieldBandMean(
+    saturationAdjustmentShoulderGuardAppliedSuppressionMassKgM2 || new Array(nx * ny).fill(0),
+    nx,
+    ny,
+    latitudesDeg,
+    rowWeights,
+    20,
+    30,
+    landMask,
+    'ocean'
+  );
+  const targetEntryProjectedBridgeAppliedMean = weightedBandMean(zonalDryingOmegaBridgeProjectedApplied, latitudesDeg, rowWeights, 30, 45);
+  const jetBandProjectedBridgeAppliedMean = weightedBandMean(zonalDryingOmegaBridgeProjectedApplied, latitudesDeg, rowWeights, 41.25, 56.25);
   const zonalCirculationReboundContainment = zonalMean(circulationReboundContainmentDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalCirculationReboundActivitySuppression = zonalMean(circulationReboundActivitySuppressionDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalCirculationReboundSourceSuppression = zonalMean(circulationReboundSourceSuppressionDiagFrac || new Array(nx * ny).fill(0), nx, ny);
@@ -1831,6 +1929,20 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       northDryBeltOceanSoftLiveGateAscentModulationMeanFrac: round(northDryBeltOceanSoftLiveGateAscentModulationMean, 5),
       northDryBeltSoftLiveGateAppliedSuppressionMeanKgM2: round(northDryBeltSoftLiveGateAppliedSuppressionMass, 5),
       northDryBeltOceanSoftLiveGateAppliedSuppressionMeanKgM2: round(northDryBeltOceanSoftLiveGateAppliedSuppressionMass, 5),
+      tropicalShoulderLargeScaleCondensationMeanKgM2: round(tropicalShoulderLargeScaleCondensationMean, 5),
+      tropicalShoulderCoreLargeScaleCondensationMeanKgM2: round(tropicalShoulderCoreLargeScaleCondensationMean, 5),
+      tropicalShoulderCoreShoulderGuardCandidateCondensationMeanKgM2: round(tropicalShoulderCoreShoulderGuardCandidateMass, 5),
+      tropicalShoulderCoreOceanShoulderGuardCandidateCondensationMeanKgM2: round(tropicalShoulderCoreOceanShoulderGuardCandidateMass, 5),
+      tropicalShoulderCoreShoulderGuardPotentialSuppressedMeanKgM2: round(tropicalShoulderCoreShoulderGuardPotentialSuppressedMass, 5),
+      tropicalShoulderCoreOceanShoulderGuardPotentialSuppressedMeanKgM2: round(tropicalShoulderCoreOceanShoulderGuardPotentialSuppressedMass, 5),
+      tropicalShoulderCoreShoulderGuardHitMean: round(tropicalShoulderCoreShoulderGuardHitMean, 5),
+      tropicalShoulderCoreOceanShoulderGuardHitMean: round(tropicalShoulderCoreOceanShoulderGuardHitMean, 5),
+      tropicalShoulderCoreOceanShoulderGuardBridgeSilenceMeanFrac: round(tropicalShoulderCoreOceanShoulderGuardBridgeSilenceMean, 5),
+      tropicalShoulderCoreOceanShoulderGuardBandWindowMeanFrac: round(tropicalShoulderCoreOceanShoulderGuardBandWindowMean, 5),
+      tropicalShoulderCoreOceanShoulderGuardSelectorSupportMeanFrac: round(tropicalShoulderCoreOceanShoulderGuardSelectorSupportMean, 5),
+      tropicalShoulderCoreShoulderGuardAppliedSuppressionMeanKgM2: round(tropicalShoulderCoreShoulderGuardAppliedSuppressionMass, 5),
+      tropicalShoulderCoreOceanShoulderGuardAppliedSuppressionMeanKgM2: round(tropicalShoulderCoreOceanShoulderGuardAppliedSuppressionMass, 5),
+      sourceCoreOceanShoulderGuardAppliedSuppressionMeanKgM2: round(sourceCoreOceanShoulderGuardAppliedSuppressionMass, 5),
       northTransitionCirculationReboundContainmentMeanFrac: round(northTransitionCirculationReboundContainmentMean, 5),
       southTransitionCirculationReboundContainmentMeanFrac: round(southTransitionCirculationReboundContainmentMean, 5),
       northDryBeltCirculationReboundContainmentMeanFrac: round(northDryBeltCirculationReboundContainmentMean, 5),
@@ -1867,6 +1979,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       southTransitionDryingOmegaBridgeAppliedMeanPaS: round(southTransitionDryingOmegaBridgeAppliedMean, 5),
       northDryBeltDryingOmegaBridgeAppliedMeanPaS: round(northDryBeltDryingOmegaBridgeAppliedMean, 5),
       southDryBeltDryingOmegaBridgeAppliedMeanPaS: round(southDryBeltDryingOmegaBridgeAppliedMean, 5),
+      targetEntryProjectedBridgeAppliedMeanPaS: round(targetEntryProjectedBridgeAppliedMean, 5),
+      jetBandProjectedBridgeAppliedMeanPaS: round(jetBandProjectedBridgeAppliedMean, 5),
       northTransitionSubtropicalSourceDriverMeanFrac: round(northTransitionSubtropicalSourceDriverMean, 5),
       southTransitionSubtropicalSourceDriverMeanFrac: round(southTransitionSubtropicalSourceDriverMean, 5),
       northDryBeltSubtropicalSourceDriverMeanFrac: round(northDryBeltSubtropicalSourceDriverMean, 5),
@@ -2010,6 +2124,13 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         surfaceCloudShortwaveShieldingWm2: roundSeries(zonalSurfaceCloudShielding, 5),
         resolvedAscentCloudBirthPotentialKgM2: roundSeries(zonalResolvedAscentCloudBirthPotential, 5),
         largeScaleCondensationSourceKgM2: roundSeries(zonalLargeScaleCondensation, 5),
+        shoulderAbsorptionGuardCandidateMassKgM2: roundSeries(zonalShoulderGuardCandidateMass, 5),
+        shoulderAbsorptionGuardPotentialSuppressedMassKgM2: roundSeries(zonalShoulderGuardPotentialSuppressedMass, 5),
+        shoulderAbsorptionGuardEventCount: roundSeries(zonalShoulderGuardHitCount, 5),
+        shoulderAbsorptionGuardBridgeSilenceFrac: roundSeries(zonalShoulderGuardBridgeSilence, 5),
+        shoulderAbsorptionGuardBandWindowFrac: roundSeries(zonalShoulderGuardBandWindow, 5),
+        shoulderAbsorptionGuardSelectorSupportFrac: roundSeries(zonalShoulderGuardSelectorSupport, 5),
+        shoulderAbsorptionGuardAppliedSuppressionKgM2: roundSeries(zonalShoulderGuardAppliedSuppression, 5),
         cloudReevaporationMassKgM2: roundSeries(zonalCloudReevaporation, 5),
         precipReevaporationMassKgM2: roundSeries(zonalPrecipReevaporation, 5),
         importedAnvilPersistenceMassKgM2: roundSeries(zonalImportedAnvilPersistence, 5),
@@ -4765,6 +4886,8 @@ export async function main() {
   else if (dryingOmegaBridgePatchMode === 'on') core.vertParams.enableDryingOmegaBridge = true;
   if (softLiveGatePatchMode === 'off') core.microParams.enableSoftLiveStateMaintenanceSuppression = false;
   else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
+  if (shoulderAbsorptionGuardPatchMode === 'off') core.microParams.enableShoulderAbsorptionGuard = false;
+  else if (shoulderAbsorptionGuardPatchMode === 'on') core.microParams.enableShoulderAbsorptionGuard = true;
   const terrainFallback = applyHeadlessTerrainFixture(core);
   const configSnapshot = cloneConfigSnapshot(core);
   const { samples, timingByTarget, horizonSummaries } = advanceAndSampleCore({ core, sampleTargetsDays });

@@ -1095,6 +1095,44 @@ Exit criteria:
 - target-entry `30-45°N` projected bridge remains non-zero
 - `itczWidthDeg` and dry-belt ratios do not regress further
 
+Status:
+- implemented with live diagnostics and runtime toggle in:
+  - [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+  - [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- same-branch `off/on` result is recorded in [phase1z-shoulder-absorption-guard-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1z-shoulder-absorption-guard-patch.md)
+- outcome:
+  - slight ITCZ / north dry-belt improvement
+  - shoulder rebound still stays positive
+  - target-entry projected bridge is still `0` on the live branch
+  - south dry-belt ratio regresses slightly
+- decision:
+  - the shoulder guard is **rejected as a kept default patch**
+  - the diagnostics and runtime toggle stay in place
+  - the guard remains disabled by default
+
+### Phase 1ZA: Shoulder Guard Residual Attribution
+
+Objective:
+- explain why the shoulder guard misses the `3.75°N` rebound while also bleeding into the `30-45°N` target-entry lane on the live branch
+
+Primary files:
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [phase1z-shoulder-absorption-guard-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1z-shoulder-absorption-guard-patch.md)
+
+Questions to resolve:
+- why is the strongest rebound latitude `3.75°N` still getting zero applied guard mass?
+- why does the current selector apply suppression in the target-entry `30-45°N` lane at all?
+- is the missing discriminator latitude-window placement, bridge-silence weighting, or a weak-engine ambiguity between shoulder and target-entry columns?
+
+Exit criteria:
+- one attribution report that ranks the selector miss:
+  - `equatorial-edge shoulder miss`
+  - `target-entry false positive`
+  - `shared weak-engine ambiguity`
+- one explicit redesign contract for the next patch attempt
+- no new physics change until that selector miss is proved
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
