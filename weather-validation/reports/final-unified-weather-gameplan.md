@@ -1332,6 +1332,33 @@ Status:
   - `33.75°N` target-entry lane stays closed
 - next active phase: `Phase 1ZI: Equatorial-Edge Candidate Gate Design`
 
+### Phase 1ZI: Equatorial-Edge Candidate Gate Design
+
+Objective:
+- redesign the shoulder candidate-entry gate so the `3-6°N` equatorial edge no longer rides inside the same fully admitted lane as the improving `9-12°N` inner shoulder
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+
+Status:
+- complete in [phase1zi-equatorial-edge-candidate-gate-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zi-equatorial-edge-candidate-gate-design.md)
+- verdict: `single_lane_geometry_overadmits_equatorial_edge`
+- key conclusion:
+  - the current single shoulder latitude window is too coarse
+  - it still admits both `3.75°N` and `11.25°N` through one lane even though only the equatorial edge now rebounds
+  - the next patch should reduce raw candidate/event generation at `3-6°N`, not increase buffered removal again
+- design contract:
+  - keep `buffered_rainout` as the suppressed-mass fate
+  - keep the `30-45°N` target-entry exclusion intact
+  - keep the `11.25°N` and `18.75°N` improvements intact
+  - split the shoulder window into an equatorial-edge lane and an inner-shoulder lane in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+  - publish new fresh-state lane diagnostics and use them in [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+  - apply an edge-only candidate-entry penalty or stricter support threshold tied to fresh subtropical support
+- next active phase: `Phase 1ZJ: Implement Split-Lane Equatorial-Edge Candidate Gate Patch`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
