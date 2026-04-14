@@ -1288,6 +1288,50 @@ Status:
   - do not expand application into the `18.75°N` spillover lane
   - reallocate shoulder suppression toward `3.75°N` before increasing total amplitude
 
+### Phase 1ZG: Implement Equatorial-Edge Buffered Shoulder Fate Patch
+
+Objective:
+- keep the winning `buffered_rainout` fate family, turn it on by default, and reallocate buffered shoulder suppression toward the `3-6°N` equatorial edge without reopening the protected lanes
+
+Primary files:
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+
+Status:
+- complete in [phase1zg-equatorial-edge-buffered-shoulder-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zg-equatorial-edge-buffered-shoulder-patch.md)
+- verdict: `keep_with_equatorial_edge_residual`
+- the patch is now worth keeping on by default because same-branch `off -> on` improves the climate guardrails:
+  - `itczWidthDeg: 25.834 -> 25.571`
+  - `subtropicalDryNorthRatio: 1.515 -> 1.421`
+  - `subtropicalDrySouthRatio: 1.192 -> 1.154`
+  - target-entry `33.75°N` suppression stays `0`
+  - `18.75°N` spillover condensation still improves: `-0.01806 kg/m²`
+- but the equatorial edge remains unresolved:
+  - `3.75°N` condensation still rises: `+0.04637 kg/m²`
+  - `3.75°N` candidate mass rises: `+0.0701 kg/m²`
+  - `3.75°N` buffered application rises too: `+0.02352 kg/m²`
+
+### Phase 1ZH: Equatorial-Edge Candidate Rebound Attribution
+
+Objective:
+- explain why the kept buffered shoulder patch improves the climate guardrails overall while still allowing a raw `3.75°N` equatorial-edge candidate rebound
+
+Primary files:
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+
+Status:
+- complete in [phase1zh-equatorial-edge-candidate-rebound-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zh-equatorial-edge-candidate-rebound-attribution.md)
+- verdict: `raw_equatorial_edge_candidate_rebound`
+- dominant finding:
+  - the remaining failure is no longer suppressed-mass fate or target-entry leakage
+  - it is a raw candidate / event-count rebound at `3.75°N` that outruns the stronger buffered removal
+- protected wins to preserve:
+  - `11.25°N` now improves
+  - `18.75°N` spillover now improves
+  - `33.75°N` target-entry lane stays closed
+- next active phase: `Phase 1ZI: Equatorial-Edge Candidate Gate Design`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

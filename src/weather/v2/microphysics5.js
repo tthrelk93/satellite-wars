@@ -133,6 +133,8 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
     shoulderAbsorptionGuardScale = 1.6,
     shoulderAbsorptionGuardMaxFrac = 0.2,
     shoulderAbsorptionGuardSuppressedMassMode = 'retain',
+    shoulderBufferedEquatorialEdgeBoost = 0.35,
+    shoulderBufferedInnerLanePenalty = 0.2,
     enable = true
   } = params;
   if (!enable) return;
@@ -680,6 +682,33 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               SUBTROPICAL_MAINTENANCE_DIAG.suppressMax
             )
           : 0;
+        const shoulderSuppressedMassMode = shoulderAbsorptionGuardSuppressedMassMode === 'sink_export'
+          ? 'sink_export'
+          : shoulderAbsorptionGuardSuppressedMassMode === 'buffered_rainout'
+            ? 'buffered_rainout'
+            : 'retain';
+        const shoulderBufferedInnerLaneSignal = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              0.7 * freshSubtropicalSuppression
+                + 0.3 * freshSubtropicalBand,
+              0,
+              1
+            )
+          : 0;
+        const shoulderBufferedEquatorialRedistribution = enableConvectiveOutcome
+          && isOceanColumn
+          && shoulderSuppressedMassMode === 'buffered_rainout'
+          ? clamp(
+              1
+                + shoulderBufferedEquatorialEdgeBoost * (1 - shoulderBufferedInnerLaneSignal)
+                - shoulderBufferedInnerLanePenalty * shoulderBufferedInnerLaneSignal,
+              0.85,
+              1.25
+            )
+          : 1;
+        const shoulderBufferedLocalMaxFrac = shoulderSuppressedMassMode === 'buffered_rainout'
+          ? shoulderAbsorptionGuardMaxFrac * shoulderBufferedEquatorialRedistribution
+          : shoulderAbsorptionGuardMaxFrac;
         const dqRaw = applyLatentCap(qvVal - qsat, iceFrac > 0.5 ? Ls : Lv);
         const softLiveGateSuppressionFrac = enableSoftLiveStateMaintenanceSuppression
           && isOceanColumn
@@ -694,9 +723,11 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
           && isOceanColumn
           && shoulderSelectorSupport >= SUBTROPICAL_MAINTENANCE_DIAG.supportThreshold
           ? clamp(
-              shoulderGuardSupport * shoulderAbsorptionGuardScale,
+              shoulderGuardSupport
+                * shoulderAbsorptionGuardScale
+                * shoulderBufferedEquatorialRedistribution,
               0,
-              shoulderAbsorptionGuardMaxFrac
+              shoulderBufferedLocalMaxFrac
             )
           : 0;
         const combinedSuppressionFrac = Math.max(softLiveGateSuppressionFrac, shoulderGuardSuppressionFrac);
@@ -705,11 +736,6 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
           : 0;
         const dqSuppressed = dqRaw * combinedSuppressionFrac;
         const dqShoulderSuppressed = dqRaw * effectiveShoulderGuardSuppressionFrac;
-        const shoulderSuppressedMassMode = shoulderAbsorptionGuardSuppressedMassMode === 'sink_export'
-          ? 'sink_export'
-          : shoulderAbsorptionGuardSuppressedMassMode === 'buffered_rainout'
-            ? 'buffered_rainout'
-            : 'retain';
         if (dqShoulderSuppressed > 0) {
           if (shoulderSuppressedMassMode === 'sink_export') {
             qvVal -= dqShoulderSuppressed;

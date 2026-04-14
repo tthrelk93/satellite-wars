@@ -457,6 +457,70 @@ test('microphysics shoulder fate modes either retain, sink, or buffer suppressed
   assert.ok(buffered.qr[1] > retain.qr[1] || buffered.qs[1] > retain.qs[1]);
 });
 
+test('microphysics buffered shoulder fate reallocates suppression toward the equatorial edge', () => {
+  const makeState = ({ freshSubtropicalSuppression, freshSubtropicalBand }) => {
+    const state = setupState(279);
+    state.qv.fill(0.002);
+    state.qc.fill(0);
+    state.qi.fill(0);
+    state.qr.fill(0);
+    state.qs.fill(0);
+    state.landMask[0] = 0;
+    state.convectiveOrganization[0] = 0.05;
+    state.convectiveMassFlux[0] = 2e-4;
+    state.convectiveAnvilSource[0] = 0.02;
+    state.subtropicalSubsidenceDrying[0] = 0.0;
+    state.freshSubtropicalSuppressionDiag[0] = freshSubtropicalSuppression;
+    state.freshSubtropicalBandDiag[0] = freshSubtropicalBand;
+    state.freshShoulderLatitudeWindowDiag[0] = 1;
+    state.freshShoulderTargetEntryExclusionDiag[0] = 0;
+    state.freshNeutralToSubsidingSupportDiag[0] = 0.62;
+    state.freshOrganizedSupportDiag[0] = 0.16;
+    state.freshRhMidSupportDiag[0] = 0.9;
+    state.dryingOmegaBridgeAppliedDiag[0] = 0;
+    state.omega.fill(0.06);
+    state.qv[1] = 0.011;
+    return state;
+  };
+
+  const equatorialEdge = makeState({
+    freshSubtropicalSuppression: 0.08,
+    freshSubtropicalBand: 0.12
+  });
+  const innerShoulder = makeState({
+    freshSubtropicalSuppression: 0.62,
+    freshSubtropicalBand: 0.7
+  });
+
+  stepMicrophysics5({
+    dt: 900,
+    state: equatorialEdge,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: false,
+      enableShoulderAbsorptionGuard: true,
+      shoulderAbsorptionGuardSuppressedMassMode: 'buffered_rainout'
+    }
+  });
+  stepMicrophysics5({
+    dt: 900,
+    state: innerShoulder,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: false,
+      enableShoulderAbsorptionGuard: true,
+      shoulderAbsorptionGuardSuppressedMassMode: 'buffered_rainout'
+    }
+  });
+
+  assert.ok(equatorialEdge.saturationAdjustmentShoulderGuardBufferedRainoutMass[0] > 0);
+  assert.ok(innerShoulder.saturationAdjustmentShoulderGuardBufferedRainoutMass[0] > 0);
+  assert.ok(
+    equatorialEdge.saturationAdjustmentShoulderGuardBufferedRainoutMass[0]
+      > innerShoulder.saturationAdjustmentShoulderGuardBufferedRainoutMass[0]
+  );
+});
+
 test('microphysics populates the upper-cloud handoff ledger and closes the upper-cloud budget', () => {
   const state = setupState(248);
   state.qv.fill(0.006);

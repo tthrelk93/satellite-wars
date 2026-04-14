@@ -1,0 +1,124 @@
+{
+  "schema": "satellite-wars.phase1zh-equatorial-edge-candidate-rebound-attribution.v1",
+  "generatedAt": "2026-04-14T08:53:35.829Z",
+  "paths": {
+    "summaryPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zg-equatorial-edge-buffered-shoulder-patch.json",
+    "reportPath": "weather-validation/reports/phase1zh-equatorial-edge-candidate-rebound-attribution.md",
+    "jsonPath": "weather-validation/reports/phase1zh-equatorial-edge-candidate-rebound-attribution.json"
+  },
+  "verdict": "raw_equatorial_edge_candidate_rebound",
+  "nextPhase": "Phase 1ZI: Equatorial-Edge Candidate Gate Design",
+  "conclusion": "The remaining shoulder failure is no longer suppressed-mass fate or selector leakage. It is a raw candidate and event-count rebound concentrated at 3.75°N that outruns the stronger buffered application.",
+  "evidence": {
+    "equatorialEdge": {
+      "latitudeDeg": 3.75,
+      "off": {
+        "largeScaleCondensationSourceKgM2": 0.07641,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.04151,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 1.14583,
+        "totalColumnWaterKgM2": 43.876
+      },
+      "on": {
+        "largeScaleCondensationSourceKgM2": 0.12278,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.11161,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.02352,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0.02352,
+        "shoulderAbsorptionGuardEventCount": 1.66667,
+        "totalColumnWaterKgM2": 43.347
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": 0.04637,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.0701,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.02352,
+        "shoulderAbsorptionGuardEventCount": 0.52084,
+        "totalColumnWaterKgM2": -0.529
+      }
+    },
+    "innerShoulder": {
+      "latitudeDeg": 11.25,
+      "off": {
+        "largeScaleCondensationSourceKgM2": 0.12779,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.08619,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 2,
+        "totalColumnWaterKgM2": 43.119
+      },
+      "on": {
+        "largeScaleCondensationSourceKgM2": 0.0893,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.06461,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.01615,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0.01615,
+        "shoulderAbsorptionGuardEventCount": 1.95833,
+        "totalColumnWaterKgM2": 42.445
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": -0.03849,
+        "shoulderAbsorptionGuardCandidateMassKgM2": -0.02158,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.01615,
+        "shoulderAbsorptionGuardEventCount": -0.04167,
+        "totalColumnWaterKgM2": -0.674
+      }
+    },
+    "spillover": {
+      "latitudeDeg": 18.75,
+      "off": {
+        "largeScaleCondensationSourceKgM2": 0.10309,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "totalColumnWaterKgM2": 38.233
+      },
+      "on": {
+        "largeScaleCondensationSourceKgM2": 0.08503,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "totalColumnWaterKgM2": 35.748
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": -0.01806,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "totalColumnWaterKgM2": -2.485
+      }
+    },
+    "targetEntry": {
+      "latitudeDeg": 33.75,
+      "off": {
+        "largeScaleCondensationSourceKgM2": 0.18497,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "totalColumnWaterKgM2": 30.909
+      },
+      "on": {
+        "largeScaleCondensationSourceKgM2": 0.17612,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "totalColumnWaterKgM2": 30.498
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": -0.00885,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "totalColumnWaterKgM2": -0.411
+      }
+    }
+  },
+  "implications": [
+    "The buffered-rainout fate should stay in place.",
+    "The target-entry exclusion should stay in place.",
+    "The next patch should reduce 3–6°N candidate/event generation rather than simply increasing buffered removal again.",
+    "The 11.25°N and 18.75°N improvements should be treated as protected wins."
+  ]
+}
