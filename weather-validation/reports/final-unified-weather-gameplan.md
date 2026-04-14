@@ -921,6 +921,56 @@ Exit criteria:
 - tropical-shoulder `largeScaleCondensation` increase is reduced materially from the current `+0.01778 kg/m²`
 - the Phase 1K and Phase 1M wins remain intact
 
+Result:
+- complete
+- see [phase1v-poleward-jet-entry-bridge-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1v-poleward-jet-entry-bridge-patch.md)
+- the projected bridge is live on the real 30-day run:
+  - `northTransitionDryingOmegaBridgeAppliedMeanPaS: 0 -> 0.00205`
+  - `northDryBeltDryingOmegaBridgeAppliedMeanPaS: 0 -> 0.00105`
+  - `northTransitionLowLevelOmegaEffectiveMeanPaS: 0.06637 -> 0.06846`
+  - `northDryBeltLowLevelOmegaEffectiveMeanPaS: 0.01565 -> 0.01674`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.14647 -> 0.14170`
+- but the target circulation still does not move:
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+  - NH storm-track response stays effectively `0`
+- guardrails stay flat to slightly worse:
+  - `itczWidthDeg: 25.834 -> 25.840`
+  - dry-belt ratios stay effectively unchanged
+- the residual profile pattern still shows equatorward absorption before jet recovery:
+  - `18.75°N` `largeScaleCondensation` decreases
+  - `3.75°N` `largeScaleCondensation` increases sharply
+
+Conclusion:
+- the poleward-projected bridge is worth keeping as a live lane and diagnostic foothold
+- but it is not yet a keepable climate fix
+- the remaining blocker is no longer “same-column placement”
+- it is now “why does improved transition omega still fail to create transition-entry / jet-band wind recovery”
+
+### Phase 1W: Transition-Omega Carrier Attribution
+
+Objective:
+- prove why the now-improved NH transition omega signal still fails to generate any meaningful transition-entry or jet-band wind / storm-track response
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+
+Questions to resolve:
+- is the projected omega signal still too shallow vertically to influence the transition wind lane?
+- is the projected omega signal landing in the wrong part of the `30-45°N` corridor?
+- is a remaining equatorward condensation sink still absorbing the response before jet entry?
+- or is the missing carrier now genuinely downstream of omega?
+
+Exit criteria:
+- one ranked dominant failure mode among:
+  - vertical-depth failure
+  - latitudinal target-placement failure
+  - equatorward condensation absorption
+  - true downstream jet-response failure
+- one explicit patch contract for the next circulation lane
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

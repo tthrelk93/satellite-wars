@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createState5 } from './state5.js';
-import { computeDryingOmegaBridgePaS, computeTransitionReturnFlowCouplingFrac, stepVertical5 } from './vertical5.js';
+import {
+  computeDryingOmegaBridgePaS,
+  computeDryingOmegaBridgeSourceSupport,
+  computeDryingOmegaBridgeTargetWeight,
+  computeTransitionReturnFlowCouplingFrac,
+  stepVertical5
+} from './vertical5.js';
 
 test('stepVertical5 keeps thin upper layers bounded during strong ascent-driven transport', () => {
   const sigmaHalf = new Float32Array([0, 0.5, 1]);
@@ -446,4 +452,107 @@ test('computeDryingOmegaBridgePaS is capped and only active for weak-engine dry-
     maxPaS: 0.018
   });
   assert.ok(tapered < active);
+});
+
+test('computeDryingOmegaBridgeSourceSupport favors 20-30N sources and penalizes equatorward leakage', () => {
+  assert.equal(
+    computeDryingOmegaBridgeSourceSupport({
+      enabled: false,
+      latAbs: 26.25,
+      sourceLat0: 20,
+      sourceLat1: 30,
+      leakLat0: 18,
+      leakLat1: 22
+    }),
+    0
+  );
+
+  const tropicalShoulder = computeDryingOmegaBridgeSourceSupport({
+    enabled: true,
+    latAbs: 11.25,
+    sourceLat0: 20,
+    sourceLat1: 30,
+    leakLat0: 18,
+    leakLat1: 22
+  });
+  const equatorwardEdge = computeDryingOmegaBridgeSourceSupport({
+    enabled: true,
+    latAbs: 18.75,
+    sourceLat0: 20,
+    sourceLat1: 30,
+    leakLat0: 18,
+    leakLat1: 22
+  });
+  const sourceCore = computeDryingOmegaBridgeSourceSupport({
+    enabled: true,
+    latAbs: 26.25,
+    sourceLat0: 20,
+    sourceLat1: 30,
+    leakLat0: 18,
+    leakLat1: 22
+  });
+  const polewardOutside = computeDryingOmegaBridgeSourceSupport({
+    enabled: true,
+    latAbs: 33.75,
+    sourceLat0: 20,
+    sourceLat1: 30,
+    leakLat0: 18,
+    leakLat1: 22
+  });
+
+  assert.equal(tropicalShoulder, 0);
+  assert.ok(equatorwardEdge < sourceCore);
+  assert.ok(sourceCore > 0.5);
+  assert.ok(polewardOutside < 0.1);
+});
+
+test('computeDryingOmegaBridgeTargetWeight focuses on weak-engine 30-45N targets', () => {
+  assert.equal(
+    computeDryingOmegaBridgeTargetWeight({
+      enabled: false,
+      latAbs: 33.75,
+      targetLat0: 30,
+      targetLat1: 45,
+      organizedSupport: 0.18,
+      convectivePotential: 0.22,
+      neutralToSubsidingSupport: 0.85,
+      existingOmegaPaS: 0.04
+    }),
+    0
+  );
+
+  const targetCore = computeDryingOmegaBridgeTargetWeight({
+    enabled: true,
+    latAbs: 33.75,
+    targetLat0: 30,
+    targetLat1: 45,
+    organizedSupport: 0.18,
+    convectivePotential: 0.22,
+    neutralToSubsidingSupport: 0.85,
+    existingOmegaPaS: 0.04
+  });
+  const strongEngine = computeDryingOmegaBridgeTargetWeight({
+    enabled: true,
+    latAbs: 33.75,
+    targetLat0: 30,
+    targetLat1: 45,
+    organizedSupport: 0.82,
+    convectivePotential: 0.78,
+    neutralToSubsidingSupport: 0.85,
+    existingOmegaPaS: 0.04
+  });
+  const outsideTarget = computeDryingOmegaBridgeTargetWeight({
+    enabled: true,
+    latAbs: 18.75,
+    targetLat0: 30,
+    targetLat1: 45,
+    organizedSupport: 0.18,
+    convectivePotential: 0.22,
+    neutralToSubsidingSupport: 0.85,
+    existingOmegaPaS: 0.04
+  });
+
+  assert.ok(targetCore > 0.3);
+  assert.ok(strongEngine < targetCore);
+  assert.equal(outsideTarget, 0);
 });

@@ -549,6 +549,14 @@ export class WeatherCore5 {
       dryingOmegaBridgeSuppressedSource0: 0.0007,
       dryingOmegaBridgeSuppressedSource1: 0.0016,
       dryingOmegaBridgeMaxPaS: 0.018,
+      dryingOmegaBridgeProjectedShareMaxFrac: 0.65,
+      dryingOmegaBridgeSourceLat0: 20,
+      dryingOmegaBridgeSourceLat1: 30,
+      dryingOmegaBridgeTargetLat0: 30,
+      dryingOmegaBridgeTargetLat1: 45,
+      dryingOmegaBridgeEquatorwardLeakLat0: 18,
+      dryingOmegaBridgeEquatorwardLeakLat1: 22,
+      dryingOmegaBridgeProjectedMaxPaS: 0.006,
       eps: 1e-12,
       debugConservation: false
     };

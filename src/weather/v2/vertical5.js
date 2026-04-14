@@ -165,6 +165,46 @@ export const computeDryingOmegaBridgePaS = ({
     maxPaS
   );
 };
+export const computeDryingOmegaBridgeSourceSupport = ({
+  enabled,
+  latAbs,
+  sourceLat0,
+  sourceLat1,
+  leakLat0,
+  leakLat1
+}) => {
+  if (!enabled) return 0;
+  const sourceWindow = smoothstep(sourceLat0 - 2, sourceLat0 + 2, latAbs)
+    * (1 - smoothstep(sourceLat1 - 2, sourceLat1 + 2, latAbs));
+  const leakPenalty = smoothstep(leakLat0, leakLat1, latAbs);
+  return clamp01(sourceWindow * leakPenalty);
+};
+export const computeDryingOmegaBridgeTargetWeight = ({
+  enabled,
+  latAbs,
+  targetLat0,
+  targetLat1,
+  organizedSupport,
+  convectivePotential,
+  neutralToSubsidingSupport,
+  existingOmegaPaS
+}) => {
+  if (!enabled) return 0;
+  const targetWindow = smoothstep(targetLat0 - 2, targetLat0 + 2, latAbs)
+    * (1 - smoothstep(targetLat1 - 2, targetLat1 + 2, latAbs));
+  const weakEngineSupport = clamp01(
+    0.6 * (1 - clamp01(organizedSupport)) +
+    0.4 * (1 - clamp01(convectivePotential))
+  );
+  const neutralSupport = clamp01(neutralToSubsidingSupport);
+  const existingDescentTaper = 1 - smoothstep(0.08, 0.22, Math.max(0, existingOmegaPaS));
+  return clamp01(
+    targetWindow
+      * weakEngineSupport
+      * (0.55 + 0.45 * neutralSupport)
+      * existingDescentTaper
+  );
+};
 const VERTICAL_ALLOWED_PARAMS = new Set([
   'enableMixing',
   'enableConvection',
@@ -245,6 +285,14 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'dryingOmegaBridgeSuppressedSource0',
   'dryingOmegaBridgeSuppressedSource1',
   'dryingOmegaBridgeMaxPaS',
+  'dryingOmegaBridgeProjectedShareMaxFrac',
+  'dryingOmegaBridgeSourceLat0',
+  'dryingOmegaBridgeSourceLat1',
+  'dryingOmegaBridgeTargetLat0',
+  'dryingOmegaBridgeTargetLat1',
+  'dryingOmegaBridgeEquatorwardLeakLat0',
+  'dryingOmegaBridgeEquatorwardLeakLat1',
+  'dryingOmegaBridgeProjectedMaxPaS',
   'enableCarryInputDominanceOverride',
   'carryInputSubtropicalSuppressionMin',
   'carryInputOrganizedSupportMax',
@@ -380,6 +428,14 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     dryingOmegaBridgeSuppressedSource0 = 0.0007,
     dryingOmegaBridgeSuppressedSource1 = 0.0016,
     dryingOmegaBridgeMaxPaS = 0.018,
+    dryingOmegaBridgeProjectedShareMaxFrac = 0.65,
+    dryingOmegaBridgeSourceLat0 = 20,
+    dryingOmegaBridgeSourceLat1 = 30,
+    dryingOmegaBridgeTargetLat0 = 30,
+    dryingOmegaBridgeTargetLat1 = 45,
+    dryingOmegaBridgeEquatorwardLeakLat0 = 18,
+    dryingOmegaBridgeEquatorwardLeakLat1 = 22,
+    dryingOmegaBridgeProjectedMaxPaS = 0.006,
     enableCarryInputDominanceOverride = true,
     carryInputSubtropicalSuppressionMin = 0.74243,
     carryInputOrganizedSupportMax = 0.22504,
@@ -845,6 +901,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           omega[lev * N + k] += omegaTerrain * decay;
         }
       }
+
     }
   }
 
@@ -1605,6 +1662,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const subtropicalAlpha = 1 - Math.exp(-dt / Math.max(subtropicalSubsidenceTau, eps));
       const subtropicalMidSigma = 0.5 * (subtropicalSubsidenceTopSigma + subtropicalSubsidenceBottomSigma);
       const levS = nz - 1;
+      const nhProjectedOmegaBridgeBudgetByX = new Float32Array(nx);
+      const shProjectedOmegaBridgeBudgetByX = new Float32Array(nx);
+      const projectedOmegaBridgeTargetWeight = new Float32Array(N);
+      const nhProjectedOmegaBridgeTargetWeightByX = new Float32Array(nx);
+      const shProjectedOmegaBridgeTargetWeightByX = new Float32Array(nx);
 
       for (let j = 0; j < ny; j++) {
         const lat = latDeg[j];
@@ -1678,11 +1740,28 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             suppressedSource1: dryingOmegaBridgeSuppressedSource1,
             maxPaS: dryingOmegaBridgeMaxPaS
           });
-          dryingOmegaBridgeAppliedDiag[k] = omegaBridgePaS;
-          if (omegaBridgePaS > 0) {
-            lowLevelOmegaEffective[k] += omegaBridgePaS;
-            omega[levS * N + k] += omegaBridgePaS;
-            if (levS > 0) omega[(levS - 1) * N + k] += omegaBridgePaS * 0.35;
+          const projectedSourceSupport = computeDryingOmegaBridgeSourceSupport({
+            enabled: enableDryingOmegaBridge,
+            latAbs,
+            sourceLat0: dryingOmegaBridgeSourceLat0,
+            sourceLat1: dryingOmegaBridgeSourceLat1,
+            leakLat0: dryingOmegaBridgeEquatorwardLeakLat0,
+            leakLat1: dryingOmegaBridgeEquatorwardLeakLat1
+          });
+          const projectedOmegaBridgeFrac = clamp01(
+            projectedSourceSupport * clamp01(dryingOmegaBridgeProjectedShareMaxFrac)
+          );
+          const projectedOmegaBridgeBudgetPaS = omegaBridgePaS * projectedOmegaBridgeFrac;
+          const localOmegaBridgePaS = Math.max(0, omegaBridgePaS - projectedOmegaBridgeBudgetPaS);
+          dryingOmegaBridgeAppliedDiag[k] = localOmegaBridgePaS;
+          if (projectedOmegaBridgeBudgetPaS > 0) {
+            if (lat >= 0) nhProjectedOmegaBridgeBudgetByX[i] += projectedOmegaBridgeBudgetPaS;
+            else shProjectedOmegaBridgeBudgetByX[i] += projectedOmegaBridgeBudgetPaS;
+          }
+          if (localOmegaBridgePaS > 0) {
+            lowLevelOmegaEffective[k] += localOmegaBridgePaS;
+            omega[levS * N + k] += localOmegaBridgePaS;
+            if (levS > 0) omega[(levS - 1) * N + k] += localOmegaBridgePaS * 0.35;
           }
           if (dryDriver <= 0) continue;
           const dryFracBase = clamp(
