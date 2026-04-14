@@ -1,0 +1,192 @@
+{
+  "schema": "satellite-wars.phase1zj-split-lane-equatorial-edge-candidate-gate-patch.v1",
+  "generatedAt": "2026-04-14T09:17:11.112Z",
+  "paths": {
+    "offPath": "/tmp/phase1zj-off.json",
+    "onPath": "/tmp/phase1zj-on.json",
+    "phase1zgPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zg-equatorial-edge-buffered-shoulder-patch.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zj-split-lane-equatorial-edge-candidate-gate-patch.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zj-split-lane-equatorial-edge-candidate-gate-patch.json"
+  },
+  "verdict": "keep_with_out_of_lane_edge_residual",
+  "keepPatch": true,
+  "nextPhase": "Phase 1ZK: Equatorial-Edge Out-Of-Lane Attribution",
+  "metrics": {
+    "itczWidthDeg": -0.227,
+    "subtropicalDryNorthRatio": -0.086,
+    "subtropicalDrySouthRatio": -0.048,
+    "midlatitudeWesterliesNorthU10Ms": 0,
+    "tropicalShoulderCoreLargeScaleCondensationMeanKgM2": -0.01472
+  },
+  "slices": {
+    "equatorialEdge": {
+      "latitudeDeg": 3.75,
+      "off": {
+        "largeScaleCondensationSourceKgM2": 0.07641,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 1,
+        "freshShoulderEquatorialEdgeWindowDiagFrac": 1,
+        "freshShoulderInnerWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeGateSupportDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0
+      },
+      "on": {
+        "largeScaleCondensationSourceKgM2": 0.10331,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 1,
+        "freshShoulderEquatorialEdgeWindowDiagFrac": 1,
+        "freshShoulderInnerWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeGateSupportDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": 0.0269,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+        "freshShoulderInnerWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeGateSupportDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0
+      }
+    },
+    "innerShoulder": {
+      "latitudeDeg": 11.25,
+      "off": {
+        "largeScaleCondensationSourceKgM2": 0.12779,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.08619,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 2,
+        "freshShoulderLatitudeWindowDiagFrac": 1,
+        "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+        "freshShoulderInnerWindowDiagFrac": 1,
+        "freshShoulderEquatorialEdgeGateSupportDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0
+      },
+      "on": {
+        "largeScaleCondensationSourceKgM2": 0.07074,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.0395,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.00988,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0.00988,
+        "shoulderAbsorptionGuardEventCount": 1.83333,
+        "freshShoulderLatitudeWindowDiagFrac": 1,
+        "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+        "freshShoulderInnerWindowDiagFrac": 1,
+        "freshShoulderEquatorialEdgeGateSupportDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": -0.05705,
+        "shoulderAbsorptionGuardCandidateMassKgM2": -0.04669,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.00988,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0.00988,
+        "shoulderAbsorptionGuardEventCount": -0.16667,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+        "freshShoulderInnerWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeGateSupportDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0
+      }
+    },
+    "spillover": {
+      "latitudeDeg": 18.75,
+      "off": {
+        "largeScaleCondensationSourceKgM2": 0.10309,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+        "freshShoulderInnerWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeGateSupportDiagFrac": 0.87976,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0
+      },
+      "on": {
+        "largeScaleCondensationSourceKgM2": 0.08891,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+        "freshShoulderInnerWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeGateSupportDiagFrac": 0.88237,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": -0.01418,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+        "freshShoulderInnerWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeGateSupportDiagFrac": 0.00261,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0
+      }
+    },
+    "targetEntry": {
+      "latitudeDeg": 33.75,
+      "off": {
+        "largeScaleCondensationSourceKgM2": 0.18497,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+        "freshShoulderInnerWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeGateSupportDiagFrac": 0.8004,
+        "freshShoulderTargetEntryExclusionDiagFrac": 1
+      },
+      "on": {
+        "largeScaleCondensationSourceKgM2": 0.17648,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+        "freshShoulderInnerWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeGateSupportDiagFrac": 0.80116,
+        "freshShoulderTargetEntryExclusionDiagFrac": 1
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": -0.00849,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+        "freshShoulderInnerWindowDiagFrac": 0,
+        "freshShoulderEquatorialEdgeGateSupportDiagFrac": 0.00076,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0
+      }
+    }
+  },
+  "phase1zgComparison": {
+    "priorEdgeCondensationDeltaKgM2": 0.04637,
+    "currentEdgeCondensationDeltaKgM2": 0.0269,
+    "priorEdgeCandidateDeltaKgM2": 0.0701,
+    "currentEdgeCandidateDeltaKgM2": 0,
+    "priorEdgeAppliedSuppressionDeltaKgM2": 0.02352,
+    "currentEdgeAppliedSuppressionDeltaKgM2": 0,
+    "priorInnerCondensationDeltaKgM2": -0.03849,
+    "currentInnerCondensationDeltaKgM2": -0.05705,
+    "priorSpilloverCondensationDeltaKgM2": -0.01806,
+    "currentSpilloverCondensationDeltaKgM2": -0.01418
+  },
+  "recommendation": "Keep the split-lane gate: it improves the main 30-day climate guardrails and preserves the 11.25°N, 18.75°N, and 33.75°N wins. The remaining 3.75°N rebound now happens with zero shoulder-guard admission, so the next phase should chase the out-of-lane source rather than re-tuning this gate."
+}

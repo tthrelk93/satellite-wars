@@ -295,6 +295,9 @@ test('microphysics shoulder absorption guard suppresses bridge-silent tropical s
     state.freshSubtropicalSuppressionDiag[0] = 0.12;
     state.freshSubtropicalBandDiag[0] = 0.18;
     state.freshShoulderLatitudeWindowDiag[0] = 1;
+    state.freshShoulderEquatorialEdgeWindowDiag[0] = 1;
+    state.freshShoulderInnerWindowDiag[0] = 0;
+    state.freshShoulderEquatorialEdgeGateSupportDiag[0] = 0.62;
     state.freshShoulderTargetEntryExclusionDiag[0] = 0;
     state.freshNeutralToSubsidingSupportDiag[0] = 0.62;
     state.freshOrganizedSupportDiag[0] = 0.16;
@@ -350,6 +353,9 @@ test('microphysics shoulder absorption guard excludes target-entry columns when 
     state.freshSubtropicalSuppressionDiag[0] = 0.12;
     state.freshSubtropicalBandDiag[0] = 0.18;
     state.freshShoulderLatitudeWindowDiag[0] = 1;
+    state.freshShoulderEquatorialEdgeWindowDiag[0] = 1;
+    state.freshShoulderInnerWindowDiag[0] = 0;
+    state.freshShoulderEquatorialEdgeGateSupportDiag[0] = 0.62;
     state.freshShoulderTargetEntryExclusionDiag[0] = targetEntryExclusion;
     state.freshNeutralToSubsidingSupportDiag[0] = 0.62;
     state.freshOrganizedSupportDiag[0] = 0.16;
@@ -404,6 +410,9 @@ test('microphysics shoulder fate modes either retain, sink, or buffer suppressed
     state.freshSubtropicalSuppressionDiag[0] = 0.12;
     state.freshSubtropicalBandDiag[0] = 0.18;
     state.freshShoulderLatitudeWindowDiag[0] = 1;
+    state.freshShoulderEquatorialEdgeWindowDiag[0] = 1;
+    state.freshShoulderInnerWindowDiag[0] = 0;
+    state.freshShoulderEquatorialEdgeGateSupportDiag[0] = 0.62;
     state.freshShoulderTargetEntryExclusionDiag[0] = 0;
     state.freshNeutralToSubsidingSupportDiag[0] = 0.62;
     state.freshOrganizedSupportDiag[0] = 0.16;
@@ -457,8 +466,14 @@ test('microphysics shoulder fate modes either retain, sink, or buffer suppressed
   assert.ok(buffered.qr[1] > retain.qr[1] || buffered.qs[1] > retain.qs[1]);
 });
 
-test('microphysics buffered shoulder fate reallocates suppression toward the equatorial edge', () => {
-  const makeState = ({ freshSubtropicalSuppression, freshSubtropicalBand }) => {
+test('microphysics split-lane shoulder gate penalizes weak equatorial-edge admission while preserving the inner shoulder', () => {
+  const makeState = ({
+    freshSubtropicalSuppression,
+    freshSubtropicalBand,
+    equatorialEdgeWindow,
+    innerWindow,
+    edgeGateSupport
+  }) => {
     const state = setupState(279);
     state.qv.fill(0.002);
     state.qc.fill(0);
@@ -472,7 +487,10 @@ test('microphysics buffered shoulder fate reallocates suppression toward the equ
     state.subtropicalSubsidenceDrying[0] = 0.0;
     state.freshSubtropicalSuppressionDiag[0] = freshSubtropicalSuppression;
     state.freshSubtropicalBandDiag[0] = freshSubtropicalBand;
-    state.freshShoulderLatitudeWindowDiag[0] = 1;
+    state.freshShoulderLatitudeWindowDiag[0] = Math.max(equatorialEdgeWindow, innerWindow);
+    state.freshShoulderEquatorialEdgeWindowDiag[0] = equatorialEdgeWindow;
+    state.freshShoulderInnerWindowDiag[0] = innerWindow;
+    state.freshShoulderEquatorialEdgeGateSupportDiag[0] = edgeGateSupport;
     state.freshShoulderTargetEntryExclusionDiag[0] = 0;
     state.freshNeutralToSubsidingSupportDiag[0] = 0.62;
     state.freshOrganizedSupportDiag[0] = 0.16;
@@ -483,18 +501,24 @@ test('microphysics buffered shoulder fate reallocates suppression toward the equ
     return state;
   };
 
-  const equatorialEdge = makeState({
+  const weakEquatorialEdge = makeState({
     freshSubtropicalSuppression: 0.08,
-    freshSubtropicalBand: 0.12
+    freshSubtropicalBand: 0.12,
+    equatorialEdgeWindow: 1,
+    innerWindow: 0,
+    edgeGateSupport: 0
   });
   const innerShoulder = makeState({
     freshSubtropicalSuppression: 0.62,
-    freshSubtropicalBand: 0.7
+    freshSubtropicalBand: 0.7,
+    equatorialEdgeWindow: 0,
+    innerWindow: 1,
+    edgeGateSupport: 0
   });
 
   stepMicrophysics5({
     dt: 900,
-    state: equatorialEdge,
+    state: weakEquatorialEdge,
     params: {
       enableConvectiveOutcome: true,
       enableSoftLiveStateMaintenanceSuppression: false,
@@ -513,12 +537,12 @@ test('microphysics buffered shoulder fate reallocates suppression toward the equ
     }
   });
 
-  assert.ok(equatorialEdge.saturationAdjustmentShoulderGuardBufferedRainoutMass[0] > 0);
+  assert.equal(weakEquatorialEdge.saturationAdjustmentShoulderGuardCandidateMass[0], 0);
+  assert.equal(weakEquatorialEdge.saturationAdjustmentShoulderGuardAppliedSuppressionMass[0], 0);
+  assert.equal(weakEquatorialEdge.saturationAdjustmentShoulderGuardBufferedRainoutMass[0], 0);
+  assert.ok(innerShoulder.saturationAdjustmentShoulderGuardCandidateMass[0] > 0);
+  assert.ok(innerShoulder.saturationAdjustmentShoulderGuardAppliedSuppressionMass[0] > 0);
   assert.ok(innerShoulder.saturationAdjustmentShoulderGuardBufferedRainoutMass[0] > 0);
-  assert.ok(
-    equatorialEdge.saturationAdjustmentShoulderGuardBufferedRainoutMass[0]
-      > innerShoulder.saturationAdjustmentShoulderGuardBufferedRainoutMass[0]
-  );
 });
 
 test('microphysics populates the upper-cloud handoff ledger and closes the upper-cloud budget', () => {

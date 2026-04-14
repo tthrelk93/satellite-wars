@@ -518,6 +518,24 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               1
             )
           : 0;
+        const freshShoulderEquatorialEdgeWindow = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              Number.isFinite(state.freshShoulderEquatorialEdgeWindowDiag?.[k])
+                ? state.freshShoulderEquatorialEdgeWindowDiag[k]
+                : freshShoulderLatitudeWindow,
+              0,
+              1
+            )
+          : 0;
+        const freshShoulderInnerWindow = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              Number.isFinite(state.freshShoulderInnerWindowDiag?.[k])
+                ? state.freshShoulderInnerWindowDiag[k]
+                : freshShoulderLatitudeWindow,
+              0,
+              1
+            )
+          : 0;
         const freshShoulderTargetEntryExclusion = enableConvectiveOutcome && isOceanColumn
           ? clamp(
               Number.isFinite(state.freshShoulderTargetEntryExclusionDiag?.[k])
@@ -552,6 +570,17 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               Number.isFinite(state.freshRhMidSupportDiag?.[k])
                 ? state.freshRhMidSupportDiag[k]
                 : 0,
+              0,
+              1
+            )
+          : 0;
+        const freshShoulderEquatorialEdgeGateSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              Number.isFinite(state.freshShoulderEquatorialEdgeGateSupportDiag?.[k])
+                ? state.freshShoulderEquatorialEdgeGateSupportDiag[k]
+                : smoothstep(0.16, 0.42, freshSubtropicalSuppression)
+                    * (0.7 + 0.3 * smoothstep(0.12, 0.36, freshSubtropicalBand))
+                    * (0.75 + 0.25 * freshNeutralToSubsidingSupport),
               0,
               1
             )
@@ -647,7 +676,10 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
           : 0;
         const shoulderBandWindowSupport = enableConvectiveOutcome && isOceanColumn
           ? clamp(
-              freshShoulderLatitudeWindow
+              (
+                freshShoulderInnerWindow
+                + freshShoulderEquatorialEdgeWindow * freshShoulderEquatorialEdgeGateSupport
+              )
                 * (1 - freshShoulderTargetEntryExclusion),
               0,
               1

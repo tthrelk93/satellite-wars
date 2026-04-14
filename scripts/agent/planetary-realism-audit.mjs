@@ -1279,6 +1279,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     freshSubtropicalSuppressionDiagFrac,
     freshSubtropicalBandDiagFrac,
     freshShoulderLatitudeWindowDiagFrac,
+    freshShoulderEquatorialEdgeWindowDiagFrac,
+    freshShoulderInnerWindowDiagFrac,
+    freshShoulderEquatorialEdgeGateSupportDiagFrac,
     freshShoulderTargetEntryExclusionDiagFrac,
     freshNeutralToSubsidingSupportDiagFrac,
     freshRhMidSupportDiagFrac,
@@ -1340,6 +1343,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalMaintenancePotentialSuppressedMass = zonalMean(saturationAdjustmentMaintenancePotentialSuppressedMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalMaintenanceCandidateHitCount = zonalMean(saturationAdjustmentMaintenanceCandidateEventCount || new Array(nx * ny).fill(0), nx, ny);
   const zonalFreshShoulderLatitudeWindow = zonalMean(freshShoulderLatitudeWindowDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalFreshShoulderEquatorialEdgeWindow = zonalMean(freshShoulderEquatorialEdgeWindowDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalFreshShoulderInnerWindow = zonalMean(freshShoulderInnerWindowDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalFreshShoulderEquatorialEdgeGateSupport = zonalMean(freshShoulderEquatorialEdgeGateSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalFreshShoulderTargetEntryExclusion = zonalMean(freshShoulderTargetEntryExclusionDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalShoulderGuardCandidateMass = zonalMean(saturationAdjustmentShoulderGuardCandidateMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalShoulderGuardPotentialSuppressedMass = zonalMean(saturationAdjustmentShoulderGuardPotentialSuppressedMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
@@ -2139,6 +2145,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         dryingOmegaBridgeLocalAppliedPaS: roundSeries(zonalDryingOmegaBridgeLocalApplied, 5),
         dryingOmegaBridgeProjectedAppliedPaS: roundSeries(zonalDryingOmegaBridgeProjectedApplied, 5),
         freshShoulderLatitudeWindowDiagFrac: roundSeries(zonalFreshShoulderLatitudeWindow, 5),
+        freshShoulderEquatorialEdgeWindowDiagFrac: roundSeries(zonalFreshShoulderEquatorialEdgeWindow, 5),
+        freshShoulderInnerWindowDiagFrac: roundSeries(zonalFreshShoulderInnerWindow, 5),
+        freshShoulderEquatorialEdgeGateSupportDiagFrac: roundSeries(zonalFreshShoulderEquatorialEdgeGateSupport, 5),
         freshShoulderTargetEntryExclusionDiagFrac: roundSeries(zonalFreshShoulderTargetEntryExclusion, 5),
         surfaceEvapRateMmHr: roundSeries(zonalSurfaceEvap),
         surfaceEvapPotentialRateMmHr: roundSeries(zonalSurfaceEvapPotential),

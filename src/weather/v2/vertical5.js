@@ -484,6 +484,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.freshSubtropicalSuppressionDiag || state.freshSubtropicalSuppressionDiag.length !== N) state.freshSubtropicalSuppressionDiag = new Float32Array(N);
   if (!state.freshSubtropicalBandDiag || state.freshSubtropicalBandDiag.length !== N) state.freshSubtropicalBandDiag = new Float32Array(N);
   if (!state.freshShoulderLatitudeWindowDiag || state.freshShoulderLatitudeWindowDiag.length !== N) state.freshShoulderLatitudeWindowDiag = new Float32Array(N);
+  if (!state.freshShoulderEquatorialEdgeWindowDiag || state.freshShoulderEquatorialEdgeWindowDiag.length !== N) state.freshShoulderEquatorialEdgeWindowDiag = new Float32Array(N);
+  if (!state.freshShoulderInnerWindowDiag || state.freshShoulderInnerWindowDiag.length !== N) state.freshShoulderInnerWindowDiag = new Float32Array(N);
+  if (!state.freshShoulderEquatorialEdgeGateSupportDiag || state.freshShoulderEquatorialEdgeGateSupportDiag.length !== N) state.freshShoulderEquatorialEdgeGateSupportDiag = new Float32Array(N);
   if (!state.freshShoulderTargetEntryExclusionDiag || state.freshShoulderTargetEntryExclusionDiag.length !== N) state.freshShoulderTargetEntryExclusionDiag = new Float32Array(N);
   if (!state.freshNeutralToSubsidingSupportDiag || state.freshNeutralToSubsidingSupportDiag.length !== N) state.freshNeutralToSubsidingSupportDiag = new Float32Array(N);
   if (!state.freshRhMidSupportDiag || state.freshRhMidSupportDiag.length !== N) state.freshRhMidSupportDiag = new Float32Array(N);
@@ -596,6 +599,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const freshSubtropicalSuppressionPublicDiag = state.freshSubtropicalSuppressionDiag;
   const freshSubtropicalBandPublicDiag = state.freshSubtropicalBandDiag;
   const freshShoulderLatitudeWindowPublicDiag = state.freshShoulderLatitudeWindowDiag;
+  const freshShoulderEquatorialEdgeWindowPublicDiag = state.freshShoulderEquatorialEdgeWindowDiag;
+  const freshShoulderInnerWindowPublicDiag = state.freshShoulderInnerWindowDiag;
+  const freshShoulderEquatorialEdgeGateSupportPublicDiag = state.freshShoulderEquatorialEdgeGateSupportDiag;
   const freshShoulderTargetEntryExclusionPublicDiag = state.freshShoulderTargetEntryExclusionDiag;
   const freshNeutralToSubsidingSupportPublicDiag = state.freshNeutralToSubsidingSupportDiag;
   const freshRhMidSupportPublicDiag = state.freshRhMidSupportDiag;
@@ -1362,12 +1368,19 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         ? smoothstep(subtropicalSubsidenceLat0 - 5, subtropicalSubsidenceLat0 + 2, latAbs)
             * (1 - smoothstep(subtropicalSubsidenceLat1 - 4, subtropicalSubsidenceLat1 + 2, latAbs))
         : 0;
-      const shoulderLatitudeWindow = latDeg
+      const shoulderEquatorialEdgeWindow = latDeg
         ? clamp01(
-            smoothstep(1.5, 3.5, latDeg[rowIndex])
-              * (1 - smoothstep(11.5, 14.5, latDeg[rowIndex]))
+            smoothstep(1.5, 3.25, latDeg[rowIndex])
+              * (1 - smoothstep(5.5, 7.25, latDeg[rowIndex]))
           )
         : 0;
+      const shoulderInnerWindow = latDeg
+        ? clamp01(
+            smoothstep(7.5, 9.25, latDeg[rowIndex])
+              * (1 - smoothstep(11.75, 13.75, latDeg[rowIndex]))
+          )
+        : 0;
+      const shoulderLatitudeWindow = Math.max(shoulderEquatorialEdgeWindow, shoulderInnerWindow);
       const shoulderTargetEntryExclusion = latDeg
         ? clamp01(
             smoothstep(28, 33, latDeg[rowIndex])
@@ -1388,6 +1401,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           0.25 * (1 - rhMidSupport)
         )
       );
+      const shoulderEquatorialEdgeGateSupport = clamp01(
+        smoothstep(0.16, 0.42, subtropicalSuppression)
+          * (0.7 + 0.3 * smoothstep(0.12, 0.36, subtropicalBand))
+          * (0.75 + 0.25 * neutralToSubsidingSupport)
+      );
       potentialTarget = clamp01(
         potentialTarget
           * (0.84 + 0.24 * tropicalCore)
@@ -1400,6 +1418,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       freshOrganizedSupportPublicDiag[k] = organizedSupport;
       freshSubtropicalSuppressionPublicDiag[k] = subtropicalSuppression;
       freshShoulderLatitudeWindowPublicDiag[k] = shoulderLatitudeWindow;
+      freshShoulderEquatorialEdgeWindowPublicDiag[k] = shoulderEquatorialEdgeWindow;
+      freshShoulderInnerWindowPublicDiag[k] = shoulderInnerWindow;
+      freshShoulderEquatorialEdgeGateSupportPublicDiag[k] = shoulderEquatorialEdgeGateSupport;
       freshShoulderTargetEntryExclusionPublicDiag[k] = shoulderTargetEntryExclusion;
       freshPotentialTargetDiag[k] = potentialTarget;
       freshOrganizedSupportDiag[k] = organizedSupport;

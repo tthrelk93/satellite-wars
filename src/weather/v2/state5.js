@@ -58,6 +58,9 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const freshSubtropicalSuppressionDiag = makeArray(N);
   const freshSubtropicalBandDiag = makeArray(N);
   const freshShoulderLatitudeWindowDiag = makeArray(N);
+  const freshShoulderEquatorialEdgeWindowDiag = makeArray(N);
+  const freshShoulderInnerWindowDiag = makeArray(N);
+  const freshShoulderEquatorialEdgeGateSupportDiag = makeArray(N);
   const freshShoulderTargetEntryExclusionDiag = makeArray(N);
   const freshNeutralToSubsidingSupportDiag = makeArray(N);
   const freshRhMidSupportDiag = makeArray(N);
@@ -329,6 +332,9 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     freshSubtropicalSuppressionDiag,
     freshSubtropicalBandDiag,
     freshShoulderLatitudeWindowDiag,
+    freshShoulderEquatorialEdgeWindowDiag,
+    freshShoulderInnerWindowDiag,
+    freshShoulderEquatorialEdgeGateSupportDiag,
     freshShoulderTargetEntryExclusionDiag,
     freshNeutralToSubsidingSupportDiag,
     freshRhMidSupportDiag,

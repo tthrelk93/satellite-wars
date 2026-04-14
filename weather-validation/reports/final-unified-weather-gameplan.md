@@ -1356,8 +1356,29 @@ Status:
   - keep the `11.25°N` and `18.75°N` improvements intact
   - split the shoulder window into an equatorial-edge lane and an inner-shoulder lane in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
   - publish new fresh-state lane diagnostics and use them in [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
-  - apply an edge-only candidate-entry penalty or stricter support threshold tied to fresh subtropical support
+- apply an edge-only candidate-entry penalty or stricter support threshold tied to fresh subtropical support
 - next active phase: `Phase 1ZJ: Implement Split-Lane Equatorial-Edge Candidate Gate Patch`
+
+### Phase 1ZJ: Implement Split-Lane Equatorial-Edge Candidate Gate Patch
+
+Objective:
+- split the shoulder candidate gate so the `3-6°N` equatorial edge is no longer admitted through the same lane as the `9-12°N` inner shoulder
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+
+Status:
+- complete in [phase1zj-split-lane-equatorial-edge-candidate-gate-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zj-split-lane-equatorial-edge-candidate-gate-patch.md)
+- verdict: `keep_with_out_of_lane_edge_residual`
+- key conclusions:
+  - the split-lane gate is worth keeping because it improves the main 30-day climate guardrails again
+  - it preserves the `11.25°N`, `18.75°N`, and `33.75°N` protected wins
+  - the remaining `3.75°N` rebound now occurs with zero shoulder-guard candidate mass and zero applied suppression
+  - that means the residual is no longer an in-lane shoulder-candidate problem
+- next active phase: `Phase 1ZK: Equatorial-Edge Out-Of-Lane Attribution`
 
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 

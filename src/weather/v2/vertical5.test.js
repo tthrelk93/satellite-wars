@@ -346,9 +346,22 @@ test('stepVertical5 precomputes a latitude-aware shoulder window and target-entr
   });
 
   assert.ok(state.freshShoulderLatitudeWindowDiag[0] > 0.9);
+  assert.ok(state.freshShoulderEquatorialEdgeWindowDiag[0] > 0.9);
+  assert.equal(state.freshShoulderInnerWindowDiag[0], 0);
+  assert.ok(state.freshShoulderEquatorialEdgeGateSupportDiag[0] >= 0);
+
   assert.ok(state.freshShoulderLatitudeWindowDiag[1] > 0.9);
+  assert.equal(state.freshShoulderEquatorialEdgeWindowDiag[1], 0);
+  assert.ok(state.freshShoulderInnerWindowDiag[1] > 0.9);
+  assert.ok(state.freshShoulderEquatorialEdgeGateSupportDiag[1] >= 0);
+
   assert.equal(state.freshShoulderLatitudeWindowDiag[2], 0);
+  assert.equal(state.freshShoulderEquatorialEdgeWindowDiag[2], 0);
+  assert.equal(state.freshShoulderInnerWindowDiag[2], 0);
+
   assert.equal(state.freshShoulderLatitudeWindowDiag[3], 0);
+  assert.equal(state.freshShoulderEquatorialEdgeWindowDiag[3], 0);
+  assert.equal(state.freshShoulderInnerWindowDiag[3], 0);
   assert.equal(state.freshShoulderTargetEntryExclusionDiag[0], 0);
   assert.equal(state.freshShoulderTargetEntryExclusionDiag[1], 0);
   assert.equal(state.freshShoulderTargetEntryExclusionDiag[2], 0);
