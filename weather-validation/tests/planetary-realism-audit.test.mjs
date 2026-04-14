@@ -207,6 +207,9 @@ test('classifySnapshot reports broad convection and subtropical drying diagnosti
   assert.equal(snapshot.profiles.series.largeScaleCondensationSourceKgM2.length, 3);
   assert.equal(snapshot.profiles.series.carriedOverUpperCloudMassKgM2.length, 3);
   assert.equal(snapshot.profiles.series.weakErosionCloudSurvivalMassKgM2.length, 3);
+  assert.equal(snapshot.profiles.series.lowerTroposphericOmegaPaS.length, 3);
+  assert.equal(snapshot.profiles.series.midTroposphericOmegaPaS.length, 3);
+  assert.equal(snapshot.profiles.series.dryingOmegaBridgeProjectedAppliedPaS.length, 3);
 });
 
 test('buildMoistureAttributionReport ranks moistening drivers and keeps regime totals', () => {

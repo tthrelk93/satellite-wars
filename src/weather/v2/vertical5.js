@@ -588,6 +588,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const circulationReturnFlowOpportunityDiag = state.circulationReturnFlowOpportunityDiag;
   const circulationReturnFlowCouplingAppliedDiag = state.circulationReturnFlowCouplingAppliedDiag;
   const dryingOmegaBridgeAppliedDiag = state.dryingOmegaBridgeAppliedDiag;
+  const dryingOmegaBridgeLocalAppliedDiag = state.dryingOmegaBridgeLocalAppliedDiag;
+  const dryingOmegaBridgeProjectedAppliedDiag = state.dryingOmegaBridgeProjectedAppliedDiag;
   const subtropicalSourceDriverDiag = state.subtropicalSourceDriverDiag;
   const subtropicalSourceDriverFloorDiag = state.subtropicalSourceDriverFloorDiag;
   const subtropicalLocalHemiSourceDiag = state.subtropicalLocalHemiSourceDiag;
@@ -681,6 +683,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   circulationReturnFlowOpportunityDiag.fill(0);
   circulationReturnFlowCouplingAppliedDiag.fill(0);
   dryingOmegaBridgeAppliedDiag.fill(0);
+  dryingOmegaBridgeLocalAppliedDiag.fill(0);
+  dryingOmegaBridgeProjectedAppliedDiag.fill(0);
   subtropicalSourceDriverDiag.fill(0);
   subtropicalSourceDriverFloorDiag.fill(0);
   subtropicalLocalHemiSourceDiag.fill(0);
@@ -1754,6 +1758,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           const projectedOmegaBridgeBudgetPaS = omegaBridgePaS * projectedOmegaBridgeFrac;
           const localOmegaBridgePaS = Math.max(0, omegaBridgePaS - projectedOmegaBridgeBudgetPaS);
           dryingOmegaBridgeAppliedDiag[k] = localOmegaBridgePaS;
+          dryingOmegaBridgeLocalAppliedDiag[k] = localOmegaBridgePaS;
           if (projectedOmegaBridgeBudgetPaS > 0) {
             if (lat >= 0) nhProjectedOmegaBridgeBudgetByX[i] += projectedOmegaBridgeBudgetPaS;
             else shProjectedOmegaBridgeBudgetByX[i] += projectedOmegaBridgeBudgetPaS;

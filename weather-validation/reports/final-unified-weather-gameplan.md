@@ -971,6 +971,44 @@ Exit criteria:
   - true downstream jet-response failure
 - one explicit patch contract for the next circulation lane
 
+Status:
+- completed
+
+Result:
+- dominant verdict: `projected_share_unapplied_before_transition_entry`
+- the projected bridge share is still not a live carrier in the target lane:
+  - source-core `20-30°N` local bridge is active: `0.00063 Pa/s`
+  - target-entry `30-45°N` projected bridge stays `0`
+  - jet-band `41.25-56.25°N` projected bridge stays `0`
+- the current branch is still behaving like a mostly source-local bridge, not a real projected transition-entry bridge
+- downstream jet recovery attribution would be premature until target-row deposition exists in the live run
+
+Patch contract for the next lane:
+- keep the current bridge diagnostics and runtime toggle
+- repair the missing projected-share deposition path in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- prove that a non-zero projected bridge reaches the `30-45°N` target rows before asking the jet lane to respond
+
+### Phase 1X: Projected-Share Application Repair
+
+Objective:
+- repair the missing target-row deposition path so the existing projected omega bridge budget actually becomes a live carrier in the `30-45°N` transition-entry lane
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+
+Questions to resolve:
+- where should the projected bridge budget be deposited into the `30-45°N` target rows in the live step order?
+- how much of the existing total bridge should remain local versus projected once the missing deposition path is real?
+- can we make the projected share visible in the target-entry lane without widening the ITCZ or undoing the Phase `1K` and `1M` wins?
+
+Exit criteria:
+- target-entry `30-45°N` projected bridge mean becomes non-zero in the live `on` run
+- target-entry lower- or mid-tropospheric omega improves relative to `off`
+- the patch stays guardrail-first and does not increase total bridge amplitude before proving placement
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

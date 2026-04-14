@@ -1226,6 +1226,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     upperCloudPathKgM2,
     boundaryLayerRhFrac,
     midTroposphericRhFrac,
+    lowerTroposphericOmegaPaS,
+    midTroposphericOmegaPaS,
+    upperTroposphericOmegaPaS,
     boundaryLayerThetaeK,
     lowerTroposphereThetaeK,
     boundaryLayerMseJkg,
@@ -1257,6 +1260,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     circulationReturnFlowOpportunityDiagFrac,
     circulationReturnFlowCouplingAppliedDiagFrac,
     dryingOmegaBridgeAppliedDiagPaS,
+    dryingOmegaBridgeLocalAppliedDiagPaS,
+    dryingOmegaBridgeProjectedAppliedDiagPaS,
     subtropicalSourceDriverDiagFrac,
     subtropicalSourceDriverFloorDiagFrac,
     subtropicalLocalHemiSourceDiagFrac,
@@ -1317,6 +1322,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalUpperCloudPath = zonalMean(upperCloudPathKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalBoundaryLayerRh = zonalMean(boundaryLayerRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalMidTroposphereRh = zonalMean(midTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalLowerTroposphericOmega = zonalMean(lowerTroposphericOmegaPaS || new Array(nx * ny).fill(0), nx, ny);
+  const zonalMidTroposphericOmega = zonalMean(midTroposphericOmegaPaS || new Array(nx * ny).fill(0), nx, ny);
+  const zonalUpperTroposphericOmega = zonalMean(upperTroposphericOmegaPaS || new Array(nx * ny).fill(0), nx, ny);
   const zonalBoundaryLayerThetae = zonalMean(boundaryLayerThetaeK || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerTroposphereThetae = zonalMean(lowerTroposphereThetaeK || new Array(nx * ny).fill(0), nx, ny);
   const zonalBoundaryLayerMse = zonalMean(boundaryLayerMseJkg || new Array(nx * ny).fill(0), nx, ny);
@@ -1331,6 +1339,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalSurfaceCloudShielding = zonalMean(surfaceCloudShortwaveShieldingWm2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalMoistureConvergence = zonalMean(lowLevelMoistureConvergenceS_1 || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowLevelOmegaEffective = zonalMean(lowLevelOmegaEffectivePaS || new Array(nx * ny).fill(0), nx, ny);
+  const zonalDryingOmegaBridgeLocalApplied = zonalMean(dryingOmegaBridgeLocalAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
+  const zonalDryingOmegaBridgeProjectedApplied = zonalMean(dryingOmegaBridgeProjectedAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSurfaceEvap = zonalMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny);
@@ -1980,6 +1990,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         boundaryLayerRhFrac: roundSeries(zonalBoundaryLayerRh),
         lowerTroposphericRhFrac: roundSeries(zonalLowerRh),
         midTroposphericRhFrac: roundSeries(zonalMidTroposphereRh),
+        lowerTroposphericOmegaPaS: roundSeries(zonalLowerTroposphericOmega, 5),
+        midTroposphericOmegaPaS: roundSeries(zonalMidTroposphericOmega, 5),
+        upperTroposphericOmegaPaS: roundSeries(zonalUpperTroposphericOmega, 5),
         boundaryLayerThetaeK: roundSeries(zonalBoundaryLayerThetae, 5),
         lowerTroposphereThetaeK: roundSeries(zonalLowerTroposphereThetae, 5),
         thetaeGradientBoundaryMinusLowerK: roundSeries(zonalThetaeGradient, 5),
@@ -1989,6 +2002,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         lowerTroposphericInversionStrengthK: roundSeries(zonalInversionStrength, 5),
         lowerLevelMoistureConvergenceS_1: roundSeries(zonalMoistureConvergence, 6),
         subtropicalSubsidenceDryingFrac: roundSeries(zonalSubsidenceDrying, 5),
+        dryingOmegaBridgeAppliedPaS: roundSeries(zonalDryingOmegaBridgeApplied, 5),
+        dryingOmegaBridgeLocalAppliedPaS: roundSeries(zonalDryingOmegaBridgeLocalApplied, 5),
+        dryingOmegaBridgeProjectedAppliedPaS: roundSeries(zonalDryingOmegaBridgeProjectedApplied, 5),
         surfaceEvapRateMmHr: roundSeries(zonalSurfaceEvap),
         surfaceEvapPotentialRateMmHr: roundSeries(zonalSurfaceEvapPotential),
         surfaceCloudShortwaveShieldingWm2: roundSeries(zonalSurfaceCloudShielding, 5),

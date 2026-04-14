@@ -209,6 +209,15 @@ const computeLayerMeanMseJkg = (state, minSigma, maxSigma) => (
   })
 );
 
+const computeLayerMeanOmegaPaS = (state, minSigma, maxSigma) => (
+  computeLayerMeanDerived(state, minSigma, maxSigma, (_idx, lev, cell) => {
+    if (!state.omega) return 0;
+    const lowerInterface = state.omega[lev * state.N + cell] || 0;
+    const upperInterface = state.omega[(lev + 1) * state.N + cell] || 0;
+    return 0.5 * (lowerInterface + upperInterface);
+  })
+);
+
 const computeVerticallyIntegratedFlux = (state, componentField, tracerSelector) => {
   const { N, nz, pHalf } = state;
   const out = new Array(N).fill(0);
@@ -2064,6 +2073,9 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
   const boundaryLayerRhFrac = computeLayerMeanRelativeHumidity(state, 0.85, 1.0);
   const lowerTroposphericRhFrac = computeLayerMeanRelativeHumidity(state, 0.45, 0.85);
   const midTroposphericRhFrac = computeLayerMeanRelativeHumidity(state, 0.25, 0.55);
+  const lowerTroposphericOmegaPaS = computeLayerMeanOmegaPaS(state, 0.45, 0.85);
+  const midTroposphericOmegaPaS = computeLayerMeanOmegaPaS(state, 0.25, 0.55);
+  const upperTroposphericOmegaPaS = computeLayerMeanOmegaPaS(state, 0.0, 0.25);
   const boundaryLayerPotentialTemperatureK = computeLayerMeanPotentialTemperature(state, 0.85, 1.0);
   const lowerTropospherePotentialTemperatureK = computeLayerMeanPotentialTemperature(state, 0.65, 0.85);
   const boundaryLayerThetaeK = computeLayerMeanThetaeK(state, 0.85, 1.0);
@@ -2193,6 +2205,9 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     boundaryLayerRhFrac,
     lowerTroposphericRhFrac,
     midTroposphericRhFrac,
+    lowerTroposphericOmegaPaS,
+    midTroposphericOmegaPaS,
+    upperTroposphericOmegaPaS,
     boundaryLayerPotentialTemperatureK,
     lowerTropospherePotentialTemperatureK,
     boundaryLayerThetaeK,
@@ -2228,6 +2243,8 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     circulationReturnFlowOpportunityDiagFrac: arrayOrZeros(state.circulationReturnFlowOpportunityDiag, state.N),
     circulationReturnFlowCouplingAppliedDiagFrac: arrayOrZeros(state.circulationReturnFlowCouplingAppliedDiag, state.N),
     dryingOmegaBridgeAppliedDiagPaS: arrayOrZeros(state.dryingOmegaBridgeAppliedDiag, state.N),
+    dryingOmegaBridgeLocalAppliedDiagPaS: arrayOrZeros(state.dryingOmegaBridgeLocalAppliedDiag, state.N),
+    dryingOmegaBridgeProjectedAppliedDiagPaS: arrayOrZeros(state.dryingOmegaBridgeProjectedAppliedDiag, state.N),
     subtropicalSourceDriverDiagFrac: arrayOrZeros(state.subtropicalSourceDriverDiag, state.N),
     subtropicalSourceDriverFloorDiagFrac: arrayOrZeros(state.subtropicalSourceDriverFloorDiag, state.N),
     subtropicalLocalHemiSourceDiagFrac: arrayOrZeros(state.subtropicalLocalHemiSourceDiag, state.N),
