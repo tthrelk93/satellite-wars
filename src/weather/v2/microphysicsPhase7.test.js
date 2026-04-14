@@ -199,6 +199,35 @@ test('microphysics redesign surfaces live-state subtropical support when legacy 
   assert.ok(state.saturationAdjustmentLiveGateEventCount[0] > 0);
 });
 
+test('microphysics soft live-state gate admits weak-ascent marine events without relying on the strict live gate', () => {
+  const state = setupState(279);
+  state.qv.fill(0.002);
+  state.qc.fill(0);
+  state.qi.fill(0);
+  state.qr.fill(0);
+  state.qs.fill(0);
+  state.landMask[0] = 0;
+  state.convectiveOrganization[0] = 0.04;
+  state.convectiveMassFlux[0] = 2e-4;
+  state.convectiveAnvilSource[0] = 0.02;
+  state.subtropicalSubsidenceDrying[0] = 0.0;
+  state.freshSubtropicalSuppressionDiag[0] = 0.68;
+  state.freshSubtropicalBandDiag[0] = 0.86;
+  state.freshNeutralToSubsidingSupportDiag[0] = 0.03;
+  state.freshOrganizedSupportDiag[0] = 0.2;
+  state.freshRhMidSupportDiag[0] = 0.97;
+  state.omega.fill(-0.03);
+  state.qv[1] = 0.011;
+
+  stepMicrophysics5({ dt: 900, state, params: { enableConvectiveOutcome: true } });
+
+  assert.ok(state.saturationAdjustmentSoftLiveGateCandidateMass[0] > 0);
+  assert.ok(state.saturationAdjustmentSoftLiveGatePotentialSuppressedMass[0] > 0);
+  assert.ok(state.saturationAdjustmentSoftLiveGateEventCount[0] > 0);
+  assert.ok(state.saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted[0] > 0);
+  assert.ok(state.saturationAdjustmentSoftLiveGateAscentModulationMassWeighted[0] > 0);
+});
+
 test('microphysics populates the upper-cloud handoff ledger and closes the upper-cloud budget', () => {
   const state = setupState(248);
   state.qv.fill(0.006);

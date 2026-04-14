@@ -477,10 +477,37 @@ Primary files:
 - [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
 - [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
 
+Result:
+- succeeded
+- the soft live-state gate is active on the real 30-day branch state while the strict Phase 1I gate is nearly inert
+- day-30 NH dry-belt ocean comparison:
+  - strict gate candidate mass `0.00065`
+  - soft gate candidate mass `0.18498`
+  - strict gate potential suppressed mass `0.00007`
+  - soft gate potential suppressed mass `0.02092`
+  - soft gate hit mean `3.36967`
+
+See:
+- [phase1j-soft-ascent-live-state-gate-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1j-soft-ascent-live-state-gate-design.md)
+
+Conclusion:
+- we now have a live-run-active gate family for the marine maintenance loop
+- the next phase should finally apply physics inside that gate instead of continuing gate-discovery work
+
+### Phase 1K: Implement Soft Live-State Maintenance Suppression Patch
+
+Objective:
+- apply a narrow maintenance-suppression physics patch inside the successful Phase 1J soft live-state gate
+
+Primary files:
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+
 Exit criteria:
-- produce a live-state candidate gate with meaningful NH dry-belt ocean occupancy in the 30-day audit
-- keep the selector anchored on fresh vertical-state subtropical suppression
-- demote weak ascent from a hard multiplicative occupancy limiter to a softer scaling term before any new physics suppression patch is attempted
+- same-branch `patch off` versus `patch on` shows a real reduction in NH dry-belt ocean large-scale condensation
+- the patch acts through the soft live-state gate rather than broad global damping
+- if the same-branch compare is promising, rerun the 30-day climate gate before returning to the original roadmap
 
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 

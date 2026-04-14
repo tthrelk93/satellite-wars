@@ -108,6 +108,11 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const saturationAdjustmentLiveGatePotentialSuppressedMass = makeArray(N);
   const saturationAdjustmentLiveGateEventCount = new Uint32Array(N);
   const saturationAdjustmentLiveGateSupportMassWeighted = makeArray(N);
+  const saturationAdjustmentSoftLiveGateCandidateMass = makeArray(N);
+  const saturationAdjustmentSoftLiveGatePotentialSuppressedMass = makeArray(N);
+  const saturationAdjustmentSoftLiveGateEventCount = new Uint32Array(N);
+  const saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted = makeArray(N);
+  const saturationAdjustmentSoftLiveGateAscentModulationMassWeighted = makeArray(N);
   const weakAscentCloudBirthAccumMass = makeArray(N);
   const strongAscentCloudBirthAccumMass = makeArray(N);
   const resolvedAscentCloudBirthByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
@@ -345,6 +350,11 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     saturationAdjustmentLiveGatePotentialSuppressedMass,
     saturationAdjustmentLiveGateEventCount,
     saturationAdjustmentLiveGateSupportMassWeighted,
+    saturationAdjustmentSoftLiveGateCandidateMass,
+    saturationAdjustmentSoftLiveGatePotentialSuppressedMass,
+    saturationAdjustmentSoftLiveGateEventCount,
+    saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted,
+    saturationAdjustmentSoftLiveGateAscentModulationMassWeighted,
     weakAscentCloudBirthAccumMass,
     strongAscentCloudBirthAccumMass,
     resolvedAscentCloudBirthByBandMass,
