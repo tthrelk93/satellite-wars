@@ -777,6 +777,41 @@ Exit criteria:
 - same-branch `off -> on` compare materially improves `northTransitionLowLevelOmegaEffectiveMeanPaS` and `northDryBeltLowLevelOmegaEffectiveMeanPaS`
 - `midlatitudeWesterliesNorthU10Ms` starts moving up without giving back the Phase 1K / 1M gains
 
+Result:
+- complete
+- see [phase1r-omega-response-patch-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1r-omega-response-patch-design.md)
+- the live carrier result from Phase 1Q now resolves to:
+  - `same_step_drying_to_omega_bridge_missing`
+- same-branch evidence says:
+  - `sourceDriverDeltaMeanFrac = 0.00111`
+  - `dryingDeltaMeanFrac = 0.01437`
+  - `omegaDeltaMeanPaS = -0.0003`
+  - `midlatitudeWesterliesNorthDeltaMs = 0`
+
+Conclusion:
+- the current lane can perturb subtropical drying, but it does not feed that drying back into `lowLevelOmegaEffective` strongly enough to matter
+- the structural reason is in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js): omega is diagnosed earlier in the step, while the subtropical dry-driver loop only applies `qv/theta` tendencies later
+- the next move should therefore be a small, guardrail-first bridge patch that converts a capped share of the proven dry-driver response into same-step subtropical omega reinforcement
+
+### Phase 1S: Implement Capped Drying-To-Omega Bridge Patch
+
+Objective:
+- turn the already-improved subtropical drying response into a real low-level omega increase without re-opening the rejected source reinjection lane
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+
+Design rule:
+- add a capped same-step omega bridge after `dryDriver` is diagnosed
+- keep the bridge same-hemisphere, subtropical-band limited, and Pa/s-capped
+- preserve the kept Phase 1K marine-maintenance and Phase 1M transition-containment wins
+
+Exit criteria:
+- same-branch `off -> on` compare improves `northTransitionLowLevelOmegaEffectiveMeanPaS` by about `0.01 Pa/s`
+- same-branch `off -> on` compare improves `northDryBeltLowLevelOmegaEffectiveMeanPaS` by about `0.005 Pa/s`
+- `midlatitudeWesterliesNorthU10Ms` starts moving upward without losing the Phase 1K / 1M guardrails
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
