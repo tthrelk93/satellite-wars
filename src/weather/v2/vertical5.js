@@ -272,6 +272,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.lowLevelMoistureConvergence || state.lowLevelMoistureConvergence.length !== N) state.lowLevelMoistureConvergence = new Float32Array(N);
   if (!state.lowLevelOmegaEffective || state.lowLevelOmegaEffective.length !== N) state.lowLevelOmegaEffective = new Float32Array(N);
   if (!state.subtropicalSubsidenceDrying || state.subtropicalSubsidenceDrying.length !== N) state.subtropicalSubsidenceDrying = new Float32Array(N);
+  if (!state.freshPotentialTargetDiag || state.freshPotentialTargetDiag.length !== N) state.freshPotentialTargetDiag = new Float32Array(N);
+  if (!state.freshOrganizedSupportDiag || state.freshOrganizedSupportDiag.length !== N) state.freshOrganizedSupportDiag = new Float32Array(N);
+  if (!state.freshSubtropicalSuppressionDiag || state.freshSubtropicalSuppressionDiag.length !== N) state.freshSubtropicalSuppressionDiag = new Float32Array(N);
+  if (!state.freshSubtropicalBandDiag || state.freshSubtropicalBandDiag.length !== N) state.freshSubtropicalBandDiag = new Float32Array(N);
+  if (!state.freshNeutralToSubsidingSupportDiag || state.freshNeutralToSubsidingSupportDiag.length !== N) state.freshNeutralToSubsidingSupportDiag = new Float32Array(N);
+  if (!state.freshRhMidSupportDiag || state.freshRhMidSupportDiag.length !== N) state.freshRhMidSupportDiag = new Float32Array(N);
   if (!state._freshPotentialTarget || state._freshPotentialTarget.length !== N) state._freshPotentialTarget = new Float32Array(N);
   if (!state._freshOrganizedSupport || state._freshOrganizedSupport.length !== N) state._freshOrganizedSupport = new Float32Array(N);
   if (!state._freshSubtropicalSuppression || state._freshSubtropicalSuppression.length !== N) state._freshSubtropicalSuppression = new Float32Array(N);
@@ -363,6 +369,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const lowLevelMoistureConvergence = state.lowLevelMoistureConvergence;
   const lowLevelOmegaEffective = state.lowLevelOmegaEffective;
   const subtropicalSubsidenceDrying = state.subtropicalSubsidenceDrying;
+  const freshPotentialTargetPublicDiag = state.freshPotentialTargetDiag;
+  const freshOrganizedSupportPublicDiag = state.freshOrganizedSupportDiag;
+  const freshSubtropicalSuppressionPublicDiag = state.freshSubtropicalSuppressionDiag;
+  const freshSubtropicalBandPublicDiag = state.freshSubtropicalBandDiag;
+  const freshNeutralToSubsidingSupportPublicDiag = state.freshNeutralToSubsidingSupportDiag;
+  const freshRhMidSupportPublicDiag = state.freshRhMidSupportDiag;
   const freshPotentialTargetDiag = state._freshPotentialTarget;
   const freshOrganizedSupportDiag = state._freshOrganizedSupport;
   const freshSubtropicalSuppressionDiag = state._freshSubtropicalSuppression;
@@ -436,6 +448,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   lowLevelMoistureConvergence.fill(0);
   lowLevelOmegaEffective.fill(0);
   subtropicalSubsidenceDrying.fill(0);
+  freshPotentialTargetPublicDiag.fill(0);
+  freshOrganizedSupportPublicDiag.fill(0);
+  freshSubtropicalSuppressionPublicDiag.fill(0);
+  freshSubtropicalBandPublicDiag.fill(0);
+  freshNeutralToSubsidingSupportPublicDiag.fill(0);
+  freshRhMidSupportPublicDiag.fill(0);
   freshPotentialTargetDiag.fill(0);
   freshOrganizedSupportDiag.fill(0);
   freshSubtropicalSuppressionDiag.fill(0);
@@ -1096,6 +1114,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           * (0.84 + 0.24 * tropicalCore)
           * (1 - 0.62 * subtropicalSuppression)
       );
+      freshSubtropicalBandPublicDiag[k] = subtropicalBand;
+      freshNeutralToSubsidingSupportPublicDiag[k] = neutralToSubsidingSupport;
+      freshRhMidSupportPublicDiag[k] = rhMidSupport;
+      freshPotentialTargetPublicDiag[k] = potentialTarget;
+      freshOrganizedSupportPublicDiag[k] = organizedSupport;
+      freshSubtropicalSuppressionPublicDiag[k] = subtropicalSuppression;
       freshPotentialTargetDiag[k] = potentialTarget;
       freshOrganizedSupportDiag[k] = organizedSupport;
       freshSubtropicalSuppressionDiag[k] = subtropicalSuppression;

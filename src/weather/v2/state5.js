@@ -53,6 +53,12 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const lowLevelMoistureConvergence = makeArray(N);
   const lowLevelOmegaEffective = makeArray(N);
   const subtropicalSubsidenceDrying = makeArray(N);
+  const freshPotentialTargetDiag = makeArray(N);
+  const freshOrganizedSupportDiag = makeArray(N);
+  const freshSubtropicalSuppressionDiag = makeArray(N);
+  const freshSubtropicalBandDiag = makeArray(N);
+  const freshNeutralToSubsidingSupportDiag = makeArray(N);
+  const freshRhMidSupportDiag = makeArray(N);
   const resolvedAscentCloudBirthPotential = makeArray(N);
   const largeScaleCondensationSource = makeArray(N);
   const cloudReevaporationMass = makeArray(N);
@@ -93,6 +99,15 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const saturationAdjustmentMarineWeakAscentSupportMassWeighted = makeArray(N);
   const saturationAdjustmentMarineMarginalSupersaturationSupportMassWeighted = makeArray(N);
   const saturationAdjustmentMarineLayerWindowSupportMassWeighted = makeArray(N);
+  const saturationAdjustmentMarineFreshSubtropicalSuppressionMassWeighted = makeArray(N);
+  const saturationAdjustmentMarineFreshSubtropicalBandMassWeighted = makeArray(N);
+  const saturationAdjustmentMarineFreshNeutralToSubsidingSupportMassWeighted = makeArray(N);
+  const saturationAdjustmentMarineFreshOrganizedSupportMassWeighted = makeArray(N);
+  const saturationAdjustmentMarineFreshRhMidSupportMassWeighted = makeArray(N);
+  const saturationAdjustmentLiveGateCandidateMass = makeArray(N);
+  const saturationAdjustmentLiveGatePotentialSuppressedMass = makeArray(N);
+  const saturationAdjustmentLiveGateEventCount = new Uint32Array(N);
+  const saturationAdjustmentLiveGateSupportMassWeighted = makeArray(N);
   const weakAscentCloudBirthAccumMass = makeArray(N);
   const strongAscentCloudBirthAccumMass = makeArray(N);
   const resolvedAscentCloudBirthByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
@@ -275,6 +290,12 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     lowLevelMoistureConvergence,
     lowLevelOmegaEffective,
     subtropicalSubsidenceDrying,
+    freshPotentialTargetDiag,
+    freshOrganizedSupportDiag,
+    freshSubtropicalSuppressionDiag,
+    freshSubtropicalBandDiag,
+    freshNeutralToSubsidingSupportDiag,
+    freshRhMidSupportDiag,
     resolvedAscentCloudBirthPotential,
     largeScaleCondensationSource,
     cloudReevaporationMass,
@@ -315,6 +336,15 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     saturationAdjustmentMarineWeakAscentSupportMassWeighted,
     saturationAdjustmentMarineMarginalSupersaturationSupportMassWeighted,
     saturationAdjustmentMarineLayerWindowSupportMassWeighted,
+    saturationAdjustmentMarineFreshSubtropicalSuppressionMassWeighted,
+    saturationAdjustmentMarineFreshSubtropicalBandMassWeighted,
+    saturationAdjustmentMarineFreshNeutralToSubsidingSupportMassWeighted,
+    saturationAdjustmentMarineFreshOrganizedSupportMassWeighted,
+    saturationAdjustmentMarineFreshRhMidSupportMassWeighted,
+    saturationAdjustmentLiveGateCandidateMass,
+    saturationAdjustmentLiveGatePotentialSuppressedMass,
+    saturationAdjustmentLiveGateEventCount,
+    saturationAdjustmentLiveGateSupportMassWeighted,
     weakAscentCloudBirthAccumMass,
     strongAscentCloudBirthAccumMass,
     resolvedAscentCloudBirthByBandMass,

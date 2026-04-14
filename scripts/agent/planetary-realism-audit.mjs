@@ -1173,6 +1173,15 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     saturationAdjustmentMarineWeakAscentSupportMassWeighted,
     saturationAdjustmentMarineMarginalSupersaturationSupportMassWeighted,
     saturationAdjustmentMarineLayerWindowSupportMassWeighted,
+    saturationAdjustmentMarineFreshSubtropicalSuppressionMassWeighted,
+    saturationAdjustmentMarineFreshSubtropicalBandMassWeighted,
+    saturationAdjustmentMarineFreshNeutralToSubsidingSupportMassWeighted,
+    saturationAdjustmentMarineFreshOrganizedSupportMassWeighted,
+    saturationAdjustmentMarineFreshRhMidSupportMassWeighted,
+    saturationAdjustmentLiveGateCandidateMassKgM2,
+    saturationAdjustmentLiveGatePotentialSuppressedMassKgM2,
+    saturationAdjustmentLiveGateEventCount,
+    saturationAdjustmentLiveGateSupportMassWeighted,
     cloudReevaporationMassKgM2,
     precipReevaporationMassKgM2,
     importedAnvilPersistenceMassKgM2,
@@ -1203,6 +1212,12 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     lowLevelMoistureConvergenceS_1,
     lowerTroposphericRhFrac,
     subtropicalSubsidenceDryingFrac,
+    freshPotentialTargetDiagFrac,
+    freshOrganizedSupportDiagFrac,
+    freshSubtropicalSuppressionDiagFrac,
+    freshSubtropicalBandDiagFrac,
+    freshNeutralToSubsidingSupportDiagFrac,
+    freshRhMidSupportDiagFrac,
     surfaceEvapPotentialRateMmHr,
     surfaceEvapTransferCoeff,
     surfaceEvapWindSpeedMs,
@@ -1384,6 +1399,84 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     weightedFieldBandMean(saturationAdjustmentMarineLayerWindowSupportMassWeighted || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean')
     / Math.max(1e-6, northDryBeltOceanMarineEventMass)
   );
+  const northDryBeltOceanMarineFreshSubtropicalSuppressionMean = (
+    weightedFieldBandMean(saturationAdjustmentMarineFreshSubtropicalSuppressionMassWeighted || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean')
+    / Math.max(1e-6, northDryBeltOceanMarineEventMass)
+  );
+  const northDryBeltOceanMarineFreshSubtropicalBandMean = (
+    weightedFieldBandMean(saturationAdjustmentMarineFreshSubtropicalBandMassWeighted || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean')
+    / Math.max(1e-6, northDryBeltOceanMarineEventMass)
+  );
+  const northDryBeltOceanMarineFreshNeutralToSubsidingSupportMean = (
+    weightedFieldBandMean(saturationAdjustmentMarineFreshNeutralToSubsidingSupportMassWeighted || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean')
+    / Math.max(1e-6, northDryBeltOceanMarineEventMass)
+  );
+  const northDryBeltOceanMarineFreshOrganizedSupportMean = (
+    weightedFieldBandMean(saturationAdjustmentMarineFreshOrganizedSupportMassWeighted || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean')
+    / Math.max(1e-6, northDryBeltOceanMarineEventMass)
+  );
+  const northDryBeltOceanMarineFreshRhMidSupportMean = (
+    weightedFieldBandMean(saturationAdjustmentMarineFreshRhMidSupportMassWeighted || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean')
+    / Math.max(1e-6, northDryBeltOceanMarineEventMass)
+  );
+  const northDryBeltLiveGateCandidateMass = weightedBandMean(
+    zonalMean(saturationAdjustmentLiveGateCandidateMassKgM2 || new Array(nx * ny).fill(0), nx, ny),
+    latitudesDeg,
+    rowWeights,
+    DEFAULT_DRY_MIN_LAT,
+    DEFAULT_DRY_MAX_LAT
+  );
+  const northDryBeltOceanLiveGateCandidateMass = weightedFieldBandMean(
+    saturationAdjustmentLiveGateCandidateMassKgM2 || new Array(nx * ny).fill(0),
+    nx,
+    ny,
+    latitudesDeg,
+    rowWeights,
+    DEFAULT_DRY_MIN_LAT,
+    DEFAULT_DRY_MAX_LAT,
+    landMask,
+    'ocean'
+  );
+  const northDryBeltLiveGatePotentialSuppressedMass = weightedBandMean(
+    zonalMean(saturationAdjustmentLiveGatePotentialSuppressedMassKgM2 || new Array(nx * ny).fill(0), nx, ny),
+    latitudesDeg,
+    rowWeights,
+    DEFAULT_DRY_MIN_LAT,
+    DEFAULT_DRY_MAX_LAT
+  );
+  const northDryBeltOceanLiveGatePotentialSuppressedMass = weightedFieldBandMean(
+    saturationAdjustmentLiveGatePotentialSuppressedMassKgM2 || new Array(nx * ny).fill(0),
+    nx,
+    ny,
+    latitudesDeg,
+    rowWeights,
+    DEFAULT_DRY_MIN_LAT,
+    DEFAULT_DRY_MAX_LAT,
+    landMask,
+    'ocean'
+  );
+  const northDryBeltLiveGateHitMean = weightedBandMean(
+    zonalMean(saturationAdjustmentLiveGateEventCount || new Array(nx * ny).fill(0), nx, ny),
+    latitudesDeg,
+    rowWeights,
+    DEFAULT_DRY_MIN_LAT,
+    DEFAULT_DRY_MAX_LAT
+  );
+  const northDryBeltOceanLiveGateHitMean = weightedFieldBandMean(
+    saturationAdjustmentLiveGateEventCount || new Array(nx * ny).fill(0),
+    nx,
+    ny,
+    latitudesDeg,
+    rowWeights,
+    DEFAULT_DRY_MIN_LAT,
+    DEFAULT_DRY_MAX_LAT,
+    landMask,
+    'ocean'
+  );
+  const northDryBeltOceanLiveGateSupportMean = (
+    weightedFieldBandMean(saturationAdjustmentLiveGateSupportMassWeighted || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean')
+    / Math.max(1e-6, northDryBeltOceanMarineEventMass)
+  );
   const northDryBeltLandResolvedAscentCloudBirthPotential = weightedFieldBandMean(resolvedAscentCloudBirthPotentialKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
   const northDryBeltOceanResolvedAscentCloudBirthPotential = weightedFieldBandMean(resolvedAscentCloudBirthPotentialKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
   const northDryBeltLandImportedAnvilPersistence = weightedFieldBandMean(importedAnvilPersistenceMassKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
@@ -1526,6 +1619,18 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       northDryBeltOceanMarineWeakAscentSupportMeanFrac: round(northDryBeltOceanMarineWeakAscentSupportMean, 5),
       northDryBeltOceanMarineMarginalSupersaturationSupportMeanFrac: round(northDryBeltOceanMarineMarginalSupersaturationSupportMean, 5),
       northDryBeltOceanMarineLayerWindowSupportMeanFrac: round(northDryBeltOceanMarineLayerWindowSupportMean, 5),
+      northDryBeltOceanMarineFreshSubtropicalSuppressionMeanFrac: round(northDryBeltOceanMarineFreshSubtropicalSuppressionMean, 5),
+      northDryBeltOceanMarineFreshSubtropicalBandMeanFrac: round(northDryBeltOceanMarineFreshSubtropicalBandMean, 5),
+      northDryBeltOceanMarineFreshNeutralToSubsidingSupportMeanFrac: round(northDryBeltOceanMarineFreshNeutralToSubsidingSupportMean, 5),
+      northDryBeltOceanMarineFreshOrganizedSupportMeanFrac: round(northDryBeltOceanMarineFreshOrganizedSupportMean, 5),
+      northDryBeltOceanMarineFreshRhMidSupportMeanFrac: round(northDryBeltOceanMarineFreshRhMidSupportMean, 5),
+      northDryBeltLiveGateCandidateCondensationMeanKgM2: round(northDryBeltLiveGateCandidateMass, 5),
+      northDryBeltOceanLiveGateCandidateCondensationMeanKgM2: round(northDryBeltOceanLiveGateCandidateMass, 5),
+      northDryBeltLiveGatePotentialSuppressedMeanKgM2: round(northDryBeltLiveGatePotentialSuppressedMass, 5),
+      northDryBeltOceanLiveGatePotentialSuppressedMeanKgM2: round(northDryBeltOceanLiveGatePotentialSuppressedMass, 5),
+      northDryBeltLiveGateHitMean: round(northDryBeltLiveGateHitMean, 5),
+      northDryBeltOceanLiveGateHitMean: round(northDryBeltOceanLiveGateHitMean, 5),
+      northDryBeltOceanLiveGateSupportMeanFrac: round(northDryBeltOceanLiveGateSupportMean, 5),
       northDryBeltConvectiveDetrainmentCloudSourceMeanKgM2: round(northDryBeltConvectiveDetrainment, 5),
       northDryBeltImportedAnvilPersistenceMeanKgM2: round(northDryBeltImportedAnvilPersistence, 5),
       northDryBeltLandImportedAnvilPersistenceMeanKgM2: round(northDryBeltLandImportedAnvilPersistence, 5),

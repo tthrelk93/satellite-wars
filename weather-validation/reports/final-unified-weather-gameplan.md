@@ -452,9 +452,35 @@ Primary files:
 - [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
 - [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
 
+Result:
+- the live ocean-side NH dry-belt marine condensation path does carry a strong fresh vertical-state subtropical signal
+- the legacy microphysics proxy collapses that signal because it infers suppression through downstream `marginalSubsiding`
+- fresh vertical-state suppression is strong while legacy subtropical support stays near zero:
+  - `northDryBeltOceanMarineFreshSubtropicalSuppressionMeanFrac = 0.68321`
+  - `northDryBeltOceanMarineSubtropicalSupportMeanFrac = 0.0374`
+- the first redesign fixed the wrong-state problem but still had near-zero live occupancy because weak ascent remained too hard a multiplicative limiter
+
+See:
+- [phase1i-subtropical-suppression-gate-redesign.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1i-subtropical-suppression-gate-redesign.md)
+
+Conclusion:
+- the next patch family should key off fresh vertical-state suppression, not the old downstream suppression proxy
+- weak ascent should become a softer modulation term rather than a hard occupancy gate
+
+### Phase 1J: Soft-Ascent Live-State Gate Design
+
+Objective:
+- redesign the maintenance-loop gate so it is active in the real 30-day branch state without becoming a broad global suppressor
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+
 Exit criteria:
-- identify the support-term mismatch that keeps live marine condensation outside the intended subtropical-suppression regime
-- produce one redesign target that is live-run active, proof-checkable, and narrower than the rejected Phase 1G patch family
+- produce a live-state candidate gate with meaningful NH dry-belt ocean occupancy in the 30-day audit
+- keep the selector anchored on fresh vertical-state subtropical suppression
+- demote weak ascent from a hard multiplicative occupancy limiter to a softer scaling term before any new physics suppression patch is attempted
 
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 

@@ -169,6 +169,36 @@ test('microphysics does not mark strong organized ascent as maintenance occupanc
   assert.equal(state.saturationAdjustmentMaintenanceCandidateEventCount[0], 0);
 });
 
+test('microphysics redesign surfaces live-state subtropical support when legacy maintenance support stays weak', () => {
+  const state = setupState(279);
+  state.qv.fill(0.002);
+  state.qc.fill(0);
+  state.qi.fill(0);
+  state.qr.fill(0);
+  state.qs.fill(0);
+  state.landMask[0] = 0;
+  state.convectiveOrganization[0] = 0.04;
+  state.convectiveMassFlux[0] = 2e-4;
+  state.convectiveAnvilSource[0] = 0.02;
+  state.subtropicalSubsidenceDrying[0] = 0.0;
+  state.freshSubtropicalSuppressionDiag[0] = 0.46;
+  state.freshSubtropicalBandDiag[0] = 0.88;
+  state.freshNeutralToSubsidingSupportDiag[0] = 0.24;
+  state.freshOrganizedSupportDiag[0] = 0.14;
+  state.freshRhMidSupportDiag[0] = 0.58;
+  state.omega.fill(-0.03);
+  state.qv[1] = 0.011;
+
+  stepMicrophysics5({ dt: 900, state, params: { enableConvectiveOutcome: true } });
+
+  assert.equal(state.saturationAdjustmentMaintenanceCandidateMass[0], 0);
+  assert.equal(state.saturationAdjustmentMaintenancePotentialSuppressedMass[0], 0);
+  assert.ok(state.saturationAdjustmentMarineFreshSubtropicalSuppressionMassWeighted[0] > 0);
+  assert.ok(state.saturationAdjustmentLiveGateCandidateMass[0] > 0);
+  assert.ok(state.saturationAdjustmentLiveGatePotentialSuppressedMass[0] > 0);
+  assert.ok(state.saturationAdjustmentLiveGateEventCount[0] > 0);
+});
+
 test('microphysics populates the upper-cloud handoff ledger and closes the upper-cloud budget', () => {
   const state = setupState(248);
   state.qv.fill(0.006);

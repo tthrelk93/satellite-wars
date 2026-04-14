@@ -185,6 +185,33 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   if (!state.saturationAdjustmentMarineLayerWindowSupportMassWeighted || state.saturationAdjustmentMarineLayerWindowSupportMassWeighted.length !== N) {
     state.saturationAdjustmentMarineLayerWindowSupportMassWeighted = new Float32Array(N);
   }
+  if (!state.saturationAdjustmentMarineFreshSubtropicalSuppressionMassWeighted || state.saturationAdjustmentMarineFreshSubtropicalSuppressionMassWeighted.length !== N) {
+    state.saturationAdjustmentMarineFreshSubtropicalSuppressionMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMarineFreshSubtropicalBandMassWeighted || state.saturationAdjustmentMarineFreshSubtropicalBandMassWeighted.length !== N) {
+    state.saturationAdjustmentMarineFreshSubtropicalBandMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMarineFreshNeutralToSubsidingSupportMassWeighted || state.saturationAdjustmentMarineFreshNeutralToSubsidingSupportMassWeighted.length !== N) {
+    state.saturationAdjustmentMarineFreshNeutralToSubsidingSupportMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMarineFreshOrganizedSupportMassWeighted || state.saturationAdjustmentMarineFreshOrganizedSupportMassWeighted.length !== N) {
+    state.saturationAdjustmentMarineFreshOrganizedSupportMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMarineFreshRhMidSupportMassWeighted || state.saturationAdjustmentMarineFreshRhMidSupportMassWeighted.length !== N) {
+    state.saturationAdjustmentMarineFreshRhMidSupportMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentLiveGateCandidateMass || state.saturationAdjustmentLiveGateCandidateMass.length !== N) {
+    state.saturationAdjustmentLiveGateCandidateMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentLiveGatePotentialSuppressedMass || state.saturationAdjustmentLiveGatePotentialSuppressedMass.length !== N) {
+    state.saturationAdjustmentLiveGatePotentialSuppressedMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentLiveGateEventCount || state.saturationAdjustmentLiveGateEventCount.length !== N) {
+    state.saturationAdjustmentLiveGateEventCount = new Uint32Array(N);
+  }
+  if (!state.saturationAdjustmentLiveGateSupportMassWeighted || state.saturationAdjustmentLiveGateSupportMassWeighted.length !== N) {
+    state.saturationAdjustmentLiveGateSupportMassWeighted = new Float32Array(N);
+  }
   if (!state.weakAscentCloudBirthAccumMass || state.weakAscentCloudBirthAccumMass.length !== N) {
     state.weakAscentCloudBirthAccumMass = new Float32Array(N);
   }
@@ -241,6 +268,15 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   state.saturationAdjustmentMarineWeakAscentSupportMassWeighted.fill(0);
   state.saturationAdjustmentMarineMarginalSupersaturationSupportMassWeighted.fill(0);
   state.saturationAdjustmentMarineLayerWindowSupportMassWeighted.fill(0);
+  state.saturationAdjustmentMarineFreshSubtropicalSuppressionMassWeighted.fill(0);
+  state.saturationAdjustmentMarineFreshSubtropicalBandMassWeighted.fill(0);
+  state.saturationAdjustmentMarineFreshNeutralToSubsidingSupportMassWeighted.fill(0);
+  state.saturationAdjustmentMarineFreshOrganizedSupportMassWeighted.fill(0);
+  state.saturationAdjustmentMarineFreshRhMidSupportMassWeighted.fill(0);
+  state.saturationAdjustmentLiveGateCandidateMass.fill(0);
+  state.saturationAdjustmentLiveGatePotentialSuppressedMass.fill(0);
+  state.saturationAdjustmentLiveGateEventCount.fill(0);
+  state.saturationAdjustmentLiveGateSupportMassWeighted.fill(0);
   state.microphysicsUpperCloudSaturationBirthMass.fill(0);
   state.microphysicsUpperCloudCloudReevaporationMass.fill(0);
   state.microphysicsUpperCloudPrecipReevaporationMass.fill(0);
@@ -380,6 +416,55 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         const omegaBot = Number.isFinite(omega?.[(lev + 1) * N + k]) ? omega[(lev + 1) * N + k] : 0;
         const ascentMagnitudePaS = Math.max(0, -0.5 * (omegaTop + omegaBot));
         const isOceanColumn = state.landMask?.[k] !== 1;
+        const freshSubtropicalSuppression = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              Number.isFinite(state.freshSubtropicalSuppressionDiag?.[k])
+                ? state.freshSubtropicalSuppressionDiag[k]
+                : Number.isFinite(state._freshSubtropicalSuppression?.[k])
+                  ? state._freshSubtropicalSuppression[k]
+                  : 0,
+              0,
+              1
+            )
+          : 0;
+        const freshSubtropicalBand = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              Number.isFinite(state.freshSubtropicalBandDiag?.[k])
+                ? state.freshSubtropicalBandDiag[k]
+                : 0,
+              0,
+              1
+            )
+          : 0;
+        const freshNeutralToSubsidingSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              Number.isFinite(state.freshNeutralToSubsidingSupportDiag?.[k])
+                ? state.freshNeutralToSubsidingSupportDiag[k]
+                : 0,
+              0,
+              1
+            )
+          : 0;
+        const freshOrganizedSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              Number.isFinite(state.freshOrganizedSupportDiag?.[k])
+                ? state.freshOrganizedSupportDiag[k]
+                : Number.isFinite(state._freshOrganizedSupport?.[k])
+                  ? state._freshOrganizedSupport[k]
+                  : 0,
+              0,
+              1
+            )
+          : 0;
+        const freshRhMidSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              Number.isFinite(state.freshRhMidSupportDiag?.[k])
+                ? state.freshRhMidSupportDiag[k]
+                : 0,
+              0,
+              1
+            )
+          : 0;
         const subtropicalSupport = enableConvectiveOutcome && isOceanColumn
           ? smoothstep(SUBTROPICAL_MAINTENANCE_DIAG.subsiding0, SUBTROPICAL_MAINTENANCE_DIAG.subsiding1, marginalSubsiding)
           : 0;
@@ -419,6 +504,19 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               SUBTROPICAL_MAINTENANCE_DIAG.suppressMax
             )
           : 0;
+        const liveGateSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              SUBTROPICAL_MAINTENANCE_DIAG.suppressMax
+                * (1 + SUBTROPICAL_MAINTENANCE_DIAG.oceanBoost)
+                * freshSubtropicalSuppression
+                * weakEngineSupport
+                * weakAscentSupport
+                * marginalSupersaturationSupport
+                * maintenanceLayerSupport,
+              0,
+              SUBTROPICAL_MAINTENANCE_DIAG.suppressMax
+            )
+          : 0;
         let dq = applyLatentCap(qvVal - qsat, iceFrac > 0.5 ? Ls : Lv);
         if (dq > 0) {
           qvVal -= dq;
@@ -433,6 +531,11 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               state.saturationAdjustmentMarineWeakAscentSupportMassWeighted[k] += weakAscentSupport * condMass;
               state.saturationAdjustmentMarineMarginalSupersaturationSupportMassWeighted[k] += marginalSupersaturationSupport * condMass;
               state.saturationAdjustmentMarineLayerWindowSupportMassWeighted[k] += maintenanceLayerSupport * condMass;
+              state.saturationAdjustmentMarineFreshSubtropicalSuppressionMassWeighted[k] += freshSubtropicalSuppression * condMass;
+              state.saturationAdjustmentMarineFreshSubtropicalBandMassWeighted[k] += freshSubtropicalBand * condMass;
+              state.saturationAdjustmentMarineFreshNeutralToSubsidingSupportMassWeighted[k] += freshNeutralToSubsidingSupport * condMass;
+              state.saturationAdjustmentMarineFreshOrganizedSupportMassWeighted[k] += freshOrganizedSupport * condMass;
+              state.saturationAdjustmentMarineFreshRhMidSupportMassWeighted[k] += freshRhMidSupport * condMass;
             }
             if (maintenanceSupport >= SUBTROPICAL_MAINTENANCE_DIAG.supportThreshold) {
               state.saturationAdjustmentMaintenanceCandidateMass[k] += condMass;
@@ -440,6 +543,12 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               state.saturationAdjustmentMaintenanceCandidateEventCount[k] += 1;
               state.saturationAdjustmentMaintenanceCandidateSupersaturationMassWeighted[k] += supersaturationFrac * condMass;
               state.saturationAdjustmentMaintenanceCandidateOmegaMassWeighted[k] += ascentMagnitudePaS * condMass;
+            }
+            if (liveGateSupport >= SUBTROPICAL_MAINTENANCE_DIAG.supportThreshold) {
+              state.saturationAdjustmentLiveGateCandidateMass[k] += condMass;
+              state.saturationAdjustmentLiveGatePotentialSuppressedMass[k] += condMass * liveGateSupport;
+              state.saturationAdjustmentLiveGateEventCount[k] += 1;
+              state.saturationAdjustmentLiveGateSupportMassWeighted[k] += liveGateSupport * condMass;
             }
             if (isUpperCloudSigma(sigmaMid)) {
               state.microphysicsUpperCloudSaturationBirthMass[k] += condMass;
