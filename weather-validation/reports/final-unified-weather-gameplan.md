@@ -1460,6 +1460,26 @@ Status:
   - the patch should stay behind the runtime toggle, not become default-on yet
 - next active phase: `Phase 1ZO: Bilateral Edge Outcome Attribution`
 
+#### Phase 1ZO: Bilateral Edge Outcome Attribution
+
+Objective:
+- explain where the now-correct bilateral edge response is being absorbed on the north side so the next patch can contain the outcome rather than reworking geometry again
+
+Primary files:
+- [phase1zo-bilateral-edge-outcome-attribution.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/phase1zo-bilateral-edge-outcome-attribution.mjs)
+- [phase1zn-mirrored-bilateral-edge-source-window-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zn-mirrored-bilateral-edge-source-window-patch.md)
+- [final-unified-weather-gameplan.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/final-unified-weather-gameplan.md)
+
+Status:
+- complete in [phase1zo-bilateral-edge-outcome-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zo-bilateral-edge-outcome-attribution.md)
+- verdict: `northside_condensation_fanout_without_humidification`
+- key conclusions:
+  - south-edge stabilization is real and no longer the blocker
+  - the remaining north-side residual fans out from `11.25°N` into `3.75°N`, `18.75°N`, and `26.25°N`
+  - TCW and RH stay nearly flat, so this is not primarily a humidification recharge problem
+  - the next patch lane should be a northside fanout containment design, not another geometry redesign
+- next active phase: `Phase 1ZP: Northside Fanout Containment Design`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
