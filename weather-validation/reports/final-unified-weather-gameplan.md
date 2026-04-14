@@ -1191,6 +1191,34 @@ Questions to answer:
 - is the residual rebound now an amplitude / spread problem inside the corrected selector, or a downstream adjustment response outside the selector?
 - can we narrow the live shoulder application without reintroducing the old `33.75°N` false-positive?
 
+Status:
+- complete in [phase1zc-shoulder-guard-reintegration-audit.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zc-shoulder-guard-reintegration-audit.md)
+- dominant residual: `same_lane_vapor_recharge`
+- supporting residual: `adjacent_ungated_shoulder_spillover`
+- ruled out: `30-45°N target-entry false-positive`
+- the corrected selector is active where it should be, but the live `3-12°N` shoulder gets moister after suppression:
+  - tropical shoulder core net condensation delta: `+0.01603 kg/m²`
+  - tropical shoulder core reconstructed raw condensation delta: `+0.03461 kg/m²`
+  - tropical shoulder core applied suppression on: `0.01858 kg/m²`
+  - tropical shoulder core TCW delta: `+0.1055 kg/m²`
+  - tropical shoulder core mid-RH delta: `+0.003`
+- a secondary spillover still rises at `18.75°N` with zero local guard application
+
+### Phase 1ZD: Suppressed-Mass Fate Design
+
+Objective:
+- prove how shoulder-guard-suppressed condensation mass should be handled so it does not immediately recharge the same `3-12°N` marine shoulder lane or spill into `18.75°N`
+
+Primary files:
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js) only if the fate path is not local to saturation adjustment
+
+Questions to answer:
+- should suppressed shoulder condensation remain in-place as vapor, or does it need a local sink / export / delayed-rainout path?
+- is `11.25°N` over-participating relative to `3.75°N`, or is the rebound mainly a shared same-lane recharge response?
+- can we reduce the `18.75°N` spillover without reopening the fixed `33.75°N` target-entry lane?
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

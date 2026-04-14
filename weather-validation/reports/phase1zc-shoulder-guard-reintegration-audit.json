@@ -1,0 +1,260 @@
+{
+  "schema": "satellite-wars.phase1zc-shoulder-guard-reintegration-audit.v1",
+  "generatedAt": "2026-04-14T08:08:00.959Z",
+  "paths": {
+    "offPath": "/tmp/phase1zb-off.json",
+    "onPath": "/tmp/phase1zb-on.json",
+    "reportPath": "weather-validation/reports/phase1zc-shoulder-guard-reintegration-audit.md",
+    "jsonPath": "weather-validation/reports/phase1zc-shoulder-guard-reintegration-audit.json"
+  },
+  "verdict": "same_lane_vapor_recharge",
+  "nextPhase": "Phase 1ZD: Suppressed-Mass Fate Design",
+  "recommendation": "The next phase should stop redesigning selector geometry and instead explain how the suppressed 3–12°N marine condensation mass is recharging the same shoulder lane and spilling into 18.75°N.",
+  "offOnCompare": {
+    "itczWidthDeg": {
+      "off": 25.834,
+      "on": 25.89,
+      "delta": 0.056
+    },
+    "subtropicalDryNorthRatio": {
+      "off": 1.515,
+      "on": 1.527,
+      "delta": 0.012
+    },
+    "subtropicalDrySouthRatio": {
+      "off": 1.192,
+      "on": 1.197,
+      "delta": 0.005
+    }
+  },
+  "bandDiagnostics": {
+    "tropicalShoulderCoreNetCondensationDeltaKgM2": 0.01603,
+    "tropicalShoulderCoreReconstructedRawCondensationDeltaKgM2": 0.03461,
+    "tropicalShoulderCoreAppliedSuppressionOnKgM2": 0.01858,
+    "tropicalShoulderCoreTcwDeltaKgM2": 0.1055,
+    "tropicalShoulderCoreMidRhDeltaFrac": 0.003,
+    "adjacentShoulderSpilloverDeltaKgM2": 0.00635,
+    "adjacentShoulderSpilloverTcwDeltaKgM2": 0.168,
+    "adjacentShoulderSpilloverMidRhDeltaFrac": 0.007,
+    "targetEntryAppliedSuppressionOnKgM2": 0
+  },
+  "referenceSlices": {
+    "shoulder3p75": {
+      "off": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.07641,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.04151,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0.00679,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0.04151,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0.01235,
+        "freshShoulderLatitudeWindowDiagFrac": 1,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0,
+        "totalColumnWaterKgM2": 43.876,
+        "boundaryLayerRhFrac": 0.547,
+        "lowerTroposphericRhFrac": 0.47,
+        "midTroposphericRhFrac": 0.439,
+        "precipRateMmHr": 0.139,
+        "reconstructedRawCondensationKgM2": 0.07641
+      },
+      "on": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.09188,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.06893,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0.01322,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.0122,
+        "shoulderAbsorptionGuardBandWindowFrac": 0.06893,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0.02404,
+        "freshShoulderLatitudeWindowDiagFrac": 1,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0,
+        "totalColumnWaterKgM2": 43.967,
+        "boundaryLayerRhFrac": 0.546,
+        "lowerTroposphericRhFrac": 0.47,
+        "midTroposphericRhFrac": 0.441,
+        "precipRateMmHr": 0.139,
+        "reconstructedRawCondensationKgM2": 0.10408
+      }
+    },
+    "shoulder11p25": {
+      "off": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.12779,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.08619,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0.02234,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0.08619,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0.04061,
+        "freshShoulderLatitudeWindowDiagFrac": 1,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0,
+        "totalColumnWaterKgM2": 43.119,
+        "boundaryLayerRhFrac": 0.544,
+        "lowerTroposphericRhFrac": 0.414,
+        "midTroposphericRhFrac": 0.4,
+        "precipRateMmHr": 0.159,
+        "reconstructedRawCondensationKgM2": 0.12779
+      },
+      "on": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.14437,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.12488,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0.0279,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.02496,
+        "shoulderAbsorptionGuardBandWindowFrac": 0.12488,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0.05073,
+        "freshShoulderLatitudeWindowDiagFrac": 1,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0,
+        "totalColumnWaterKgM2": 43.239,
+        "boundaryLayerRhFrac": 0.545,
+        "lowerTroposphericRhFrac": 0.416,
+        "midTroposphericRhFrac": 0.404,
+        "precipRateMmHr": 0.157,
+        "reconstructedRawCondensationKgM2": 0.16933
+      }
+    },
+    "spillover18p75": {
+      "off": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.10309,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0,
+        "totalColumnWaterKgM2": 38.233,
+        "boundaryLayerRhFrac": 0.479,
+        "lowerTroposphericRhFrac": 0.356,
+        "midTroposphericRhFrac": 0.377,
+        "precipRateMmHr": 0.157,
+        "reconstructedRawCondensationKgM2": 0.10309
+      },
+      "on": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.10944,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0,
+        "totalColumnWaterKgM2": 38.401,
+        "boundaryLayerRhFrac": 0.479,
+        "lowerTroposphericRhFrac": 0.358,
+        "midTroposphericRhFrac": 0.384,
+        "precipRateMmHr": 0.16,
+        "reconstructedRawCondensationKgM2": 0.10944
+      }
+    },
+    "source26p25": {
+      "off": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.12559,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0,
+        "totalColumnWaterKgM2": 37.291,
+        "boundaryLayerRhFrac": 0.562,
+        "lowerTroposphericRhFrac": 0.407,
+        "midTroposphericRhFrac": 0.404,
+        "precipRateMmHr": 0.22,
+        "reconstructedRawCondensationKgM2": 0.12559
+      },
+      "on": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.10811,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0,
+        "totalColumnWaterKgM2": 37.418,
+        "boundaryLayerRhFrac": 0.565,
+        "lowerTroposphericRhFrac": 0.408,
+        "midTroposphericRhFrac": 0.411,
+        "precipRateMmHr": 0.222,
+        "reconstructedRawCondensationKgM2": 0.10811
+      }
+    },
+    "targetEntry33p75": {
+      "off": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.18497,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 1,
+        "totalColumnWaterKgM2": 30.909,
+        "boundaryLayerRhFrac": 0.787,
+        "lowerTroposphericRhFrac": 0.658,
+        "midTroposphericRhFrac": 0.604,
+        "precipRateMmHr": 0.257,
+        "reconstructedRawCondensationKgM2": 0.18497
+      },
+      "on": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.17971,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 1,
+        "totalColumnWaterKgM2": 31.03,
+        "boundaryLayerRhFrac": 0.792,
+        "lowerTroposphericRhFrac": 0.663,
+        "midTroposphericRhFrac": 0.612,
+        "precipRateMmHr": 0.256,
+        "reconstructedRawCondensationKgM2": 0.17971
+      }
+    }
+  },
+  "ranking": [
+    {
+      "key": "same_lane_vapor_recharge",
+      "label": "Suppressed shoulder condensation is reappearing as a same-lane vapor recharge inside the corrected 3–12°N selector.",
+      "score": 1,
+      "evidence": {
+        "tropicalShoulderCoreNetCondensationDeltaKgM2": 0.01603,
+        "tropicalShoulderCoreReconstructedRawCondensationDeltaKgM2": 0.03461,
+        "tropicalShoulderCoreAppliedSuppressionOnKgM2": 0.01858,
+        "tropicalShoulderCoreTcwDeltaKgM2": 0.1055,
+        "tropicalShoulderCoreMidRhDeltaFrac": 0.003
+      }
+    },
+    {
+      "key": "adjacent_ungated_shoulder_spillover",
+      "label": "A secondary share of the rebound spills poleward into the ungated 12–22.5°N shoulder-adjacent lane.",
+      "score": 1,
+      "evidence": {
+        "adjacentShoulderSpilloverDeltaKgM2": 0.00635,
+        "adjacentShoulderSpilloverTcwDeltaKgM2": 0.168,
+        "adjacentShoulderSpilloverMidRhDeltaFrac": 0.007,
+        "spill18p75AppliedSuppressionOnKgM2": 0
+      }
+    }
+  ],
+  "rootCauseAssessment": {
+    "ruledIn": [
+      "The corrected selector is active in the right 3–12°N shoulder cells, but the same lane becomes moister and more RH-rich, so reconstructed raw condensation rises faster than the applied suppression.",
+      "A smaller secondary rebound leaks into 18.75°N even though the guard never fires there."
+    ],
+    "ruledOut": [
+      "This is no longer a 30–45°N target-entry false-positive problem."
+    ],
+    "ambiguous": [
+      "Whether the next fix should route suppressed mass into a local sink, a delayed rainout path, or a narrower inner-vs-outer shoulder split is still unresolved."
+    ]
+  }
+}
