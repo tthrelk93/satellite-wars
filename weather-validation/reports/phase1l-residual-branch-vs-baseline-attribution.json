@@ -1,0 +1,488 @@
+{
+  "schema": "satellite-wars.phase1l-residual-branch-vs-baseline-attribution.v1",
+  "generatedAt": "2026-04-14T03:49:30.869Z",
+  "config": {
+    "preset": "quick",
+    "seed": 12345,
+    "reportBasePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1l-residual-branch-vs-baseline-attribution"
+  },
+  "targetDay": 30,
+  "baseline": {
+    "summaryPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-hadley-second-pass-restore-v4.json",
+    "gitCommit": null
+  },
+  "current": {
+    "summaryPath": "/tmp/satellite-wars-phase1l-current-branch.json",
+    "gitCommit": "e675f19e8f5b1b61eaec4d9e3aec210bf28b392b",
+    "softLiveGatePatchMode": "default"
+  },
+  "climateGuardrailDeltas": {
+    "itczWidthDeg": {
+      "baseline": 23.646,
+      "current": 25.874,
+      "delta": 2.228
+    },
+    "subtropicalDryNorthRatio": {
+      "baseline": 1.1,
+      "current": 1.524,
+      "delta": 0.424
+    },
+    "subtropicalDrySouthRatio": {
+      "baseline": 0.519,
+      "current": 1.194,
+      "delta": 0.675
+    },
+    "subtropicalSubsidenceNorthMean": {
+      "baseline": 0.065,
+      "current": 0.086,
+      "delta": 0.021
+    },
+    "subtropicalSubsidenceSouthMean": {
+      "baseline": 0.038,
+      "current": 0.032,
+      "delta": -0.006
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "baseline": 1.192,
+      "current": 0.531,
+      "delta": -0.661
+    },
+    "midlatitudeWesterliesSouthU10Ms": {
+      "baseline": 0.943,
+      "current": 0.851,
+      "delta": -0.092
+    },
+    "tropicalConvectiveOrganization": {
+      "baseline": 0.331,
+      "current": 0.343,
+      "delta": 0.012
+    },
+    "tropicalConvectiveMassFluxKgM2S": {
+      "baseline": 0.0009,
+      "current": 0.0009,
+      "delta": 0
+    },
+    "equatorialPrecipMeanMmHr": {
+      "baseline": 0.13,
+      "current": 0.138,
+      "delta": 0.008
+    }
+  },
+  "residualFamilyRanking": [
+    {
+      "key": "circulation_side_rebound",
+      "label": "Circulation-side rebound",
+      "score": 0.31725,
+      "contributions": [
+        {
+          "key": "midlatitudeWesterliesNorthU10Ms",
+          "baseline": 1.192,
+          "current": 0.531,
+          "rawDelta": -0.661,
+          "directionalDelta": 0.76727,
+          "weight": 1
+        },
+        {
+          "key": "midlatitudeWesterliesSouthU10Ms",
+          "baseline": 0.943,
+          "current": 0.851,
+          "rawDelta": -0.092,
+          "directionalDelta": 0.10256,
+          "weight": 0.5
+        },
+        {
+          "key": "northDryBeltSubsidenceDryingMeanFrac",
+          "baseline": 0.05597,
+          "current": 0.06337,
+          "rawDelta": 0.00739,
+          "directionalDelta": -0.12389,
+          "weight": 0.5
+        },
+        {
+          "key": "southDryBeltSubsidenceDryingMeanFrac",
+          "baseline": 0.03872,
+          "current": 0.03356,
+          "rawDelta": -0.00516,
+          "directionalDelta": 0.1428,
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "key": "broadened_tropical_response",
+      "label": "Broadened tropical response",
+      "score": 0.24192,
+      "contributions": [
+        {
+          "key": "itczWidthDeg",
+          "baseline": 23.646,
+          "current": 25.874,
+          "rawDelta": 2.228,
+          "directionalDelta": 0.08998,
+          "weight": 1
+        },
+        {
+          "key": "northTransitionPrecipMeanMmHr",
+          "baseline": 0.19276,
+          "current": 0.159,
+          "rawDelta": -0.03376,
+          "directionalDelta": -0.19192,
+          "weight": 0.8
+        },
+        {
+          "key": "southTransitionPrecipMeanMmHr",
+          "baseline": 0.07753,
+          "current": 0.14019,
+          "rawDelta": 0.06267,
+          "directionalDelta": 0.57566,
+          "weight": 0.6
+        },
+        {
+          "key": "subtropicalDryNorthRatio",
+          "baseline": 1.1,
+          "current": 1.524,
+          "rawDelta": 0.424,
+          "directionalDelta": 0.32317,
+          "weight": 0.8
+        },
+        {
+          "key": "subtropicalDrySouthRatio",
+          "baseline": 0.519,
+          "current": 1.194,
+          "rawDelta": 0.675,
+          "directionalDelta": 0.78809,
+          "weight": 0.6
+        },
+        {
+          "key": "tropicalCoreConvectiveOrganizationMeanFrac",
+          "baseline": 0.41,
+          "current": 0.421,
+          "rawDelta": 0.011,
+          "directionalDelta": -0.02647,
+          "weight": 0.35
+        }
+      ]
+    },
+    {
+      "key": "marine_maintenance_residual",
+      "label": "Marine maintenance residual",
+      "score": 0.11325,
+      "contributions": [
+        {
+          "key": "northDryBeltPrecipMeanMmHr",
+          "baseline": 0.13862,
+          "current": 0.23888,
+          "rawDelta": 0.10026,
+          "directionalDelta": 0.53119,
+          "weight": 0.9
+        },
+        {
+          "key": "northDryBeltCloudMeanFrac",
+          "baseline": 0.74023,
+          "current": 0.79197,
+          "rawDelta": 0.05175,
+          "directionalDelta": 0.06754,
+          "weight": 0.7
+        },
+        {
+          "key": "northDryBeltLowerRhMeanFrac",
+          "baseline": 0.48669,
+          "current": 0.52968,
+          "rawDelta": 0.04298,
+          "directionalDelta": 0.08458,
+          "weight": 0.8
+        },
+        {
+          "key": "northDryBeltTcwMeanKgM2",
+          "baseline": 36.29703,
+          "current": 34.28875,
+          "rawDelta": -2.00827,
+          "directionalDelta": -0.0569,
+          "weight": 0.7
+        },
+        {
+          "key": "northDryBeltMoistureConvergenceMeanS_1",
+          "baseline": 0.00001,
+          "current": 0.00001,
+          "rawDelta": 0,
+          "directionalDelta": -0.39198,
+          "weight": 0.4
+        }
+      ]
+    },
+    {
+      "key": "upper_cloud_clouddeck_residual",
+      "label": "Upper-cloud / cloud-deck residual",
+      "score": 0.00346,
+      "contributions": [
+        {
+          "key": "northDryBeltCloudMeanFrac",
+          "baseline": 0.74023,
+          "current": 0.79197,
+          "rawDelta": 0.05175,
+          "directionalDelta": 0.06754,
+          "weight": 0.7
+        },
+        {
+          "key": "northDryBeltAnvilPersistenceMeanFrac",
+          "baseline": 0.00296,
+          "current": 0.00292,
+          "rawDelta": -0.00004,
+          "directionalDelta": -0.01285,
+          "weight": 0.9
+        },
+        {
+          "key": "northDryBeltTcwMeanKgM2",
+          "baseline": 36.29703,
+          "current": 34.28875,
+          "rawDelta": -2.00827,
+          "directionalDelta": -0.0569,
+          "weight": 0.5
+        }
+      ]
+    }
+  ],
+  "dominantResidualFamily": {
+    "key": "circulation_side_rebound",
+    "label": "Circulation-side rebound",
+    "score": 0.31725,
+    "contributions": [
+      {
+        "key": "midlatitudeWesterliesNorthU10Ms",
+        "baseline": 1.192,
+        "current": 0.531,
+        "rawDelta": -0.661,
+        "directionalDelta": 0.76727,
+        "weight": 1
+      },
+      {
+        "key": "midlatitudeWesterliesSouthU10Ms",
+        "baseline": 0.943,
+        "current": 0.851,
+        "rawDelta": -0.092,
+        "directionalDelta": 0.10256,
+        "weight": 0.5
+      },
+      {
+        "key": "northDryBeltSubsidenceDryingMeanFrac",
+        "baseline": 0.05597,
+        "current": 0.06337,
+        "rawDelta": 0.00739,
+        "directionalDelta": -0.12389,
+        "weight": 0.5
+      },
+      {
+        "key": "southDryBeltSubsidenceDryingMeanFrac",
+        "baseline": 0.03872,
+        "current": 0.03356,
+        "rawDelta": -0.00516,
+        "directionalDelta": 0.1428,
+        "weight": 0.7
+      }
+    ]
+  },
+  "nextPatchLane": {
+    "key": "phase1m-circulation-rebound-lane",
+    "label": "Phase 1M: Circulation rebound lane",
+    "focus": "Target circulation partition and wind response in [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js) and [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)."
+  },
+  "bandDeltaAttribution": {
+    "precipRateMmHr": [
+      {
+        "band": "equatorialCore",
+        "label": "Equatorial core",
+        "baseline": 0.103,
+        "current": 0.1215,
+        "delta": 0.0185
+      },
+      {
+        "band": "northTransition",
+        "label": "North transition",
+        "baseline": 0.19276,
+        "current": 0.159,
+        "delta": -0.03376
+      },
+      {
+        "band": "northDryBelt",
+        "label": "North dry belt",
+        "baseline": 0.13862,
+        "current": 0.23888,
+        "delta": 0.10026
+      },
+      {
+        "band": "southTransition",
+        "label": "South transition",
+        "baseline": 0.07753,
+        "current": 0.14019,
+        "delta": 0.06267
+      },
+      {
+        "band": "southDryBelt",
+        "label": "South dry belt",
+        "baseline": 0.06282,
+        "current": 0.1848,
+        "delta": 0.12198
+      }
+    ],
+    "cloudTotalFraction": [
+      {
+        "band": "equatorialCore",
+        "label": "Equatorial core",
+        "baseline": 0.7625,
+        "current": 0.8005,
+        "delta": 0.038
+      },
+      {
+        "band": "northTransition",
+        "label": "North transition",
+        "baseline": 0.67774,
+        "current": 0.7193,
+        "delta": 0.04156
+      },
+      {
+        "band": "northDryBelt",
+        "label": "North dry belt",
+        "baseline": 0.74023,
+        "current": 0.79197,
+        "delta": 0.05175
+      },
+      {
+        "band": "southTransition",
+        "label": "South transition",
+        "baseline": 0.51019,
+        "current": 0.7359,
+        "delta": 0.2257
+      },
+      {
+        "band": "southDryBelt",
+        "label": "South dry belt",
+        "baseline": 0.46866,
+        "current": 0.7531,
+        "delta": 0.28444
+      }
+    ],
+    "convectiveOrganization": [
+      {
+        "band": "equatorialCore",
+        "label": "Equatorial core",
+        "baseline": 0.41,
+        "current": 0.421,
+        "delta": 0.011
+      },
+      {
+        "band": "northTransition",
+        "label": "North transition",
+        "baseline": 0.1577,
+        "current": 0.1537,
+        "delta": -0.004
+      },
+      {
+        "band": "northDryBelt",
+        "label": "North dry belt",
+        "baseline": 0.0706,
+        "current": 0.06549,
+        "delta": -0.00511
+      },
+      {
+        "band": "southTransition",
+        "label": "South transition",
+        "baseline": 0.12228,
+        "current": 0.14342,
+        "delta": 0.02114
+      },
+      {
+        "band": "southDryBelt",
+        "label": "South dry belt",
+        "baseline": 0.03343,
+        "current": 0.04876,
+        "delta": 0.01533
+      }
+    ],
+    "lowerTroposphericRhFrac": [
+      {
+        "band": "equatorialCore",
+        "label": "Equatorial core",
+        "baseline": 0.328,
+        "current": 0.4795,
+        "delta": 0.1515
+      },
+      {
+        "band": "northTransition",
+        "label": "North transition",
+        "baseline": 0.3786,
+        "current": 0.38651,
+        "delta": 0.00791
+      },
+      {
+        "band": "northDryBelt",
+        "label": "North dry belt",
+        "baseline": 0.48669,
+        "current": 0.52968,
+        "delta": 0.04298
+      },
+      {
+        "band": "southTransition",
+        "label": "South transition",
+        "baseline": 0.30391,
+        "current": 0.62298,
+        "delta": 0.31907
+      },
+      {
+        "band": "southDryBelt",
+        "label": "South dry belt",
+        "baseline": 0.28894,
+        "current": 0.62121,
+        "delta": 0.33226
+      }
+    ],
+    "wind10mU": [
+      {
+        "band": "equatorialCore",
+        "label": "Equatorial core",
+        "baseline": -0.5225,
+        "current": -0.5505,
+        "delta": -0.028
+      },
+      {
+        "band": "northTransition",
+        "label": "North transition",
+        "baseline": -0.78813,
+        "current": -0.74211,
+        "delta": 0.04602
+      },
+      {
+        "band": "northDryBelt",
+        "label": "North dry belt",
+        "baseline": 1.96085,
+        "current": 0.66136,
+        "delta": -1.29949
+      },
+      {
+        "band": "southTransition",
+        "label": "South transition",
+        "baseline": -0.32828,
+        "current": -0.37219,
+        "delta": -0.04391
+      },
+      {
+        "band": "southDryBelt",
+        "label": "South dry belt",
+        "baseline": -0.11382,
+        "current": -0.21194,
+        "delta": -0.09812
+      }
+    ]
+  },
+  "currentCorroboration": {
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.1526,
+    "northDryBeltOceanMarineCondensationMeanKgM2": 0.1526,
+    "northDryBeltOceanSoftLiveGateAppliedSuppressionMeanKgM2": 0.04238,
+    "northDryBeltOceanSoftLiveGateHitMean": 3.55832,
+    "northDryBeltOceanSoftLiveGateSelectorSupportMeanFrac": 0.56672,
+    "northDryBeltImportedAnvilPersistenceMeanKgM2": 0.22232,
+    "northDryBeltWeakErosionCloudSurvivalMeanKgM2": 0.2204,
+    "northDryBeltCarriedOverUpperCloudMeanKgM2": 0.22249,
+    "northDryBeltUpperCloudPathMeanKgM2": 0.20978
+  },
+  "conclusion": "Residual mismatch is coupled between Circulation-side rebound and Broadened tropical response. The next patch lane should start with Phase 1M: Circulation rebound lane but keep both families in view."
+}

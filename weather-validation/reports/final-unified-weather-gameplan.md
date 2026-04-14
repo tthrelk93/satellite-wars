@@ -544,6 +544,42 @@ Exit criteria:
 - prove whether the next blocker is still marine maintenance, a broadened tropical response, or a circulation-side rebound
 - choose the next narrow patch lane from that ranked residual, not from the pre-Phase-1K story
 
+Result:
+- succeeded
+- dominant residual family: `circulation_side_rebound` with score `0.31725`
+- second residual family: `broadened_tropical_response` with score `0.24192`
+- marine maintenance residual now ranks well behind them at `0.11325`
+- the kept Phase 1K patch is still clearly live:
+  - `northDryBeltOceanSoftLiveGateAppliedSuppressionMeanKgM2 = 0.04238`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2 = 0.15260`
+- but the trusted-baseline gap is now led by circulation / transition structure:
+  - `midlatitudeWesterliesNorthU10Ms`: `1.192 -> 0.531`
+  - `itczWidthDeg`: `23.646 -> 25.874`
+  - `subtropicalDryNorthRatio`: `1.100 -> 1.524`
+  - `subtropicalDrySouthRatio`: `0.519 -> 1.194`
+
+Conclusion:
+- Phase 1K successfully moved the local marine-maintenance lever, but that is no longer the dominant blocker
+- the next patch lane should start with circulation rebound, while keeping broadened tropical response coupled into the design and verification loop
+
+See:
+- [phase1l-residual-branch-vs-baseline-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1l-residual-branch-vs-baseline-attribution.md)
+
+### Phase 1M: Circulation Rebound Lane
+
+Objective:
+- reduce the residual circulation-side rebound against the trusted baseline without undoing the kept Phase 1K marine-maintenance gain
+
+Primary files:
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js) as a support lane only if the circulation patch changes live gate occupancy
+
+Exit criteria:
+- improve `midlatitudeWesterliesNorthU10Ms` and `itczWidthDeg` against the kept Phase 1K branch
+- do not lose the Phase 1K marine-maintenance win in `northDryBeltOceanLargeScaleCondensationMeanKgM2`
+- keep the next design focused on circulation / transition partition, not another isolated local dry-belt suppressor
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
