@@ -1480,6 +1480,26 @@ Status:
   - the next patch lane should be a northside fanout containment design, not another geometry redesign
 - next active phase: `Phase 1ZP: Northside Fanout Containment Design`
 
+#### Phase 1ZP: Northside Fanout Containment Design
+
+Objective:
+- select the safest and most evidence-aligned containment family for the north-side fanout residual before we implement another live physics patch
+
+Primary files:
+- [phase1zp-northside-fanout-containment-design.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/phase1zp-northside-fanout-containment-design.mjs)
+- [phase1zo-bilateral-edge-outcome-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zo-bilateral-edge-outcome-attribution.md)
+- [final-unified-weather-gameplan.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/final-unified-weather-gameplan.md)
+
+Status:
+- complete in [phase1zp-northside-fanout-containment-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zp-northside-fanout-containment-design.md)
+- verdict: `northside_source_leak_penalty_preferred`
+- key conclusions:
+  - the best fit is a capped northside source-leak penalty around the 11.25°N source lane
+  - target-only capping is too narrow because the residual already fans out into `18.75°N` and `26.25°N`
+  - humidification-focused fixes are poor fits because Phase 1ZO showed almost no TCW/RH recharge signature
+  - global amplitude reduction would throw away the south-edge stabilization and the bilateral geometry win
+- next active phase: `Phase 1ZQ: Implement Capped Northside Fanout Leak Penalty Patch`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
