@@ -1133,6 +1133,38 @@ Exit criteria:
 - one explicit redesign contract for the next patch attempt
 - no new physics change until that selector miss is proved
 
+Status:
+- complete in [phase1za-shoulder-guard-residual-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1za-shoulder-guard-residual-attribution.md)
+- dominant residual: `equatorial_edge_shoulder_miss`
+- supporting residual: `target_entry_false_positive`
+- structural conclusion:
+  - the current selector never admits the strongest `3.75°N` rebound because its shoulder-window proxy is effectively zero there
+  - the same selector still fires in the `30-45°N` target-entry lane, so it is not safely local
+  - weak-engine plus bridge-silence alone are too shared to distinguish the desired shoulder lane from the false-positive transition lane
+- the most important design consequence is now explicit:
+  - [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js) needs a latitude-aware discriminator or a dedicated precomputed shoulder-window diagnostic
+
+### Phase 1ZB: Latitude-Aware Shoulder Guard Redesign
+
+Objective:
+- redesign the shoulder guard selector so it reaches the `3–6°N` equatorial shoulder while explicitly excluding the `30–45°N` target-entry lane
+
+Primary files:
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js) only if we choose to precompute the selector upstream
+
+Required design rules:
+- do not solve this by only raising suppression amplitude
+- add explicit equatorial-shoulder admission for `3–6°N`
+- add explicit target-entry exclusion for `30–45°N`
+- do not remove the kept Phase `1K`, `1M`, or `1X` lanes
+
+Exit criteria:
+- the strongest shoulder latitude receives non-zero candidate and applied guard mass
+- target-entry shoulder-guard application falls to zero
+- same-branch `off/on` still preserves or improves ITCZ width and the dry-belt ratios
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

@@ -50,6 +50,7 @@
     "agent:phase1e-proof-vs-climate-delta-attribution": "node scripts/agent/phase1e-proof-vs-climate-delta-attribution.mjs",
     "agent:phase1f-maintenance-loop-patch-design": "node scripts/agent/phase1f-maintenance-loop-patch-design.mjs",
     "agent:phase1z-shoulder-absorption-guard-patch": "node scripts/agent/phase1z-shoulder-absorption-guard-patch.mjs",
+    "agent:phase1za-shoulder-guard-residual-attribution": "node scripts/agent/phase1za-shoulder-guard-residual-attribution.mjs",
     "agent:orographic-probe-cdp": "node scripts/agent/orographic-probe-cdp.mjs",
     "agent:reuse-localhost-tab": "node scripts/agent/reuse-localhost-tab.mjs",
     "agent:summarize-runtime-log": "node scripts/agent/summarize-runtime-log.mjs",
