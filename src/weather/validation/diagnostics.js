@@ -2227,6 +2227,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     circulationReboundSuppressedSourceDiagFrac: arrayOrZeros(state.circulationReboundSuppressedSourceDiag, state.N),
     circulationReturnFlowOpportunityDiagFrac: arrayOrZeros(state.circulationReturnFlowOpportunityDiag, state.N),
     circulationReturnFlowCouplingAppliedDiagFrac: arrayOrZeros(state.circulationReturnFlowCouplingAppliedDiag, state.N),
+    dryingOmegaBridgeAppliedDiagPaS: arrayOrZeros(state.dryingOmegaBridgeAppliedDiag, state.N),
     subtropicalSourceDriverDiagFrac: arrayOrZeros(state.subtropicalSourceDriverDiag, state.N),
     subtropicalSourceDriverFloorDiagFrac: arrayOrZeros(state.subtropicalSourceDriverFloorDiag, state.N),
     subtropicalLocalHemiSourceDiagFrac: arrayOrZeros(state.subtropicalLocalHemiSourceDiag, state.N),

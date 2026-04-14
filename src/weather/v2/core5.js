@@ -543,6 +543,12 @@ export class WeatherCore5 {
       circulationReturnFlowCouplingOpportunity0: 0.0002,
       circulationReturnFlowCouplingOpportunity1: 0.0012,
       circulationReturnFlowCouplingMaxFrac: 0.14,
+      enableDryingOmegaBridge: false,
+      dryingOmegaBridgeDry0: 0.08,
+      dryingOmegaBridgeDry1: 0.16,
+      dryingOmegaBridgeSuppressedSource0: 0.0007,
+      dryingOmegaBridgeSuppressedSource1: 0.0016,
+      dryingOmegaBridgeMaxPaS: 0.018,
       eps: 1e-12,
       debugConservation: false
     };

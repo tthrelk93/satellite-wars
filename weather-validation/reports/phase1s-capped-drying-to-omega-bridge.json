@@ -1,0 +1,90 @@
+{
+  "schema": "satellite-wars.phase1s-capped-drying-to-omega-bridge.v1",
+  "generatedAt": "2026-04-14T05:40:35.413Z",
+  "paths": {
+    "baselinePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-hadley-second-pass-restore-v4.json",
+    "offPath": "/tmp/phase1s-omega-bridge-off.json",
+    "onPath": "/tmp/phase1s-omega-bridge-on.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1s-capped-drying-to-omega-bridge.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1s-capped-drying-to-omega-bridge.json"
+  },
+  "verdict": "omega_to_jet_recovery_failure",
+  "nextPhase": "Phase 1T: Omega-To-Jet Recovery Attribution",
+  "baselineGap": {
+    "itczWidthDeg": {
+      "baseline": 23.646,
+      "current": 25.837,
+      "delta": 2.191
+    },
+    "subtropicalDryNorthRatio": {
+      "baseline": 1.1,
+      "current": 1.517,
+      "delta": 0.417
+    },
+    "subtropicalDrySouthRatio": {
+      "baseline": 0.519,
+      "current": 1.193,
+      "delta": 0.674
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "baseline": 1.192,
+      "current": 0.531,
+      "delta": -0.661
+    }
+  },
+  "offOnCompare": {
+    "itczWidthDeg": {
+      "off": 25.834,
+      "on": 25.837,
+      "delta": 0.003
+    },
+    "subtropicalDryNorthRatio": {
+      "off": 1.515,
+      "on": 1.517,
+      "delta": 0.002
+    },
+    "subtropicalDrySouthRatio": {
+      "off": 1.192,
+      "on": 1.193,
+      "delta": 0.001
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "off": 0.531,
+      "on": 0.531,
+      "delta": 0
+    }
+  },
+  "bridgeResponse": {
+    "northTransitionDryingOmegaBridgeAppliedMeanPaS": 0.00206,
+    "northDryBeltDryingOmegaBridgeAppliedMeanPaS": 0.00145,
+    "northTransitionLowLevelOmegaEffectiveMeanPaS": {
+      "off": 0.06637,
+      "on": 0.06845,
+      "delta": 0.00208
+    },
+    "northDryBeltLowLevelOmegaEffectiveMeanPaS": {
+      "off": 0.01565,
+      "on": 0.01705,
+      "delta": 0.0014
+    },
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": {
+      "off": 0.14647,
+      "on": 0.14242,
+      "delta": -0.00405
+    }
+  },
+  "phaseTargets": {
+    "northTransitionOmegaTargetPaS": 0.01,
+    "northDryBeltOmegaTargetPaS": 0.005,
+    "northTransitionOmegaTargetHitFrac": 0.208,
+    "northDryBeltOmegaTargetHitFrac": 0.28,
+    "nhJetRecoveryDeltaMs": 0
+  },
+  "guardrailAssessment": {
+    "itczWidthDegDelta": 0.003,
+    "subtropicalDryNorthRatioDelta": 0.002,
+    "subtropicalDrySouthRatioDelta": 0.001,
+    "guardrailCostScore": 0.06667
+  },
+  "recommendation": "The bridge is live and does move low-level omega, but NH westerlies stay flat. Keep diagnostics, leave the patch disabled by default, and move to omega-to-jet recovery attribution instead of blindly strengthening the bridge."
+}

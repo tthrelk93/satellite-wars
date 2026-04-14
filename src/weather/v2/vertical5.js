@@ -129,6 +129,42 @@ export const computeTransitionReturnFlowCouplingFrac = ({
     maxFrac
   );
 };
+export const computeDryingOmegaBridgePaS = ({
+  enabled,
+  dryDriver,
+  suppressedSource,
+  latShape,
+  organizedSupport,
+  convectivePotential,
+  neutralToSubsidingSupport,
+  existingOmegaPaS,
+  dry0,
+  dry1,
+  suppressedSource0,
+  suppressedSource1,
+  maxPaS
+}) => {
+  if (!enabled) return 0;
+  const drySupport = smoothstep(dry0, dry1, dryDriver);
+  const sourceSupport = smoothstep(suppressedSource0, suppressedSource1, suppressedSource);
+  const weakEngineSupport = clamp01(
+    0.6 * (1 - clamp01(organizedSupport)) +
+    0.4 * (1 - clamp01(convectivePotential))
+  );
+  const neutralSupport = clamp01(neutralToSubsidingSupport);
+  const existingDescentTaper = 1 - smoothstep(0.08, 0.22, Math.max(0, existingOmegaPaS));
+  return clamp(
+    maxPaS
+      * clamp01(latShape)
+      * drySupport
+      * sourceSupport
+      * weakEngineSupport
+      * (0.55 + 0.45 * neutralSupport)
+      * existingDescentTaper,
+    0,
+    maxPaS
+  );
+};
 const VERTICAL_ALLOWED_PARAMS = new Set([
   'enableMixing',
   'enableConvection',
@@ -203,6 +239,12 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'circulationReturnFlowCouplingOpportunity0',
   'circulationReturnFlowCouplingOpportunity1',
   'circulationReturnFlowCouplingMaxFrac',
+  'enableDryingOmegaBridge',
+  'dryingOmegaBridgeDry0',
+  'dryingOmegaBridgeDry1',
+  'dryingOmegaBridgeSuppressedSource0',
+  'dryingOmegaBridgeSuppressedSource1',
+  'dryingOmegaBridgeMaxPaS',
   'enableCarryInputDominanceOverride',
   'carryInputSubtropicalSuppressionMin',
   'carryInputOrganizedSupportMax',
@@ -332,6 +374,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     circulationReturnFlowCouplingOpportunity0 = 0.0002,
     circulationReturnFlowCouplingOpportunity1 = 0.0012,
     circulationReturnFlowCouplingMaxFrac = 0.14,
+    enableDryingOmegaBridge = false,
+    dryingOmegaBridgeDry0 = 0.08,
+    dryingOmegaBridgeDry1 = 0.16,
+    dryingOmegaBridgeSuppressedSource0 = 0.0007,
+    dryingOmegaBridgeSuppressedSource1 = 0.0016,
+    dryingOmegaBridgeMaxPaS = 0.018,
     enableCarryInputDominanceOverride = true,
     carryInputSubtropicalSuppressionMin = 0.74243,
     carryInputOrganizedSupportMax = 0.22504,
@@ -483,6 +531,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const circulationReboundSuppressedSourceDiag = state.circulationReboundSuppressedSourceDiag;
   const circulationReturnFlowOpportunityDiag = state.circulationReturnFlowOpportunityDiag;
   const circulationReturnFlowCouplingAppliedDiag = state.circulationReturnFlowCouplingAppliedDiag;
+  const dryingOmegaBridgeAppliedDiag = state.dryingOmegaBridgeAppliedDiag;
   const subtropicalSourceDriverDiag = state.subtropicalSourceDriverDiag;
   const subtropicalSourceDriverFloorDiag = state.subtropicalSourceDriverFloorDiag;
   const subtropicalLocalHemiSourceDiag = state.subtropicalLocalHemiSourceDiag;
@@ -575,6 +624,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   circulationReboundSuppressedSourceDiag.fill(0);
   circulationReturnFlowOpportunityDiag.fill(0);
   circulationReturnFlowCouplingAppliedDiag.fill(0);
+  dryingOmegaBridgeAppliedDiag.fill(0);
   subtropicalSourceDriverDiag.fill(0);
   subtropicalSourceDriverFloorDiag.fill(0);
   subtropicalLocalHemiSourceDiag.fill(0);
@@ -1554,6 +1604,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const meanTropicalSource = (nhSource * nhWeight + shSource * shWeight) / Math.max(eps, nhWeight + shWeight);
       const subtropicalAlpha = 1 - Math.exp(-dt / Math.max(subtropicalSubsidenceTau, eps));
       const subtropicalMidSigma = 0.5 * (subtropicalSubsidenceTopSigma + subtropicalSubsidenceBottomSigma);
+      const levS = nz - 1;
 
       for (let j = 0; j < ny; j++) {
         const lat = latDeg[j];
@@ -1612,6 +1663,27 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
               * (1 - 0.24 * convectivePotential[k])
           );
           subtropicalSubsidenceDrying[k] = dryDriver;
+          const omegaBridgePaS = computeDryingOmegaBridgePaS({
+            enabled: enableDryingOmegaBridge,
+            dryDriver,
+            suppressedSource: hemiTransitionSuppressedSource,
+            latShape,
+            organizedSupport: convectiveOrganization[k],
+            convectivePotential: convectivePotential[k],
+            neutralToSubsidingSupport: freshNeutralToSubsidingSupportPublicDiag[k] || 0,
+            existingOmegaPaS: lowLevelOmegaEffective[k],
+            dry0: dryingOmegaBridgeDry0,
+            dry1: dryingOmegaBridgeDry1,
+            suppressedSource0: dryingOmegaBridgeSuppressedSource0,
+            suppressedSource1: dryingOmegaBridgeSuppressedSource1,
+            maxPaS: dryingOmegaBridgeMaxPaS
+          });
+          dryingOmegaBridgeAppliedDiag[k] = omegaBridgePaS;
+          if (omegaBridgePaS > 0) {
+            lowLevelOmegaEffective[k] += omegaBridgePaS;
+            omega[levS * N + k] += omegaBridgePaS;
+            if (levS > 0) omega[(levS - 1) * N + k] += omegaBridgePaS * 0.35;
+          }
           if (dryDriver <= 0) continue;
           const dryFracBase = clamp(
             subtropicalAlpha * dryDriver * (1.12 + 0.42 * latShape),

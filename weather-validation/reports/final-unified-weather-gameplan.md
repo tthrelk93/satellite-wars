@@ -812,6 +812,41 @@ Exit criteria:
 - same-branch `off -> on` compare improves `northDryBeltLowLevelOmegaEffectiveMeanPaS` by about `0.005 Pa/s`
 - `midlatitudeWesterliesNorthU10Ms` starts moving upward without losing the Phase 1K / 1M guardrails
 
+Result:
+- complete
+- see [phase1s-capped-drying-to-omega-bridge.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1s-capped-drying-to-omega-bridge.md)
+- the bridge patch is live, but it does not clear the climate gate:
+  - `northTransitionLowLevelOmegaEffectiveMeanPaS: 0.06637 -> 0.06845`
+  - `northDryBeltLowLevelOmegaEffectiveMeanPaS: 0.01565 -> 0.01705`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+  - `itczWidthDeg: 25.834 -> 25.837`
+  - `subtropicalDryNorthRatio: 1.515 -> 1.517`
+  - `subtropicalDrySouthRatio: 1.192 -> 1.193`
+
+Conclusion:
+- the capped same-step bridge does create a real NH omega response
+- but the gain is too small, and NH westerlies still do not recover
+- because the bridge is live but not climate-keepable, it should stay disabled by default while we use its diagnostics to attribute the downstream missing lane
+
+### Phase 1T: Omega-To-Jet Recovery Attribution
+
+Objective:
+- prove whether the residual failure is weak bridge gain, bad vertical placement of the omega response, or a downstream omega-to-jet recovery gap
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+
+Design rule:
+- keep the Phase 1S bridge instrumentation and runtime toggle
+- do not strengthen the bridge blindly while it still worsens guardrails and leaves NH westerlies flat
+- rank whether the next patch should target bridge gain, bridge vertical distribution, or omega-to-jet recovery
+
+Exit criteria:
+- same-branch attribution cleanly identifies the dominant residual carrier after the bridge is turned on
+- the next patch lane is specific enough that we can change one mechanism instead of broadening circulation tuning again
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createState5 } from './state5.js';
-import { computeTransitionReturnFlowCouplingFrac, stepVertical5 } from './vertical5.js';
+import { computeDryingOmegaBridgePaS, computeTransitionReturnFlowCouplingFrac, stepVertical5 } from './vertical5.js';
 
 test('stepVertical5 keeps thin upper layers bounded during strong ascent-driven transport', () => {
   const sigmaHalf = new Float32Array([0, 0.5, 1]);
@@ -390,4 +390,60 @@ test('computeTransitionReturnFlowCouplingFrac is capped and only active when ena
   });
   assert.ok(active > 0);
   assert.ok(active <= 0.14);
+});
+
+test('computeDryingOmegaBridgePaS is capped and only active for weak-engine dry-driver cases', () => {
+  assert.equal(
+    computeDryingOmegaBridgePaS({
+      enabled: false,
+      dryDriver: 0.14,
+      suppressedSource: 0.0012,
+      latShape: 0.8,
+      organizedSupport: 0.18,
+      convectivePotential: 0.22,
+      neutralToSubsidingSupport: 0.8,
+      existingOmegaPaS: 0.03,
+      dry0: 0.08,
+      dry1: 0.16,
+      suppressedSource0: 0.0007,
+      suppressedSource1: 0.0016,
+      maxPaS: 0.018
+    }),
+    0
+  );
+
+  const active = computeDryingOmegaBridgePaS({
+    enabled: true,
+    dryDriver: 0.14,
+    suppressedSource: 0.0012,
+    latShape: 0.8,
+    organizedSupport: 0.18,
+    convectivePotential: 0.22,
+    neutralToSubsidingSupport: 0.8,
+    existingOmegaPaS: 0.03,
+    dry0: 0.08,
+    dry1: 0.16,
+    suppressedSource0: 0.0007,
+    suppressedSource1: 0.0016,
+    maxPaS: 0.018
+  });
+  assert.ok(active > 0);
+  assert.ok(active <= 0.018);
+
+  const tapered = computeDryingOmegaBridgePaS({
+    enabled: true,
+    dryDriver: 0.14,
+    suppressedSource: 0.0012,
+    latShape: 0.8,
+    organizedSupport: 0.18,
+    convectivePotential: 0.22,
+    neutralToSubsidingSupport: 0.8,
+    existingOmegaPaS: 0.24,
+    dry0: 0.08,
+    dry1: 0.16,
+    suppressedSource0: 0.0007,
+    suppressedSource1: 0.0016,
+    maxPaS: 0.018
+  });
+  assert.ok(tapered < active);
 });

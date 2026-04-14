@@ -72,6 +72,7 @@ let carryInputOverrideMode = 'default';
 let softLiveGatePatchMode = 'default';
 let circulationReboundPatchMode = 'default';
 let returnFlowCouplingPatchMode = 'default';
+let dryingOmegaBridgePatchMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -115,6 +116,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--circulation-rebound-patch=')) circulationReboundPatchMode = arg.slice('--circulation-rebound-patch='.length);
   else if (arg === '--return-flow-coupling-patch' && argv[i + 1]) returnFlowCouplingPatchMode = argv[++i];
   else if (arg.startsWith('--return-flow-coupling-patch=')) returnFlowCouplingPatchMode = arg.slice('--return-flow-coupling-patch='.length);
+  else if (arg === '--drying-omega-bridge-patch' && argv[i + 1]) dryingOmegaBridgePatchMode = argv[++i];
+  else if (arg.startsWith('--drying-omega-bridge-patch=')) dryingOmegaBridgePatchMode = arg.slice('--drying-omega-bridge-patch='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--trusted-baseline' && argv[i + 1]) trustedBaselinePath = path.resolve(argv[++i]);
   else if (arg.startsWith('--trusted-baseline=')) trustedBaselinePath = path.resolve(arg.slice('--trusted-baseline='.length));
@@ -1253,6 +1256,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     circulationReboundSuppressedSourceDiagFrac,
     circulationReturnFlowOpportunityDiagFrac,
     circulationReturnFlowCouplingAppliedDiagFrac,
+    dryingOmegaBridgeAppliedDiagPaS,
     subtropicalSourceDriverDiagFrac,
     subtropicalSourceDriverFloorDiagFrac,
     subtropicalLocalHemiSourceDiagFrac,
@@ -1612,6 +1616,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalCirculationReboundSuppressedSource = zonalMean(circulationReboundSuppressedSourceDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalCirculationReturnFlowOpportunity = zonalMean(circulationReturnFlowOpportunityDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalCirculationReturnFlowCouplingApplied = zonalMean(circulationReturnFlowCouplingAppliedDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalDryingOmegaBridgeApplied = zonalMean(dryingOmegaBridgeAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
   const northTransitionCirculationReboundContainmentMean = weightedBandMean(zonalCirculationReboundContainment, latitudesDeg, rowWeights, 12, 22);
   const southTransitionCirculationReboundContainmentMean = weightedBandMean(zonalCirculationReboundContainment, latitudesDeg, rowWeights, -22, -12);
   const northDryBeltCirculationReboundContainmentMean = weightedBandMean(zonalCirculationReboundContainment, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
@@ -1628,6 +1633,10 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const southDryBeltCirculationReturnFlowOpportunityMean = weightedBandMean(zonalCirculationReturnFlowOpportunity, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
   const northDryBeltCirculationReturnFlowCouplingAppliedMean = weightedBandMean(zonalCirculationReturnFlowCouplingApplied, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const southDryBeltCirculationReturnFlowCouplingAppliedMean = weightedBandMean(zonalCirculationReturnFlowCouplingApplied, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northTransitionDryingOmegaBridgeAppliedMean = weightedBandMean(zonalDryingOmegaBridgeApplied, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionDryingOmegaBridgeAppliedMean = weightedBandMean(zonalDryingOmegaBridgeApplied, latitudesDeg, rowWeights, -22, -12);
+  const northDryBeltDryingOmegaBridgeAppliedMean = weightedBandMean(zonalDryingOmegaBridgeApplied, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltDryingOmegaBridgeAppliedMean = weightedBandMean(zonalDryingOmegaBridgeApplied, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
   const zonalSubtropicalSourceDriver = zonalMean(subtropicalSourceDriverDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubtropicalSourceDriverFloor = zonalMean(subtropicalSourceDriverFloorDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubtropicalLocalHemiSource = zonalMean(subtropicalLocalHemiSourceDiagFrac || new Array(nx * ny).fill(0), nx, ny);
@@ -1844,6 +1853,10 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       southDryBeltCirculationReturnFlowOpportunityMeanFrac: round(southDryBeltCirculationReturnFlowOpportunityMean, 5),
       northDryBeltCirculationReturnFlowCouplingAppliedMeanFrac: round(northDryBeltCirculationReturnFlowCouplingAppliedMean, 5),
       southDryBeltCirculationReturnFlowCouplingAppliedMeanFrac: round(southDryBeltCirculationReturnFlowCouplingAppliedMean, 5),
+      northTransitionDryingOmegaBridgeAppliedMeanPaS: round(northTransitionDryingOmegaBridgeAppliedMean, 5),
+      southTransitionDryingOmegaBridgeAppliedMeanPaS: round(southTransitionDryingOmegaBridgeAppliedMean, 5),
+      northDryBeltDryingOmegaBridgeAppliedMeanPaS: round(northDryBeltDryingOmegaBridgeAppliedMean, 5),
+      southDryBeltDryingOmegaBridgeAppliedMeanPaS: round(southDryBeltDryingOmegaBridgeAppliedMean, 5),
       northTransitionSubtropicalSourceDriverMeanFrac: round(northTransitionSubtropicalSourceDriverMean, 5),
       southTransitionSubtropicalSourceDriverMeanFrac: round(southTransitionSubtropicalSourceDriverMean, 5),
       northDryBeltSubtropicalSourceDriverMeanFrac: round(northDryBeltSubtropicalSourceDriverMean, 5),
@@ -4732,6 +4745,8 @@ export async function main() {
   else if (circulationReboundPatchMode === 'on') core.vertParams.enableCirculationReboundContainment = true;
   if (returnFlowCouplingPatchMode === 'off') core.vertParams.enableTransitionReturnFlowCoupling = false;
   else if (returnFlowCouplingPatchMode === 'on') core.vertParams.enableTransitionReturnFlowCoupling = true;
+  if (dryingOmegaBridgePatchMode === 'off') core.vertParams.enableDryingOmegaBridge = false;
+  else if (dryingOmegaBridgePatchMode === 'on') core.vertParams.enableDryingOmegaBridge = true;
   if (softLiveGatePatchMode === 'off') core.microParams.enableSoftLiveStateMaintenanceSuppression = false;
   else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
   const terrainFallback = applyHeadlessTerrainFixture(core);
