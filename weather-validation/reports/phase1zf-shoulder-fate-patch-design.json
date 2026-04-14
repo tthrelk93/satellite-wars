@@ -1,0 +1,385 @@
+{
+  "schema": "satellite-wars.phase1zf-shoulder-fate-patch-design.v1",
+  "generatedAt": "2026-04-14T08:36:24.168Z",
+  "paths": {
+    "summaryPath": "weather-validation/reports/phase1ze-suppressed-mass-fate-counterfactuals.json",
+    "offPath": "/tmp/phase1ze-off.json",
+    "candidatePath": "/tmp/phase1ze-buffered.json",
+    "reportPath": "weather-validation/reports/phase1zf-shoulder-fate-patch-design.md",
+    "jsonPath": "weather-validation/reports/phase1zf-shoulder-fate-patch-design.json"
+  },
+  "verdict": "equatorial_edge_buffered_underreach",
+  "nextPhase": "Phase 1ZG: Implement Equatorial-Edge Buffered Shoulder Fate Patch",
+  "winner": {
+    "key": "buffered_rainout",
+    "label": "Buffered rainout",
+    "score": 0.98969,
+    "exitCriteriaPass": false,
+    "exitCriteria": {
+      "shoulderCoreCondensationPass": false,
+      "spilloverPass": true,
+      "targetEntryPass": true,
+      "itczGuardrailPass": true,
+      "dryNorthGuardrailPass": true,
+      "drySouthGuardrailPass": true
+    },
+    "metrics": {
+      "itczWidthDeg": 25.792,
+      "subtropicalDryNorthRatio": 1.475,
+      "subtropicalDrySouthRatio": 1.183,
+      "midlatitudeWesterliesNorthU10Ms": 0.531
+    },
+    "deltas": {
+      "itczWidthDeg": -0.042,
+      "subtropicalDryNorthRatio": -0.04,
+      "subtropicalDrySouthRatio": -0.009,
+      "tropicalShoulderCoreCondensationKgM2": 0.00099,
+      "shoulderSpilloverKgM2": -0.01452,
+      "targetEntryAppliedSuppressionKgM2": 0
+    },
+    "fateDiagnostics": {
+      "retainedVaporKgM2": 0,
+      "sinkExportKgM2": 0,
+      "bufferedRainoutKgM2": 0.01403
+    }
+  },
+  "ranking": [
+    {
+      "key": "buffered_rainout",
+      "label": "Buffered rainout",
+      "score": 0.98969,
+      "exitCriteriaPass": false,
+      "exitCriteria": {
+        "shoulderCoreCondensationPass": false,
+        "spilloverPass": true,
+        "targetEntryPass": true,
+        "itczGuardrailPass": true,
+        "dryNorthGuardrailPass": true,
+        "drySouthGuardrailPass": true
+      },
+      "metrics": {
+        "itczWidthDeg": 25.792,
+        "subtropicalDryNorthRatio": 1.475,
+        "subtropicalDrySouthRatio": 1.183,
+        "midlatitudeWesterliesNorthU10Ms": 0.531
+      },
+      "deltas": {
+        "itczWidthDeg": -0.042,
+        "subtropicalDryNorthRatio": -0.04,
+        "subtropicalDrySouthRatio": -0.009,
+        "tropicalShoulderCoreCondensationKgM2": 0.00099,
+        "shoulderSpilloverKgM2": -0.01452,
+        "targetEntryAppliedSuppressionKgM2": 0
+      },
+      "fateDiagnostics": {
+        "retainedVaporKgM2": 0,
+        "sinkExportKgM2": 0,
+        "bufferedRainoutKgM2": 0.01403
+      }
+    },
+    {
+      "key": "sink_export",
+      "label": "Capped local sink/export",
+      "score": 0.83333,
+      "exitCriteriaPass": false,
+      "exitCriteria": {
+        "shoulderCoreCondensationPass": true,
+        "spilloverPass": true,
+        "targetEntryPass": true,
+        "itczGuardrailPass": true,
+        "dryNorthGuardrailPass": true,
+        "drySouthGuardrailPass": false
+      },
+      "metrics": {
+        "itczWidthDeg": 25.489,
+        "subtropicalDryNorthRatio": 1.367,
+        "subtropicalDrySouthRatio": 1.297,
+        "midlatitudeWesterliesNorthU10Ms": 0.531
+      },
+      "deltas": {
+        "itczWidthDeg": -0.345,
+        "subtropicalDryNorthRatio": -0.148,
+        "subtropicalDrySouthRatio": 0.105,
+        "tropicalShoulderCoreCondensationKgM2": -0.01967,
+        "shoulderSpilloverKgM2": -0.03469,
+        "targetEntryAppliedSuppressionKgM2": 0
+      },
+      "fateDiagnostics": {
+        "retainedVaporKgM2": 0,
+        "sinkExportKgM2": 0.00802,
+        "bufferedRainoutKgM2": 0
+      }
+    },
+    {
+      "key": "retain",
+      "label": "In-place vapor retention",
+      "score": 0.17051,
+      "exitCriteriaPass": false,
+      "exitCriteria": {
+        "shoulderCoreCondensationPass": false,
+        "spilloverPass": false,
+        "targetEntryPass": true,
+        "itczGuardrailPass": false,
+        "dryNorthGuardrailPass": false,
+        "drySouthGuardrailPass": false
+      },
+      "metrics": {
+        "itczWidthDeg": 25.89,
+        "subtropicalDryNorthRatio": 1.527,
+        "subtropicalDrySouthRatio": 1.197,
+        "midlatitudeWesterliesNorthU10Ms": 0.531
+      },
+      "deltas": {
+        "itczWidthDeg": 0.056,
+        "subtropicalDryNorthRatio": 0.012,
+        "subtropicalDrySouthRatio": 0.005,
+        "tropicalShoulderCoreCondensationKgM2": 0.01603,
+        "shoulderSpilloverKgM2": 0.00635,
+        "targetEntryAppliedSuppressionKgM2": 0
+      },
+      "fateDiagnostics": {
+        "retainedVaporKgM2": 0.01858,
+        "sinkExportKgM2": 0,
+        "bufferedRainoutKgM2": 0
+      }
+    }
+  ],
+  "designChoice": {
+    "baseFate": "buffered_rainout",
+    "rejectedAlternatives": [
+      {
+        "key": "sink_export",
+        "reason": "It fixes the shoulder-core condensation and spillover strongly, but it breaks the south dry-belt guardrail."
+      },
+      {
+        "key": "retain",
+        "reason": "It preserves the current in-place vapor recharge failure and therefore is no longer a serious candidate."
+      }
+    ],
+    "requiredPatchTraits": [
+      "keep buffered rainout as the suppressed-mass fate",
+      "increase effective buffered application specifically in the 3–6°N equatorial-edge shoulder lane",
+      "do not reopen the 30–45°N target-entry lane",
+      "do not expand application into the 18.75°N spillover lane",
+      "reallocate shoulder suppression toward 3.75°N before increasing total amplitude"
+    ]
+  },
+  "evidence": {
+    "buffered": {
+      "key": "buffered_rainout",
+      "label": "Buffered rainout",
+      "score": 0.98969,
+      "exitCriteriaPass": false,
+      "exitCriteria": {
+        "shoulderCoreCondensationPass": false,
+        "spilloverPass": true,
+        "targetEntryPass": true,
+        "itczGuardrailPass": true,
+        "dryNorthGuardrailPass": true,
+        "drySouthGuardrailPass": true
+      },
+      "metrics": {
+        "itczWidthDeg": 25.792,
+        "subtropicalDryNorthRatio": 1.475,
+        "subtropicalDrySouthRatio": 1.183,
+        "midlatitudeWesterliesNorthU10Ms": 0.531
+      },
+      "deltas": {
+        "itczWidthDeg": -0.042,
+        "subtropicalDryNorthRatio": -0.04,
+        "subtropicalDrySouthRatio": -0.009,
+        "tropicalShoulderCoreCondensationKgM2": 0.00099,
+        "shoulderSpilloverKgM2": -0.01452,
+        "targetEntryAppliedSuppressionKgM2": 0
+      },
+      "fateDiagnostics": {
+        "retainedVaporKgM2": 0,
+        "sinkExportKgM2": 0,
+        "bufferedRainoutKgM2": 0.01403
+      }
+    },
+    "sink": {
+      "key": "sink_export",
+      "label": "Capped local sink/export",
+      "score": 0.83333,
+      "exitCriteriaPass": false,
+      "exitCriteria": {
+        "shoulderCoreCondensationPass": true,
+        "spilloverPass": true,
+        "targetEntryPass": true,
+        "itczGuardrailPass": true,
+        "dryNorthGuardrailPass": true,
+        "drySouthGuardrailPass": false
+      },
+      "metrics": {
+        "itczWidthDeg": 25.489,
+        "subtropicalDryNorthRatio": 1.367,
+        "subtropicalDrySouthRatio": 1.297,
+        "midlatitudeWesterliesNorthU10Ms": 0.531
+      },
+      "deltas": {
+        "itczWidthDeg": -0.345,
+        "subtropicalDryNorthRatio": -0.148,
+        "subtropicalDrySouthRatio": 0.105,
+        "tropicalShoulderCoreCondensationKgM2": -0.01967,
+        "shoulderSpilloverKgM2": -0.03469,
+        "targetEntryAppliedSuppressionKgM2": 0
+      },
+      "fateDiagnostics": {
+        "retainedVaporKgM2": 0,
+        "sinkExportKgM2": 0.00802,
+        "bufferedRainoutKgM2": 0
+      }
+    },
+    "retain": {
+      "key": "retain",
+      "label": "In-place vapor retention",
+      "score": 0.17051,
+      "exitCriteriaPass": false,
+      "exitCriteria": {
+        "shoulderCoreCondensationPass": false,
+        "spilloverPass": false,
+        "targetEntryPass": true,
+        "itczGuardrailPass": false,
+        "dryNorthGuardrailPass": false,
+        "drySouthGuardrailPass": false
+      },
+      "metrics": {
+        "itczWidthDeg": 25.89,
+        "subtropicalDryNorthRatio": 1.527,
+        "subtropicalDrySouthRatio": 1.197,
+        "midlatitudeWesterliesNorthU10Ms": 0.531
+      },
+      "deltas": {
+        "itczWidthDeg": 0.056,
+        "subtropicalDryNorthRatio": 0.012,
+        "subtropicalDrySouthRatio": 0.005,
+        "tropicalShoulderCoreCondensationKgM2": 0.01603,
+        "shoulderSpilloverKgM2": 0.00635,
+        "targetEntryAppliedSuppressionKgM2": 0
+      },
+      "fateDiagnostics": {
+        "retainedVaporKgM2": 0.01858,
+        "sinkExportKgM2": 0,
+        "bufferedRainoutKgM2": 0
+      }
+    },
+    "equatorialEdge": {
+      "latitudeDeg": 3.75,
+      "off": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.07641,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "totalColumnWaterKgM2": 43.876,
+        "lowerTroposphericRhFrac": 0.47,
+        "midTroposphericRhFrac": 0.439
+      },
+      "on": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.08408,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.00781,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0.00781,
+        "totalColumnWaterKgM2": 43.681,
+        "lowerTroposphericRhFrac": 0.469,
+        "midTroposphericRhFrac": 0.438
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": 0.00767,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.00781,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0.00781,
+        "totalColumnWaterKgM2": -0.195,
+        "lowerTroposphericRhFrac": -0.001,
+        "midTroposphericRhFrac": -0.001
+      }
+    },
+    "innerShoulder": {
+      "latitudeDeg": 11.25,
+      "off": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.12779,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "totalColumnWaterKgM2": 43.119,
+        "lowerTroposphericRhFrac": 0.414,
+        "midTroposphericRhFrac": 0.4
+      },
+      "on": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.1221,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.02025,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0.02025,
+        "totalColumnWaterKgM2": 42.703,
+        "lowerTroposphericRhFrac": 0.404,
+        "midTroposphericRhFrac": 0.389
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": -0.00569,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.02025,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0.02025,
+        "totalColumnWaterKgM2": -0.416,
+        "lowerTroposphericRhFrac": -0.01,
+        "midTroposphericRhFrac": -0.011
+      }
+    },
+    "spillover": {
+      "latitudeDeg": 18.75,
+      "off": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.10309,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "totalColumnWaterKgM2": 38.233,
+        "lowerTroposphericRhFrac": 0.356,
+        "midTroposphericRhFrac": 0.377
+      },
+      "on": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.08857,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "totalColumnWaterKgM2": 36.925,
+        "lowerTroposphericRhFrac": 0.34,
+        "midTroposphericRhFrac": 0.353
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": -0.01452,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "totalColumnWaterKgM2": -1.308,
+        "lowerTroposphericRhFrac": -0.016,
+        "midTroposphericRhFrac": -0.024
+      }
+    },
+    "targetEntry": {
+      "latitudeDeg": 33.75,
+      "off": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.18497,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "totalColumnWaterKgM2": 30.909,
+        "lowerTroposphericRhFrac": 0.658,
+        "midTroposphericRhFrac": 0.604
+      },
+      "on": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.17247,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "totalColumnWaterKgM2": 30.694,
+        "lowerTroposphericRhFrac": 0.653,
+        "midTroposphericRhFrac": 0.591
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": -0.0125,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "totalColumnWaterKgM2": -0.215,
+        "lowerTroposphericRhFrac": -0.005,
+        "midTroposphericRhFrac": -0.013
+      }
+    }
+  },
+  "recommendation": "Buffered rainout is the right fate family, but the live patch needs an equatorial-edge allocation redesign so 3.75°N is suppressed harder without borrowing climate stability from sink/export."
+}

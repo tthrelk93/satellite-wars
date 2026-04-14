@@ -132,6 +132,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
     enableShoulderAbsorptionGuard = false,
     shoulderAbsorptionGuardScale = 1.6,
     shoulderAbsorptionGuardMaxFrac = 0.2,
+    shoulderAbsorptionGuardSuppressedMassMode = 'retain',
     enable = true
   } = params;
   if (!enable) return;
@@ -257,6 +258,15 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   if (!state.saturationAdjustmentShoulderGuardAppliedSuppressionMass || state.saturationAdjustmentShoulderGuardAppliedSuppressionMass.length !== N) {
     state.saturationAdjustmentShoulderGuardAppliedSuppressionMass = new Float32Array(N);
   }
+  if (!state.saturationAdjustmentShoulderGuardRetainedVaporMass || state.saturationAdjustmentShoulderGuardRetainedVaporMass.length !== N) {
+    state.saturationAdjustmentShoulderGuardRetainedVaporMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentShoulderGuardSinkExportMass || state.saturationAdjustmentShoulderGuardSinkExportMass.length !== N) {
+    state.saturationAdjustmentShoulderGuardSinkExportMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentShoulderGuardBufferedRainoutMass || state.saturationAdjustmentShoulderGuardBufferedRainoutMass.length !== N) {
+    state.saturationAdjustmentShoulderGuardBufferedRainoutMass = new Float32Array(N);
+  }
   if (!state.weakAscentCloudBirthAccumMass || state.weakAscentCloudBirthAccumMass.length !== N) {
     state.weakAscentCloudBirthAccumMass = new Float32Array(N);
   }
@@ -335,6 +345,9 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   state.saturationAdjustmentShoulderGuardBandWindowMassWeighted.fill(0);
   state.saturationAdjustmentShoulderGuardSelectorSupportMassWeighted.fill(0);
   state.saturationAdjustmentShoulderGuardAppliedSuppressionMass.fill(0);
+  state.saturationAdjustmentShoulderGuardRetainedVaporMass.fill(0);
+  state.saturationAdjustmentShoulderGuardSinkExportMass.fill(0);
+  state.saturationAdjustmentShoulderGuardBufferedRainoutMass.fill(0);
   state.microphysicsUpperCloudSaturationBirthMass.fill(0);
   state.microphysicsUpperCloudCloudReevaporationMass.fill(0);
   state.microphysicsUpperCloudPrecipReevaporationMass.fill(0);
@@ -691,6 +704,26 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
           ? shoulderGuardSuppressionFrac
           : 0;
         const dqSuppressed = dqRaw * combinedSuppressionFrac;
+        const dqShoulderSuppressed = dqRaw * effectiveShoulderGuardSuppressionFrac;
+        const shoulderSuppressedMassMode = shoulderAbsorptionGuardSuppressedMassMode === 'sink_export'
+          ? 'sink_export'
+          : shoulderAbsorptionGuardSuppressedMassMode === 'buffered_rainout'
+            ? 'buffered_rainout'
+            : 'retain';
+        if (dqShoulderSuppressed > 0) {
+          if (shoulderSuppressedMassMode === 'sink_export') {
+            qvVal -= dqShoulderSuppressed;
+          } else if (shoulderSuppressedMassMode === 'buffered_rainout') {
+            qvVal -= dqShoulderSuppressed;
+            if (iceFrac > 0.5) {
+              qsVal += dqShoulderSuppressed;
+              thetaVal = applyThetaLatent(thetaVal, dqShoulderSuppressed, Ls, Pi);
+            } else {
+              qrVal += dqShoulderSuppressed;
+              thetaVal = applyThetaLatent(thetaVal, dqShoulderSuppressed, Lv, Pi);
+            }
+          }
+        }
         let dq = dqRaw - dqSuppressed;
         if (dq > 0) {
           qvVal -= dq;
@@ -698,7 +731,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
             const condMass = dq * massCell;
             const condMassRaw = dqRaw * massCell;
             const condSuppressedMass = dqSuppressed * massCell;
-            const condShoulderSuppressedMass = dqRaw * effectiveShoulderGuardSuppressionFrac * massCell;
+            const condShoulderSuppressedMass = dqShoulderSuppressed * massCell;
             const numericalBandIndex = findInstrumentationLevelBandIndex(sigmaMid);
             state.largeScaleCondensationSource[k] += condMass;
             if (isOceanColumn) {
@@ -743,6 +776,13 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               state.saturationAdjustmentShoulderGuardBandWindowMassWeighted[k] += shoulderBandWindowSupport * condMassRaw;
               state.saturationAdjustmentShoulderGuardSelectorSupportMassWeighted[k] += shoulderSelectorSupport * condMassRaw;
               state.saturationAdjustmentShoulderGuardAppliedSuppressionMass[k] += condShoulderSuppressedMass;
+              if (shoulderSuppressedMassMode === 'sink_export') {
+                state.saturationAdjustmentShoulderGuardSinkExportMass[k] += condShoulderSuppressedMass;
+              } else if (shoulderSuppressedMassMode === 'buffered_rainout') {
+                state.saturationAdjustmentShoulderGuardBufferedRainoutMass[k] += condShoulderSuppressedMass;
+              } else {
+                state.saturationAdjustmentShoulderGuardRetainedVaporMass[k] += condShoulderSuppressedMass;
+              }
             }
             if (isUpperCloudSigma(sigmaMid)) {
               state.microphysicsUpperCloudSaturationBirthMass[k] += condMass;

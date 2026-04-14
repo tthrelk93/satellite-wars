@@ -139,6 +139,9 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const saturationAdjustmentShoulderGuardBandWindowMassWeighted = makeArray(N);
   const saturationAdjustmentShoulderGuardSelectorSupportMassWeighted = makeArray(N);
   const saturationAdjustmentShoulderGuardAppliedSuppressionMass = makeArray(N);
+  const saturationAdjustmentShoulderGuardRetainedVaporMass = makeArray(N);
+  const saturationAdjustmentShoulderGuardSinkExportMass = makeArray(N);
+  const saturationAdjustmentShoulderGuardBufferedRainoutMass = makeArray(N);
   const weakAscentCloudBirthAccumMass = makeArray(N);
   const strongAscentCloudBirthAccumMass = makeArray(N);
   const resolvedAscentCloudBirthByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
@@ -407,6 +410,9 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     saturationAdjustmentShoulderGuardBandWindowMassWeighted,
     saturationAdjustmentShoulderGuardSelectorSupportMassWeighted,
     saturationAdjustmentShoulderGuardAppliedSuppressionMass,
+    saturationAdjustmentShoulderGuardRetainedVaporMass,
+    saturationAdjustmentShoulderGuardSinkExportMass,
+    saturationAdjustmentShoulderGuardBufferedRainoutMass,
     weakAscentCloudBirthAccumMass,
     strongAscentCloudBirthAccumMass,
     resolvedAscentCloudBirthByBandMass,

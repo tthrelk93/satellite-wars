@@ -388,6 +388,75 @@ test('microphysics shoulder absorption guard excludes target-entry columns when 
   assert.equal(targetEntryLane.saturationAdjustmentShoulderGuardAppliedSuppressionMass[0], 0);
 });
 
+test('microphysics shoulder fate modes either retain, sink, or buffer suppressed mass', () => {
+  const makeState = () => {
+    const state = setupState(279);
+    state.qv.fill(0.002);
+    state.qc.fill(0);
+    state.qi.fill(0);
+    state.qr.fill(0);
+    state.qs.fill(0);
+    state.landMask[0] = 0;
+    state.convectiveOrganization[0] = 0.05;
+    state.convectiveMassFlux[0] = 2e-4;
+    state.convectiveAnvilSource[0] = 0.02;
+    state.subtropicalSubsidenceDrying[0] = 0.0;
+    state.freshSubtropicalSuppressionDiag[0] = 0.12;
+    state.freshSubtropicalBandDiag[0] = 0.18;
+    state.freshShoulderLatitudeWindowDiag[0] = 1;
+    state.freshShoulderTargetEntryExclusionDiag[0] = 0;
+    state.freshNeutralToSubsidingSupportDiag[0] = 0.62;
+    state.freshOrganizedSupportDiag[0] = 0.16;
+    state.freshRhMidSupportDiag[0] = 0.9;
+    state.dryingOmegaBridgeAppliedDiag[0] = 0;
+    state.omega.fill(0.06);
+    state.qv[1] = 0.011;
+    return state;
+  };
+
+  const retain = makeState();
+  const sink = makeState();
+  const buffered = makeState();
+
+  stepMicrophysics5({
+    dt: 900,
+    state: retain,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: false,
+      enableShoulderAbsorptionGuard: true,
+      shoulderAbsorptionGuardSuppressedMassMode: 'retain'
+    }
+  });
+  stepMicrophysics5({
+    dt: 900,
+    state: sink,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: false,
+      enableShoulderAbsorptionGuard: true,
+      shoulderAbsorptionGuardSuppressedMassMode: 'sink_export'
+    }
+  });
+  stepMicrophysics5({
+    dt: 900,
+    state: buffered,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: false,
+      enableShoulderAbsorptionGuard: true,
+      shoulderAbsorptionGuardSuppressedMassMode: 'buffered_rainout'
+    }
+  });
+
+  assert.ok(retain.saturationAdjustmentShoulderGuardRetainedVaporMass[0] > 0);
+  assert.ok(sink.saturationAdjustmentShoulderGuardSinkExportMass[0] > 0);
+  assert.ok(buffered.saturationAdjustmentShoulderGuardBufferedRainoutMass[0] > 0);
+  assert.ok(sink.qv[1] < retain.qv[1]);
+  assert.ok(buffered.qv[1] < retain.qv[1]);
+  assert.ok(buffered.qr[1] > retain.qr[1] || buffered.qs[1] > retain.qs[1]);
+});
+
 test('microphysics populates the upper-cloud handoff ledger and closes the upper-cloud budget', () => {
   const state = setupState(248);
   state.qv.fill(0.006);

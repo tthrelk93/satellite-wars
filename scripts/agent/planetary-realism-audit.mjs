@@ -71,6 +71,7 @@ let trustedBaselinePath = null;
 let carryInputOverrideMode = 'default';
 let softLiveGatePatchMode = 'default';
 let shoulderAbsorptionGuardPatchMode = 'default';
+let shoulderGuardFateMode = 'retain';
 let circulationReboundPatchMode = 'default';
 let returnFlowCouplingPatchMode = 'default';
 let dryingOmegaBridgePatchMode = 'default';
@@ -115,6 +116,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--soft-live-gate-patch=')) softLiveGatePatchMode = arg.slice('--soft-live-gate-patch='.length);
   else if (arg === '--shoulder-absorption-guard-patch' && argv[i + 1]) shoulderAbsorptionGuardPatchMode = argv[++i];
   else if (arg.startsWith('--shoulder-absorption-guard-patch=')) shoulderAbsorptionGuardPatchMode = arg.slice('--shoulder-absorption-guard-patch='.length);
+  else if (arg === '--shoulder-guard-fate-mode' && argv[i + 1]) shoulderGuardFateMode = argv[++i];
+  else if (arg.startsWith('--shoulder-guard-fate-mode=')) shoulderGuardFateMode = arg.slice('--shoulder-guard-fate-mode='.length);
   else if (arg === '--circulation-rebound-patch' && argv[i + 1]) circulationReboundPatchMode = argv[++i];
   else if (arg.startsWith('--circulation-rebound-patch=')) circulationReboundPatchMode = arg.slice('--circulation-rebound-patch='.length);
   else if (arg === '--return-flow-coupling-patch' && argv[i + 1]) returnFlowCouplingPatchMode = argv[++i];
@@ -159,6 +162,11 @@ shoulderAbsorptionGuardPatchMode = shoulderAbsorptionGuardPatchMode === 'off'
   : shoulderAbsorptionGuardPatchMode === 'on'
     ? 'on'
     : 'default';
+shoulderGuardFateMode = shoulderGuardFateMode === 'sink_export'
+  ? 'sink_export'
+  : shoulderGuardFateMode === 'buffered_rainout'
+    ? 'buffered_rainout'
+    : 'retain';
 circulationReboundPatchMode = circulationReboundPatchMode === 'off'
   ? 'off'
   : circulationReboundPatchMode === 'on'
@@ -579,6 +587,7 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
     carryInputOverrideMode,
     softLiveGatePatchMode,
     shoulderAbsorptionGuardPatchMode,
+    shoulderGuardFateMode,
     circulationReboundPatchMode,
     instrumentationMode: core.getInstrumentationMode ? core.getInstrumentationMode() : instrumentationMode,
     sampleTargetsDays,
@@ -1228,6 +1237,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     saturationAdjustmentShoulderGuardBandWindowMassWeighted,
     saturationAdjustmentShoulderGuardSelectorSupportMassWeighted,
     saturationAdjustmentShoulderGuardAppliedSuppressionMassKgM2,
+    saturationAdjustmentShoulderGuardRetainedVaporMassKgM2,
+    saturationAdjustmentShoulderGuardSinkExportMassKgM2,
+    saturationAdjustmentShoulderGuardBufferedRainoutMassKgM2,
     cloudReevaporationMassKgM2,
     precipReevaporationMassKgM2,
     importedAnvilPersistenceMassKgM2,
@@ -1336,6 +1348,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalShoulderGuardBandWindow = zonalMean(saturationAdjustmentShoulderGuardBandWindowMassWeighted || new Array(nx * ny).fill(0), nx, ny);
   const zonalShoulderGuardSelectorSupport = zonalMean(saturationAdjustmentShoulderGuardSelectorSupportMassWeighted || new Array(nx * ny).fill(0), nx, ny);
   const zonalShoulderGuardAppliedSuppression = zonalMean(saturationAdjustmentShoulderGuardAppliedSuppressionMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalShoulderGuardRetainedVapor = zonalMean(saturationAdjustmentShoulderGuardRetainedVaporMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalShoulderGuardSinkExport = zonalMean(saturationAdjustmentShoulderGuardSinkExportMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalShoulderGuardBufferedRainout = zonalMean(saturationAdjustmentShoulderGuardBufferedRainoutMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalCloudReevaporation = zonalMean(cloudReevaporationMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalPrecipReevaporation = zonalMean(precipReevaporationMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalImportedAnvilPersistence = zonalMean(importedAnvilPersistenceMassKgM2 || new Array(nx * ny).fill(0), nx, ny);
@@ -2137,6 +2152,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         shoulderAbsorptionGuardBandWindowFrac: roundSeries(zonalShoulderGuardBandWindow, 5),
         shoulderAbsorptionGuardSelectorSupportFrac: roundSeries(zonalShoulderGuardSelectorSupport, 5),
         shoulderAbsorptionGuardAppliedSuppressionKgM2: roundSeries(zonalShoulderGuardAppliedSuppression, 5),
+        shoulderAbsorptionGuardRetainedVaporKgM2: roundSeries(zonalShoulderGuardRetainedVapor, 5),
+        shoulderAbsorptionGuardSinkExportKgM2: roundSeries(zonalShoulderGuardSinkExport, 5),
+        shoulderAbsorptionGuardBufferedRainoutKgM2: roundSeries(zonalShoulderGuardBufferedRainout, 5),
         cloudReevaporationMassKgM2: roundSeries(zonalCloudReevaporation, 5),
         precipReevaporationMassKgM2: roundSeries(zonalPrecipReevaporation, 5),
         importedAnvilPersistenceMassKgM2: roundSeries(zonalImportedAnvilPersistence, 5),
@@ -4894,6 +4912,7 @@ export async function main() {
   else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
   if (shoulderAbsorptionGuardPatchMode === 'off') core.microParams.enableShoulderAbsorptionGuard = false;
   else if (shoulderAbsorptionGuardPatchMode === 'on') core.microParams.enableShoulderAbsorptionGuard = true;
+  core.microParams.shoulderAbsorptionGuardSuppressedMassMode = shoulderGuardFateMode;
   const terrainFallback = applyHeadlessTerrainFixture(core);
   const configSnapshot = cloneConfigSnapshot(core);
   const { samples, timingByTarget, horizonSummaries } = advanceAndSampleCore({ core, sampleTargetsDays });

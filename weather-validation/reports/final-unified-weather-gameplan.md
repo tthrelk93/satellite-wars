@@ -1249,6 +1249,45 @@ Exit criteria:
 - fixed `33.75°N` target-entry exclusion stays intact
 - ITCZ width and dry-belt ratios do not worsen versus the current kept branch
 
+Status:
+- complete in [phase1ze-suppressed-mass-fate-counterfactuals.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1ze-suppressed-mass-fate-counterfactuals.md)
+- verdict: `no_counterfactual_clears_gate`
+- `buffered_rainout` is the best current fate family:
+  - score: `0.98969`
+  - shoulder-core delta: `+0.00099 kg/m²`
+  - spillover delta: `-0.01452 kg/m²`
+  - dry south delta: `-0.009`
+- `sink_export` fixes the shoulder more aggressively, but fails the south dry-belt guardrail:
+  - shoulder-core delta: `-0.01967 kg/m²`
+  - spillover delta: `-0.03469 kg/m²`
+  - dry south delta: `+0.105`
+- `retain` remains the losing baseline and preserves the known recharge failure
+
+### Phase 1ZF: Shoulder Fate Patch Design
+
+Objective:
+- turn the Phase 1ZE counterfactual result into a patch-ready design, using `buffered_rainout` as the base fate while fixing the remaining equatorial-edge shoulder miss
+
+Primary files:
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+
+Questions to answer:
+- why does the best `buffered_rainout` mode still leave `3.75°N` positive while `11.25°N` and `18.75°N` already improve?
+- how do we shift buffered application toward `3-6°N` without reopening the fixed `30-45°N` target-entry lane?
+- can we reallocate shoulder suppression equatorward before increasing total amplitude?
+
+Status:
+- complete in [phase1zf-shoulder-fate-patch-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zf-shoulder-fate-patch-design.md)
+- verdict: `equatorial_edge_buffered_underreach`
+- next active phase: `Phase 1ZG: Implement Equatorial-Edge Buffered Shoulder Fate Patch`
+- current design contract:
+  - keep `buffered_rainout` as the suppressed-mass fate
+  - increase effective buffered application specifically in the `3-6°N` equatorial-edge shoulder lane
+  - do not reopen the `30-45°N` target-entry lane
+  - do not expand application into the `18.75°N` spillover lane
+  - reallocate shoulder suppression toward `3.75°N` before increasing total amplitude
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
