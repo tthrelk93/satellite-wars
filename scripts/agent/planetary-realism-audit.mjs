@@ -1237,6 +1237,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     surfaceCloudShortwaveShieldingWm2,
     lowLevelMoistureSourceTracersKgM2,
     lowLevelMoistureConvergenceS_1,
+    lowLevelOmegaEffectivePaS,
     lowerTroposphericRhFrac,
     subtropicalSubsidenceDryingFrac,
     freshPotentialTargetDiagFrac,
@@ -1325,6 +1326,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalUpperCloudNetCloudRadiativeEffect = zonalMean(upperCloudNetCloudRadiativeEffectWm2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalSurfaceCloudShielding = zonalMean(surfaceCloudShortwaveShieldingWm2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalMoistureConvergence = zonalMean(lowLevelMoistureConvergenceS_1 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalLowLevelOmegaEffective = zonalMean(lowLevelOmegaEffectivePaS || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSurfaceEvap = zonalMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny);
@@ -1355,6 +1357,12 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const tropicalMoistureConvergence = weightedBandMean(zonalMoistureConvergence, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
   const subtropicalRhNorth = weightedBandMean(zonalLowerRh, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const subtropicalRhSouth = weightedBandMean(zonalLowerRh, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northTransitionLowLevelOmegaEffective = weightedBandMean(zonalLowLevelOmegaEffective, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionLowLevelOmegaEffective = weightedBandMean(zonalLowLevelOmegaEffective, latitudesDeg, rowWeights, -22, -12);
+  const northDryBeltLowLevelOmegaEffective = weightedBandMean(zonalLowLevelOmegaEffective, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltLowLevelOmegaEffective = weightedBandMean(zonalLowLevelOmegaEffective, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northTransitionSubsidenceDrying = weightedBandMean(zonalSubsidenceDrying, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionSubsidenceDrying = weightedBandMean(zonalSubsidenceDrying, latitudesDeg, rowWeights, -22, -12);
   const subtropicalSubsidenceNorth = weightedBandMean(zonalSubsidenceDrying, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const subtropicalSubsidenceSouth = weightedBandMean(zonalSubsidenceDrying, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
   const tropicalUpperDetrainment = weightedBandMean(zonalDetrainment, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
@@ -1816,6 +1824,14 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       southTransitionCirculationReboundRawSourceMeanFrac: round(southTransitionCirculationReboundRawSourceMean, 5),
       northTransitionCirculationReboundSuppressedSourceMeanFrac: round(northTransitionCirculationReboundSuppressedSourceMean, 5),
       southTransitionCirculationReboundSuppressedSourceMeanFrac: round(southTransitionCirculationReboundSuppressedSourceMean, 5),
+      northTransitionSubtropicalSubsidenceDryingMeanFrac: round(northTransitionSubsidenceDrying, 5),
+      southTransitionSubtropicalSubsidenceDryingMeanFrac: round(southTransitionSubsidenceDrying, 5),
+      northDryBeltSubtropicalSubsidenceDryingMeanFrac: round(subtropicalSubsidenceNorth, 5),
+      southDryBeltSubtropicalSubsidenceDryingMeanFrac: round(subtropicalSubsidenceSouth, 5),
+      northTransitionLowLevelOmegaEffectiveMeanPaS: round(northTransitionLowLevelOmegaEffective, 5),
+      southTransitionLowLevelOmegaEffectiveMeanPaS: round(southTransitionLowLevelOmegaEffective, 5),
+      northDryBeltLowLevelOmegaEffectiveMeanPaS: round(northDryBeltLowLevelOmegaEffective, 5),
+      southDryBeltLowLevelOmegaEffectiveMeanPaS: round(southDryBeltLowLevelOmegaEffective, 5),
       northTransitionCirculationReboundSuppressedSourceShareMeanFrac: round(
         northTransitionCirculationReboundSuppressedSourceMean / Math.max(1e-6, northTransitionCirculationReboundRawSourceMean),
         5

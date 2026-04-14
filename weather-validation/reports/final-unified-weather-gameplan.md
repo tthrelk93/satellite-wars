@@ -742,6 +742,41 @@ Exit criteria:
 - one dominant downstream carrier mismatch is identified
 - the next circulation patch is placed at that carrier, not at the already-rejected source reinjection lane
 
+Result:
+- complete
+- see [phase1q-return-flow-carrier-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1q-return-flow-carrier-attribution.md)
+- the dominant downstream carrier mismatch is now:
+  - `drying_to_omega_response_failure`
+- same-branch `off -> on` compare says:
+  - `northDryBeltCirculationReturnFlowCouplingAppliedMeanFrac: 0 -> 0.00975`
+  - `sourceDriverDeltaMeanFrac = 0.00111`
+  - `dryingDeltaMeanFrac = 0.01437`
+  - `omegaDeltaMeanPaS = -0.0003`
+  - `midlatitudeWesterliesNorthDeltaMs = 0`
+
+Conclusion:
+- the current transition / source lane is strong enough to perturb subtropical drying
+- that drying is not turning into a stronger low-level omega response
+- the next patch lane should therefore move to the drying-to-omega bridge in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js) and [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js), not back to source reinjection
+
+### Phase 1R: Omega Response Patch Design
+
+Objective:
+- make the already-improved transition / drying lane produce a meaningful low-level omega response in the NH dry belt and transition zone
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+
+Design rule:
+- treat this as a bridge patch, not a broader circulation retune
+- preserve the kept Phase 1K marine-maintenance win and the kept Phase 1M transition-containment win
+- do not reactivate the rejected Phase 1P reinjection lane as the primary lever
+
+Exit criteria:
+- same-branch `off -> on` compare materially improves `northTransitionLowLevelOmegaEffectiveMeanPaS` and `northDryBeltLowLevelOmegaEffectiveMeanPaS`
+- `midlatitudeWesterliesNorthU10Ms` starts moving up without giving back the Phase 1K / 1M gains
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
