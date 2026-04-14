@@ -1245,6 +1245,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     circulationReboundContainmentDiagFrac,
     circulationReboundActivitySuppressionDiagFrac,
     circulationReboundSourceSuppressionDiagFrac,
+    circulationReboundRawSourceDiagFrac,
+    circulationReboundSuppressedSourceDiagFrac,
+    circulationReturnFlowOpportunityDiagFrac,
     subtropicalSourceDriverDiagFrac,
     subtropicalSourceDriverFloorDiagFrac,
     subtropicalLocalHemiSourceDiagFrac,
@@ -1593,6 +1596,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalCirculationReboundContainment = zonalMean(circulationReboundContainmentDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalCirculationReboundActivitySuppression = zonalMean(circulationReboundActivitySuppressionDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalCirculationReboundSourceSuppression = zonalMean(circulationReboundSourceSuppressionDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalCirculationReboundRawSource = zonalMean(circulationReboundRawSourceDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalCirculationReboundSuppressedSource = zonalMean(circulationReboundSuppressedSourceDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalCirculationReturnFlowOpportunity = zonalMean(circulationReturnFlowOpportunityDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const northTransitionCirculationReboundContainmentMean = weightedBandMean(zonalCirculationReboundContainment, latitudesDeg, rowWeights, 12, 22);
   const southTransitionCirculationReboundContainmentMean = weightedBandMean(zonalCirculationReboundContainment, latitudesDeg, rowWeights, -22, -12);
   const northDryBeltCirculationReboundContainmentMean = weightedBandMean(zonalCirculationReboundContainment, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
@@ -1601,6 +1607,12 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const southTransitionCirculationReboundActivitySuppressionMean = weightedBandMean(zonalCirculationReboundActivitySuppression, latitudesDeg, rowWeights, -22, -12);
   const northTransitionCirculationReboundSourceSuppressionMean = weightedBandMean(zonalCirculationReboundSourceSuppression, latitudesDeg, rowWeights, 12, 22);
   const southTransitionCirculationReboundSourceSuppressionMean = weightedBandMean(zonalCirculationReboundSourceSuppression, latitudesDeg, rowWeights, -22, -12);
+  const northTransitionCirculationReboundRawSourceMean = weightedBandMean(zonalCirculationReboundRawSource, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionCirculationReboundRawSourceMean = weightedBandMean(zonalCirculationReboundRawSource, latitudesDeg, rowWeights, -22, -12);
+  const northTransitionCirculationReboundSuppressedSourceMean = weightedBandMean(zonalCirculationReboundSuppressedSource, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionCirculationReboundSuppressedSourceMean = weightedBandMean(zonalCirculationReboundSuppressedSource, latitudesDeg, rowWeights, -22, -12);
+  const northDryBeltCirculationReturnFlowOpportunityMean = weightedBandMean(zonalCirculationReturnFlowOpportunity, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltCirculationReturnFlowOpportunityMean = weightedBandMean(zonalCirculationReturnFlowOpportunity, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
   const zonalSubtropicalSourceDriver = zonalMean(subtropicalSourceDriverDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubtropicalSourceDriverFloor = zonalMean(subtropicalSourceDriverFloorDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubtropicalLocalHemiSource = zonalMean(subtropicalLocalHemiSourceDiagFrac || new Array(nx * ny).fill(0), nx, ny);
@@ -1793,6 +1805,20 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       southTransitionCirculationReboundActivitySuppressionMeanFrac: round(southTransitionCirculationReboundActivitySuppressionMean, 5),
       northTransitionCirculationReboundSourceSuppressionMeanFrac: round(northTransitionCirculationReboundSourceSuppressionMean, 5),
       southTransitionCirculationReboundSourceSuppressionMeanFrac: round(southTransitionCirculationReboundSourceSuppressionMean, 5),
+      northTransitionCirculationReboundRawSourceMeanFrac: round(northTransitionCirculationReboundRawSourceMean, 5),
+      southTransitionCirculationReboundRawSourceMeanFrac: round(southTransitionCirculationReboundRawSourceMean, 5),
+      northTransitionCirculationReboundSuppressedSourceMeanFrac: round(northTransitionCirculationReboundSuppressedSourceMean, 5),
+      southTransitionCirculationReboundSuppressedSourceMeanFrac: round(southTransitionCirculationReboundSuppressedSourceMean, 5),
+      northTransitionCirculationReboundSuppressedSourceShareMeanFrac: round(
+        northTransitionCirculationReboundSuppressedSourceMean / Math.max(1e-6, northTransitionCirculationReboundRawSourceMean),
+        5
+      ),
+      southTransitionCirculationReboundSuppressedSourceShareMeanFrac: round(
+        southTransitionCirculationReboundSuppressedSourceMean / Math.max(1e-6, southTransitionCirculationReboundRawSourceMean),
+        5
+      ),
+      northDryBeltCirculationReturnFlowOpportunityMeanFrac: round(northDryBeltCirculationReturnFlowOpportunityMean, 5),
+      southDryBeltCirculationReturnFlowOpportunityMeanFrac: round(southDryBeltCirculationReturnFlowOpportunityMean, 5),
       northTransitionSubtropicalSourceDriverMeanFrac: round(northTransitionSubtropicalSourceDriverMean, 5),
       southTransitionSubtropicalSourceDriverMeanFrac: round(southTransitionSubtropicalSourceDriverMean, 5),
       northDryBeltSubtropicalSourceDriverMeanFrac: round(northDryBeltSubtropicalSourceDriverMean, 5),

@@ -364,6 +364,8 @@ test('stepVertical5 circulation rebound containment suppresses a weak off-equato
   assert.ok(onCase.state.circulationReboundContainmentDiag[1] > 0.05);
   assert.ok(onCase.state.circulationReboundActivitySuppressionDiag[1] > 0);
   assert.ok(onCase.state.circulationReboundSourceSuppressionDiag[1] > 0);
+  assert.ok(onCase.state.circulationReboundRawSourceDiag[1] > 0);
+  assert.ok(onCase.state.circulationReboundSuppressedSourceDiag[1] > 0);
   assert.ok(onCase.state.convectiveOrganization[1] < offCase.state.convectiveOrganization[1]);
   assert.ok(onCase.state.convectiveMassFlux[1] <= offCase.state.convectiveMassFlux[1]);
 });

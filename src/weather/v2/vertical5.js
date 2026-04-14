@@ -347,6 +347,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.circulationReboundContainmentDiag || state.circulationReboundContainmentDiag.length !== N) state.circulationReboundContainmentDiag = new Float32Array(N);
   if (!state.circulationReboundActivitySuppressionDiag || state.circulationReboundActivitySuppressionDiag.length !== N) state.circulationReboundActivitySuppressionDiag = new Float32Array(N);
   if (!state.circulationReboundSourceSuppressionDiag || state.circulationReboundSourceSuppressionDiag.length !== N) state.circulationReboundSourceSuppressionDiag = new Float32Array(N);
+  if (!state.circulationReboundRawSourceDiag || state.circulationReboundRawSourceDiag.length !== N) state.circulationReboundRawSourceDiag = new Float32Array(N);
+  if (!state.circulationReboundSuppressedSourceDiag || state.circulationReboundSuppressedSourceDiag.length !== N) state.circulationReboundSuppressedSourceDiag = new Float32Array(N);
+  if (!state.circulationReturnFlowOpportunityDiag || state.circulationReturnFlowOpportunityDiag.length !== N) state.circulationReturnFlowOpportunityDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverDiag || state.subtropicalSourceDriverDiag.length !== N) state.subtropicalSourceDriverDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverFloorDiag || state.subtropicalSourceDriverFloorDiag.length !== N) state.subtropicalSourceDriverFloorDiag = new Float32Array(N);
   if (!state.subtropicalLocalHemiSourceDiag || state.subtropicalLocalHemiSourceDiag.length !== N) state.subtropicalLocalHemiSourceDiag = new Float32Array(N);
@@ -453,6 +456,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const circulationReboundContainmentDiag = state.circulationReboundContainmentDiag;
   const circulationReboundActivitySuppressionDiag = state.circulationReboundActivitySuppressionDiag;
   const circulationReboundSourceSuppressionDiag = state.circulationReboundSourceSuppressionDiag;
+  const circulationReboundRawSourceDiag = state.circulationReboundRawSourceDiag;
+  const circulationReboundSuppressedSourceDiag = state.circulationReboundSuppressedSourceDiag;
+  const circulationReturnFlowOpportunityDiag = state.circulationReturnFlowOpportunityDiag;
   const subtropicalSourceDriverDiag = state.subtropicalSourceDriverDiag;
   const subtropicalSourceDriverFloorDiag = state.subtropicalSourceDriverFloorDiag;
   const subtropicalLocalHemiSourceDiag = state.subtropicalLocalHemiSourceDiag;
@@ -541,6 +547,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   circulationReboundContainmentDiag.fill(0);
   circulationReboundActivitySuppressionDiag.fill(0);
   circulationReboundSourceSuppressionDiag.fill(0);
+  circulationReboundRawSourceDiag.fill(0);
+  circulationReboundSuppressedSourceDiag.fill(0);
+  circulationReturnFlowOpportunityDiag.fill(0);
   subtropicalSourceDriverDiag.fill(0);
   subtropicalSourceDriverFloorDiag.fill(0);
   subtropicalLocalHemiSourceDiag.fill(0);
@@ -1078,10 +1087,20 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     if (!state._rowConvectiveSource || state._rowConvectiveSource.length !== ny) {
       state._rowConvectiveSource = new Float32Array(ny);
     }
+    if (!state._rowConvectiveSourceRaw || state._rowConvectiveSourceRaw.length !== ny) {
+      state._rowConvectiveSourceRaw = new Float32Array(ny);
+    }
+    if (!state._rowTransitionSuppressedSource || state._rowTransitionSuppressedSource.length !== ny) {
+      state._rowTransitionSuppressedSource = new Float32Array(ny);
+    }
     const omegaPos = state._omegaPosScratch;
     const instabArr = state._instabScratch;
     const rowConvectiveSource = state._rowConvectiveSource;
+    const rowConvectiveSourceRaw = state._rowConvectiveSourceRaw;
+    const rowTransitionSuppressedSource = state._rowTransitionSuppressedSource;
     rowConvectiveSource.fill(0);
+    rowConvectiveSourceRaw.fill(0);
+    rowTransitionSuppressedSource.fill(0);
     nOmegaPos = 0;
     const omegaThreshDynamic = Math.max(omegaTrig, state.vertMetrics?.omegaPosP90 || 0);
     const muMax = clamp01(mu0);
@@ -1299,10 +1318,16 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       convectiveMassFlux[k] = massSurface > 0 && dt > 0 ? (mu * massSurface) / dt : 0;
       convMassFluxWeightedSum += convectiveMassFlux[k] * columnWeight;
       const convMassFluxSupport = smoothstep(0.0005, 0.02, convectiveMassFlux[k]);
-      rowConvectiveSource[rowIndex] += (
+      const rawSourceContribution = (
         0.95 * Math.pow(convectiveOrganization[k], 1.1) * (0.85 + 0.15 * tropicalCore)
         + 0.75 * convMassFluxSupport
-      ) * (1 - circulationReboundContainment.sourceSuppressFrac);
+      );
+      const suppressedSourceContribution = rawSourceContribution * circulationReboundContainment.sourceSuppressFrac;
+      rowConvectiveSourceRaw[rowIndex] += rawSourceContribution;
+      rowTransitionSuppressedSource[rowIndex] += suppressedSourceContribution;
+      rowConvectiveSource[rowIndex] += rawSourceContribution - suppressedSourceContribution;
+      circulationReboundRawSourceDiag[k] = rawSourceContribution;
+      circulationReboundSuppressedSourceDiag[k] = suppressedSourceContribution;
       if (mu <= 1e-6 || massSurface <= 0) continue;
 
       const entrainEff = clamp(
@@ -1461,26 +1486,46 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
 
     let subsidenceDryingWeightedSum = 0;
     if (latDeg) {
-      for (let j = 0; j < ny; j++) rowConvectiveSource[j] /= Math.max(1, nx);
+      for (let j = 0; j < ny; j++) {
+        rowConvectiveSource[j] /= Math.max(1, nx);
+        rowConvectiveSourceRaw[j] /= Math.max(1, nx);
+        rowTransitionSuppressedSource[j] /= Math.max(1, nx);
+      }
       let nhSource = 0;
       let nhWeight = 0;
       let shSource = 0;
       let shWeight = 0;
+      let nhTransitionSuppressedSource = 0;
+      let nhTransitionWeight = 0;
+      let shTransitionSuppressedSource = 0;
+      let shTransitionWeight = 0;
       for (let j = 0; j < ny; j++) {
         const lat = latDeg[j];
         const latAbs = Math.abs(lat);
-        if (latAbs > tropicalOrganizationBandDeg) continue;
         const weight = cosLat[j];
-        if (lat >= 0) {
-          nhSource += rowConvectiveSource[j] * weight;
-          nhWeight += weight;
-        } else {
-          shSource += rowConvectiveSource[j] * weight;
-          shWeight += weight;
+        if (latAbs <= tropicalOrganizationBandDeg) {
+          if (lat >= 0) {
+            nhSource += rowConvectiveSource[j] * weight;
+            nhWeight += weight;
+          } else {
+            shSource += rowConvectiveSource[j] * weight;
+            shWeight += weight;
+          }
+        }
+        if (latAbs >= 12 && latAbs <= 22) {
+          if (lat >= 0) {
+            nhTransitionSuppressedSource += rowTransitionSuppressedSource[j] * weight;
+            nhTransitionWeight += weight;
+          } else {
+            shTransitionSuppressedSource += rowTransitionSuppressedSource[j] * weight;
+            shTransitionWeight += weight;
+          }
         }
       }
       nhSource = nhWeight > 0 ? nhSource / nhWeight : 0;
       shSource = shWeight > 0 ? shSource / shWeight : 0;
+      nhTransitionSuppressedSource = nhTransitionWeight > 0 ? nhTransitionSuppressedSource / nhTransitionWeight : 0;
+      shTransitionSuppressedSource = shTransitionWeight > 0 ? shTransitionSuppressedSource / shTransitionWeight : 0;
       const meanTropicalSource = (nhSource * nhWeight + shSource * shWeight) / Math.max(eps, nhWeight + shWeight);
       const subtropicalAlpha = 1 - Math.exp(-dt / Math.max(subtropicalSubsidenceTau, eps));
       const subtropicalMidSigma = 0.5 * (subtropicalSubsidenceTopSigma + subtropicalSubsidenceBottomSigma);
@@ -1505,11 +1550,19 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         const row = j * nx;
         for (let i = 0; i < nx; i++) {
           const k = row + i;
+          const hemiTransitionSuppressedSource = lat >= 0 ? nhTransitionSuppressedSource : shTransitionSuppressedSource;
+          const returnFlowOpportunity = clamp01(
+            2.2 * hemiTransitionSuppressedSource
+            * latShape
+            * smoothstep(-0.01, 0.24, lowLevelOmegaEffective[k])
+            * (0.7 + 0.3 * (1 - convectiveOrganization[k]))
+          );
           subtropicalSourceDriverDiag[k] = sourceDriver;
           subtropicalSourceDriverFloorDiag[k] = sourceDriverFloor;
           subtropicalLocalHemiSourceDiag[k] = hemiSource;
           subtropicalMeanTropicalSourceDiag[k] = meanTropicalSource;
           subtropicalWeakHemiFracDiag[k] = weakHemiFrac;
+          circulationReturnFlowOpportunityDiag[k] = returnFlowOpportunity;
           subtropicalCrossHemiFloorShareDiag[k] = sourceDriverFloor > eps
             ? clamp01(Math.max(0, sourceDriverFloor - hemiSource) / sourceDriverFloor)
             : 0;

@@ -654,6 +654,50 @@ Exit criteria:
   - `subtropicalDryNorthRatio`
   - `subtropicalDrySouthRatio`
 
+Result:
+- complete
+- see [phase1o-coupled-transition-to-return-flow-patch-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1o-coupled-transition-to-return-flow-patch-design.md)
+- verdict: `missing_transition_to_return_flow_coupling`
+- the added diagnostics show:
+  - transition containment is strong and live
+  - the same-hemisphere transition-suppressed source is real but low-amplitude
+  - the resulting dry-belt return-flow opportunity is also narrow, not broad
+  - NH westerlies still stay flat even while width/dry-belt metrics improve a bit
+- important day-30 read:
+  - `northTransitionCirculationReboundContainmentMeanFrac = 0.81272`
+  - `northTransitionCirculationReboundSuppressedSourceMeanFrac = 0.00133`
+  - `northDryBeltCirculationReturnFlowOpportunityMeanFrac = 0.00084`
+  - `midlatitudeWesterliesNorthU10Ms = 0.531 -> 0.531`
+
+Conclusion:
+- the next patch should exist, but it must be a **capped** coupling patch
+- Phase 1M is not missing because containment is dead; it is missing because the removed transition source currently behaves like a sink instead of a return-flow reinforcement
+- the absolute opportunity is small enough that the next lane should be implemented as a guardrail-first incremental patch, not a broad circulation retune
+
+### Phase 1P: Implement Capped Transition-To-Return-Flow Coupling Patch
+
+Objective:
+- convert a bounded share of same-hemisphere transition-suppressed convective source into subtropical return-flow reinforcement so NH westerlies can recover without giving back the kept Phase 1K and Phase 1M wins
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js) and [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js) for verification support
+
+Design rules:
+- use the existing transition containment lane as the selector
+- reinject only a capped same-hemisphere share of suppressed transition source
+- couple into subtropical source driver and/or descent support, not cross-hemisphere floor borrowing
+- preserve the kept marine-maintenance patch as a guardrail lane
+
+Exit criteria:
+- same-branch `patch off` versus `patch on` improves `midlatitudeWesterliesNorthU10Ms` by at least `0.08 m/s`
+- preserves or improves:
+  - `itczWidthDeg`
+  - `subtropicalDryNorthRatio`
+  - `subtropicalDrySouthRatio`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
