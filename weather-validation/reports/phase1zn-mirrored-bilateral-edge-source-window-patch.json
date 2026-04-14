@@ -1,0 +1,227 @@
+{
+  "schema": "satellite-wars.phase1zn-mirrored-bilateral-edge-source-window-patch.v1",
+  "generatedAt": "2026-04-14T16:25:00.737Z",
+  "paths": {
+    "offPath": "/tmp/phase1zn-off.json",
+    "onPath": "/tmp/phase1zn-on.json",
+    "phase1zmPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zm-bilateral-equatorial-edge-source-redesign.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zn-mirrored-bilateral-edge-source-window-patch.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zn-mirrored-bilateral-edge-source-window-patch.json"
+  },
+  "verdict": "bilateral_activation_with_nh_edge_overresponse",
+  "keepPatch": false,
+  "nextPhase": "Phase 1ZO: Bilateral Edge Outcome Attribution",
+  "recommendation": "Do not enable the mirrored bilateral edge-source patch by default. The geometry bug is fixed, but the outcome is now a bilateral activation with north-edge and 18.75°N overresponse.",
+  "phase1zmContext": {
+    "verdict": "signed_latitude_window_inheritance",
+    "nextPhase": "Phase 1ZN: Implement Mirrored Bilateral Edge-Source Window Patch"
+  },
+  "metrics": {
+    "itczWidthDeg": -0.005,
+    "subtropicalDryNorthRatio": -0.001,
+    "subtropicalDrySouthRatio": -0.002,
+    "midlatitudeWesterliesNorthU10Ms": 0,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.0131
+  },
+  "bilateralActivation": true,
+  "slices": {
+    "southSource": {
+      "off": {
+        "latitudeDeg": -11.25,
+        "largeScaleCondensationSourceKgM2": 0.10585,
+        "lowerTroposphericOmegaPaS": -0.09261,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "on": {
+        "latitudeDeg": -11.25,
+        "largeScaleCondensationSourceKgM2": 0.10715,
+        "lowerTroposphericOmegaPaS": -0.0928,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0.10521,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0.0013,
+        "lowerTroposphericOmegaPaS": -0.00019,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0.10521,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      }
+    },
+    "southEdge": {
+      "off": {
+        "latitudeDeg": -3.75,
+        "largeScaleCondensationSourceKgM2": 0.05852,
+        "lowerTroposphericOmegaPaS": 0.14679,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "on": {
+        "latitudeDeg": -3.75,
+        "largeScaleCondensationSourceKgM2": 0.05851,
+        "lowerTroposphericOmegaPaS": 0.1468,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00054,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.47609,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": -0.00001,
+        "lowerTroposphericOmegaPaS": 0.00001,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00054,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.47609,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      }
+    },
+    "northEdge": {
+      "off": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.09574,
+        "lowerTroposphericOmegaPaS": 0.12463,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "on": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.1083,
+        "lowerTroposphericOmegaPaS": 0.12466,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00072,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.41485,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0.01256,
+        "lowerTroposphericOmegaPaS": 0.00003,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00072,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.41485,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      }
+    },
+    "northSource": {
+      "off": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.14212,
+        "lowerTroposphericOmegaPaS": 0.17391,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.12187,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.02437
+      },
+      "on": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.13552,
+        "lowerTroposphericOmegaPaS": 0.17391,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0.13665,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.11361,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.02272
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": -0.0066,
+        "lowerTroposphericOmegaPaS": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0.13665,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": -0.00826,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": -0.00165
+      }
+    },
+    "spillover": {
+      "off": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.10718,
+        "lowerTroposphericOmegaPaS": 0.43981,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "on": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.11945,
+        "lowerTroposphericOmegaPaS": 0.43987,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0.01227,
+        "lowerTroposphericOmegaPaS": 0.00006,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      }
+    },
+    "targetEntry": {
+      "off": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.1794,
+        "lowerTroposphericOmegaPaS": -0.32162,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "on": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.18333,
+        "lowerTroposphericOmegaPaS": -0.32173,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0.00393,
+        "lowerTroposphericOmegaPaS": -0.00011,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      }
+    }
+  },
+  "designContract": {
+    "keep": [
+      "keep the bilateral abs-lat source and target geometry",
+      "keep the NH target-entry exclusion separate from the bilateral edge guard",
+      "keep the equatorial-edge guard runtime toggle disabled by default until the climate screen passes"
+    ],
+    "change": [
+      "explain why the north edge 3.75°N and adjacent 18.75°N lane over-respond once bilateral activation becomes live",
+      "treat the next phase as an outcome-attribution problem, not another geometry problem",
+      "preserve the south-edge stabilization while reducing the north-edge and 18.75°N rebound"
+    ]
+  }
+}

@@ -1439,6 +1439,27 @@ Status:
   - the correct next move is a dedicated bilateral `abs(lat)` source/target geometry, while preserving the NH target-entry exclusion as a separate lane
 - next active phase: `Phase 1ZN: Implement Mirrored Bilateral Edge-Source Window Patch`
 
+#### Phase 1ZN: Mirrored Bilateral Edge-Source Window Patch
+
+Objective:
+- repair the geometry bug from Phase 1ZM so both `-3.75°` and `3.75°` edge lanes can receive a real equatorial-edge guard response
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [phase1zn-mirrored-bilateral-edge-source-window-patch.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/phase1zn-mirrored-bilateral-edge-source-window-patch.mjs)
+
+Status:
+- complete in [phase1zn-mirrored-bilateral-edge-source-window-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zn-mirrored-bilateral-edge-source-window-patch.md)
+- verdict: `bilateral_activation_with_nh_edge_overresponse`
+- keep patch: `false`
+- key conclusions:
+  - the mirrored abs-lat geometry fix succeeds: both source lanes and both edge targets become live
+  - `-3.75°` is now effectively neutralized, which means the south-side geometry bug is truly fixed
+  - the remaining failure is now an outcome problem, not a geometry problem: `3.75°N` and `18.75°N` over-respond while NH dry-belt ocean condensation rises
+  - the patch should stay behind the runtime toggle, not become default-on yet
+- next active phase: `Phase 1ZO: Bilateral Edge Outcome Attribution`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

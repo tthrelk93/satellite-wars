@@ -225,18 +225,19 @@ export const computeEquatorialEdgeSubsidenceGuardSourceSupport = ({
   latAbs,
   sourceLat0,
   sourceLat1,
-  innerShoulderWindow,
+  sourceWindow,
   subtropicalBand,
   neutralToSubsidingSupport,
   existingOmegaPaS
 }) => {
   if (!enabled) return 0;
-  const sourceWindow = smoothstep(sourceLat0 - 2, sourceLat0 + 2, latAbs)
-    * (1 - smoothstep(sourceLat1 - 2, sourceLat1 + 2, latAbs));
+  const bilateralSourceWindow = sourceWindow ?? (
+    smoothstep(sourceLat0 - 2, sourceLat0 + 2, latAbs)
+      * (1 - smoothstep(sourceLat1 - 2, sourceLat1 + 2, latAbs))
+  );
   const localDescentSupport = smoothstep(0.04, 0.18, Math.max(0, existingOmegaPaS));
   return clamp01(
-    sourceWindow
-      * clamp01(innerShoulderWindow)
+    clamp01(bilateralSourceWindow)
       * (0.45 + 0.55 * clamp01(subtropicalBand))
       * (0.4 + 0.6 * clamp01(neutralToSubsidingSupport))
       * localDescentSupport
@@ -247,15 +248,17 @@ export const computeEquatorialEdgeSubsidenceGuardTargetWeight = ({
   latAbs,
   targetLat0,
   targetLat1,
-  edgeWindow,
+  targetWindow,
   edgeGateSupport,
   organizedSupport,
   convectivePotential,
   existingOmegaPaS
 }) => {
   if (!enabled) return 0;
-  const targetWindow = smoothstep(targetLat0 - 1.5, targetLat0 + 1.5, latAbs)
-    * (1 - smoothstep(targetLat1 - 1.5, targetLat1 + 1.5, latAbs));
+  const bilateralTargetWindow = targetWindow ?? (
+    smoothstep(targetLat0 - 1.5, targetLat0 + 1.5, latAbs)
+      * (1 - smoothstep(targetLat1 - 1.5, targetLat1 + 1.5, latAbs))
+  );
   const weakEngineSupport = clamp01(
     0.6 * (1 - clamp01(organizedSupport)) +
     0.4 * (1 - clamp01(convectivePotential))
@@ -263,8 +266,7 @@ export const computeEquatorialEdgeSubsidenceGuardTargetWeight = ({
   const missingEdgeSupport = 1 - clamp01(edgeGateSupport);
   const existingDescentTaper = 1 - smoothstep(0.08, 0.2, Math.max(0, existingOmegaPaS));
   return clamp01(
-    targetWindow
-      * clamp01(edgeWindow)
+    clamp01(bilateralTargetWindow)
       * weakEngineSupport
       * (0.55 + 0.45 * missingEdgeSupport)
       * existingDescentTaper
@@ -1998,7 +2000,10 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             latAbs,
             sourceLat0: equatorialEdgeSubsidenceGuardSourceLat0,
             sourceLat1: equatorialEdgeSubsidenceGuardSourceLat1,
-            innerShoulderWindow: freshShoulderInnerWindowPublicDiag[k] || 0,
+            sourceWindow: clamp01(
+              smoothstep(equatorialEdgeSubsidenceGuardSourceLat0 - 2, equatorialEdgeSubsidenceGuardSourceLat0 + 2, latAbs)
+                * (1 - smoothstep(equatorialEdgeSubsidenceGuardSourceLat1 - 2, equatorialEdgeSubsidenceGuardSourceLat1 + 2, latAbs))
+            ),
             subtropicalBand: freshSubtropicalBandPublicDiag[k] || 0,
             neutralToSubsidingSupport: freshNeutralToSubsidingSupportPublicDiag[k] || 0,
             existingOmegaPaS: lowLevelOmegaEffective[k]
@@ -2033,7 +2038,10 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             latAbs,
             targetLat0: equatorialEdgeSubsidenceGuardTargetLat0,
             targetLat1: equatorialEdgeSubsidenceGuardTargetLat1,
-            edgeWindow: freshShoulderEquatorialEdgeWindowPublicDiag[k] || 0,
+            targetWindow: clamp01(
+              smoothstep(equatorialEdgeSubsidenceGuardTargetLat0 - 1.5, equatorialEdgeSubsidenceGuardTargetLat0 + 1.5, latAbs)
+                * (1 - smoothstep(equatorialEdgeSubsidenceGuardTargetLat1 - 1.5, equatorialEdgeSubsidenceGuardTargetLat1 + 1.5, latAbs))
+            ),
             edgeGateSupport: freshShoulderEquatorialEdgeGateSupportPublicDiag[k] || 0,
             organizedSupport: convectiveOrganization[k],
             convectivePotential: convectivePotential[k],

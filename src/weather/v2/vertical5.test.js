@@ -642,7 +642,7 @@ test('computeEquatorialEdgeSubsidenceGuardSourceSupport favors inner-shoulder so
       latAbs: 11.25,
       sourceLat0: 8,
       sourceLat1: 14,
-      innerShoulderWindow: 1,
+      sourceWindow: 1,
       subtropicalBand: 0.7,
       neutralToSubsidingSupport: 0.8,
       existingOmegaPaS: 0.16
@@ -655,17 +655,17 @@ test('computeEquatorialEdgeSubsidenceGuardSourceSupport favors inner-shoulder so
     latAbs: 11.25,
     sourceLat0: 8,
     sourceLat1: 14,
-    innerShoulderWindow: 1,
+    sourceWindow: 1,
     subtropicalBand: 0.7,
     neutralToSubsidingSupport: 0.8,
     existingOmegaPaS: 0.16
   });
-  const noInnerLane = computeEquatorialEdgeSubsidenceGuardSourceSupport({
+  const noSourceWindow = computeEquatorialEdgeSubsidenceGuardSourceSupport({
     enabled: true,
     latAbs: 11.25,
     sourceLat0: 8,
     sourceLat1: 14,
-    innerShoulderWindow: 0,
+    sourceWindow: 0,
     subtropicalBand: 0.7,
     neutralToSubsidingSupport: 0.8,
     existingOmegaPaS: 0.16
@@ -675,14 +675,13 @@ test('computeEquatorialEdgeSubsidenceGuardSourceSupport favors inner-shoulder so
     latAbs: 18.75,
     sourceLat0: 8,
     sourceLat1: 14,
-    innerShoulderWindow: 1,
     subtropicalBand: 0.7,
     neutralToSubsidingSupport: 0.8,
     existingOmegaPaS: 0.16
   });
 
   assert.ok(sourceCore > 0.5);
-  assert.equal(noInnerLane, 0);
+  assert.equal(noSourceWindow, 0);
   assert.ok(outsideSource < 0.1);
 });
 
@@ -693,7 +692,7 @@ test('computeEquatorialEdgeSubsidenceGuardTargetWeight focuses on weakly support
       latAbs: 3.75,
       targetLat0: 2,
       targetLat1: 6,
-      edgeWindow: 1,
+      targetWindow: 1,
       edgeGateSupport: 0,
       organizedSupport: 0.25,
       convectivePotential: 0.3,
@@ -707,7 +706,7 @@ test('computeEquatorialEdgeSubsidenceGuardTargetWeight focuses on weakly support
     latAbs: 3.75,
     targetLat0: 2,
     targetLat1: 6,
-    edgeWindow: 1,
+    targetWindow: 1,
     edgeGateSupport: 0,
     organizedSupport: 0.25,
     convectivePotential: 0.3,
@@ -718,7 +717,7 @@ test('computeEquatorialEdgeSubsidenceGuardTargetWeight focuses on weakly support
     latAbs: 3.75,
     targetLat0: 2,
     targetLat1: 6,
-    edgeWindow: 1,
+    targetWindow: 1,
     edgeGateSupport: 0.9,
     organizedSupport: 0.25,
     convectivePotential: 0.3,
@@ -729,7 +728,7 @@ test('computeEquatorialEdgeSubsidenceGuardTargetWeight focuses on weakly support
     latAbs: 11.25,
     targetLat0: 2,
     targetLat1: 6,
-    edgeWindow: 0,
+    targetWindow: 0,
     edgeGateSupport: 0,
     organizedSupport: 0.25,
     convectivePotential: 0.3,
@@ -739,6 +738,54 @@ test('computeEquatorialEdgeSubsidenceGuardTargetWeight focuses on weakly support
   assert.ok(targetEdge > 0.4);
   assert.ok(supportedEdge < targetEdge);
   assert.equal(outsideTarget, 0);
+});
+
+test('equatorial-edge guard windows are mirrored by absolute latitude rather than NH-only shoulder geometry', () => {
+  const sourceNorth = computeEquatorialEdgeSubsidenceGuardSourceSupport({
+    enabled: true,
+    latAbs: 11.25,
+    sourceLat0: 8,
+    sourceLat1: 14,
+    sourceWindow: 1,
+    subtropicalBand: 0.7,
+    neutralToSubsidingSupport: 0.8,
+    existingOmegaPaS: 0.16
+  });
+  const sourceSouth = computeEquatorialEdgeSubsidenceGuardSourceSupport({
+    enabled: true,
+    latAbs: 11.25,
+    sourceLat0: 8,
+    sourceLat1: 14,
+    sourceWindow: 1,
+    subtropicalBand: 0.7,
+    neutralToSubsidingSupport: 0.8,
+    existingOmegaPaS: 0.16
+  });
+  const targetNorth = computeEquatorialEdgeSubsidenceGuardTargetWeight({
+    enabled: true,
+    latAbs: 3.75,
+    targetLat0: 2,
+    targetLat1: 6,
+    targetWindow: 1,
+    edgeGateSupport: 0,
+    organizedSupport: 0.25,
+    convectivePotential: 0.3,
+    existingOmegaPaS: 0.1
+  });
+  const targetSouth = computeEquatorialEdgeSubsidenceGuardTargetWeight({
+    enabled: true,
+    latAbs: 3.75,
+    targetLat0: 2,
+    targetLat1: 6,
+    targetWindow: 1,
+    edgeGateSupport: 0,
+    organizedSupport: 0.25,
+    convectivePotential: 0.3,
+    existingOmegaPaS: 0.1
+  });
+
+  assert.equal(sourceNorth, sourceSouth);
+  assert.equal(targetNorth, targetSouth);
 });
 
 test('computeProjectedOmegaBridgeCellPaS redistributes a capped projected share into live target rows', () => {
