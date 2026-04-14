@@ -82,6 +82,17 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const saturationAdjustmentEventCount = new Uint32Array(N);
   const saturationAdjustmentSupersaturationMassWeighted = makeArray(N);
   const saturationAdjustmentOmegaMassWeighted = makeArray(N);
+  const saturationAdjustmentMaintenanceCandidateMass = makeArray(N);
+  const saturationAdjustmentMaintenancePotentialSuppressedMass = makeArray(N);
+  const saturationAdjustmentMaintenanceCandidateEventCount = new Uint32Array(N);
+  const saturationAdjustmentMaintenanceCandidateSupersaturationMassWeighted = makeArray(N);
+  const saturationAdjustmentMaintenanceCandidateOmegaMassWeighted = makeArray(N);
+  const saturationAdjustmentMarineEventMass = makeArray(N);
+  const saturationAdjustmentMarineSubtropicalSupportMassWeighted = makeArray(N);
+  const saturationAdjustmentMarineWeakEngineSupportMassWeighted = makeArray(N);
+  const saturationAdjustmentMarineWeakAscentSupportMassWeighted = makeArray(N);
+  const saturationAdjustmentMarineMarginalSupersaturationSupportMassWeighted = makeArray(N);
+  const saturationAdjustmentMarineLayerWindowSupportMassWeighted = makeArray(N);
   const weakAscentCloudBirthAccumMass = makeArray(N);
   const strongAscentCloudBirthAccumMass = makeArray(N);
   const resolvedAscentCloudBirthByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
@@ -293,6 +304,17 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     saturationAdjustmentEventCount,
     saturationAdjustmentSupersaturationMassWeighted,
     saturationAdjustmentOmegaMassWeighted,
+    saturationAdjustmentMaintenanceCandidateMass,
+    saturationAdjustmentMaintenancePotentialSuppressedMass,
+    saturationAdjustmentMaintenanceCandidateEventCount,
+    saturationAdjustmentMaintenanceCandidateSupersaturationMassWeighted,
+    saturationAdjustmentMaintenanceCandidateOmegaMassWeighted,
+    saturationAdjustmentMarineEventMass,
+    saturationAdjustmentMarineSubtropicalSupportMassWeighted,
+    saturationAdjustmentMarineWeakEngineSupportMassWeighted,
+    saturationAdjustmentMarineWeakAscentSupportMassWeighted,
+    saturationAdjustmentMarineMarginalSupersaturationSupportMassWeighted,
+    saturationAdjustmentMarineLayerWindowSupportMassWeighted,
     weakAscentCloudBirthAccumMass,
     strongAscentCloudBirthAccumMass,
     resolvedAscentCloudBirthByBandMass,

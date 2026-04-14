@@ -124,6 +124,51 @@ test('microphysics records large-scale condensation and re-evaporation diagnosti
   assert.ok(Array.from(state.saturationAdjustmentCloudBirthByBandMass).some((value) => value > 0));
 });
 
+test('microphysics records weak-engine subtropical maintenance occupancy for marginal marine saturation adjustment', () => {
+  const state = setupState(279);
+  state.qv.fill(0.002);
+  state.qc.fill(0);
+  state.qi.fill(0);
+  state.qr.fill(0);
+  state.qs.fill(0);
+  state.landMask[0] = 0;
+  state.convectiveOrganization[0] = 0.04;
+  state.convectiveMassFlux[0] = 2e-4;
+  state.convectiveAnvilSource[0] = 0.02;
+  state.subtropicalSubsidenceDrying[0] = 0.09;
+  state.omega.fill(-0.03);
+  state.qv[1] = 0.011;
+
+  stepMicrophysics5({ dt: 900, state, params: { enableConvectiveOutcome: true } });
+
+  assert.ok(state.largeScaleCondensationSource[0] > 0);
+  assert.ok(state.saturationAdjustmentMaintenanceCandidateMass[0] > 0);
+  assert.ok(state.saturationAdjustmentMaintenancePotentialSuppressedMass[0] > 0);
+  assert.ok(state.saturationAdjustmentMaintenanceCandidateEventCount[0] > 0);
+});
+
+test('microphysics does not mark strong organized ascent as maintenance occupancy', () => {
+  const state = setupState(279);
+  state.qv.fill(0.002);
+  state.qc.fill(0);
+  state.qi.fill(0);
+  state.qr.fill(0);
+  state.qs.fill(0);
+  state.landMask[0] = 0;
+  state.convectiveOrganization[0] = 0.92;
+  state.convectiveMassFlux[0] = 0.03;
+  state.convectiveAnvilSource[0] = 0.8;
+  state.subtropicalSubsidenceDrying[0] = 0.01;
+  state.omega.fill(-0.28);
+  state.qv[1] = 0.015;
+
+  stepMicrophysics5({ dt: 900, state, params: { enableConvectiveOutcome: true } });
+
+  assert.equal(state.saturationAdjustmentMaintenanceCandidateMass[0], 0);
+  assert.equal(state.saturationAdjustmentMaintenancePotentialSuppressedMass[0], 0);
+  assert.equal(state.saturationAdjustmentMaintenanceCandidateEventCount[0], 0);
+});
+
 test('microphysics populates the upper-cloud handoff ledger and closes the upper-cloud budget', () => {
   const state = setupState(248);
   state.qv.fill(0.006);

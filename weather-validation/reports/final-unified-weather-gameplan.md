@@ -402,20 +402,59 @@ Implementation rule:
 - patch the `qvVal > qsat` saturation-adjustment path with regime-selective suppression based on existing weak-engine / subtropical terms
 - do not start by retuning radiation, transport, or the carry-input override
 
+Outcome:
+- rejected as inert in the live 30-day climate
+- same-branch `patch off` versus `patch on` compares were effectively identical
+- the supposed weak-engine marine-maintenance candidate regime did not occur in the real quick audit
+
+See:
+- [phase1g-maintenance-delta-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1g-maintenance-delta-attribution.md)
+- [phase1h-maintenance-regime-coverage.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1h-maintenance-regime-coverage.md)
+
+### Phase 1H: Maintenance Regime Coverage
+
+Objective:
+- prove whether the rejected Phase 1G regime actually owns any meaningful share of the live 30-day climate drift
+
+Primary files:
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+
+Result:
+- candidate occupancy is effectively zero in the live 30-day run
+- ocean-side NH dry-belt marine saturation-adjustment condensation is still present
+- weak-engine support is already nearly maximal
+- the main missing live support term is subtropical suppression, with weak ascent as a secondary limiter
+
+Key metrics:
+- `northDryBeltOceanMarineCondensationMeanKgM2 = 0.19722`
+- `northDryBeltOceanMarineSubtropicalSupportMeanFrac = 0.0374`
+- `northDryBeltOceanMarineWeakEngineSupportMeanFrac = 0.99953`
+- `northDryBeltOceanMarineWeakAscentSupportMeanFrac = 0.18488`
+- `northDryBeltOceanMarineMarginalSupersaturationSupportMeanFrac = 0.88424`
+
+Conclusion:
+- the old Phase 1G regime targeted the wrong live lever
+- the next phase should redesign the subtropical-suppression gate itself, not keep tuning an inert maintenance suppressor
+
+### Phase 1I: Subtropical-Suppression Gate Redesign
+
+Objective:
+- explain why live ocean-side NH dry-belt saturation-adjustment events have almost no subtropical-suppression support
+- determine whether suppression is being diagnosed from the wrong state, at the wrong time, or with the wrong magnitude
+- redesign the live maintenance-loop gate from that evidence
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+
 Exit criteria:
-- the next 30-day compare shows:
-  - `northDryBeltLargeScaleCondensationMeanKgM2 < 0.16079`
-  - `northDryBeltOceanLargeScaleCondensationMeanKgM2 < 0.18314`
-  - `northDryBeltBoundaryLayerRhMeanFrac < 0.61368`
-  - `northDryBeltMidTroposphereRhMeanFrac < 0.44885`
-  - `itczWidthDeg < 26.415`
-  - `subtropicalDryNorthRatio < 1.704`
-  - `subtropicalDrySouthRatio < 1.296`
-- while holding:
-  - `northDryBeltImportedAnvilPersistenceMeanKgM2 <= 0.21583`
-  - `northDryBeltWeakErosionCloudSurvivalMeanKgM2 <= 0.21337`
-  - `midlatitudeWesterliesNorthU10Ms >= 0.532`
-  - `midlatitudeWesterliesSouthU10Ms >= 0.851`
+- identify the support-term mismatch that keeps live marine condensation outside the intended subtropical-suppression regime
+- produce one redesign target that is live-run active, proof-checkable, and narrower than the rejected Phase 1G patch family
 
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 

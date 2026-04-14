@@ -29,6 +29,25 @@ const saturationMixingRatio = (T, p) => {
 
 const applyThetaLatent = (thetaVal, dq, latentHeat, Pi) => thetaVal + (latentHeat / Cp * dq) / Pi;
 const isUpperCloudSigma = (sigmaMid) => sigmaMid <= 0.55;
+const SUBTROPICAL_MAINTENANCE_DIAG = {
+  supportThreshold: 0.05,
+  suppressMax: 0.55,
+  oceanBoost: 0.15,
+  subsiding0: 0.55,
+  subsiding1: 0.9,
+  organization0: 0.12,
+  organization1: 0.4,
+  massFlux0: 0.1,
+  massFlux1: 0.45,
+  ascent0: 0.04,
+  ascent1: 0.14,
+  supersat0: 0.02,
+  supersat1: 0.16,
+  sigmaLo0: 0.18,
+  sigmaLo1: 0.32,
+  sigmaHi0: 0.8,
+  sigmaHi1: 0.94
+};
 const sumUpperCloudMassAtCell = (state, pHalf, sigmaHalf, nz, cellIndex, qFields = ['qc', 'qi', 'qr', 'qs']) => {
   let upperCloudMass = 0;
   for (let lev = 0; lev < nz; lev += 1) {
@@ -133,6 +152,39 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   if (!state.saturationAdjustmentOmegaMassWeighted || state.saturationAdjustmentOmegaMassWeighted.length !== N) {
     state.saturationAdjustmentOmegaMassWeighted = new Float32Array(N);
   }
+  if (!state.saturationAdjustmentMaintenanceCandidateMass || state.saturationAdjustmentMaintenanceCandidateMass.length !== N) {
+    state.saturationAdjustmentMaintenanceCandidateMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMaintenancePotentialSuppressedMass || state.saturationAdjustmentMaintenancePotentialSuppressedMass.length !== N) {
+    state.saturationAdjustmentMaintenancePotentialSuppressedMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMaintenanceCandidateEventCount || state.saturationAdjustmentMaintenanceCandidateEventCount.length !== N) {
+    state.saturationAdjustmentMaintenanceCandidateEventCount = new Uint32Array(N);
+  }
+  if (!state.saturationAdjustmentMaintenanceCandidateSupersaturationMassWeighted || state.saturationAdjustmentMaintenanceCandidateSupersaturationMassWeighted.length !== N) {
+    state.saturationAdjustmentMaintenanceCandidateSupersaturationMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMaintenanceCandidateOmegaMassWeighted || state.saturationAdjustmentMaintenanceCandidateOmegaMassWeighted.length !== N) {
+    state.saturationAdjustmentMaintenanceCandidateOmegaMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMarineEventMass || state.saturationAdjustmentMarineEventMass.length !== N) {
+    state.saturationAdjustmentMarineEventMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMarineSubtropicalSupportMassWeighted || state.saturationAdjustmentMarineSubtropicalSupportMassWeighted.length !== N) {
+    state.saturationAdjustmentMarineSubtropicalSupportMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMarineWeakEngineSupportMassWeighted || state.saturationAdjustmentMarineWeakEngineSupportMassWeighted.length !== N) {
+    state.saturationAdjustmentMarineWeakEngineSupportMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMarineWeakAscentSupportMassWeighted || state.saturationAdjustmentMarineWeakAscentSupportMassWeighted.length !== N) {
+    state.saturationAdjustmentMarineWeakAscentSupportMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMarineMarginalSupersaturationSupportMassWeighted || state.saturationAdjustmentMarineMarginalSupersaturationSupportMassWeighted.length !== N) {
+    state.saturationAdjustmentMarineMarginalSupersaturationSupportMassWeighted = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentMarineLayerWindowSupportMassWeighted || state.saturationAdjustmentMarineLayerWindowSupportMassWeighted.length !== N) {
+    state.saturationAdjustmentMarineLayerWindowSupportMassWeighted = new Float32Array(N);
+  }
   if (!state.weakAscentCloudBirthAccumMass || state.weakAscentCloudBirthAccumMass.length !== N) {
     state.weakAscentCloudBirthAccumMass = new Float32Array(N);
   }
@@ -178,6 +230,17 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   state.largeScaleCondensationSource.fill(0);
   state.cloudReevaporationMass.fill(0);
   state.precipReevaporationMass.fill(0);
+  state.saturationAdjustmentMaintenanceCandidateMass.fill(0);
+  state.saturationAdjustmentMaintenancePotentialSuppressedMass.fill(0);
+  state.saturationAdjustmentMaintenanceCandidateEventCount.fill(0);
+  state.saturationAdjustmentMaintenanceCandidateSupersaturationMassWeighted.fill(0);
+  state.saturationAdjustmentMaintenanceCandidateOmegaMassWeighted.fill(0);
+  state.saturationAdjustmentMarineEventMass.fill(0);
+  state.saturationAdjustmentMarineSubtropicalSupportMassWeighted.fill(0);
+  state.saturationAdjustmentMarineWeakEngineSupportMassWeighted.fill(0);
+  state.saturationAdjustmentMarineWeakAscentSupportMassWeighted.fill(0);
+  state.saturationAdjustmentMarineMarginalSupersaturationSupportMassWeighted.fill(0);
+  state.saturationAdjustmentMarineLayerWindowSupportMassWeighted.fill(0);
   state.microphysicsUpperCloudSaturationBirthMass.fill(0);
   state.microphysicsUpperCloudCloudReevaporationMass.fill(0);
   state.microphysicsUpperCloudPrecipReevaporationMass.fill(0);
@@ -312,14 +375,73 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
 
       if (qvVal > qsat) {
         const supersaturationFrac = Math.max(0, (qvVal - qsat) / Math.max(1e-8, qsat));
+        const sigmaMid = sigmaMidAtLevel(sigmaHalf, lev, nz);
+        const omegaTop = Number.isFinite(omega?.[lev * N + k]) ? omega[lev * N + k] : 0;
+        const omegaBot = Number.isFinite(omega?.[(lev + 1) * N + k]) ? omega[(lev + 1) * N + k] : 0;
+        const ascentMagnitudePaS = Math.max(0, -0.5 * (omegaTop + omegaBot));
+        const isOceanColumn = state.landMask?.[k] !== 1;
+        const subtropicalSupport = enableConvectiveOutcome && isOceanColumn
+          ? smoothstep(SUBTROPICAL_MAINTENANCE_DIAG.subsiding0, SUBTROPICAL_MAINTENANCE_DIAG.subsiding1, marginalSubsiding)
+          : 0;
+        const weakOrganizationSupport = enableConvectiveOutcome && isOceanColumn
+          ? 1 - smoothstep(SUBTROPICAL_MAINTENANCE_DIAG.organization0, SUBTROPICAL_MAINTENANCE_DIAG.organization1, organizedOutflow)
+          : 0;
+        const weakMassFluxSupport = enableConvectiveOutcome && isOceanColumn
+          ? 1 - smoothstep(SUBTROPICAL_MAINTENANCE_DIAG.massFlux0, SUBTROPICAL_MAINTENANCE_DIAG.massFlux1, convMassFluxStrength)
+          : 0;
+        const weakEngineSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(0.65 * weakOrganizationSupport + 0.35 * weakMassFluxSupport, 0, 1)
+          : 0;
+        const weakAscentSupport = enableConvectiveOutcome && isOceanColumn
+          ? 1 - smoothstep(SUBTROPICAL_MAINTENANCE_DIAG.ascent0, SUBTROPICAL_MAINTENANCE_DIAG.ascent1, ascentMagnitudePaS)
+          : 0;
+        const marginalSupersaturationSupport = enableConvectiveOutcome && isOceanColumn
+          ? 1 - smoothstep(SUBTROPICAL_MAINTENANCE_DIAG.supersat0, SUBTROPICAL_MAINTENANCE_DIAG.supersat1, supersaturationFrac)
+          : 0;
+        const maintenanceLayerSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              smoothstep(SUBTROPICAL_MAINTENANCE_DIAG.sigmaLo0, SUBTROPICAL_MAINTENANCE_DIAG.sigmaLo1, sigmaMid)
+              * (1 - smoothstep(SUBTROPICAL_MAINTENANCE_DIAG.sigmaHi0, SUBTROPICAL_MAINTENANCE_DIAG.sigmaHi1, sigmaMid)),
+              0,
+              1
+            )
+          : 0;
+        const maintenanceSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              SUBTROPICAL_MAINTENANCE_DIAG.suppressMax
+                * (1 + SUBTROPICAL_MAINTENANCE_DIAG.oceanBoost)
+                * subtropicalSupport
+                * weakEngineSupport
+                * weakAscentSupport
+                * marginalSupersaturationSupport
+                * maintenanceLayerSupport,
+              0,
+              SUBTROPICAL_MAINTENANCE_DIAG.suppressMax
+            )
+          : 0;
         let dq = applyLatentCap(qvVal - qsat, iceFrac > 0.5 ? Ls : Lv);
         if (dq > 0) {
           qvVal -= dq;
           if (traceEnabled && massCell > 0) {
             const condMass = dq * massCell;
-            const numericalBandIndex = findInstrumentationLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));
+            const numericalBandIndex = findInstrumentationLevelBandIndex(sigmaMid);
             state.largeScaleCondensationSource[k] += condMass;
-            if (isUpperCloudSigma(sigmaMidAtLevel(sigmaHalf, lev, nz))) {
+            if (isOceanColumn) {
+              state.saturationAdjustmentMarineEventMass[k] += condMass;
+              state.saturationAdjustmentMarineSubtropicalSupportMassWeighted[k] += subtropicalSupport * condMass;
+              state.saturationAdjustmentMarineWeakEngineSupportMassWeighted[k] += weakEngineSupport * condMass;
+              state.saturationAdjustmentMarineWeakAscentSupportMassWeighted[k] += weakAscentSupport * condMass;
+              state.saturationAdjustmentMarineMarginalSupersaturationSupportMassWeighted[k] += marginalSupersaturationSupport * condMass;
+              state.saturationAdjustmentMarineLayerWindowSupportMassWeighted[k] += maintenanceLayerSupport * condMass;
+            }
+            if (maintenanceSupport >= SUBTROPICAL_MAINTENANCE_DIAG.supportThreshold) {
+              state.saturationAdjustmentMaintenanceCandidateMass[k] += condMass;
+              state.saturationAdjustmentMaintenancePotentialSuppressedMass[k] += condMass * maintenanceSupport;
+              state.saturationAdjustmentMaintenanceCandidateEventCount[k] += 1;
+              state.saturationAdjustmentMaintenanceCandidateSupersaturationMassWeighted[k] += supersaturationFrac * condMass;
+              state.saturationAdjustmentMaintenanceCandidateOmegaMassWeighted[k] += ascentMagnitudePaS * condMass;
+            }
+            if (isUpperCloudSigma(sigmaMid)) {
               state.microphysicsUpperCloudSaturationBirthMass[k] += condMass;
             }
             state.saturationAdjustmentCloudBirthAccumMass[k] += condMass;
@@ -328,9 +450,6 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
             state.numericalSupersaturationClampCount[k] += 1;
             state.numericalSupersaturationClampMass[k] += condMass;
             recordBandValue(state.numericalSupersaturationClampByBandMass, numericalBandIndex, k, N, condMass);
-            const omegaTop = Number.isFinite(omega?.[lev * N + k]) ? omega[lev * N + k] : 0;
-            const omegaBot = Number.isFinite(omega?.[(lev + 1) * N + k]) ? omega[(lev + 1) * N + k] : 0;
-            const ascentMagnitudePaS = Math.max(0, -0.5 * (omegaTop + omegaBot));
             state.saturationAdjustmentOmegaMassWeighted[k] += ascentMagnitudePaS * condMass;
             if (ascentMagnitudePaS <= 0.08) state.weakAscentCloudBirthAccumMass[k] += condMass;
             if (ascentMagnitudePaS >= 0.18) state.strongAscentCloudBirthAccumMass[k] += condMass;
