@@ -1,0 +1,300 @@
+{
+  "schema": "satellite-wars.phase1y-equatorward-absorption-guard-design.v1",
+  "generatedAt": "2026-04-14T06:58:40.637Z",
+  "paths": {
+    "baselinePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-hadley-second-pass-restore-v4.json",
+    "offPath": "/tmp/phase1x-off.json",
+    "onPath": "/tmp/phase1x-on.json"
+  },
+  "verdict": "remote_shoulder_absorption",
+  "nextPhase": "Phase 1Z: Implement Shoulder Absorption Guard Patch",
+  "recommendation": "Keep the repaired projected-share bridge in place and add a narrow tropical-shoulder absorption guard in the saturation-adjustment lane before trying more downstream jet coupling.",
+  "baselineGap": {
+    "itczWidthDeg": {
+      "baseline": 23.646,
+      "current": 25.839,
+      "delta": 2.193
+    },
+    "subtropicalDryNorthRatio": {
+      "baseline": 1.1,
+      "current": 1.517,
+      "delta": 0.417
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "baseline": 1.192,
+      "current": 0.531,
+      "delta": -0.661
+    }
+  },
+  "offOnCompare": {
+    "itczWidthDeg": {
+      "off": 25.834,
+      "on": 25.839,
+      "delta": 0.005
+    },
+    "subtropicalDryNorthRatio": {
+      "off": 1.515,
+      "on": 1.517,
+      "delta": 0.002
+    },
+    "subtropicalDrySouthRatio": {
+      "off": 1.192,
+      "on": 1.194,
+      "delta": 0.002
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "off": 0.531,
+      "on": 0.531,
+      "delta": 0
+    }
+  },
+  "bandDiagnostics": {
+    "tropicalShoulderNorth": {
+      "label": "Tropical shoulder (3-18.75N)",
+      "condensationDeltaKgM2": 0.01365,
+      "lowerOmegaDeltaPaS": 0.00006,
+      "midOmegaDeltaPaS": 0.00008,
+      "localBridgeOnPaS": 0.00068,
+      "projectedBridgeOnPaS": 0,
+      "stormTrackOn": 0.00001,
+      "wind10mUOn": -0.71533
+    },
+    "tropicalShoulderCoreNorth": {
+      "label": "Tropical shoulder core (3-12N)",
+      "condensationDeltaKgM2": 0.02052,
+      "lowerOmegaDeltaPaS": -0.00002,
+      "midOmegaDeltaPaS": 0.00001,
+      "localBridgeOnPaS": 0,
+      "projectedBridgeOnPaS": 0,
+      "stormTrackOn": 0.00001,
+      "wind10mUOn": -0.9085
+    },
+    "equatorwardLeakNorth": {
+      "label": "Equatorward leak window (18-22N)",
+      "condensationDeltaKgM2": -0.00009,
+      "lowerOmegaDeltaPaS": 0.00022,
+      "midOmegaDeltaPaS": 0.0002,
+      "localBridgeOnPaS": 0.00205,
+      "projectedBridgeOnPaS": 0,
+      "stormTrackOn": 0.00001,
+      "wind10mUOn": -0.329
+    },
+    "sourceCoreNorth": {
+      "label": "Source core (20-30N)",
+      "condensationDeltaKgM2": -0.00972,
+      "lowerOmegaDeltaPaS": -0.00017,
+      "midOmegaDeltaPaS": -0.00022,
+      "localBridgeOnPaS": 0.00063,
+      "projectedBridgeOnPaS": 0,
+      "stormTrackOn": 0.00005,
+      "wind10mUOn": 1.357
+    },
+    "targetEntryNorth": {
+      "label": "Target entry (30-45N)",
+      "condensationDeltaKgM2": -0.00019,
+      "lowerOmegaDeltaPaS": -0.00033,
+      "midOmegaDeltaPaS": -0.00043,
+      "localBridgeOnPaS": 0.00019,
+      "projectedBridgeOnPaS": 0.00059,
+      "stormTrackOn": 0.00013,
+      "wind10mUOn": 0.2475
+    },
+    "jetBandNorth": {
+      "label": "Jet band (41.25-56.25N)",
+      "condensationDeltaKgM2": -0.00005,
+      "lowerOmegaDeltaPaS": 0.00026,
+      "midOmegaDeltaPaS": 0.00035,
+      "localBridgeOnPaS": 0,
+      "projectedBridgeOnPaS": 0.00018,
+      "stormTrackOn": 0.00016,
+      "wind10mUOn": 0.78033
+    }
+  },
+  "shoulderPeak": {
+    "latitudeDeg": 11.25,
+    "condensationDeltaKgM2": 0.02107,
+    "localBridgeOnPaS": 0,
+    "projectedBridgeOnPaS": 0,
+    "lowerOmegaOnPaS": 0.17323,
+    "midOmegaOnPaS": 0.17414,
+    "stormTrackOn": 0.00001
+  },
+  "referenceSlices": {
+    "tropicalShoulder3p75": {
+      "off": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.07641,
+        "lowerTroposphericOmegaPaS": 0.12506,
+        "midTroposphericOmegaPaS": 0.14954,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "stormTrackIndex": 0.00001,
+        "wind10mU": -0.677
+      },
+      "on": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.09638,
+        "lowerTroposphericOmegaPaS": 0.12496,
+        "midTroposphericOmegaPaS": 0.14948,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "stormTrackIndex": 0.00001,
+        "wind10mU": -0.677
+      }
+    },
+    "tropicalShoulder11p25": {
+      "off": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.12779,
+        "lowerTroposphericOmegaPaS": 0.17318,
+        "midTroposphericOmegaPaS": 0.17405,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "stormTrackIndex": 0.00001,
+        "wind10mU": -1.14
+      },
+      "on": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.14886,
+        "lowerTroposphericOmegaPaS": 0.17323,
+        "midTroposphericOmegaPaS": 0.17414,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "stormTrackIndex": 0.00001,
+        "wind10mU": -1.14
+      }
+    },
+    "equatorwardLeak18p75": {
+      "off": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.10309,
+        "lowerTroposphericOmegaPaS": 0.43743,
+        "midTroposphericOmegaPaS": 0.44807,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "stormTrackIndex": 0.00001,
+        "wind10mU": -0.329
+      },
+      "on": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.103,
+        "lowerTroposphericOmegaPaS": 0.43765,
+        "midTroposphericOmegaPaS": 0.44827,
+        "dryingOmegaBridgeLocalAppliedPaS": 0.00205,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "stormTrackIndex": 0.00001,
+        "wind10mU": -0.329
+      }
+    },
+    "sourceCore26p25": {
+      "off": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.12559,
+        "lowerTroposphericOmegaPaS": 0.27488,
+        "midTroposphericOmegaPaS": 0.31574,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "stormTrackIndex": 0.00005,
+        "wind10mU": 1.357
+      },
+      "on": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.11587,
+        "lowerTroposphericOmegaPaS": 0.27471,
+        "midTroposphericOmegaPaS": 0.31552,
+        "dryingOmegaBridgeLocalAppliedPaS": 0.00063,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "stormTrackIndex": 0.00005,
+        "wind10mU": 1.357
+      }
+    },
+    "targetEntry33p75": {
+      "off": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.18497,
+        "lowerTroposphericOmegaPaS": -0.30796,
+        "midTroposphericOmegaPaS": -0.2938,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "stormTrackIndex": 0.00011,
+        "wind10mU": -0.089
+      },
+      "on": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.18468,
+        "lowerTroposphericOmegaPaS": -0.30883,
+        "midTroposphericOmegaPaS": -0.29491,
+        "dryingOmegaBridgeLocalAppliedPaS": 0.00038,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0.00065,
+        "stormTrackIndex": 0.00011,
+        "wind10mU": -0.089
+      }
+    }
+  },
+  "patchContract": {
+    "targetLane": "marine saturation-adjustment condensation in the tropical shoulder",
+    "preferredFiles": [
+      "microphysics5.js",
+      "planetary-realism-audit.mjs"
+    ],
+    "latitudeWindowDeg": [
+      3,
+      12
+    ],
+    "doNotTouch": [
+      "projected bridge deposition in 30-45N",
+      "Phase 1K marine-maintenance dry-belt suppression",
+      "Phase 1M circulation rebound containment"
+    ],
+    "desiredSignature": {
+      "tropicalShoulderCondensationDeltaKgM2": "<= 0",
+      "targetEntryProjectedBridgeOnPaS": "stay > 0",
+      "midlatitudeWesterliesNorthU10Ms": "non-decreasing"
+    }
+  },
+  "ranking": [
+    {
+      "key": "remote_shoulder_absorption",
+      "label": "Remote tropical-shoulder condensation rebound absorbs the carrier before wind recovery",
+      "score": 1,
+      "evidence": {
+        "shoulderPeakLatitudeDeg": 11.25,
+        "shoulderPeakCondensationDeltaKgM2": 0.02107,
+        "shoulderPeakProjectedBridgeOnPaS": 0,
+        "shoulderPeakLocalBridgeOnPaS": 0,
+        "targetEntryProjectedBridgeOnPaS": 0.00059,
+        "sourceCoreCondensationDeltaKgM2": -0.00972
+      }
+    },
+    {
+      "key": "downstream_jet_nonresponse",
+      "label": "Carrier reaches the jet-entry structure but wind recovery still fails downstream",
+      "score": 1,
+      "evidence": {
+        "targetEntryProjectedBridgeOnPaS": 0.00059,
+        "jetBandProjectedBridgeOnPaS": 0.00018,
+        "midlatitudeWesterliesNorthDeltaMs": 0
+      }
+    },
+    {
+      "key": "broad_humidification_rebound",
+      "label": "A broad tropical humidification rebound is overwhelming any narrow guard",
+      "score": 0.34267,
+      "evidence": {
+        "tropicalShoulderCondensationDeltaKgM2": 0.01365,
+        "equatorwardLeakCondensationDeltaKgM2": -0.00009,
+        "sourceCoreCondensationDeltaKgM2": -0.00972
+      }
+    },
+    {
+      "key": "direct_shoulder_bridge_leak",
+      "label": "The bridge itself is leaking directly into the tropical shoulder",
+      "score": 0.33333,
+      "evidence": {
+        "shoulderPeakLatitudeDeg": 11.25,
+        "shoulderPeakProjectedBridgeOnPaS": 0,
+        "shoulderPeakLocalBridgeOnPaS": 0
+      }
+    }
+  ]
+}

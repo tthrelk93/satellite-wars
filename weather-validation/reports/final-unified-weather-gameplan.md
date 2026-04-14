@@ -1036,8 +1036,7 @@ Objective:
 - explain and then reduce the remaining equatorward condensation sink that absorbs the now-live projected bridge before transition-entry omega can become wind recovery
 
 Primary files:
-- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
-- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
 - [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
 - [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
 
@@ -1050,6 +1049,51 @@ Exit criteria:
 - tropical-shoulder condensation rebound is materially reduced in same-branch `off/on`
 - target-entry lower- or mid-tropospheric omega no longer regresses relative to `off`
 - the guard stays narrow and does not increase total bridge amplitude first
+
+Status:
+- completed
+
+Result:
+- dominant verdict: `remote_shoulder_absorption`
+- the strongest rebound is in the tropical shoulder core, not the bridge source or target lanes:
+  - strongest latitude: `11.25°N`
+  - condensation delta: `+0.02107 kg/m²`
+  - local bridge on: `0`
+  - projected bridge on: `0`
+- the shoulder-core `3-12°N` band rises while the source core falls:
+  - tropical-shoulder-core condensation delta: `+0.02052 kg/m²`
+  - source-core `20-30°N` condensation delta: `-0.00972 kg/m²`
+- the repaired projected bridge remains live where we wanted it:
+  - target-entry `30-45°N` projected bridge on: `0.00059 Pa/s`
+  - jet-band projected bridge on: `0.00018 Pa/s`
+- so the next blocker is not direct bridge leakage and not missing target deposition
+- it is a remote tropical-shoulder marine condensation rebound that absorbs the benefit before wind recovery
+
+Patch contract for the next lane:
+- keep the Phase `1X` projected-share repair in place
+- do not touch the `30-45°N` projected bridge deposition path
+- add a narrow marine saturation-adjustment guard in the tropical shoulder core `3-12°N`
+- use [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js) as the first patch lane, not more bridge placement tuning
+
+### Phase 1Z: Implement Shoulder Absorption Guard Patch
+
+Objective:
+- suppress the remote tropical-shoulder marine condensation rebound without undoing the kept Phase `1K`, `1M`, and `1X` wins
+
+Primary files:
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+
+Questions to resolve:
+- can a narrow `3-12°N` marine saturation-adjustment guard cut the shoulder rebound while leaving the `30-45°N` projected bridge alive?
+- can we reduce shoulder condensation without worsening ITCZ width or the dry-belt ratios?
+- can the patch stay local enough that the source-core and target-entry bridge lanes remain intact?
+
+Exit criteria:
+- tropical-shoulder-core `3-12°N` condensation delta becomes non-positive in same-branch `off/on`
+- target-entry `30-45°N` projected bridge remains non-zero
+- `itczWidthDeg` and dry-belt ratios do not regress further
 
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
