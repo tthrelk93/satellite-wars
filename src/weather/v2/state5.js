@@ -113,6 +113,7 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const saturationAdjustmentSoftLiveGateEventCount = new Uint32Array(N);
   const saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted = makeArray(N);
   const saturationAdjustmentSoftLiveGateAscentModulationMassWeighted = makeArray(N);
+  const saturationAdjustmentSoftLiveGateAppliedSuppressionMass = makeArray(N);
   const weakAscentCloudBirthAccumMass = makeArray(N);
   const strongAscentCloudBirthAccumMass = makeArray(N);
   const resolvedAscentCloudBirthByBandMass = makeArray(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
@@ -355,6 +356,7 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     saturationAdjustmentSoftLiveGateEventCount,
     saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted,
     saturationAdjustmentSoftLiveGateAscentModulationMassWeighted,
+    saturationAdjustmentSoftLiveGateAppliedSuppressionMass,
     weakAscentCloudBirthAccumMass,
     strongAscentCloudBirthAccumMass,
     resolvedAscentCloudBirthByBandMass,

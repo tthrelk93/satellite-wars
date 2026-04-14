@@ -126,6 +126,9 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
     terrainLeeWarmRainSuppress = 0.9,
     terrainDeliveryProtectExposure0 = 0.5,
     terrainDeliveryProtectExposure1 = 8.0,
+    enableSoftLiveStateMaintenanceSuppression = false,
+    softLiveStateMaintenanceSuppressionScale = 2.0,
+    softLiveStateMaintenanceSuppressionMaxFrac = 0.4,
     enable = true
   } = params;
   if (!enable) return;
@@ -227,6 +230,9 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   if (!state.saturationAdjustmentSoftLiveGateAscentModulationMassWeighted || state.saturationAdjustmentSoftLiveGateAscentModulationMassWeighted.length !== N) {
     state.saturationAdjustmentSoftLiveGateAscentModulationMassWeighted = new Float32Array(N);
   }
+  if (!state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass || state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass.length !== N) {
+    state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass = new Float32Array(N);
+  }
   if (!state.weakAscentCloudBirthAccumMass || state.weakAscentCloudBirthAccumMass.length !== N) {
     state.weakAscentCloudBirthAccumMass = new Float32Array(N);
   }
@@ -297,6 +303,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   state.saturationAdjustmentSoftLiveGateEventCount.fill(0);
   state.saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted.fill(0);
   state.saturationAdjustmentSoftLiveGateAscentModulationMassWeighted.fill(0);
+  state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass.fill(0);
   state.microphysicsUpperCloudSaturationBirthMass.fill(0);
   state.microphysicsUpperCloudCloudReevaporationMass.fill(0);
   state.microphysicsUpperCloudPrecipReevaporationMass.fill(0);
@@ -568,11 +575,24 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               SUBTROPICAL_MAINTENANCE_DIAG.suppressMax
             )
           : 0;
-        let dq = applyLatentCap(qvVal - qsat, iceFrac > 0.5 ? Ls : Lv);
+        const dqRaw = applyLatentCap(qvVal - qsat, iceFrac > 0.5 ? Ls : Lv);
+        const softLiveGateSuppressionFrac = enableSoftLiveStateMaintenanceSuppression
+          && isOceanColumn
+          && softLiveGateSelectorSupport >= SUBTROPICAL_MAINTENANCE_DIAG.supportThreshold
+          ? clamp(
+              softLiveGateSupport * softLiveStateMaintenanceSuppressionScale,
+              0,
+              softLiveStateMaintenanceSuppressionMaxFrac
+            )
+          : 0;
+        const dqSuppressed = dqRaw * softLiveGateSuppressionFrac;
+        let dq = dqRaw - dqSuppressed;
         if (dq > 0) {
           qvVal -= dq;
           if (traceEnabled && massCell > 0) {
             const condMass = dq * massCell;
+            const condMassRaw = dqRaw * massCell;
+            const condSuppressedMass = dqSuppressed * massCell;
             const numericalBandIndex = findInstrumentationLevelBandIndex(sigmaMid);
             state.largeScaleCondensationSource[k] += condMass;
             if (isOceanColumn) {
@@ -589,24 +609,25 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               state.saturationAdjustmentMarineFreshRhMidSupportMassWeighted[k] += freshRhMidSupport * condMass;
             }
             if (maintenanceSupport >= SUBTROPICAL_MAINTENANCE_DIAG.supportThreshold) {
-              state.saturationAdjustmentMaintenanceCandidateMass[k] += condMass;
-              state.saturationAdjustmentMaintenancePotentialSuppressedMass[k] += condMass * maintenanceSupport;
+              state.saturationAdjustmentMaintenanceCandidateMass[k] += condMassRaw;
+              state.saturationAdjustmentMaintenancePotentialSuppressedMass[k] += condMassRaw * maintenanceSupport;
               state.saturationAdjustmentMaintenanceCandidateEventCount[k] += 1;
-              state.saturationAdjustmentMaintenanceCandidateSupersaturationMassWeighted[k] += supersaturationFrac * condMass;
-              state.saturationAdjustmentMaintenanceCandidateOmegaMassWeighted[k] += ascentMagnitudePaS * condMass;
+              state.saturationAdjustmentMaintenanceCandidateSupersaturationMassWeighted[k] += supersaturationFrac * condMassRaw;
+              state.saturationAdjustmentMaintenanceCandidateOmegaMassWeighted[k] += ascentMagnitudePaS * condMassRaw;
             }
             if (liveGateSupport >= SUBTROPICAL_MAINTENANCE_DIAG.supportThreshold) {
-              state.saturationAdjustmentLiveGateCandidateMass[k] += condMass;
-              state.saturationAdjustmentLiveGatePotentialSuppressedMass[k] += condMass * liveGateSupport;
+              state.saturationAdjustmentLiveGateCandidateMass[k] += condMassRaw;
+              state.saturationAdjustmentLiveGatePotentialSuppressedMass[k] += condMassRaw * liveGateSupport;
               state.saturationAdjustmentLiveGateEventCount[k] += 1;
-              state.saturationAdjustmentLiveGateSupportMassWeighted[k] += liveGateSupport * condMass;
+              state.saturationAdjustmentLiveGateSupportMassWeighted[k] += liveGateSupport * condMassRaw;
             }
             if (softLiveGateSelectorSupport >= SUBTROPICAL_MAINTENANCE_DIAG.supportThreshold) {
-              state.saturationAdjustmentSoftLiveGateCandidateMass[k] += condMass;
-              state.saturationAdjustmentSoftLiveGatePotentialSuppressedMass[k] += condMass * softLiveGateSupport;
+              state.saturationAdjustmentSoftLiveGateCandidateMass[k] += condMassRaw;
+              state.saturationAdjustmentSoftLiveGatePotentialSuppressedMass[k] += condMassRaw * softLiveGateSupport;
               state.saturationAdjustmentSoftLiveGateEventCount[k] += 1;
-              state.saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted[k] += softLiveGateSelectorSupport * condMass;
-              state.saturationAdjustmentSoftLiveGateAscentModulationMassWeighted[k] += softLiveGateAscentModulation * condMass;
+              state.saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted[k] += softLiveGateSelectorSupport * condMassRaw;
+              state.saturationAdjustmentSoftLiveGateAscentModulationMassWeighted[k] += softLiveGateAscentModulation * condMassRaw;
+              state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass[k] += condSuppressedMass;
             }
             if (isUpperCloudSigma(sigmaMid)) {
               state.microphysicsUpperCloudSaturationBirthMass[k] += condMass;

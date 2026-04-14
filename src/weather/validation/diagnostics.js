@@ -2247,6 +2247,7 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     saturationAdjustmentSoftLiveGateEventCount: Array.from(state.saturationAdjustmentSoftLiveGateEventCount || new Uint32Array(state.N)),
     saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted: arrayOrZeros(state.saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted, state.N),
     saturationAdjustmentSoftLiveGateAscentModulationMassWeighted: arrayOrZeros(state.saturationAdjustmentSoftLiveGateAscentModulationMassWeighted, state.N),
+    saturationAdjustmentSoftLiveGateAppliedSuppressionMassKgM2: arrayOrZeros(state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass, state.N),
     cloudReevaporationMassKgM2: arrayOrZeros(state.cloudReevaporationMass, state.N),
     precipReevaporationMassKgM2: arrayOrZeros(state.precipReevaporationMass, state.N),
     importedAnvilPersistenceMassKgM2: arrayOrZeros(state.importedAnvilPersistenceMass, state.N),

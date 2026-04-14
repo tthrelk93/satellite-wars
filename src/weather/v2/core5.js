@@ -572,6 +572,9 @@ export class WeatherCore5 {
       convTauEvapCloudScale: 0.35,
       convKAutoScale: 2.0,
       convPrecipEffBoost: 0.12,
+      enableSoftLiveStateMaintenanceSuppression: true,
+      softLiveStateMaintenanceSuppressionScale: 2.0,
+      softLiveStateMaintenanceSuppressionMaxFrac: 0.4,
       terrainLeeWarmRainSuppress: 0.9,
       dThetaMaxMicroPerStepConv: 2.5,
       enable: true

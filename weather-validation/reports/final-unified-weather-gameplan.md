@@ -509,6 +509,41 @@ Exit criteria:
 - the patch acts through the soft live-state gate rather than broad global damping
 - if the same-branch compare is promising, rerun the 30-day climate gate before returning to the original roadmap
 
+Result:
+- succeeded as a live-lever patch and is now kept on the branch
+- same-branch day-30 `patch on` versus `patch off` improved:
+  - `itczWidthDeg`: `26.415 -> 25.874`
+  - `subtropicalDryNorthRatio`: `1.704 -> 1.524`
+  - `subtropicalDrySouthRatio`: `1.296 -> 1.194`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2`: `0.19722 -> 0.15260`
+- the patch records real live suppression:
+  - `northDryBeltOceanSoftLiveGateAppliedSuppressionMeanKgM2 = 0.04238`
+- midlatitude westerlies stayed effectively neutral in the same-branch compare
+
+Conclusion:
+- Phase 1K proved this soft live-state maintenance lane is a real climate lever
+- but the kept `patch on` state is still worse than the trusted old Phase 1 baseline, so we are not ready to return to the original climate roadmap yet
+
+See:
+- [phase1k-soft-live-state-maintenance-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1k-soft-live-state-maintenance-patch.md)
+
+### Phase 1L: Residual Branch-Versus-Baseline Attribution
+
+Objective:
+- explain what still keeps the current kept Phase 1K branch worse than the trusted old Phase 1 baseline after the marine maintenance loop is partially suppressed
+
+Primary files:
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+
+Exit criteria:
+- rank the remaining branch-versus-baseline compensation paths after Phase 1K
+- prove whether the next blocker is still marine maintenance, a broadened tropical response, or a circulation-side rebound
+- choose the next narrow patch lane from that ranked residual, not from the pre-Phase-1K story
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

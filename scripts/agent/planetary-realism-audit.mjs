@@ -69,6 +69,7 @@ let instrumentationMode = 'full';
 let observerEffectAudit = false;
 let trustedBaselinePath = null;
 let carryInputOverrideMode = 'default';
+let softLiveGatePatchMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -106,6 +107,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--instrumentation-mode=')) instrumentationMode = arg.slice('--instrumentation-mode='.length);
   else if (arg === '--carry-input-override' && argv[i + 1]) carryInputOverrideMode = argv[++i];
   else if (arg.startsWith('--carry-input-override=')) carryInputOverrideMode = arg.slice('--carry-input-override='.length);
+  else if (arg === '--soft-live-gate-patch' && argv[i + 1]) softLiveGatePatchMode = argv[++i];
+  else if (arg.startsWith('--soft-live-gate-patch=')) softLiveGatePatchMode = arg.slice('--soft-live-gate-patch='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--trusted-baseline' && argv[i + 1]) trustedBaselinePath = path.resolve(argv[++i]);
   else if (arg.startsWith('--trusted-baseline=')) trustedBaselinePath = path.resolve(arg.slice('--trusted-baseline='.length));
@@ -132,6 +135,11 @@ instrumentationMode = instrumentationMode === 'disabled'
 carryInputOverrideMode = carryInputOverrideMode === 'off'
   ? 'off'
   : carryInputOverrideMode === 'on'
+    ? 'on'
+    : 'default';
+softLiveGatePatchMode = softLiveGatePatchMode === 'off'
+  ? 'off'
+  : softLiveGatePatchMode === 'on'
     ? 'on'
     : 'default';
 
@@ -547,6 +555,7 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
     sampleEveryDays,
     horizonsDays,
     carryInputOverrideMode,
+    softLiveGatePatchMode,
     instrumentationMode: core.getInstrumentationMode ? core.getInstrumentationMode() : instrumentationMode,
     sampleTargetsDays,
     targetSeconds: targetsSeconds,
@@ -1187,6 +1196,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     saturationAdjustmentSoftLiveGateEventCount,
     saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted,
     saturationAdjustmentSoftLiveGateAscentModulationMassWeighted,
+    saturationAdjustmentSoftLiveGateAppliedSuppressionMassKgM2,
     cloudReevaporationMassKgM2,
     precipReevaporationMassKgM2,
     importedAnvilPersistenceMassKgM2,
@@ -1544,6 +1554,24 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     weightedFieldBandMean(saturationAdjustmentSoftLiveGateAscentModulationMassWeighted || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean')
     / Math.max(1e-6, northDryBeltOceanMarineEventMass)
   );
+  const northDryBeltSoftLiveGateAppliedSuppressionMass = weightedBandMean(
+    zonalMean(saturationAdjustmentSoftLiveGateAppliedSuppressionMassKgM2 || new Array(nx * ny).fill(0), nx, ny),
+    latitudesDeg,
+    rowWeights,
+    DEFAULT_DRY_MIN_LAT,
+    DEFAULT_DRY_MAX_LAT
+  );
+  const northDryBeltOceanSoftLiveGateAppliedSuppressionMass = weightedFieldBandMean(
+    saturationAdjustmentSoftLiveGateAppliedSuppressionMassKgM2 || new Array(nx * ny).fill(0),
+    nx,
+    ny,
+    latitudesDeg,
+    rowWeights,
+    DEFAULT_DRY_MIN_LAT,
+    DEFAULT_DRY_MAX_LAT,
+    landMask,
+    'ocean'
+  );
   const northDryBeltLandResolvedAscentCloudBirthPotential = weightedFieldBandMean(resolvedAscentCloudBirthPotentialKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
   const northDryBeltOceanResolvedAscentCloudBirthPotential = weightedFieldBandMean(resolvedAscentCloudBirthPotentialKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
   const northDryBeltLandImportedAnvilPersistence = weightedFieldBandMean(importedAnvilPersistenceMassKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
@@ -1706,6 +1734,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       northDryBeltOceanSoftLiveGateHitMean: round(northDryBeltOceanSoftLiveGateHitMean, 5),
       northDryBeltOceanSoftLiveGateSelectorSupportMeanFrac: round(northDryBeltOceanSoftLiveGateSelectorSupportMean, 5),
       northDryBeltOceanSoftLiveGateAscentModulationMeanFrac: round(northDryBeltOceanSoftLiveGateAscentModulationMean, 5),
+      northDryBeltSoftLiveGateAppliedSuppressionMeanKgM2: round(northDryBeltSoftLiveGateAppliedSuppressionMass, 5),
+      northDryBeltOceanSoftLiveGateAppliedSuppressionMeanKgM2: round(northDryBeltOceanSoftLiveGateAppliedSuppressionMass, 5),
       northDryBeltConvectiveDetrainmentCloudSourceMeanKgM2: round(northDryBeltConvectiveDetrainment, 5),
       northDryBeltImportedAnvilPersistenceMeanKgM2: round(northDryBeltImportedAnvilPersistence, 5),
       northDryBeltLandImportedAnvilPersistenceMeanKgM2: round(northDryBeltLandImportedAnvilPersistence, 5),
@@ -4576,6 +4606,8 @@ export async function main() {
   await core._initPromise;
   if (carryInputOverrideMode === 'off') core.vertParams.enableCarryInputDominanceOverride = false;
   else if (carryInputOverrideMode === 'on') core.vertParams.enableCarryInputDominanceOverride = true;
+  if (softLiveGatePatchMode === 'off') core.microParams.enableSoftLiveStateMaintenanceSuppression = false;
+  else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
   const terrainFallback = applyHeadlessTerrainFixture(core);
   const configSnapshot = cloneConfigSnapshot(core);
   const { samples, timingByTarget, horizonSummaries } = advanceAndSampleCore({ core, sampleTargetsDays });
