@@ -372,6 +372,51 @@ Exit criteria:
   - dry-belt ratios
   - westerly guardrails
 
+Status:
+- complete
+- see [phase1f-maintenance-loop-patch-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1f-maintenance-loop-patch-design.md)
+- exact design outcome:
+  - primary patch target: [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js) saturation-adjustment condensation branch
+  - primary live region: [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js):313
+  - secondary support only: [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js):1478
+  - patch concept:
+    - regime-selective saturation-adjustment maintenance suppression
+    - target weak-engine, subtropically suppressed, marine-maintained columns
+    - do not globally suppress condensation
+- proof result:
+  - ocean-side NH dry-belt large-scale condensation rises `0.18314 -> 0.19722`
+  - imported carryover, weak-erosion survival, and radiative support all move down
+  - surface ocean evaporation is effectively unchanged
+  - so the next patch should attack local marine maintenance, not imported-cloud retention again
+
+### Phase 1G: Implement Regime-Selective Saturation-Adjustment Maintenance Patch
+
+Objective:
+- reduce local subtropical marine maintenance cloud birth without damaging organized or strong-ascent tropical condensation
+
+Primary files:
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+
+Implementation rule:
+- patch the `qvVal > qsat` saturation-adjustment path with regime-selective suppression based on existing weak-engine / subtropical terms
+- do not start by retuning radiation, transport, or the carry-input override
+
+Exit criteria:
+- the next 30-day compare shows:
+  - `northDryBeltLargeScaleCondensationMeanKgM2 < 0.16079`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2 < 0.18314`
+  - `northDryBeltBoundaryLayerRhMeanFrac < 0.61368`
+  - `northDryBeltMidTroposphereRhMeanFrac < 0.44885`
+  - `itczWidthDeg < 26.415`
+  - `subtropicalDryNorthRatio < 1.704`
+  - `subtropicalDrySouthRatio < 1.296`
+- while holding:
+  - `northDryBeltImportedAnvilPersistenceMeanKgM2 <= 0.21583`
+  - `northDryBeltWeakErosionCloudSurvivalMeanKgM2 <= 0.21337`
+  - `midlatitudeWesterliesNorthU10Ms >= 0.532`
+  - `midlatitudeWesterliesSouthU10Ms >= 0.851`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
