@@ -1245,6 +1245,12 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     circulationReboundContainmentDiagFrac,
     circulationReboundActivitySuppressionDiagFrac,
     circulationReboundSourceSuppressionDiagFrac,
+    subtropicalSourceDriverDiagFrac,
+    subtropicalSourceDriverFloorDiagFrac,
+    subtropicalLocalHemiSourceDiagFrac,
+    subtropicalMeanTropicalSourceDiagFrac,
+    subtropicalCrossHemiFloorShareDiagFrac,
+    subtropicalWeakHemiFracDiag,
     surfaceEvapPotentialRateMmHr,
     surfaceEvapTransferCoeff,
     surfaceEvapWindSpeedMs,
@@ -1595,6 +1601,26 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const southTransitionCirculationReboundActivitySuppressionMean = weightedBandMean(zonalCirculationReboundActivitySuppression, latitudesDeg, rowWeights, -22, -12);
   const northTransitionCirculationReboundSourceSuppressionMean = weightedBandMean(zonalCirculationReboundSourceSuppression, latitudesDeg, rowWeights, 12, 22);
   const southTransitionCirculationReboundSourceSuppressionMean = weightedBandMean(zonalCirculationReboundSourceSuppression, latitudesDeg, rowWeights, -22, -12);
+  const zonalSubtropicalSourceDriver = zonalMean(subtropicalSourceDriverDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSubtropicalSourceDriverFloor = zonalMean(subtropicalSourceDriverFloorDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSubtropicalLocalHemiSource = zonalMean(subtropicalLocalHemiSourceDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSubtropicalMeanTropicalSource = zonalMean(subtropicalMeanTropicalSourceDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSubtropicalCrossHemiFloorShare = zonalMean(subtropicalCrossHemiFloorShareDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSubtropicalWeakHemiFrac = zonalMean(subtropicalWeakHemiFracDiag || new Array(nx * ny).fill(0), nx, ny);
+  const northTransitionSubtropicalSourceDriverMean = weightedBandMean(zonalSubtropicalSourceDriver, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionSubtropicalSourceDriverMean = weightedBandMean(zonalSubtropicalSourceDriver, latitudesDeg, rowWeights, -22, -12);
+  const northDryBeltSubtropicalSourceDriverMean = weightedBandMean(zonalSubtropicalSourceDriver, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltSubtropicalSourceDriverMean = weightedBandMean(zonalSubtropicalSourceDriver, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northTransitionSubtropicalSourceDriverFloorMean = weightedBandMean(zonalSubtropicalSourceDriverFloor, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionSubtropicalSourceDriverFloorMean = weightedBandMean(zonalSubtropicalSourceDriverFloor, latitudesDeg, rowWeights, -22, -12);
+  const northTransitionSubtropicalLocalHemiSourceMean = weightedBandMean(zonalSubtropicalLocalHemiSource, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionSubtropicalLocalHemiSourceMean = weightedBandMean(zonalSubtropicalLocalHemiSource, latitudesDeg, rowWeights, -22, -12);
+  const northTransitionSubtropicalMeanTropicalSourceMean = weightedBandMean(zonalSubtropicalMeanTropicalSource, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionSubtropicalMeanTropicalSourceMean = weightedBandMean(zonalSubtropicalMeanTropicalSource, latitudesDeg, rowWeights, -22, -12);
+  const northTransitionSubtropicalCrossHemiFloorShareMean = weightedBandMean(zonalSubtropicalCrossHemiFloorShare, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionSubtropicalCrossHemiFloorShareMean = weightedBandMean(zonalSubtropicalCrossHemiFloorShare, latitudesDeg, rowWeights, -22, -12);
+  const northTransitionSubtropicalWeakHemiFracMean = weightedBandMean(zonalSubtropicalWeakHemiFrac, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionSubtropicalWeakHemiFracMean = weightedBandMean(zonalSubtropicalWeakHemiFrac, latitudesDeg, rowWeights, -22, -12);
   const northDryBeltLandResolvedAscentCloudBirthPotential = weightedFieldBandMean(resolvedAscentCloudBirthPotentialKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
   const northDryBeltOceanResolvedAscentCloudBirthPotential = weightedFieldBandMean(resolvedAscentCloudBirthPotentialKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
   const northDryBeltLandImportedAnvilPersistence = weightedFieldBandMean(importedAnvilPersistenceMassKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
@@ -1767,6 +1793,20 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       southTransitionCirculationReboundActivitySuppressionMeanFrac: round(southTransitionCirculationReboundActivitySuppressionMean, 5),
       northTransitionCirculationReboundSourceSuppressionMeanFrac: round(northTransitionCirculationReboundSourceSuppressionMean, 5),
       southTransitionCirculationReboundSourceSuppressionMeanFrac: round(southTransitionCirculationReboundSourceSuppressionMean, 5),
+      northTransitionSubtropicalSourceDriverMeanFrac: round(northTransitionSubtropicalSourceDriverMean, 5),
+      southTransitionSubtropicalSourceDriverMeanFrac: round(southTransitionSubtropicalSourceDriverMean, 5),
+      northDryBeltSubtropicalSourceDriverMeanFrac: round(northDryBeltSubtropicalSourceDriverMean, 5),
+      southDryBeltSubtropicalSourceDriverMeanFrac: round(southDryBeltSubtropicalSourceDriverMean, 5),
+      northTransitionSubtropicalSourceDriverFloorMeanFrac: round(northTransitionSubtropicalSourceDriverFloorMean, 5),
+      southTransitionSubtropicalSourceDriverFloorMeanFrac: round(southTransitionSubtropicalSourceDriverFloorMean, 5),
+      northTransitionSubtropicalLocalHemiSourceMeanFrac: round(northTransitionSubtropicalLocalHemiSourceMean, 5),
+      southTransitionSubtropicalLocalHemiSourceMeanFrac: round(southTransitionSubtropicalLocalHemiSourceMean, 5),
+      northTransitionSubtropicalMeanTropicalSourceMeanFrac: round(northTransitionSubtropicalMeanTropicalSourceMean, 5),
+      southTransitionSubtropicalMeanTropicalSourceMeanFrac: round(southTransitionSubtropicalMeanTropicalSourceMean, 5),
+      northTransitionSubtropicalCrossHemiFloorShareMeanFrac: round(northTransitionSubtropicalCrossHemiFloorShareMean, 5),
+      southTransitionSubtropicalCrossHemiFloorShareMeanFrac: round(southTransitionSubtropicalCrossHemiFloorShareMean, 5),
+      northTransitionSubtropicalWeakHemiFracMean: round(northTransitionSubtropicalWeakHemiFracMean, 5),
+      southTransitionSubtropicalWeakHemiFracMean: round(southTransitionSubtropicalWeakHemiFracMean, 5),
       northDryBeltConvectiveDetrainmentCloudSourceMeanKgM2: round(northDryBeltConvectiveDetrainment, 5),
       northDryBeltImportedAnvilPersistenceMeanKgM2: round(northDryBeltImportedAnvilPersistence, 5),
       northDryBeltLandImportedAnvilPersistenceMeanKgM2: round(northDryBeltLandImportedAnvilPersistence, 5),

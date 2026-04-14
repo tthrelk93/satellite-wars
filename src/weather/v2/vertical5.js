@@ -347,6 +347,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.circulationReboundContainmentDiag || state.circulationReboundContainmentDiag.length !== N) state.circulationReboundContainmentDiag = new Float32Array(N);
   if (!state.circulationReboundActivitySuppressionDiag || state.circulationReboundActivitySuppressionDiag.length !== N) state.circulationReboundActivitySuppressionDiag = new Float32Array(N);
   if (!state.circulationReboundSourceSuppressionDiag || state.circulationReboundSourceSuppressionDiag.length !== N) state.circulationReboundSourceSuppressionDiag = new Float32Array(N);
+  if (!state.subtropicalSourceDriverDiag || state.subtropicalSourceDriverDiag.length !== N) state.subtropicalSourceDriverDiag = new Float32Array(N);
+  if (!state.subtropicalSourceDriverFloorDiag || state.subtropicalSourceDriverFloorDiag.length !== N) state.subtropicalSourceDriverFloorDiag = new Float32Array(N);
+  if (!state.subtropicalLocalHemiSourceDiag || state.subtropicalLocalHemiSourceDiag.length !== N) state.subtropicalLocalHemiSourceDiag = new Float32Array(N);
+  if (!state.subtropicalMeanTropicalSourceDiag || state.subtropicalMeanTropicalSourceDiag.length !== N) state.subtropicalMeanTropicalSourceDiag = new Float32Array(N);
+  if (!state.subtropicalCrossHemiFloorShareDiag || state.subtropicalCrossHemiFloorShareDiag.length !== N) state.subtropicalCrossHemiFloorShareDiag = new Float32Array(N);
+  if (!state.subtropicalWeakHemiFracDiag || state.subtropicalWeakHemiFracDiag.length !== N) state.subtropicalWeakHemiFracDiag = new Float32Array(N);
   if (!state._freshPotentialTarget || state._freshPotentialTarget.length !== N) state._freshPotentialTarget = new Float32Array(N);
   if (!state._freshOrganizedSupport || state._freshOrganizedSupport.length !== N) state._freshOrganizedSupport = new Float32Array(N);
   if (!state._freshSubtropicalSuppression || state._freshSubtropicalSuppression.length !== N) state._freshSubtropicalSuppression = new Float32Array(N);
@@ -447,6 +453,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const circulationReboundContainmentDiag = state.circulationReboundContainmentDiag;
   const circulationReboundActivitySuppressionDiag = state.circulationReboundActivitySuppressionDiag;
   const circulationReboundSourceSuppressionDiag = state.circulationReboundSourceSuppressionDiag;
+  const subtropicalSourceDriverDiag = state.subtropicalSourceDriverDiag;
+  const subtropicalSourceDriverFloorDiag = state.subtropicalSourceDriverFloorDiag;
+  const subtropicalLocalHemiSourceDiag = state.subtropicalLocalHemiSourceDiag;
+  const subtropicalMeanTropicalSourceDiag = state.subtropicalMeanTropicalSourceDiag;
+  const subtropicalCrossHemiFloorShareDiag = state.subtropicalCrossHemiFloorShareDiag;
+  const subtropicalWeakHemiFracDiag = state.subtropicalWeakHemiFracDiag;
   const freshPotentialTargetDiag = state._freshPotentialTarget;
   const freshOrganizedSupportDiag = state._freshOrganizedSupport;
   const freshSubtropicalSuppressionDiag = state._freshSubtropicalSuppression;
@@ -529,6 +541,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   circulationReboundContainmentDiag.fill(0);
   circulationReboundActivitySuppressionDiag.fill(0);
   circulationReboundSourceSuppressionDiag.fill(0);
+  subtropicalSourceDriverDiag.fill(0);
+  subtropicalSourceDriverFloorDiag.fill(0);
+  subtropicalLocalHemiSourceDiag.fill(0);
+  subtropicalMeanTropicalSourceDiag.fill(0);
+  subtropicalCrossHemiFloorShareDiag.fill(0);
+  subtropicalWeakHemiFracDiag.fill(0);
   freshPotentialTargetDiag.fill(0);
   freshOrganizedSupportDiag.fill(0);
   freshSubtropicalSuppressionDiag.fill(0);
@@ -1487,6 +1505,14 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         const row = j * nx;
         for (let i = 0; i < nx; i++) {
           const k = row + i;
+          subtropicalSourceDriverDiag[k] = sourceDriver;
+          subtropicalSourceDriverFloorDiag[k] = sourceDriverFloor;
+          subtropicalLocalHemiSourceDiag[k] = hemiSource;
+          subtropicalMeanTropicalSourceDiag[k] = meanTropicalSource;
+          subtropicalWeakHemiFracDiag[k] = weakHemiFrac;
+          subtropicalCrossHemiFloorShareDiag[k] = sourceDriverFloor > eps
+            ? clamp01(Math.max(0, sourceDriverFloor - hemiSource) / sourceDriverFloor)
+            : 0;
           const descentSupport = smoothstep(-0.01, 0.24, lowLevelOmegaEffective[k]);
           const localOrganizationRelief = 1 - 0.45 * convectiveOrganization[k];
           const localMoistureExportSupport = 0.62 + 0.38 * (1 - clamp01(lowLevelMoistureConvergence[k] * 21600));

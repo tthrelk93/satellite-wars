@@ -606,6 +606,54 @@ Exit criteria:
 - identify the remaining return-flow / jet-response mismatch that stays after Phase 1M
 - produce a narrower circulation-facing patch design instead of more transition-occupancy tuning
 
+Result:
+- complete
+- see [phase1n-return-flow-rebound-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1n-return-flow-rebound-attribution.md)
+- verdict: `transition_lane_only_response`
+- same-branch Phase 1M `off -> on` still improves the transition-side climate metrics:
+  - `itczWidthDeg`: `25.874 -> 25.834`
+  - `subtropicalDryNorthRatio`: `1.524 -> 1.515`
+  - `subtropicalDrySouthRatio`: `1.194 -> 1.192`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2`: `0.1526 -> 0.14647`
+- but NH jet / return-flow response remains flat:
+  - `midlatitudeWesterliesNorthU10Ms`: `0.531 -> 0.531`
+- the new return-flow diagnostics show why:
+  - transition containment is strongly live: north/south `0.81272 / 0.70617`
+  - transition source suppression is also live: north/south `0.612 / 0.51949`
+  - but the subtropical return-flow source driver stays weak:
+    - north/south transition driver `0.16716 / 0.07608`
+  - cross-hemi floor dominance is not the leading failure:
+    - north/south cross-hemi floor share `0 / 0.12935`
+
+Conclusion:
+- the Phase 1M lane is real, but it is only a transition-containment response
+- the remaining blocker is not primarily a cross-hemisphere floor bug or a local-source underweighting bug
+- the next patch family should couple the already-live transition suppression to a stronger return-flow / jet response instead of retuning occupancy alone
+
+### Phase 1O: Coupled Transition-To-Return-Flow Patch Design
+
+Objective:
+- turn the kept Phase 1M transition containment win into a real circulation recovery by explicitly coupling transition suppression to the return-flow / jet-response lane
+
+Primary files:
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+
+Design rule:
+- do not treat this as another source-partition cleanup
+- do not fall back to more transition-occupancy-only suppression
+- use the Phase 1M containment lane as the entry condition, then design a coupled return-flow response that can move NH westerlies and not just local width/dry-belt metrics
+
+Exit criteria:
+- same-branch `patch off` versus `patch on` moves `midlatitudeWesterliesNorthU10Ms` upward while preserving the kept Phase 1K and Phase 1M wins
+- no material rebound in:
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2`
+  - `itczWidthDeg`
+  - `subtropicalDryNorthRatio`
+  - `subtropicalDrySouthRatio`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
