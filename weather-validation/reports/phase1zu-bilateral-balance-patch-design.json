@@ -1,0 +1,60 @@
+{
+  "schema": "satellite-wars.phase1zu-bilateral-balance-patch-design.v1",
+  "generatedAt": "2026-04-14T17:22:37.893Z",
+  "paths": {
+    "offPath": "/tmp/phase1zs-off.json",
+    "onPath": "/tmp/phase1zs-on.json",
+    "phase1ztPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zt-south-mirror-rebound-attribution.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zu-bilateral-balance-patch-design.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zu-bilateral-balance-patch-design.json"
+  },
+  "verdict": "weak_hemi_crosshemi_floor_overhang",
+  "nextPhase": "Phase 1ZV: Implement Weak-Hemisphere Cross-Hemi Floor Taper Patch",
+  "recommendation": "Do not add a south-local humidity or omega patch. The smallest evidence-backed balance fix is to taper the weak-hemisphere cross-hemi floor in the subtropical source-driver path when the northside leak gate is live, rather than letting the south transition inherit an over-high floor.",
+  "phase1ztContext": {
+    "verdict": "cross_equatorial_compensation_without_local_recharge",
+    "nextPhase": "Phase 1ZU: Bilateral Balance Patch Design"
+  },
+  "metrics": {
+    "itczWidthDeg": 0.007,
+    "subtropicalDryNorthRatio": 0.002,
+    "subtropicalDrySouthRatio": 0.002,
+    "crossEquatorialVaporFluxNorthKgM_1S": -0.21439,
+    "equatorialPrecipMeanMmHr": -0.001
+  },
+  "liveBalanceState": {
+    "northsideLeakPenalty11N": 0.06225,
+    "southsideLeakPenalty11S": 0,
+    "northLocalHemiSource": 0.16841,
+    "northMeanTropicalSource": 0.10765,
+    "northCrossHemiFloorShare": 0,
+    "southLocalHemiSource": 0.04689,
+    "southMeanTropicalSource": 0.10765,
+    "southSourceDriverFloor": 0.06244,
+    "southCrossHemiFloorShare": 0.24904,
+    "southWeakHemiFrac": 0.56444
+  },
+  "overhangAnalysis": {
+    "southEffectiveCrossHemiFloorFrac": 0.58003,
+    "southNeutralCrossHemiFloorFrac": 0.43558,
+    "weakHemiFloorOverhangFrac": 0.14445,
+    "northSuppressionNetCondDelta": -0.03065,
+    "southMirrorNetCondDelta": 0.02957
+  },
+  "designContract": {
+    "keep": [
+      "keep the northside leak-risk gate and bilateral equatorial-edge geometry available behind their runtime toggles",
+      "keep the south-edge stabilization lane and target-entry exclusion unchanged for the next implementation"
+    ],
+    "change": [
+      "patch the subtropical source-driver floor in vertical5.js rather than adding a south-local humidity or omega sink",
+      "compute a weak-hemisphere-only taper from max(0, effectiveCrossHemiFloorFrac - localHemiSource / meanTropicalSource)",
+      "apply that taper only where the hemisphere is weak, the cross-hemi floor share is positive, and the northside leak gate is live",
+      "cap the live taper near the current overhang magnitude (~0.144) before considering any stronger amplitude"
+    ],
+    "avoid": [
+      "do not globally reduce subtropicalSubsidenceCrossHemiFloorFrac because the north transition already has zero floor share",
+      "do not add a south-local TCW/RH/omega patch because Phase 1ZT showed no meaningful local recharge signal"
+    ]
+  }
+}

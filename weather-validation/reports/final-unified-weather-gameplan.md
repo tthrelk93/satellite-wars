@@ -1539,6 +1539,16 @@ Status:
   - this looks like bilateral compensation after NH suppression, not a local south selector bug
 - next active phase: `Phase 1ZU: Bilateral Balance Patch Design`
 
+Status:
+- complete in [phase1zu-bilateral-balance-patch-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zu-bilateral-balance-patch-design.md)
+- verdict: `weak_hemi_crosshemi_floor_overhang`
+- key conclusions:
+  - the south transition is the weak hemisphere, with local source `0.04689` versus mean tropical source `0.10765`
+  - the live south source-driver floor is effectively `0.58003`, but a neutral weak-hemi floor would be only `0.43558`
+  - that leaves a weak-hemi floor overhang of about `0.14445`, which is large enough to sustain the south mirror compensation lane without a local recharge signal
+  - the right next patch is to taper the weak-hemisphere cross-hemi floor in the subtropical source-driver path, not add a south-local humidity or omega sink
+- next active phase: `Phase 1ZV: Implement Weak-Hemisphere Cross-Hemi Floor Taper Patch`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
