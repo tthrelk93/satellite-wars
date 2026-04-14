@@ -698,6 +698,50 @@ Exit criteria:
   - `subtropicalDrySouthRatio`
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2`
 
+Result:
+- complete and rejected as a default-on fix
+- see [phase1p-capped-transition-to-return-flow-coupling.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1p-capped-transition-to-return-flow-coupling.md)
+- the new capped same-hemisphere reinjection lane is measurably active:
+  - `northDryBeltCirculationReturnFlowCouplingAppliedMeanFrac = 0 -> 0.00975`
+- but it does not move the real circulation target:
+  - `midlatitudeWesterliesNorthU10Ms = 0.531 -> 0.531`
+  - `northDryBeltCirculationReturnFlowOpportunityMeanFrac = 0.00084 -> 0.00084`
+- and the climate guardrails degrade:
+  - `itczWidthDeg: 25.834 -> 26.055`
+  - `subtropicalDryNorthRatio: 1.515 -> 1.572`
+  - `subtropicalDrySouthRatio: 1.192 -> 1.203`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.14647 -> 0.14768`
+
+Conclusion:
+- the missing circulation carrier is not solved by a small source-driver reinjection alone
+- the patch lane was real enough to test, but it acted too far upstream of the actual jet / return-flow response
+- keep the new diagnostics and runtime toggle, but leave the Phase 1P coupling disabled by default
+
+### Phase 1Q: Return-Flow Carrier Attribution
+
+Objective:
+- prove which downstream circulation carrier is actually missing between:
+  - transition-source suppression
+  - subtropical drying / descent response
+  - and NH midlatitude westerly recovery
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+
+Design rule:
+- do not make the next move a stronger Phase 1P reinjection
+- use the new Phase 1P diagnostics to identify whether the missing link is:
+  - source-driver to subtropical-drying conversion
+  - subtropical drying to low-level omega response
+  - or low-level omega response to jet recovery
+
+Exit criteria:
+- one dominant downstream carrier mismatch is identified
+- the next circulation patch is placed at that carrier, not at the already-rejected source reinjection lane
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

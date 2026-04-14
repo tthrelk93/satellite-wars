@@ -115,6 +115,20 @@ const computeCirculationReboundContainment = ({
     )
   };
 };
+export const computeTransitionReturnFlowCouplingFrac = ({
+  enabled,
+  returnFlowOpportunity,
+  opportunity0,
+  opportunity1,
+  maxFrac
+}) => {
+  if (!enabled) return 0;
+  return clamp(
+    maxFrac * smoothstep(opportunity0, opportunity1, returnFlowOpportunity),
+    0,
+    maxFrac
+  );
+};
 const VERTICAL_ALLOWED_PARAMS = new Set([
   'enableMixing',
   'enableConvection',
@@ -185,6 +199,10 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'circulationReboundOrganizationScale',
   'circulationReboundActivityScale',
   'circulationReboundSourceScale',
+  'enableTransitionReturnFlowCoupling',
+  'circulationReturnFlowCouplingOpportunity0',
+  'circulationReturnFlowCouplingOpportunity1',
+  'circulationReturnFlowCouplingMaxFrac',
   'enableCarryInputDominanceOverride',
   'carryInputSubtropicalSuppressionMin',
   'carryInputOrganizedSupportMax',
@@ -310,6 +328,10 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     circulationReboundOrganizationScale = 0.6,
     circulationReboundActivityScale = 0.35,
     circulationReboundSourceScale = 0.75,
+    enableTransitionReturnFlowCoupling = false,
+    circulationReturnFlowCouplingOpportunity0 = 0.0002,
+    circulationReturnFlowCouplingOpportunity1 = 0.0012,
+    circulationReturnFlowCouplingMaxFrac = 0.14,
     enableCarryInputDominanceOverride = true,
     carryInputSubtropicalSuppressionMin = 0.74243,
     carryInputOrganizedSupportMax = 0.22504,
@@ -350,6 +372,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.circulationReboundRawSourceDiag || state.circulationReboundRawSourceDiag.length !== N) state.circulationReboundRawSourceDiag = new Float32Array(N);
   if (!state.circulationReboundSuppressedSourceDiag || state.circulationReboundSuppressedSourceDiag.length !== N) state.circulationReboundSuppressedSourceDiag = new Float32Array(N);
   if (!state.circulationReturnFlowOpportunityDiag || state.circulationReturnFlowOpportunityDiag.length !== N) state.circulationReturnFlowOpportunityDiag = new Float32Array(N);
+  if (!state.circulationReturnFlowCouplingAppliedDiag || state.circulationReturnFlowCouplingAppliedDiag.length !== N) state.circulationReturnFlowCouplingAppliedDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverDiag || state.subtropicalSourceDriverDiag.length !== N) state.subtropicalSourceDriverDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverFloorDiag || state.subtropicalSourceDriverFloorDiag.length !== N) state.subtropicalSourceDriverFloorDiag = new Float32Array(N);
   if (!state.subtropicalLocalHemiSourceDiag || state.subtropicalLocalHemiSourceDiag.length !== N) state.subtropicalLocalHemiSourceDiag = new Float32Array(N);
@@ -459,6 +482,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const circulationReboundRawSourceDiag = state.circulationReboundRawSourceDiag;
   const circulationReboundSuppressedSourceDiag = state.circulationReboundSuppressedSourceDiag;
   const circulationReturnFlowOpportunityDiag = state.circulationReturnFlowOpportunityDiag;
+  const circulationReturnFlowCouplingAppliedDiag = state.circulationReturnFlowCouplingAppliedDiag;
   const subtropicalSourceDriverDiag = state.subtropicalSourceDriverDiag;
   const subtropicalSourceDriverFloorDiag = state.subtropicalSourceDriverFloorDiag;
   const subtropicalLocalHemiSourceDiag = state.subtropicalLocalHemiSourceDiag;
@@ -550,6 +574,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   circulationReboundRawSourceDiag.fill(0);
   circulationReboundSuppressedSourceDiag.fill(0);
   circulationReturnFlowOpportunityDiag.fill(0);
+  circulationReturnFlowCouplingAppliedDiag.fill(0);
   subtropicalSourceDriverDiag.fill(0);
   subtropicalSourceDriverFloorDiag.fill(0);
   subtropicalLocalHemiSourceDiag.fill(0);
@@ -1557,12 +1582,21 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             * smoothstep(-0.01, 0.24, lowLevelOmegaEffective[k])
             * (0.7 + 0.3 * (1 - convectiveOrganization[k]))
           );
+          const returnFlowCouplingFrac = computeTransitionReturnFlowCouplingFrac({
+            enabled: enableTransitionReturnFlowCoupling,
+            returnFlowOpportunity,
+            opportunity0: circulationReturnFlowCouplingOpportunity0,
+            opportunity1: circulationReturnFlowCouplingOpportunity1,
+            maxFrac: circulationReturnFlowCouplingMaxFrac
+          });
+          const coupledSourceDriver = sourceDriver * (1 + returnFlowCouplingFrac);
           subtropicalSourceDriverDiag[k] = sourceDriver;
           subtropicalSourceDriverFloorDiag[k] = sourceDriverFloor;
           subtropicalLocalHemiSourceDiag[k] = hemiSource;
           subtropicalMeanTropicalSourceDiag[k] = meanTropicalSource;
           subtropicalWeakHemiFracDiag[k] = weakHemiFrac;
           circulationReturnFlowOpportunityDiag[k] = returnFlowOpportunity;
+          circulationReturnFlowCouplingAppliedDiag[k] = coupledSourceDriver - sourceDriver;
           subtropicalCrossHemiFloorShareDiag[k] = sourceDriverFloor > eps
             ? clamp01(Math.max(0, sourceDriverFloor - hemiSource) / sourceDriverFloor)
             : 0;
@@ -1570,7 +1604,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           const localOrganizationRelief = 1 - 0.45 * convectiveOrganization[k];
           const localMoistureExportSupport = 0.62 + 0.38 * (1 - clamp01(lowLevelMoistureConvergence[k] * 21600));
           const dryDriver = clamp01(
-            2.05 * sourceDriver
+            2.05 * coupledSourceDriver
               * latShape
               * descentSupport
               * localOrganizationRelief

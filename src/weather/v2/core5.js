@@ -539,6 +539,10 @@ export class WeatherCore5 {
       circulationReboundOrganizationScale: 0.6,
       circulationReboundActivityScale: 0.35,
       circulationReboundSourceScale: 0.75,
+      enableTransitionReturnFlowCoupling: false,
+      circulationReturnFlowCouplingOpportunity0: 0.0002,
+      circulationReturnFlowCouplingOpportunity1: 0.0012,
+      circulationReturnFlowCouplingMaxFrac: 0.14,
       eps: 1e-12,
       debugConservation: false
     };

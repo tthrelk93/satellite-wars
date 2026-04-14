@@ -65,6 +65,7 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const circulationReboundRawSourceDiag = makeArray(N);
   const circulationReboundSuppressedSourceDiag = makeArray(N);
   const circulationReturnFlowOpportunityDiag = makeArray(N);
+  const circulationReturnFlowCouplingAppliedDiag = makeArray(N);
   const subtropicalSourceDriverDiag = makeArray(N);
   const subtropicalSourceDriverFloorDiag = makeArray(N);
   const subtropicalLocalHemiSourceDiag = makeArray(N);
@@ -320,6 +321,7 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     circulationReboundRawSourceDiag,
     circulationReboundSuppressedSourceDiag,
     circulationReturnFlowOpportunityDiag,
+    circulationReturnFlowCouplingAppliedDiag,
     subtropicalSourceDriverDiag,
     subtropicalSourceDriverFloorDiag,
     subtropicalLocalHemiSourceDiag,

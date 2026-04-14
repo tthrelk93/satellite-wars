@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createState5 } from './state5.js';
-import { stepVertical5 } from './vertical5.js';
+import { computeTransitionReturnFlowCouplingFrac, stepVertical5 } from './vertical5.js';
 
 test('stepVertical5 keeps thin upper layers bounded during strong ascent-driven transport', () => {
   const sigmaHalf = new Float32Array([0, 0.5, 1]);
@@ -368,4 +368,26 @@ test('stepVertical5 circulation rebound containment suppresses a weak off-equato
   assert.ok(onCase.state.circulationReboundSuppressedSourceDiag[1] > 0);
   assert.ok(onCase.state.convectiveOrganization[1] < offCase.state.convectiveOrganization[1]);
   assert.ok(onCase.state.convectiveMassFlux[1] <= offCase.state.convectiveMassFlux[1]);
+});
+
+test('computeTransitionReturnFlowCouplingFrac is capped and only active when enabled', () => {
+  assert.equal(
+    computeTransitionReturnFlowCouplingFrac({
+      enabled: false,
+      returnFlowOpportunity: 0.001,
+      opportunity0: 0.0002,
+      opportunity1: 0.0012,
+      maxFrac: 0.14
+    }),
+    0
+  );
+  const active = computeTransitionReturnFlowCouplingFrac({
+    enabled: true,
+    returnFlowOpportunity: 0.00084,
+    opportunity0: 0.0002,
+    opportunity1: 0.0012,
+    maxFrac: 0.14
+  });
+  assert.ok(active > 0);
+  assert.ok(active <= 0.14);
 });
