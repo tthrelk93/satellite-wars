@@ -1,0 +1,209 @@
+{
+  "schema": "satellite-wars.phase1zq-capped-northside-fanout-leak-penalty-patch.v1",
+  "generatedAt": "2026-04-14T16:46:43.174Z",
+  "paths": {
+    "offPath": "/tmp/phase1zq-off.json",
+    "onPath": "/tmp/phase1zq-on.json",
+    "phase1zpPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zp-northside-fanout-containment-design.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zq-capped-northside-fanout-leak-penalty-patch.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zq-capped-northside-fanout-leak-penalty-patch.json"
+  },
+  "verdict": "northside_leak_penalty_inert_zero_live_admission",
+  "keepPatch": false,
+  "nextPhase": "Phase 1ZR: Northside Leak Penalty Admission Attribution",
+  "recommendation": "Keep the 1ZQ plumbing and diagnostics, but leave the leak-penalty disabled by default. The live 11.25°N source lane keeps positive equatorial-edge source support while the new penalty stays at zero, so the next step is admission attribution rather than amplitude tuning.",
+  "phase1zpContext": {
+    "verdict": "northside_source_leak_penalty_preferred",
+    "preferredLane": "northside_source_leak_penalty"
+  },
+  "metrics": {
+    "itczWidthDeg": 0,
+    "subtropicalDryNorthRatio": 0,
+    "subtropicalDrySouthRatio": 0,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0,
+    "midlatitudeWesterliesNorthU10Ms": 0
+  },
+  "slices": {
+    "northEdge": {
+      "off": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.1083,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00072,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.41485,
+        "totalColumnWaterKgM2": 43.866,
+        "boundaryLayerRhFrac": 0.544,
+        "lowerTroposphericOmegaPaS": 0.12466
+      },
+      "on": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.1083,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00072,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.41485,
+        "totalColumnWaterKgM2": 43.866,
+        "boundaryLayerRhFrac": 0.544,
+        "lowerTroposphericOmegaPaS": 0.12466
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "totalColumnWaterKgM2": 0,
+        "boundaryLayerRhFrac": 0,
+        "lowerTroposphericOmegaPaS": 0
+      }
+    },
+    "northSource": {
+      "off": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.13552,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0.13665,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "totalColumnWaterKgM2": 43.212,
+        "boundaryLayerRhFrac": 0.547,
+        "lowerTroposphericOmegaPaS": 0.17391
+      },
+      "on": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.13552,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0.13665,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "totalColumnWaterKgM2": 43.212,
+        "boundaryLayerRhFrac": 0.547,
+        "lowerTroposphericOmegaPaS": 0.17391
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "totalColumnWaterKgM2": 0,
+        "boundaryLayerRhFrac": 0,
+        "lowerTroposphericOmegaPaS": 0
+      }
+    },
+    "northSpillover": {
+      "off": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.11945,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "totalColumnWaterKgM2": 38.413,
+        "boundaryLayerRhFrac": 0.479,
+        "lowerTroposphericOmegaPaS": 0.43987
+      },
+      "on": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.11945,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "totalColumnWaterKgM2": 38.413,
+        "boundaryLayerRhFrac": 0.479,
+        "lowerTroposphericOmegaPaS": 0.43987
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "totalColumnWaterKgM2": 0,
+        "boundaryLayerRhFrac": 0,
+        "lowerTroposphericOmegaPaS": 0
+      }
+    },
+    "northDryBeltCore": {
+      "off": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.12644,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "totalColumnWaterKgM2": 37.462,
+        "boundaryLayerRhFrac": 0.563,
+        "lowerTroposphericOmegaPaS": 0.26979
+      },
+      "on": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.12644,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "totalColumnWaterKgM2": 37.462,
+        "boundaryLayerRhFrac": 0.563,
+        "lowerTroposphericOmegaPaS": 0.26979
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "totalColumnWaterKgM2": 0,
+        "boundaryLayerRhFrac": 0,
+        "lowerTroposphericOmegaPaS": 0
+      }
+    },
+    "southEdge": {
+      "off": {
+        "latitudeDeg": -3.75,
+        "largeScaleCondensationSourceKgM2": 0.05851,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00054,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.47609,
+        "totalColumnWaterKgM2": 38.439,
+        "boundaryLayerRhFrac": 0.57,
+        "lowerTroposphericOmegaPaS": 0.1468
+      },
+      "on": {
+        "latitudeDeg": -3.75,
+        "largeScaleCondensationSourceKgM2": 0.05851,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00054,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.47609,
+        "totalColumnWaterKgM2": 38.439,
+        "boundaryLayerRhFrac": 0.57,
+        "lowerTroposphericOmegaPaS": 0.1468
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "totalColumnWaterKgM2": 0,
+        "boundaryLayerRhFrac": 0,
+        "lowerTroposphericOmegaPaS": 0
+      }
+    }
+  },
+  "designContract": {
+    "keep": [
+      "keep the bilateral abs-lat equatorial-edge guard geometry",
+      "keep the south-edge stabilization and the NH target-entry exclusion untouched",
+      "keep the northside leak-penalty plumbing and diagnostics available behind a toggle"
+    ],
+    "change": [
+      "attribute why the 11.25°N source lane never admits a non-zero leak penalty in the real 30-day branch state",
+      "treat the remaining miss as an admission/selector threshold problem, not a global amplitude problem"
+    ]
+  }
+}

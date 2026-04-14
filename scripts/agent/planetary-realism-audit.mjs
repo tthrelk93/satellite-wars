@@ -76,6 +76,7 @@ let circulationReboundPatchMode = 'default';
 let returnFlowCouplingPatchMode = 'default';
 let dryingOmegaBridgePatchMode = 'default';
 let equatorialEdgeSubsidenceGuardPatchMode = 'default';
+let northsideFanoutLeakPenaltyPatchMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -127,6 +128,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--drying-omega-bridge-patch=')) dryingOmegaBridgePatchMode = arg.slice('--drying-omega-bridge-patch='.length);
   else if (arg === '--equatorial-edge-subsidence-guard-patch' && argv[i + 1]) equatorialEdgeSubsidenceGuardPatchMode = argv[++i];
   else if (arg.startsWith('--equatorial-edge-subsidence-guard-patch=')) equatorialEdgeSubsidenceGuardPatchMode = arg.slice('--equatorial-edge-subsidence-guard-patch='.length);
+  else if (arg === '--northside-fanout-leak-penalty-patch' && argv[i + 1]) northsideFanoutLeakPenaltyPatchMode = argv[++i];
+  else if (arg.startsWith('--northside-fanout-leak-penalty-patch=')) northsideFanoutLeakPenaltyPatchMode = arg.slice('--northside-fanout-leak-penalty-patch='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--trusted-baseline' && argv[i + 1]) trustedBaselinePath = path.resolve(argv[++i]);
   else if (arg.startsWith('--trusted-baseline=')) trustedBaselinePath = path.resolve(arg.slice('--trusted-baseline='.length));
@@ -598,6 +601,7 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
     shoulderGuardFateMode,
     circulationReboundPatchMode,
     equatorialEdgeSubsidenceGuardPatchMode,
+    northsideFanoutLeakPenaltyPatchMode,
     instrumentationMode: core.getInstrumentationMode ? core.getInstrumentationMode() : instrumentationMode,
     sampleTargetsDays,
     targetSeconds: targetsSeconds,
@@ -1307,6 +1311,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     equatorialEdgeSubsidenceGuardSourceSupportDiagFrac,
     equatorialEdgeSubsidenceGuardTargetWeightDiagFrac,
     equatorialEdgeSubsidenceGuardAppliedDiagPaS,
+    equatorialEdgeNorthsideLeakPenaltyDiagFrac,
     subtropicalSourceDriverDiagFrac,
     subtropicalSourceDriverFloorDiagFrac,
     subtropicalLocalHemiSourceDiagFrac,
@@ -1404,6 +1409,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalEquatorialEdgeSubsidenceGuardSourceSupport = zonalMean(equatorialEdgeSubsidenceGuardSourceSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalEquatorialEdgeSubsidenceGuardTargetWeight = zonalMean(equatorialEdgeSubsidenceGuardTargetWeightDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalEquatorialEdgeSubsidenceGuardApplied = zonalMean(equatorialEdgeSubsidenceGuardAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
+  const zonalEquatorialEdgeNorthsideLeakPenalty = zonalMean(equatorialEdgeNorthsideLeakPenaltyDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSurfaceEvap = zonalMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny);
@@ -2162,6 +2168,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         equatorialEdgeSubsidenceGuardSourceSupportDiagFrac: roundSeries(zonalEquatorialEdgeSubsidenceGuardSourceSupport, 5),
         equatorialEdgeSubsidenceGuardTargetWeightDiagFrac: roundSeries(zonalEquatorialEdgeSubsidenceGuardTargetWeight, 5),
         equatorialEdgeSubsidenceGuardAppliedDiagPaS: roundSeries(zonalEquatorialEdgeSubsidenceGuardApplied, 5),
+        equatorialEdgeNorthsideLeakPenaltyDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakPenalty, 5),
         freshShoulderLatitudeWindowDiagFrac: roundSeries(zonalFreshShoulderLatitudeWindow, 5),
         freshShoulderEquatorialEdgeWindowDiagFrac: roundSeries(zonalFreshShoulderEquatorialEdgeWindow, 5),
         freshShoulderInnerWindowDiagFrac: roundSeries(zonalFreshShoulderInnerWindow, 5),
@@ -4937,6 +4944,8 @@ export async function main() {
   else if (dryingOmegaBridgePatchMode === 'on') core.vertParams.enableDryingOmegaBridge = true;
   if (equatorialEdgeSubsidenceGuardPatchMode === 'off') core.vertParams.enableEquatorialEdgeSubsidenceGuard = false;
   else if (equatorialEdgeSubsidenceGuardPatchMode === 'on') core.vertParams.enableEquatorialEdgeSubsidenceGuard = true;
+  if (northsideFanoutLeakPenaltyPatchMode === 'off') core.vertParams.enableNorthsideFanoutLeakPenalty = false;
+  else if (northsideFanoutLeakPenaltyPatchMode === 'on') core.vertParams.enableNorthsideFanoutLeakPenalty = true;
   if (softLiveGatePatchMode === 'off') core.microParams.enableSoftLiveStateMaintenanceSuppression = false;
   else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
   if (shoulderAbsorptionGuardPatchMode === 'off') core.microParams.enableShoulderAbsorptionGuard = false;

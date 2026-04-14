@@ -564,6 +564,12 @@ export class WeatherCore5 {
       equatorialEdgeSubsidenceGuardTargetLat0: 2,
       equatorialEdgeSubsidenceGuardTargetLat1: 6,
       equatorialEdgeSubsidenceGuardProjectedMaxPaS: 0.0035,
+      enableNorthsideFanoutLeakPenalty: false,
+      northsideFanoutLeakPenaltyMaxFrac: 0.28,
+      northsideFanoutLeakPenaltyLat0: 9,
+      northsideFanoutLeakPenaltyLat1: 13,
+      northsideFanoutLeakPenaltyRisk0: 0.55,
+      northsideFanoutLeakPenaltyRisk1: 0.8,
       eps: 1e-12,
       debugConservation: false
     };

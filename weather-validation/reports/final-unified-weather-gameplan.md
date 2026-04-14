@@ -1500,6 +1500,16 @@ Status:
   - global amplitude reduction would throw away the south-edge stabilization and the bilateral geometry win
 - next active phase: `Phase 1ZQ: Implement Capped Northside Fanout Leak Penalty Patch`
 
+Status:
+- complete in [phase1zq-capped-northside-fanout-leak-penalty-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zq-capped-northside-fanout-leak-penalty-patch.md)
+- verdict: `northside_leak_penalty_inert_zero_live_admission`
+- key conclusions:
+  - the `11.25°N` source lane keeps positive equatorial-edge source support in the live 30-day branch state
+  - the new northside leak-penalty still stays exactly `0`, so the lane is wired but not admitted
+  - climate guardrails and north fanout bands stay flat because the penalty never becomes active
+  - the next problem is admission/selector attribution, not stronger amplitude
+- next active phase: `Phase 1ZR: Northside Leak Penalty Admission Attribution`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

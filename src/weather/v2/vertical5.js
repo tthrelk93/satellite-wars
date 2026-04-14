@@ -243,6 +243,32 @@ export const computeEquatorialEdgeSubsidenceGuardSourceSupport = ({
       * localDescentSupport
   );
 };
+export const computeEquatorialEdgeNorthsideLeakPenaltyFrac = ({
+  enabled,
+  latDeg,
+  lat0,
+  lat1,
+  subtropicalBand,
+  neutralToSubsidingSupport,
+  existingOmegaPaS,
+  risk0,
+  risk1,
+  maxFrac
+}) => {
+  if (!enabled || !(latDeg > 0)) return 0;
+  const sourceWindow = smoothstep(lat0 - 1.5, lat0 + 1.5, latDeg)
+    * (1 - smoothstep(lat1 - 1.5, lat1 + 1.5, latDeg));
+  const fanoutRisk = clamp01(
+    0.55 * clamp01(subtropicalBand)
+      + 0.3 * clamp01(neutralToSubsidingSupport)
+      + 0.15 * smoothstep(0.05, 0.18, Math.max(0, existingOmegaPaS))
+  );
+  return clamp(
+    maxFrac * sourceWindow * smoothstep(risk0, risk1, fanoutRisk),
+    0,
+    maxFrac
+  );
+};
 export const computeEquatorialEdgeSubsidenceGuardTargetWeight = ({
   enabled,
   latAbs,
@@ -367,6 +393,12 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'equatorialEdgeSubsidenceGuardTargetLat0',
   'equatorialEdgeSubsidenceGuardTargetLat1',
   'equatorialEdgeSubsidenceGuardProjectedMaxPaS',
+  'enableNorthsideFanoutLeakPenalty',
+  'northsideFanoutLeakPenaltyMaxFrac',
+  'northsideFanoutLeakPenaltyLat0',
+  'northsideFanoutLeakPenaltyLat1',
+  'northsideFanoutLeakPenaltyRisk0',
+  'northsideFanoutLeakPenaltyRisk1',
   'enableCarryInputDominanceOverride',
   'carryInputSubtropicalSuppressionMin',
   'carryInputOrganizedSupportMax',
@@ -517,6 +549,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     equatorialEdgeSubsidenceGuardTargetLat0 = 2,
     equatorialEdgeSubsidenceGuardTargetLat1 = 6,
     equatorialEdgeSubsidenceGuardProjectedMaxPaS = 0.0035,
+    enableNorthsideFanoutLeakPenalty = false,
+    northsideFanoutLeakPenaltyMaxFrac = 0.28,
+    northsideFanoutLeakPenaltyLat0 = 9,
+    northsideFanoutLeakPenaltyLat1 = 13,
+    northsideFanoutLeakPenaltyRisk0 = 0.55,
+    northsideFanoutLeakPenaltyRisk1 = 0.8,
     enableCarryInputDominanceOverride = true,
     carryInputSubtropicalSuppressionMin = 0.74243,
     carryInputOrganizedSupportMax = 0.22504,
@@ -569,6 +607,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.equatorialEdgeSubsidenceGuardSourceSupportDiag || state.equatorialEdgeSubsidenceGuardSourceSupportDiag.length !== N) state.equatorialEdgeSubsidenceGuardSourceSupportDiag = new Float32Array(N);
   if (!state.equatorialEdgeSubsidenceGuardTargetWeightDiag || state.equatorialEdgeSubsidenceGuardTargetWeightDiag.length !== N) state.equatorialEdgeSubsidenceGuardTargetWeightDiag = new Float32Array(N);
   if (!state.equatorialEdgeSubsidenceGuardAppliedDiag || state.equatorialEdgeSubsidenceGuardAppliedDiag.length !== N) state.equatorialEdgeSubsidenceGuardAppliedDiag = new Float32Array(N);
+  if (!state.equatorialEdgeNorthsideLeakPenaltyDiag || state.equatorialEdgeNorthsideLeakPenaltyDiag.length !== N) state.equatorialEdgeNorthsideLeakPenaltyDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverDiag || state.subtropicalSourceDriverDiag.length !== N) state.subtropicalSourceDriverDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverFloorDiag || state.subtropicalSourceDriverFloorDiag.length !== N) state.subtropicalSourceDriverFloorDiag = new Float32Array(N);
   if (!state.subtropicalLocalHemiSourceDiag || state.subtropicalLocalHemiSourceDiag.length !== N) state.subtropicalLocalHemiSourceDiag = new Float32Array(N);
@@ -690,6 +729,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const equatorialEdgeSubsidenceGuardSourceSupportDiag = state.equatorialEdgeSubsidenceGuardSourceSupportDiag;
   const equatorialEdgeSubsidenceGuardTargetWeightDiag = state.equatorialEdgeSubsidenceGuardTargetWeightDiag;
   const equatorialEdgeSubsidenceGuardAppliedDiag = state.equatorialEdgeSubsidenceGuardAppliedDiag;
+  const equatorialEdgeNorthsideLeakPenaltyDiag = state.equatorialEdgeNorthsideLeakPenaltyDiag;
   const subtropicalSourceDriverDiag = state.subtropicalSourceDriverDiag;
   const subtropicalSourceDriverFloorDiag = state.subtropicalSourceDriverFloorDiag;
   const subtropicalLocalHemiSourceDiag = state.subtropicalLocalHemiSourceDiag;
@@ -788,6 +828,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   equatorialEdgeSubsidenceGuardSourceSupportDiag.fill(0);
   equatorialEdgeSubsidenceGuardTargetWeightDiag.fill(0);
   equatorialEdgeSubsidenceGuardAppliedDiag.fill(0);
+  equatorialEdgeNorthsideLeakPenaltyDiag.fill(0);
   subtropicalSourceDriverDiag.fill(0);
   subtropicalSourceDriverFloorDiag.fill(0);
   subtropicalLocalHemiSourceDiag.fill(0);
@@ -2014,9 +2055,23 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             0.6 * (1 - clamp01(convectiveOrganization[k])) +
             0.4 * (1 - clamp01(convectivePotential[k]))
           );
+          const northsideLeakPenaltyFrac = computeEquatorialEdgeNorthsideLeakPenaltyFrac({
+            enabled: enableNorthsideFanoutLeakPenalty,
+            latDeg: lat,
+            lat0: northsideFanoutLeakPenaltyLat0,
+            lat1: northsideFanoutLeakPenaltyLat1,
+            subtropicalBand: freshSubtropicalBandPublicDiag[k] || 0,
+            neutralToSubsidingSupport: freshNeutralToSubsidingSupportPublicDiag[k] || 0,
+            existingOmegaPaS: lowLevelOmegaEffective[k],
+            risk0: northsideFanoutLeakPenaltyRisk0,
+            risk1: northsideFanoutLeakPenaltyRisk1,
+            maxFrac: northsideFanoutLeakPenaltyMaxFrac
+          });
+          equatorialEdgeNorthsideLeakPenaltyDiag[k] = northsideLeakPenaltyFrac;
           const sourceBudgetPaS = equatorialEdgeSubsidenceGuardMaxPaS
             * equatorialEdgeSourceSupport
-            * weakEngineSupport;
+            * weakEngineSupport
+            * (1 - northsideLeakPenaltyFrac);
           if (!(sourceBudgetPaS > 0)) continue;
           if (lat >= 0) nhEquatorialEdgeSubsidenceGuardBudgetByX[i] += sourceBudgetPaS;
           else shEquatorialEdgeSubsidenceGuardBudgetByX[i] += sourceBudgetPaS;

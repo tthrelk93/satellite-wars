@@ -6,6 +6,7 @@ import {
   computeProjectedOmegaBridgeCellPaS,
   computeDryingOmegaBridgeSourceSupport,
   computeDryingOmegaBridgeTargetWeight,
+  computeEquatorialEdgeNorthsideLeakPenaltyFrac,
   computeEquatorialEdgeSubsidenceGuardSourceSupport,
   computeEquatorialEdgeSubsidenceGuardTargetWeight,
   computeTransitionReturnFlowCouplingFrac,
@@ -738,6 +739,65 @@ test('computeEquatorialEdgeSubsidenceGuardTargetWeight focuses on weakly support
   assert.ok(targetEdge > 0.4);
   assert.ok(supportedEdge < targetEdge);
   assert.equal(outsideTarget, 0);
+});
+
+test('computeEquatorialEdgeNorthsideLeakPenaltyFrac only trims NH source rows with live fanout risk', () => {
+  assert.equal(
+    computeEquatorialEdgeNorthsideLeakPenaltyFrac({
+      enabled: false,
+      latDeg: 11.25,
+      lat0: 9,
+      lat1: 13,
+      subtropicalBand: 0.7,
+      neutralToSubsidingSupport: 0.8,
+      existingOmegaPaS: 0.16,
+      risk0: 0.55,
+      risk1: 0.8,
+      maxFrac: 0.28
+    }),
+    0
+  );
+
+  const sourceCore = computeEquatorialEdgeNorthsideLeakPenaltyFrac({
+    enabled: true,
+    latDeg: 11.25,
+    lat0: 9,
+    lat1: 13,
+    subtropicalBand: 0.7,
+    neutralToSubsidingSupport: 0.8,
+    existingOmegaPaS: 0.16,
+    risk0: 0.55,
+    risk1: 0.8,
+    maxFrac: 0.28
+  });
+  const southMirror = computeEquatorialEdgeNorthsideLeakPenaltyFrac({
+    enabled: true,
+    latDeg: -11.25,
+    lat0: 9,
+    lat1: 13,
+    subtropicalBand: 0.7,
+    neutralToSubsidingSupport: 0.8,
+    existingOmegaPaS: 0.16,
+    risk0: 0.55,
+    risk1: 0.8,
+    maxFrac: 0.28
+  });
+  const outsideLane = computeEquatorialEdgeNorthsideLeakPenaltyFrac({
+    enabled: true,
+    latDeg: 18.75,
+    lat0: 9,
+    lat1: 13,
+    subtropicalBand: 0.7,
+    neutralToSubsidingSupport: 0.8,
+    existingOmegaPaS: 0.16,
+    risk0: 0.55,
+    risk1: 0.8,
+    maxFrac: 0.28
+  });
+
+  assert.ok(sourceCore > 0.15);
+  assert.equal(southMirror, 0);
+  assert.equal(outsideLane, 0);
 });
 
 test('equatorial-edge guard windows are mirrored by absolute latitude rather than NH-only shoulder geometry', () => {
