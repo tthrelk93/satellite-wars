@@ -7,6 +7,8 @@ import {
   computeDryingOmegaBridgeSourceSupport,
   computeDryingOmegaBridgeTargetWeight,
   computeEquatorialEdgeNorthsideLeakPenaltyFrac,
+  computeEquatorialEdgeNorthsideLeakRiskFrac,
+  computeEquatorialEdgeNorthsideLeakSourceWindowFrac,
   computeEquatorialEdgeSubsidenceGuardSourceSupport,
   computeEquatorialEdgeSubsidenceGuardTargetWeight,
   computeTransitionReturnFlowCouplingFrac,
@@ -798,6 +800,49 @@ test('computeEquatorialEdgeNorthsideLeakPenaltyFrac only trims NH source rows wi
   assert.ok(sourceCore > 0.15);
   assert.equal(southMirror, 0);
   assert.equal(outsideLane, 0);
+});
+
+test('computeEquatorialEdgeNorthsideLeakSourceWindowFrac only admits the NH source lane geometry', () => {
+  const northCore = computeEquatorialEdgeNorthsideLeakSourceWindowFrac({
+    enabled: true,
+    latDeg: 11.25,
+    lat0: 9,
+    lat1: 13
+  });
+  const southMirror = computeEquatorialEdgeNorthsideLeakSourceWindowFrac({
+    enabled: true,
+    latDeg: -11.25,
+    lat0: 9,
+    lat1: 13
+  });
+  const outsideLane = computeEquatorialEdgeNorthsideLeakSourceWindowFrac({
+    enabled: true,
+    latDeg: 18.75,
+    lat0: 9,
+    lat1: 13
+  });
+
+  assert.equal(northCore, 1);
+  assert.equal(southMirror, 0);
+  assert.equal(outsideLane, 0);
+});
+
+test('computeEquatorialEdgeNorthsideLeakRiskFrac stays below threshold when live subtropical support is weak', () => {
+  const weakRisk = computeEquatorialEdgeNorthsideLeakRiskFrac({
+    enabled: true,
+    subtropicalBand: 0.18,
+    neutralToSubsidingSupport: 0.12,
+    existingOmegaPaS: 0.17
+  });
+  const strongRisk = computeEquatorialEdgeNorthsideLeakRiskFrac({
+    enabled: true,
+    subtropicalBand: 0.7,
+    neutralToSubsidingSupport: 0.8,
+    existingOmegaPaS: 0.17
+  });
+
+  assert.ok(weakRisk < 0.55);
+  assert.ok(strongRisk > weakRisk);
 });
 
 test('equatorial-edge guard windows are mirrored by absolute latitude rather than NH-only shoulder geometry', () => {

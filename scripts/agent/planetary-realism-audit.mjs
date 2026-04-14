@@ -1311,6 +1311,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     equatorialEdgeSubsidenceGuardSourceSupportDiagFrac,
     equatorialEdgeSubsidenceGuardTargetWeightDiagFrac,
     equatorialEdgeSubsidenceGuardAppliedDiagPaS,
+    equatorialEdgeNorthsideLeakSourceWindowDiagFrac,
+    equatorialEdgeNorthsideLeakRiskDiagFrac,
     equatorialEdgeNorthsideLeakPenaltyDiagFrac,
     subtropicalSourceDriverDiagFrac,
     subtropicalSourceDriverFloorDiagFrac,
@@ -1409,6 +1411,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalEquatorialEdgeSubsidenceGuardSourceSupport = zonalMean(equatorialEdgeSubsidenceGuardSourceSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalEquatorialEdgeSubsidenceGuardTargetWeight = zonalMean(equatorialEdgeSubsidenceGuardTargetWeightDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalEquatorialEdgeSubsidenceGuardApplied = zonalMean(equatorialEdgeSubsidenceGuardAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
+  const zonalEquatorialEdgeNorthsideLeakSourceWindow = zonalMean(equatorialEdgeNorthsideLeakSourceWindowDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalEquatorialEdgeNorthsideLeakRisk = zonalMean(equatorialEdgeNorthsideLeakRiskDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalEquatorialEdgeNorthsideLeakPenalty = zonalMean(equatorialEdgeNorthsideLeakPenaltyDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
@@ -2168,12 +2172,16 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         equatorialEdgeSubsidenceGuardSourceSupportDiagFrac: roundSeries(zonalEquatorialEdgeSubsidenceGuardSourceSupport, 5),
         equatorialEdgeSubsidenceGuardTargetWeightDiagFrac: roundSeries(zonalEquatorialEdgeSubsidenceGuardTargetWeight, 5),
         equatorialEdgeSubsidenceGuardAppliedDiagPaS: roundSeries(zonalEquatorialEdgeSubsidenceGuardApplied, 5),
+        equatorialEdgeNorthsideLeakSourceWindowDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakSourceWindow, 5),
+        equatorialEdgeNorthsideLeakRiskDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakRisk, 5),
         equatorialEdgeNorthsideLeakPenaltyDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakPenalty, 5),
+        freshSubtropicalBandDiagFrac: roundSeries(zonalMean(freshSubtropicalBandDiagFrac || new Array(nx * ny).fill(0), nx, ny), 5),
         freshShoulderLatitudeWindowDiagFrac: roundSeries(zonalFreshShoulderLatitudeWindow, 5),
         freshShoulderEquatorialEdgeWindowDiagFrac: roundSeries(zonalFreshShoulderEquatorialEdgeWindow, 5),
         freshShoulderInnerWindowDiagFrac: roundSeries(zonalFreshShoulderInnerWindow, 5),
         freshShoulderEquatorialEdgeGateSupportDiagFrac: roundSeries(zonalFreshShoulderEquatorialEdgeGateSupport, 5),
         freshShoulderTargetEntryExclusionDiagFrac: roundSeries(zonalFreshShoulderTargetEntryExclusion, 5),
+        freshNeutralToSubsidingSupportDiagFrac: roundSeries(zonalMean(freshNeutralToSubsidingSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny), 5),
         surfaceEvapRateMmHr: roundSeries(zonalSurfaceEvap),
         surfaceEvapPotentialRateMmHr: roundSeries(zonalSurfaceEvapPotential),
         surfaceCloudShortwaveShieldingWm2: roundSeries(zonalSurfaceCloudShielding, 5),

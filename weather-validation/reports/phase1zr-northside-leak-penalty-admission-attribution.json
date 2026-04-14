@@ -1,0 +1,74 @@
+{
+  "schema": "satellite-wars.phase1zr-northside-leak-penalty-admission-attribution.v1",
+  "generatedAt": "2026-04-14T16:57:11.602Z",
+  "paths": {
+    "onPath": "/tmp/phase1zr-on.json",
+    "phase1zqPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zq-capped-northside-fanout-leak-penalty-patch.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zr-northside-leak-penalty-admission-attribution.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zr-northside-leak-penalty-admission-attribution.json"
+  },
+  "verdict": "supported_subset_risk_below_gate",
+  "nextPhase": "Phase 1ZS: Northside Leak Risk Gate Redesign",
+  "recommendation": "Keep the 1ZQ lane disabled by default. The northside source row is live and partially occupied, but its active supported subset still does not clear the leak-risk entry gate. The next patch should redesign the leak admission around supported-source-normalized risk instead of simply increasing amplitude.",
+  "phase1zqContext": {
+    "verdict": "northside_leak_penalty_inert_zero_live_admission",
+    "keepPatch": false
+  },
+  "thresholds": {
+    "risk0": 0.55,
+    "risk1": 0.8
+  },
+  "scores": {
+    "activeSourceFraction": 0.45833,
+    "rowMeanRisk": 0.16908,
+    "activeSubsetRiskMean": 0.3689,
+    "riskMiss": 0.1811
+  },
+  "slices": {
+    "northSource": {
+      "latitudeDeg": 11.25,
+      "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0.13665,
+      "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0.45833,
+      "equatorialEdgeNorthsideLeakRiskDiagFrac": 0.16908,
+      "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+      "freshSubtropicalBandDiagFrac": 0.08427,
+      "freshNeutralToSubsidingSupportDiagFrac": 0.36527,
+      "lowerTroposphericOmegaPaS": 0.17391,
+      "largeScaleCondensationSourceKgM2": 0.13552
+    },
+    "northEdge": {
+      "latitudeDeg": 3.75,
+      "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+      "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+      "equatorialEdgeNorthsideLeakRiskDiagFrac": 0,
+      "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+      "freshSubtropicalBandDiagFrac": 0,
+      "freshNeutralToSubsidingSupportDiagFrac": 0.3542,
+      "lowerTroposphericOmegaPaS": 0.12466,
+      "largeScaleCondensationSourceKgM2": 0.1083
+    },
+    "southSource": {
+      "latitudeDeg": -11.25,
+      "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0.10521,
+      "equatorialEdgeNorthsideLeakSourceWindowDiagFrac": 0,
+      "equatorialEdgeNorthsideLeakRiskDiagFrac": 0.12804,
+      "equatorialEdgeNorthsideLeakPenaltyDiagFrac": 0,
+      "freshSubtropicalBandDiagFrac": 0.08427,
+      "freshNeutralToSubsidingSupportDiagFrac": 0.27249,
+      "lowerTroposphericOmegaPaS": -0.0928,
+      "largeScaleCondensationSourceKgM2": 0.10715
+    }
+  },
+  "designContract": {
+    "keep": [
+      "keep the bilateral equatorial-edge subsidence guard geometry",
+      "keep the northside leak-penalty wiring and diagnostics behind the runtime toggle",
+      "keep the south-edge stabilization intact"
+    ],
+    "change": [
+      "redesign leak admission around supported-source-normalized risk instead of the current stricter raw risk gate",
+      "treat the dominant miss as weak live subtropical-band admission on the NH source subset, not as a wiring failure",
+      "do not increase global amplitude until the source-row risk gate actually becomes live"
+    ]
+  }
+}

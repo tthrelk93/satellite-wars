@@ -2253,6 +2253,8 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     equatorialEdgeSubsidenceGuardSourceSupportDiagFrac: arrayOrZeros(state.equatorialEdgeSubsidenceGuardSourceSupportDiag, state.N),
     equatorialEdgeSubsidenceGuardTargetWeightDiagFrac: arrayOrZeros(state.equatorialEdgeSubsidenceGuardTargetWeightDiag, state.N),
     equatorialEdgeSubsidenceGuardAppliedDiagPaS: arrayOrZeros(state.equatorialEdgeSubsidenceGuardAppliedDiag, state.N),
+    equatorialEdgeNorthsideLeakSourceWindowDiagFrac: arrayOrZeros(state.equatorialEdgeNorthsideLeakSourceWindowDiag, state.N),
+    equatorialEdgeNorthsideLeakRiskDiagFrac: arrayOrZeros(state.equatorialEdgeNorthsideLeakRiskDiag, state.N),
     equatorialEdgeNorthsideLeakPenaltyDiagFrac: arrayOrZeros(state.equatorialEdgeNorthsideLeakPenaltyDiag, state.N),
     subtropicalSourceDriverDiagFrac: arrayOrZeros(state.subtropicalSourceDriverDiag, state.N),
     subtropicalSourceDriverFloorDiagFrac: arrayOrZeros(state.subtropicalSourceDriverFloorDiag, state.N),

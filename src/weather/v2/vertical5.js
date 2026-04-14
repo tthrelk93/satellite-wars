@@ -256,17 +256,47 @@ export const computeEquatorialEdgeNorthsideLeakPenaltyFrac = ({
   maxFrac
 }) => {
   if (!enabled || !(latDeg > 0)) return 0;
-  const sourceWindow = smoothstep(lat0 - 1.5, lat0 + 1.5, latDeg)
-    * (1 - smoothstep(lat1 - 1.5, lat1 + 1.5, latDeg));
-  const fanoutRisk = clamp01(
-    0.55 * clamp01(subtropicalBand)
-      + 0.3 * clamp01(neutralToSubsidingSupport)
-      + 0.15 * smoothstep(0.05, 0.18, Math.max(0, existingOmegaPaS))
-  );
+  const sourceWindow = computeEquatorialEdgeNorthsideLeakSourceWindowFrac({
+    enabled,
+    latDeg,
+    lat0,
+    lat1
+  });
+  const fanoutRisk = computeEquatorialEdgeNorthsideLeakRiskFrac({
+    enabled,
+    subtropicalBand,
+    neutralToSubsidingSupport,
+    existingOmegaPaS
+  });
   return clamp(
     maxFrac * sourceWindow * smoothstep(risk0, risk1, fanoutRisk),
     0,
     maxFrac
+  );
+};
+export const computeEquatorialEdgeNorthsideLeakSourceWindowFrac = ({
+  enabled,
+  latDeg,
+  lat0,
+  lat1
+}) => {
+  if (!enabled || !(latDeg > 0)) return 0;
+  return clamp01(
+    smoothstep(lat0 - 1.5, lat0 + 1.5, latDeg)
+      * (1 - smoothstep(lat1 - 1.5, lat1 + 1.5, latDeg))
+  );
+};
+export const computeEquatorialEdgeNorthsideLeakRiskFrac = ({
+  enabled,
+  subtropicalBand,
+  neutralToSubsidingSupport,
+  existingOmegaPaS
+}) => {
+  if (!enabled) return 0;
+  return clamp01(
+    0.55 * clamp01(subtropicalBand)
+      + 0.3 * clamp01(neutralToSubsidingSupport)
+      + 0.15 * smoothstep(0.05, 0.18, Math.max(0, existingOmegaPaS))
   );
 };
 export const computeEquatorialEdgeSubsidenceGuardTargetWeight = ({
@@ -607,6 +637,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.equatorialEdgeSubsidenceGuardSourceSupportDiag || state.equatorialEdgeSubsidenceGuardSourceSupportDiag.length !== N) state.equatorialEdgeSubsidenceGuardSourceSupportDiag = new Float32Array(N);
   if (!state.equatorialEdgeSubsidenceGuardTargetWeightDiag || state.equatorialEdgeSubsidenceGuardTargetWeightDiag.length !== N) state.equatorialEdgeSubsidenceGuardTargetWeightDiag = new Float32Array(N);
   if (!state.equatorialEdgeSubsidenceGuardAppliedDiag || state.equatorialEdgeSubsidenceGuardAppliedDiag.length !== N) state.equatorialEdgeSubsidenceGuardAppliedDiag = new Float32Array(N);
+  if (!state.equatorialEdgeNorthsideLeakSourceWindowDiag || state.equatorialEdgeNorthsideLeakSourceWindowDiag.length !== N) state.equatorialEdgeNorthsideLeakSourceWindowDiag = new Float32Array(N);
+  if (!state.equatorialEdgeNorthsideLeakRiskDiag || state.equatorialEdgeNorthsideLeakRiskDiag.length !== N) state.equatorialEdgeNorthsideLeakRiskDiag = new Float32Array(N);
   if (!state.equatorialEdgeNorthsideLeakPenaltyDiag || state.equatorialEdgeNorthsideLeakPenaltyDiag.length !== N) state.equatorialEdgeNorthsideLeakPenaltyDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverDiag || state.subtropicalSourceDriverDiag.length !== N) state.subtropicalSourceDriverDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverFloorDiag || state.subtropicalSourceDriverFloorDiag.length !== N) state.subtropicalSourceDriverFloorDiag = new Float32Array(N);
@@ -729,6 +761,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const equatorialEdgeSubsidenceGuardSourceSupportDiag = state.equatorialEdgeSubsidenceGuardSourceSupportDiag;
   const equatorialEdgeSubsidenceGuardTargetWeightDiag = state.equatorialEdgeSubsidenceGuardTargetWeightDiag;
   const equatorialEdgeSubsidenceGuardAppliedDiag = state.equatorialEdgeSubsidenceGuardAppliedDiag;
+  const equatorialEdgeNorthsideLeakSourceWindowDiag = state.equatorialEdgeNorthsideLeakSourceWindowDiag;
+  const equatorialEdgeNorthsideLeakRiskDiag = state.equatorialEdgeNorthsideLeakRiskDiag;
   const equatorialEdgeNorthsideLeakPenaltyDiag = state.equatorialEdgeNorthsideLeakPenaltyDiag;
   const subtropicalSourceDriverDiag = state.subtropicalSourceDriverDiag;
   const subtropicalSourceDriverFloorDiag = state.subtropicalSourceDriverFloorDiag;
@@ -828,6 +862,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   equatorialEdgeSubsidenceGuardSourceSupportDiag.fill(0);
   equatorialEdgeSubsidenceGuardTargetWeightDiag.fill(0);
   equatorialEdgeSubsidenceGuardAppliedDiag.fill(0);
+  equatorialEdgeNorthsideLeakSourceWindowDiag.fill(0);
+  equatorialEdgeNorthsideLeakRiskDiag.fill(0);
   equatorialEdgeNorthsideLeakPenaltyDiag.fill(0);
   subtropicalSourceDriverDiag.fill(0);
   subtropicalSourceDriverFloorDiag.fill(0);
@@ -2055,6 +2091,18 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             0.6 * (1 - clamp01(convectiveOrganization[k])) +
             0.4 * (1 - clamp01(convectivePotential[k]))
           );
+          const northsideLeakSourceWindow = computeEquatorialEdgeNorthsideLeakSourceWindowFrac({
+            enabled: enableNorthsideFanoutLeakPenalty,
+            latDeg: lat,
+            lat0: northsideFanoutLeakPenaltyLat0,
+            lat1: northsideFanoutLeakPenaltyLat1
+          });
+          const northsideLeakRisk = computeEquatorialEdgeNorthsideLeakRiskFrac({
+            enabled: enableNorthsideFanoutLeakPenalty,
+            subtropicalBand: freshSubtropicalBandPublicDiag[k] || 0,
+            neutralToSubsidingSupport: freshNeutralToSubsidingSupportPublicDiag[k] || 0,
+            existingOmegaPaS: lowLevelOmegaEffective[k]
+          });
           const northsideLeakPenaltyFrac = computeEquatorialEdgeNorthsideLeakPenaltyFrac({
             enabled: enableNorthsideFanoutLeakPenalty,
             latDeg: lat,
@@ -2067,6 +2115,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             risk1: northsideFanoutLeakPenaltyRisk1,
             maxFrac: northsideFanoutLeakPenaltyMaxFrac
           });
+          equatorialEdgeNorthsideLeakSourceWindowDiag[k] = northsideLeakSourceWindow;
+          equatorialEdgeNorthsideLeakRiskDiag[k] = northsideLeakRisk;
           equatorialEdgeNorthsideLeakPenaltyDiag[k] = northsideLeakPenaltyFrac;
           const sourceBudgetPaS = equatorialEdgeSubsidenceGuardMaxPaS
             * equatorialEdgeSourceSupport

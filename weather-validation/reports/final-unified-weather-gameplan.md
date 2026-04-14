@@ -1510,6 +1510,16 @@ Status:
   - the next problem is admission/selector attribution, not stronger amplitude
 - next active phase: `Phase 1ZR: Northside Leak Penalty Admission Attribution`
 
+Status:
+- complete in [phase1zr-northside-leak-penalty-admission-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zr-northside-leak-penalty-admission-attribution.md)
+- verdict: `supported_subset_risk_below_gate`
+- key conclusions:
+  - the `11.25°N` source row is live and partially occupied, not dead
+  - active source-window fraction is `0.45833`
+  - active-subset leak risk is only `0.36889`, still below the current entry gate at `0.55`
+  - this is an admission-threshold / gate-shape miss, not a wiring bug
+- next active phase: `Phase 1ZS: Northside Leak Risk Gate Redesign`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
