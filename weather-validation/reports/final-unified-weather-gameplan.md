@@ -1219,6 +1219,36 @@ Questions to answer:
 - is `11.25°N` over-participating relative to `3.75°N`, or is the rebound mainly a shared same-lane recharge response?
 - can we reduce the `18.75°N` spillover without reopening the fixed `33.75°N` target-entry lane?
 
+Status:
+- complete in [phase1zd-suppressed-mass-fate-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zd-suppressed-mass-fate-design.md)
+- dominant verdict: `in_place_vapor_retention`
+- the current shoulder guard is now proved to leave more vapor and less condensate in the same column when it suppresses condensation
+- that one-column witness matches the live 30-day branch behavior:
+  - tropical shoulder core TCW delta: `+0.1055 kg/m²`
+  - tropical shoulder core mid-RH delta: `+0.003`
+  - adjacent `12-22.5°N` spillover still rises
+- selector geometry is no longer the lead problem
+
+### Phase 1ZE: Suppressed-Mass Fate Counterfactuals
+
+Objective:
+- compare bounded alternatives for shoulder-guard-suppressed mass handling so we can choose the least damaging fate before patching the live climate
+
+Primary files:
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+
+Counterfactuals to compare:
+- capped local sink/export of suppressed shoulder mass
+- delayed-rainout / buffered-removal path
+- current in-place vapor retention baseline
+
+Exit criteria:
+- tropical shoulder core net condensation no longer increases in same-branch `off/on`
+- `18.75°N` spillover is reduced
+- fixed `33.75°N` target-entry exclusion stays intact
+- ITCZ width and dry-belt ratios do not worsen versus the current kept branch
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
