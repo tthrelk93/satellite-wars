@@ -1420,6 +1420,25 @@ Status:
   - the main 30-day guardrails are flat-to-worse, so this is not a keepable default patch
 - next active phase: `Phase 1ZM: Bilateral Equatorial-Edge Source Redesign`
 
+#### Phase 1ZM: Bilateral Equatorial-Edge Source Redesign
+
+Objective:
+- prove exactly why the Phase 1ZL guard stayed north-only and define the bilateral source/target contract before another implementation patch
+
+Primary files:
+- [phase1zm-bilateral-equatorial-edge-source-redesign.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/phase1zm-bilateral-equatorial-edge-source-redesign.mjs)
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [final-unified-weather-gameplan.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/final-unified-weather-gameplan.md)
+
+Status:
+- complete in [phase1zm-bilateral-equatorial-edge-source-redesign.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zm-bilateral-equatorial-edge-source-redesign.md)
+- verdict: `signed_latitude_window_inheritance`
+- key conclusions:
+  - the equatorial-edge guard inherits `freshShoulderInnerWindow` for source admission and `freshShoulderEquatorialEdgeWindow` for target admission
+  - both of those windows are currently NH-only signed-latitude lanes, so the south mirror is structurally excluded before any amplitude or support logic matters
+  - the correct next move is a dedicated bilateral `abs(lat)` source/target geometry, while preserving the NH target-entry exclusion as a separate lane
+- next active phase: `Phase 1ZN: Implement Mirrored Bilateral Edge-Source Window Patch`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
