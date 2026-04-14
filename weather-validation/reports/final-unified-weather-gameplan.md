@@ -884,6 +884,43 @@ Exit criteria:
 - same-branch `off -> on` compare produces a non-zero positive NH jet-band wind or storm-track response
 - the bridge still improves NH transition / dry-belt omega without giving back the kept Phase 1K and Phase 1M wins
 
+Result:
+- complete
+- see [phase1u-jet-band-placement-patch-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1u-jet-band-placement-patch-design.md)
+- the design verdict is:
+  - `poleward_projected_transition_bridge_required`
+- the key structural reason is:
+  - the current bridge is confined to the same-column `15-35°` subtropical loop, so a same-column retune cannot directly seed the `41.25-56.25°N` jet band
+- the current Phase 1S off/on evidence says:
+  - tropical-shoulder `largeScaleCondensation` increases `+0.01778`
+  - dry-belt-core `largeScaleCondensation` decreases `-0.00425`
+  - transition-entry and jet-band wind deltas stay effectively `0`
+
+Conclusion:
+- the right next patch is not a stronger same-column bridge
+- it is a poleward-projected same-hemisphere bridge that redistributes a capped share of the proved dry-belt response into the `30-45°N` transition / jet-entry rows
+- the current bridge diagnostics and runtime toggle should stay in place so we can compare the placement patch cleanly against Phase 1S
+
+### Phase 1V: Implement Poleward Jet-Entry Bridge Patch
+
+Objective:
+- implement a capped same-hemisphere projected bridge that shifts part of the current omega response from the NH dry-belt core into the `30-45°N` transition / jet-entry lane
+
+Primary files:
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+
+Design rule:
+- keep the existing Phase 1S bridge diagnostics and runtime toggle
+- split the bridge into a capped local share plus a capped poleward-projected share
+- penalize equatorward leakage below roughly `18-22°N`
+- do not increase total bridge amplitude before verifying placement
+
+Exit criteria:
+- same-branch `off -> on` compare produces a positive NH transition-entry or jet-band wind / storm-track response
+- tropical-shoulder `largeScaleCondensation` increase is reduced materially from the current `+0.01778 kg/m²`
+- the Phase 1K and Phase 1M wins remain intact
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
