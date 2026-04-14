@@ -1376,9 +1376,28 @@ Status:
 - key conclusions:
   - the split-lane gate is worth keeping because it improves the main 30-day climate guardrails again
   - it preserves the `11.25°N`, `18.75°N`, and `33.75°N` protected wins
-  - the remaining `3.75°N` rebound now occurs with zero shoulder-guard candidate mass and zero applied suppression
-  - that means the residual is no longer an in-lane shoulder-candidate problem
+- the remaining `3.75°N` rebound now occurs with zero shoulder-guard candidate mass and zero applied suppression
+- that means the residual is no longer an in-lane shoulder-candidate problem
 - next active phase: `Phase 1ZK: Equatorial-Edge Out-Of-Lane Attribution`
+
+### Phase 1ZK: Equatorial-Edge Out-Of-Lane Attribution
+
+Objective:
+- prove why the remaining `3.75°N` rebound persists even after the split-lane shoulder gate stopped admitting that lane
+
+Primary files:
+- [phase1zk-equatorial-edge-out-of-lane-attribution.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/phase1zk-equatorial-edge-out-of-lane-attribution.mjs)
+- [final-unified-weather-gameplan.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/final-unified-weather-gameplan.md)
+
+Status:
+- complete in [phase1zk-equatorial-edge-out-of-lane-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zk-equatorial-edge-out-of-lane-attribution.md)
+- verdict: `bilateral_equatorial_edge_subsidence_relaxation`
+- key conclusions:
+  - the residual is mirrored at `-3.75°` and `3.75°`, so it is not just a local NH shoulder miss anymore
+  - both equatorial-edge lanes show weaker low-level omega while condensation increases
+  - `3.75°N` keeps zero shoulder candidate mass and zero shoulder applied suppression
+  - the `11.25°N`, `18.75°N`, and `33.75°N` kept wins remain intact
+- next active phase: `Phase 1ZL: Equatorial-Edge Subsidence Guard Design`
 
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
