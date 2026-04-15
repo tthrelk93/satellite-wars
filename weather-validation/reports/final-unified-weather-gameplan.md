@@ -1564,6 +1564,24 @@ Status:
   - the residual is now a narrower north-source rebound at `11.25°N`
 - next active phase: `Phase 1ZW: North Source Rebound Attribution`
 
+Status:
+- complete in [phase1zw-north-source-rebound-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zw-north-source-rebound-attribution.md)
+- verdict: `north_source_condensation_concentration_without_local_recharge`
+- keep patch: `true`
+- key conclusions:
+  - the remaining `11.25°N` rebound is not a local recharge signal:
+    - condensation rises `+0.02481 kg/m²`
+    - total column water falls `-0.085 kg/m²`
+    - BL/lower/mid RH all fall
+    - lower/mid omega both weaken slightly
+  - the rebound is better explained as a same-hemisphere source-row concentration lane:
+    - `18.75°N` condensation falls `-0.01008 kg/m²`
+    - `26.25°N` condensation falls `-0.01896 kg/m²`
+    - cross-equatorial vapor flux north still rises `+1.21412`
+  - the weak-hemi floor taper should stay kept
+  - the next fix should stay in `vertical5.js` / `core5.js` and contain source-row concentration around `9–13°N`, not add another local humidity or omega boost
+- next active phase: `Phase 1ZX: North Source Concentration Patch Design`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
