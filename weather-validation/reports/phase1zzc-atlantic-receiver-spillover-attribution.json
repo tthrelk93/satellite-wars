@@ -1,0 +1,62 @@
+{
+  "schema": "satellite-wars.phase1zzc-atlantic-receiver-spillover-attribution.v1",
+  "generatedAt": "2026-04-15T01:59:23.475Z",
+  "paths": {
+    "offPath": "/tmp/phase1zzb-off.json",
+    "onPath": "/tmp/phase1zzb-on.json",
+    "offSectorPath": "/tmp/phase1zzb-off-nh-dry-belt-source-sector-summary.json",
+    "onSectorPath": "/tmp/phase1zzb-on-nh-dry-belt-source-sector-summary.json",
+    "offBirthPath": "/tmp/phase1zzb-off-vertical-cloud-birth-attribution.json",
+    "onBirthPath": "/tmp/phase1zzb-on-vertical-cloud-birth-attribution.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zzc-atlantic-receiver-spillover-attribution.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zzc-atlantic-receiver-spillover-attribution.json"
+  },
+  "verdict": "atlantic_transition_carryover_spillover_without_source_recharge",
+  "nextPhase": "Phase 1ZZD: Atlantic Transition Carryover Containment Design",
+  "recommendation": "Do not retune Atlantic receiver geometry again. The spillover is not fresh low-level source recharge; it is transition-lane carryover and cloud-maintenance uptake around 18.75°N. The next patch should target Atlantic transition carryover containment while preserving the 26.25°N receiver relief.",
+  "metrics": {
+    "itczWidthDeg": 0.077,
+    "subtropicalDryNorthRatio": 0.017,
+    "subtropicalDrySouthRatio": 0.003,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": -0.00039
+  },
+  "spillover18N": {
+    "condensationDelta": 0.00891,
+    "tcwDelta": 0.342,
+    "lowerOmegaDelta": 0.00268,
+    "midRhDelta": 0.011,
+    "surfaceEvapDelta": -0.001,
+    "northDryBeltOceanSourceDelta": -0.00223,
+    "tropicalNorthSourceDelta": -0.00018,
+    "resolvedAscentBirthDelta": 0.00015,
+    "importedAnvilPersistenceDelta": 0.03092,
+    "carriedOverUpperCloudDelta": 0.03092,
+    "weakErosionCloudSurvivalDelta": 0.03047,
+    "upperCloudPathDelta": 0.03391,
+    "cloudReevaporationDelta": -0.0031,
+    "precipReevaporationDelta": -0.00068
+  },
+  "receiver26N": {
+    "condensationDelta": -0.0097,
+    "tcwDelta": 0.308,
+    "lowerOmegaDelta": -0.00626,
+    "midRhDelta": 0.014,
+    "taperDiagFrac": 0.00595,
+    "taperApplied": 0.00164
+  },
+  "sectorDeltas": {
+    "atlanticCondensationDelta": -0.00234,
+    "atlanticLowLevelSourceDelta": 0.23564,
+    "eastPacificCondensationDelta": 0.00387,
+    "indoPacificCondensationDelta": -0.00023,
+    "continentalCondensationDelta": 0.0001
+  },
+  "atlanticBirthDeltas": {
+    "resolvedAscentCloudBirthDelta": 0.1101,
+    "saturationAdjustmentCloudBirthDelta": 1.51576,
+    "convectiveDetrainmentCloudBirthDelta": 0.00015,
+    "carryOverUpperCloudEnteringDelta": 4.3246,
+    "carryOverUpperCloudSurvivingDelta": 4.24108,
+    "carrySurvivalFracDelta": 0.00006
+  }
+}

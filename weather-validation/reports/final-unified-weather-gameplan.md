@@ -1699,6 +1699,32 @@ Status update:
   - the next blocker is not Atlantic receiver admission anymore; it is Atlantic-receiver spillover into `18.75°N`
 - next active phase: `Phase 1ZZC: Atlantic Receiver Spillover Attribution`
 
+Status update:
+- completed in [phase1zzc-atlantic-receiver-spillover-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zzc-atlantic-receiver-spillover-attribution.md)
+- outcome:
+  - `18.75°N` spillover is **not** fresh low-level source recharge:
+    - north-dry-belt-ocean source delta `-0.00223`
+    - tropical-ocean-north source delta `-0.00018`
+    - surface-evap delta `-0.001`
+    - resolved-ascent birth delta `+0.00015`
+  - the dominant carrier is Atlantic transition-lane upper-cloud maintenance:
+    - imported-anvil persistence delta `+0.03092`
+    - carried-over upper-cloud delta `+0.03092`
+    - weak-erosion survival delta `+0.03047`
+    - upper-cloud path delta `+0.03391`
+  - Atlantic sector dry-core condensation itself still falls:
+    - Atlantic condensation delta `-0.00234`
+  - but Atlantic carryover and saturation-adjustment channels rise:
+    - Atlantic saturation-adjustment birth delta `+1.51576`
+    - Atlantic carry-entering delta `+4.3246`
+    - Atlantic carry-surviving delta `+4.24108`
+  - east Pacific has a smaller secondary dry-belt rebound:
+    - east Pacific condensation delta `+0.00387`
+- decision:
+  - the remaining 1ZZB miss is best described as `atlantic_transition_carryover_spillover_without_source_recharge`
+  - the next patch should target Atlantic transition carryover containment around `18–22.5°N`, not Atlantic receiver geometry or fresh low-level source terms
+- next active phase: `Phase 1ZZD: Atlantic Transition Carryover Containment Design`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
