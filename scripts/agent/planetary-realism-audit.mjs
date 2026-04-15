@@ -68,6 +68,8 @@ let counterfactuals = null;
 let instrumentationMode = 'full';
 let observerEffectAudit = false;
 let trustedBaselinePath = null;
+let quiet = false;
+let systemExperiment = 'baseline';
 let carryInputOverrideMode = 'default';
 let softLiveGatePatchMode = 'default';
 let shoulderAbsorptionGuardPatchMode = 'default';
@@ -143,6 +145,9 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg === '--atlantic-transition-carryover-containment-patch' && argv[i + 1]) atlanticTransitionCarryoverContainmentPatchMode = argv[++i];
   else if (arg.startsWith('--atlantic-transition-carryover-containment-patch=')) atlanticTransitionCarryoverContainmentPatchMode = arg.slice('--atlantic-transition-carryover-containment-patch='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
+  else if (arg === '--quiet') quiet = true;
+  else if (arg === '--system-experiment' && argv[i + 1]) systemExperiment = argv[++i];
+  else if (arg.startsWith('--system-experiment=')) systemExperiment = arg.slice('--system-experiment='.length);
   else if (arg === '--trusted-baseline' && argv[i + 1]) trustedBaselinePath = path.resolve(argv[++i]);
   else if (arg.startsWith('--trusted-baseline=')) trustedBaselinePath = path.resolve(arg.slice('--trusted-baseline='.length));
 }
@@ -215,6 +220,90 @@ atlanticDryCoreReceiverTaperPatchMode = atlanticDryCoreReceiverTaperPatchMode ==
   : atlanticDryCoreReceiverTaperPatchMode === 'on'
     ? 'on'
     : 'default';
+systemExperiment = [
+  'baseline',
+  'upper-cloud-persistence-collapse',
+  'annual-numerical-hardening',
+  'hydrology-balance-repartition'
+].includes(systemExperiment)
+  ? systemExperiment
+  : 'baseline';
+
+const applySystemExperiment = (core, experimentKey) => {
+  if (!core || experimentKey === 'baseline') {
+    return {
+      key: 'baseline',
+      label: 'Baseline branch state',
+      overrides: {}
+    };
+  }
+  if (experimentKey === 'upper-cloud-persistence-collapse') {
+    core.vertParams.upperCloudWeakErosionSupportScale = 0.68;
+    core.vertParams.upperCloudPersistenceSupportScale = 0.72;
+    core.radParams.upperCloudRadiativePersistenceEquivalentScale = 0.62;
+    return {
+      key: experimentKey,
+      label: 'Upper-cloud persistence collapse',
+      overrides: {
+        vertParams: {
+          upperCloudWeakErosionSupportScale: core.vertParams.upperCloudWeakErosionSupportScale,
+          upperCloudPersistenceSupportScale: core.vertParams.upperCloudPersistenceSupportScale
+        },
+        radParams: {
+          upperCloudRadiativePersistenceEquivalentScale: core.radParams.upperCloudRadiativePersistenceEquivalentScale
+        }
+      }
+    };
+  }
+  if (experimentKey === 'annual-numerical-hardening') {
+    core.vertParams.verticalAdvectionCflMax = 0.3;
+    core.vertParams.dThetaMaxVertAdvPerStep = 1.5;
+    core.vertParams.dThetaMaxConvPerStep = 1.9;
+    core.vertParams.autoMaxFrac = 0.16;
+    core.microParams.dThetaMaxMicroPerStep = 0.7;
+    core.microParams.dThetaMaxMicroPerStepConv = 1.9;
+    core.microParams.autoMaxFrac = 0.18;
+    return {
+      key: experimentKey,
+      label: 'Annual numerical hardening',
+      overrides: {
+        vertParams: {
+          verticalAdvectionCflMax: core.vertParams.verticalAdvectionCflMax,
+          dThetaMaxVertAdvPerStep: core.vertParams.dThetaMaxVertAdvPerStep,
+          dThetaMaxConvPerStep: core.vertParams.dThetaMaxConvPerStep,
+          autoMaxFrac: core.vertParams.autoMaxFrac
+        },
+        microParams: {
+          dThetaMaxMicroPerStep: core.microParams.dThetaMaxMicroPerStep,
+          dThetaMaxMicroPerStepConv: core.microParams.dThetaMaxMicroPerStepConv,
+          autoMaxFrac: core.microParams.autoMaxFrac
+        }
+      }
+    };
+  }
+  core.vertParams.enableWeakHemiCrossHemiFloorTaper = true;
+  core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac = 0.5;
+  core.vertParams.subtropicalSubsidenceWeakHemiBoost = 0.15;
+  core.vertParams.weakHemiCrossHemiFloorTaperPenalty0 = 0.025;
+  core.vertParams.weakHemiCrossHemiFloorTaperPenalty1 = 0.075;
+  core.microParams.softLiveStateMaintenanceSuppressionScale = 2.2;
+  return {
+    key: experimentKey,
+    label: 'Hydrology balance repartition',
+    overrides: {
+      vertParams: {
+        enableWeakHemiCrossHemiFloorTaper: core.vertParams.enableWeakHemiCrossHemiFloorTaper,
+        subtropicalSubsidenceCrossHemiFloorFrac: core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac,
+        subtropicalSubsidenceWeakHemiBoost: core.vertParams.subtropicalSubsidenceWeakHemiBoost,
+        weakHemiCrossHemiFloorTaperPenalty0: core.vertParams.weakHemiCrossHemiFloorTaperPenalty0,
+        weakHemiCrossHemiFloorTaperPenalty1: core.vertParams.weakHemiCrossHemiFloorTaperPenalty1
+      },
+      microParams: {
+        softLiveStateMaintenanceSuppressionScale: core.microParams.softLiveStateMaintenanceSuppressionScale
+      }
+    }
+  };
+};
 
 const effectiveReportBase = outPath || mdOutPath ? null : (reportBase || defaultReportBase);
 
@@ -625,6 +714,7 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
     ny,
     dtSeconds: dt,
     seed,
+    systemExperiment,
     sampleEveryDays,
     horizonsDays,
     carryInputOverrideMode,
@@ -5040,6 +5130,7 @@ export async function main() {
   if (shoulderAbsorptionGuardPatchMode === 'off') core.microParams.enableShoulderAbsorptionGuard = false;
   else if (shoulderAbsorptionGuardPatchMode === 'on') core.microParams.enableShoulderAbsorptionGuard = true;
   core.microParams.shoulderAbsorptionGuardSuppressedMassMode = shoulderGuardFateMode;
+  const systemExperimentSummary = applySystemExperiment(core, systemExperiment);
   const terrainFallback = applyHeadlessTerrainFixture(core);
   const configSnapshot = cloneConfigSnapshot(core);
   const { samples, timingByTarget, horizonSummaries } = advanceAndSampleCore({ core, sampleTargetsDays });
@@ -5443,6 +5534,7 @@ export async function main() {
       ny,
       dtSeconds: dt,
       seed,
+      systemExperiment,
       sampleEveryDays,
       horizonsDays
     },
@@ -5500,6 +5592,7 @@ export async function main() {
     artifacts,
     defaultNextPriorities
   };
+  summary.systemExperiment = systemExperimentSummary;
 
   const markdown = renderMarkdown(summary);
   if (outPath) {
@@ -5577,7 +5670,7 @@ export async function main() {
       fs.writeFileSync(artifacts.observerEffectModuleOrderParityJsonPath, toJson(observerEffectModuleOrderParity));
     }
   }
-  process.stdout.write(toJson(summary));
+  if (!quiet) process.stdout.write(toJson(summary));
   return summary;
 }
 
@@ -5588,6 +5681,7 @@ if (isMain) {
 
 export const _test = {
   buildConservationSummary,
+  applySystemExperiment,
   PLANETARY_PRESETS,
   buildMoistureAttributionReport,
   buildNhDryBeltSourceSectorReport,

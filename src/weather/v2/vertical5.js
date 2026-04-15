@@ -760,6 +760,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     weakHemiCrossHemiFloorTaperOverhang0 = 0.06,
     weakHemiCrossHemiFloorTaperOverhang1 = 0.12,
     weakHemiCrossHemiFloorTaperMaxFrac = 0.145,
+    upperCloudWeakErosionSupportScale = 1.0,
+    upperCloudPersistenceSupportScale = 1.0,
     enableCarryInputDominanceOverride = true,
     carryInputSubtropicalSuppressionMin = 0.74243,
     carryInputOrganizedSupportMax = 0.22504,
@@ -2662,18 +2664,22 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     const weakSubsidenceErosion = 1 - smoothstep(0.01, 0.08, subtropicalSubsidenceDrying[k]);
     const weakDescentVent = 1 - smoothstep(0.02, 0.18, Math.max(0, lowLevelOmegaEffective[k]));
     const weakErosionSupport = clamp01(
-      0.4 * weakSubsidenceErosion +
-      0.25 * weakDescentVent +
-      0.2 * weakLocalOrganization +
-      0.1 * weakLocalMassFlux +
-      0.05 * weakLocalAnvilSource
+      (
+        0.4 * weakSubsidenceErosion +
+        0.25 * weakDescentVent +
+        0.2 * weakLocalOrganization +
+        0.1 * weakLocalMassFlux +
+        0.05 * weakLocalAnvilSource
+      ) * Math.max(0, upperCloudWeakErosionSupportScale)
     );
     weakErosionCloudSurvivalMass[k] = overlap * weakErosionSupport;
     const persistenceSupport = clamp01(
-      0.35 * weakLocalOrganization +
-      0.25 * weakLocalMassFlux +
-      0.2 * weakLocalDetrainment +
-      0.2 * weakLocalAnvilSource
+      (
+        0.35 * weakLocalOrganization +
+        0.25 * weakLocalMassFlux +
+        0.2 * weakLocalDetrainment +
+        0.2 * weakLocalAnvilSource
+      ) * Math.max(0, upperCloudPersistenceSupportScale)
     );
     importedAnvilPersistenceMass[k] = overlap * persistenceSupport;
     const localBirthMass = Math.max(0, upperCloudMass - overlap);

@@ -38,7 +38,8 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
     radIceFactor = 0.7,
     pTop = 20000,
     enableFullColumnLW = true,
-    enableSigmaLWProfile = true
+    enableSigmaLWProfile = true,
+    upperCloudRadiativePersistenceEquivalentScale = 1.0
   } = params;
   if (!enable) return;
 
@@ -215,7 +216,10 @@ export function stepRadiation2D5({ dt, grid, state, timeUTC, params = {} }) {
         state.upperCloudCloudyLwCoolingWm2[k] = upperCloudyLwCoolingSum;
         state.upperCloudLwCloudEffectWm2[k] = upperLwCloudEffectSum;
         state.upperCloudNetCloudRadiativeEffectWm2[k] = upperSwAbsLayerSum + upperLwCloudEffectSum;
-        const supportFrac = clamp01(Math.max(0, state.upperCloudRadiativePersistenceSupportWm2[k]) / 80);
+        const supportFrac = clamp01(
+          (Math.max(0, state.upperCloudRadiativePersistenceSupportWm2[k]) / 80)
+          * Math.max(0, upperCloudRadiativePersistenceEquivalentScale)
+        );
         if (supportFrac > 0) {
           for (let lev = 0; lev < nz; lev += 1) {
             const idx = lev * N + k;

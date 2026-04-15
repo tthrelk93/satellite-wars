@@ -471,7 +471,8 @@ export class WeatherCore5 {
       radIceFactor: 0.7,
       pTop: P_TOP,
       enableSigmaLWProfile: true,
-      enableSwMassDistribution: true
+      enableSwMassDistribution: true,
+      upperCloudRadiativePersistenceEquivalentScale: 1.0
     };
      this.vertParams = {
        enableMixing: true,
@@ -604,6 +605,8 @@ export class WeatherCore5 {
       weakHemiCrossHemiFloorTaperOverhang0: 0.06,
       weakHemiCrossHemiFloorTaperOverhang1: 0.12,
       weakHemiCrossHemiFloorTaperMaxFrac: 0.145,
+      upperCloudWeakErosionSupportScale: 1.0,
+      upperCloudPersistenceSupportScale: 1.0,
       eps: 1e-12,
       debugConservation: false
     };
