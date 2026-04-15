@@ -1623,6 +1623,33 @@ Status:
   - that means the phase succeeded as a source-lane experiment but failed as a keepable default climate fix
 - next active phase: `Phase 1ZZ: Source-Cap Redistribution Attribution`
 
+Status:
+- complete in [phase1zz-source-cap-redistribution-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zz-source-cap-redistribution-attribution.md)
+- verdict: `atlantic_dry_core_redistribution_with_secondary_south_mirror`
+- keep patch: `false`
+- key conclusions:
+  - the capped north-source penalty really does relieve the `11.25°N` source row:
+    - condensation delta `-0.0306 kg/m²`
+    - total-column-water delta `-0.03 kg/m²`
+    - no compensating local omega or RH recovery
+  - the failed receiver lane is now clearly the north dry-core, not the original source row:
+    - `26.25°N` condensation delta `+0.0084 kg/m²`
+    - `26.25°N` total-column-water delta `-0.122 kg/m²`
+    - `26.25°N` lower-omega delta `+0.00233`
+    - that is a concentration-style dry-core uptake, not local recharge
+  - the dominant NH basin receiver is the Atlantic:
+    - Atlantic dry-belt condensation delta `+0.00966 kg/m²`
+    - east Pacific `+0.00034`
+    - continental subtropics `-0.00004`
+    - Indo-Pacific `-0.00337`
+  - the south mirror is still present but secondary:
+    - `-11.25°` condensation delta `+0.02652 kg/m²`
+    - `-11.25°` total-column-water delta `+0.017 kg/m²`
+    - this is weaker evidence than the Atlantic dry-core uptake for the current failure
+  - the next honest move is not a stronger source cap
+  - it is a receiver-lane patch/design step around Atlantic-facing `20–30°N` dry-core uptake while preserving the `11.25°N` source relief
+- next active phase: `Phase 1ZZA: Atlantic Dry-Core Receiver Design`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
