@@ -16,6 +16,57 @@ Build a world climate and weather model that is:
 - convincing in the shipped game runtime
 - strong enough to support believable seasonality, storms, and cyclone environments
 
+## Reset Override (2026-04-14)
+
+This section supersedes the serial Phase 1 micro-phase continuation below.
+
+### Why The Roadmap Changed
+
+The long `Phase 1A -> 1ZZF` sequence produced real attribution, but it became too local and too reactive. It was helping us explain residuals without reliably moving the full-objective climate state back toward the trusted baseline.
+
+The active blocker is still the same:
+- **north subtropical dry-belt wet bias**
+
+The working symptom set is still:
+- ITCZ too broad
+- NH subtropical dry belts too wet
+- NH westerlies too weak
+
+### Frozen Branch State
+
+- frozen branch commit: `8593bf5`
+- 30-day frozen screen artifact: `/tmp/phase1-reset-current-quick.json`
+- 365-day frozen screen artifact: [phase1-reset-triage-annual.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-reset-triage-annual.json)
+- reset report: [phase1-reset-triage.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1-reset-triage.md)
+
+### Active Plan Now
+
+The active roadmap is no longer another alphabetized micro-phase. It is a bounded reset:
+
+1. `Reset R1: Freeze And Triage`
+- complete the 30-day and 365-day screens
+- summarize real progress, remaining failures, live candidates, and ruled-out families
+
+2. `Reset R2: Run Three System-Level Experiments`
+- experiment A: upper-cloud persistence collapse
+- experiment B: annual numerical-fragility hardening
+- experiment C: hydrology balance repartition
+
+3. `Reset R3: Choose Winner Or Stop`
+- if one system-level experiment wins on both 30-day and 365-day climate objectives, that becomes the new active branch direction
+- if none win, stop the patch spiral and escalate to rollback or architecture change
+
+### Rule For Future Work
+
+From this point on, candidate changes should be judged primarily by:
+- ITCZ width
+- both subtropical dry ratios
+- NH westerlies
+- NH dry-belt ocean condensation
+- annual stability
+
+They should **not** be promoted just because they locally improve one residual slice.
+
 ## Where We Actually Stand Now
 
 ### Original climate roadmap status
