@@ -1,0 +1,60 @@
+{
+  "schema": "satellite-wars.phase1zza-atlantic-dry-core-receiver-design.v1",
+  "generatedAt": "2026-04-15T01:31:54.332Z",
+  "paths": {
+    "offPath": "/tmp/phase1zy-off.json",
+    "onPath": "/tmp/phase1zy-on.json",
+    "offSectorPath": "/tmp/phase1zy-off-nh-dry-belt-source-sector-summary.json",
+    "onSectorPath": "/tmp/phase1zy-on-nh-dry-belt-source-sector-summary.json",
+    "offBirthPath": "/tmp/phase1zy-off-vertical-cloud-birth-attribution.json",
+    "onBirthPath": "/tmp/phase1zy-on-vertical-cloud-birth-attribution.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zza-atlantic-dry-core-receiver-design.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zza-atlantic-dry-core-receiver-design.json"
+  },
+  "verdict": "atlantic_receiver_efficiency_without_birth_or_import_growth",
+  "keepPatch": false,
+  "nextPhase": "Phase 1ZZB: Implement Atlantic Receiver Efficiency Taper Patch",
+  "recommendation": "Do not strengthen the north-source cap. Add a basin-aware Atlantic dry-core receiver taper in vertical5/core5, ocean-only and centered on the poleward half of the 20–30°N lane, keyed off the already-live north leak signal while leaving 11.25°N relief intact.",
+  "designContract": {
+    "basinWindow": "Atlantic ocean sector, lonDeg >= -90 && lonDeg < 20, land excluded",
+    "latitudeWindow": "Poleward half of the dry-core receiver lane, centered near 22–30°N with taper outside it",
+    "activationCarrier": "Reuse the existing live northside leak signal / source-cap activity rather than introducing a new independent source switch",
+    "targetMechanism": "Receiver efficiency / uptake taper under dry-core condensation concentration, not source strengthening, local humidity recharge, or import ablation",
+    "antiPatterns": [
+      "Do not increase the north-source cap amplitude first",
+      "Do not blunt Atlantic carryover or saturation-adjustment birth globally",
+      "Do not add a new local humidity or omega boost at 11.25°N"
+    ]
+  },
+  "guardrails": {
+    "itczWidthDeg": -0.028,
+    "subtropicalDryNorthRatio": -0.004,
+    "subtropicalDrySouthRatio": 0,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.00199
+  },
+  "zonalReceiverSignature": {
+    "northSource11NCondensation": -0.0306,
+    "northSource11NTotalColumnWater": -0.03,
+    "northSource11NLowerOmega": -0.00006,
+    "atlanticDryCore26NCondensation": 0.0084,
+    "atlanticDryCore26NTotalColumnWater": -0.122,
+    "atlanticDryCore26NLowerOmega": 0.00233,
+    "atlanticDryCore26NMidRh": -0.006,
+    "equatorialEdge3NCondensation": 0.00749,
+    "southMirror11SCondensation": 0.02652
+  },
+  "sectorSignature": {
+    "atlanticLowLevelSource": -0.11393,
+    "atlanticCondensation": 0.00966,
+    "eastPacificCondensation": 0.00034,
+    "continentalCondensation": -0.00004,
+    "indoPacificCondensation": -0.00337
+  },
+  "birthSignature": {
+    "atlanticCarryEntering": -1.56613,
+    "atlanticCarrySurviving": -1.535,
+    "atlanticSaturationAdjustmentBirth": -0.61447,
+    "atlanticResolvedAscentBirth": -0.03308,
+    "atlanticConvectiveDetrainmentBirth": -0.00014
+  }
+}

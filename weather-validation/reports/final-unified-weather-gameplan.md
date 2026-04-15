@@ -1650,6 +1650,34 @@ Status:
   - it is a receiver-lane patch/design step around Atlantic-facing `20–30°N` dry-core uptake while preserving the `11.25°N` source relief
 - next active phase: `Phase 1ZZA: Atlantic Dry-Core Receiver Design`
 
+Status:
+- complete in [phase1zza-atlantic-dry-core-receiver-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zza-atlantic-dry-core-receiver-design.md)
+- verdict: `atlantic_receiver_efficiency_without_birth_or_import_growth`
+- keep patch: `false`
+- key conclusions:
+  - the failed receiver lane is specifically the Atlantic-facing ocean dry-core, not a generic NH receiver:
+    - Atlantic dry-belt condensation delta `+0.00966`
+    - east Pacific `+0.00034`
+    - continental subtropics `-0.00004`
+    - Indo-Pacific `-0.00337`
+  - this is not being driven by stronger Atlantic import or cloud-birth generation:
+    - Atlantic low-level source delta `-0.11393`
+    - Atlantic carryover entering delta `-1.56613`
+    - Atlantic carryover surviving delta `-1.535`
+    - Atlantic saturation-adjustment birth delta `-0.61447`
+    - Atlantic resolved-ascent birth delta `-0.03308`
+  - the poleward Atlantic dry-core row still behaves like a receiver-efficiency lane:
+    - `26.25°N` condensation delta `+0.0084`
+    - `26.25°N` total-column-water delta `-0.122`
+    - `26.25°N` lower-omega delta `+0.00233`
+    - `26.25°N` mid-RH delta `-0.006`
+  - so the next patch should be basin-aware and receiver-focused:
+    - ocean-only Atlantic window using the existing sector definition `lonDeg >= -90 && lonDeg < 20`
+    - poleward-half dry-core latitude taper centered around `22–30°N`
+    - reuse the live northside leak/source-cap signal as the activation carrier
+    - do not strengthen the source cap or globally ablate Atlantic carryover/birth
+- next active phase: `Phase 1ZZB: Implement Atlantic Receiver Efficiency Taper Patch`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
