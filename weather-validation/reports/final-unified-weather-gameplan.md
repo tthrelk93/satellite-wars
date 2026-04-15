@@ -1725,6 +1725,29 @@ Status update:
   - the next patch should target Atlantic transition carryover containment around `18–22.5°N`, not Atlantic receiver geometry or fresh low-level source terms
 - next active phase: `Phase 1ZZD: Atlantic Transition Carryover Containment Design`
 
+Status update:
+- completed in [phase1zzd-atlantic-transition-carryover-containment-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zzd-atlantic-transition-carryover-containment-design.md)
+- outcome:
+  - preferred verdict: `atlantic_transition_overlap_survival_taper_preferred`
+  - strongest live evidence still points at Atlantic transition carryover maintenance, not low-level recharge:
+    - `18.75°N` imported persistence delta `+0.03092`
+    - `18.75°N` carryover delta `+0.03092`
+    - `18.75°N` weak-erosion survival delta `+0.03047`
+    - Atlantic carry-entering delta `+4.3246`
+    - Atlantic carry-surviving delta `+4.24108`
+    - `18.75°N` north-dry-belt-ocean source delta `-0.00223`
+    - `18.75°N` resolved-ascent birth delta `+0.00015`
+  - candidate ranking now prefers:
+    - `atlantic_transition_carryover_containment`
+    - then `atlantic_transition_saturation_adjustment_cap`
+    - and rules out source-sink / resolved-ascent-first fixes as the primary lane
+- decision:
+  - the next patch should stay in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js) / [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+  - it should taper Atlantic transition overlap-survival / persistence support in `18–22.5°N`
+  - it should preserve the kept `26.25°N` Atlantic receiver relief from Phase `1ZZB`
+  - it should not retune Atlantic receiver geometry or add a fresh low-level humidity sink
+- next active phase: `Phase 1ZZE: Implement Atlantic Transition Carryover Containment Patch`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
