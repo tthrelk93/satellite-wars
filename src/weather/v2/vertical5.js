@@ -1599,6 +1599,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   }
 
   let northsideLeakCarrierSignalMean = 0;
+  state.northsideLeakCarrierSignalMean = 0;
 
   // Deep convection with entrainment/detrainment
   if (enableConvection) {
@@ -2173,6 +2174,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         northsideLeakCarrierSignalMean = northsideLeakPenaltyWeightSum > eps
           ? northsideLeakPenaltySum / northsideLeakPenaltyWeightSum
           : 0;
+        state.northsideLeakCarrierSignalMean = northsideLeakCarrierSignalMean;
         northsideLeakPenaltySignalMean = (enableWeakHemiCrossHemiFloorTaper && enableNorthsideFanoutLeakPenalty)
           ? northsideLeakCarrierSignalMean
           : 0;

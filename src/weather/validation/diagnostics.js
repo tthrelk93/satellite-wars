@@ -2226,6 +2226,9 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     convectiveAnvilSourceFrac: arrayOrZeros(state.convectiveAnvilSource, state.N),
     convectiveHeatingProxyKgM2S: arrayOrZeros(state.convectiveHeatingProxy, state.N),
     convectiveTopLevelIndex: arrayOrZeros(state.convectiveTopLevel, state.N),
+    northsideLeakCarrierSignalMean: Number.isFinite(state.northsideLeakCarrierSignalMean)
+      ? state.northsideLeakCarrierSignalMean
+      : 0,
     lowLevelMoistureConvergenceS_1: arrayOrZeros(state.lowLevelMoistureConvergence, state.N),
     lowLevelOmegaEffectivePaS: arrayOrZeros(state.lowLevelOmegaEffective, state.N),
     subtropicalSubsidenceDryingFrac: arrayOrZeros(state.subtropicalSubsidenceDrying, state.N),

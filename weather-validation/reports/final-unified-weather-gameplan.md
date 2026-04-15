@@ -1768,6 +1768,31 @@ Status update:
   - keep the `26.25°N` Atlantic receiver taper work in place and move to transition-lane admission attribution
 - next active phase: `Phase 1ZZF: Transition Carryover Admission Attribution`
 
+Status update:
+- completed in [phase1zzf-transition-carryover-admission-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zzf-transition-carryover-admission-attribution.md)
+- outcome:
+  - verdict: `omega_support_below_transition_admission`
+  - keep patch: `false`
+  - the Atlantic transition lane now has enough live carrier, overlap, and dry support to admit in principle:
+    - northside leak carrier signal mean `0.06059`
+    - carryover overlap mass `0.18727`
+    - subtropical drying `0.1267`
+  - the missing leg is low-level omega support:
+    - `18.75°N` low-level omega effective `0.06678`
+    - containment frac `0`
+    - containment applied `0`
+  - support ranking at `18.75°N`:
+    - `omegaSupport = 0`
+    - `drySupport = 0.009`
+    - `carrierSignalSupport = 0.63105`
+    - `latSupport = 0.84375`
+    - `overlapSupport = 1`
+- decision:
+  - do not increase Atlantic transition containment amplitude
+  - keep the receiver taper lane in place
+  - redesign the transition omega admission lane so the `18–22.5°N` Atlantic carryover containment path can actually turn on
+- next active phase: `Phase 1ZZG: Transition Omega Admission Design`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
