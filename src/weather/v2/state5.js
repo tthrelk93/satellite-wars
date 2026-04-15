@@ -87,6 +87,8 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const subtropicalMeanTropicalSourceDiag = makeArray(N);
   const subtropicalCrossHemiFloorShareDiag = makeArray(N);
   const subtropicalWeakHemiFracDiag = makeArray(N);
+  const subtropicalWeakHemiFloorOverhangDiag = makeArray(N);
+  const subtropicalWeakHemiFloorTaperAppliedDiag = makeArray(N);
   const resolvedAscentCloudBirthPotential = makeArray(N);
   const largeScaleCondensationSource = makeArray(N);
   const cloudReevaporationMass = makeArray(N);
@@ -368,6 +370,8 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     subtropicalMeanTropicalSourceDiag,
     subtropicalCrossHemiFloorShareDiag,
     subtropicalWeakHemiFracDiag,
+    subtropicalWeakHemiFloorOverhangDiag,
+    subtropicalWeakHemiFloorTaperAppliedDiag,
     resolvedAscentCloudBirthPotential,
     largeScaleCondensationSource,
     cloudReevaporationMass,

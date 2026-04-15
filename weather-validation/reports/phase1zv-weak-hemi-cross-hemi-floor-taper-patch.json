@@ -1,0 +1,40 @@
+{
+  "schema": "satellite-wars.phase1zv-weak-hemi-cross-hemi-floor-taper-patch.v1",
+  "generatedAt": "2026-04-15T00:35:12.258Z",
+  "paths": {
+    "offPath": "/tmp/phase1zv-off.json",
+    "onPath": "/tmp/phase1zv-on.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zv-weak-hemi-cross-hemi-floor-taper-patch.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zv-weak-hemi-cross-hemi-floor-taper-patch.json"
+  },
+  "verdict": "guardrail_improvement_with_north_source_rebound",
+  "keepPatch": true,
+  "nextPhase": "Phase 1ZW: North Source Rebound Attribution",
+  "recommendation": "Keep the weak-hemi floor taper lane available, but do not increase amplitude yet. The main guardrails improve, while a narrower north-source rebound remains to be attributed.",
+  "metrics": {
+    "itczWidthDeg": -0.072,
+    "subtropicalDryNorthRatio": -0.024,
+    "subtropicalDrySouthRatio": -0.004,
+    "midlatitudeWesterliesNorthU10Ms": 0,
+    "crossEquatorialVaporFluxNorthKgM_1S": 1.21412,
+    "tropicalShoulderLargeScaleCondensationMeanKgM2": 0.00423,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": -0.01518,
+    "southTransitionSubtropicalCrossHemiFloorShareMeanFrac": -0.12934,
+    "southTransitionSubtropicalWeakHemiFloorOverhangMeanFrac": -0.06893,
+    "southTransitionSubtropicalWeakHemiFloorTaperAppliedMeanFrac": 0.00691
+  },
+  "condensationDeltas": {
+    "southSource11S": -0.0215,
+    "southEdge3S": 0.01019,
+    "northEdge3N": -0.00238,
+    "northSource11N": 0.02481,
+    "spillover18N": -0.01008,
+    "dryCore26N": -0.01896
+  },
+  "liveState": {
+    "southTransitionSubtropicalCrossHemiFloorShareMeanFrac": 0.1197,
+    "southTransitionSubtropicalWeakHemiFloorOverhangMeanFrac": 0.07551,
+    "southTransitionSubtropicalWeakHemiFloorTaperAppliedMeanFrac": 0.00691,
+    "northTransitionSubtropicalWeakHemiFloorTaperAppliedMeanFrac": 0
+  }
+}

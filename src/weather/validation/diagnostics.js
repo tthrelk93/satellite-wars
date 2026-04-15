@@ -2263,6 +2263,8 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     subtropicalMeanTropicalSourceDiagFrac: arrayOrZeros(state.subtropicalMeanTropicalSourceDiag, state.N),
     subtropicalCrossHemiFloorShareDiagFrac: arrayOrZeros(state.subtropicalCrossHemiFloorShareDiag, state.N),
     subtropicalWeakHemiFracDiag: arrayOrZeros(state.subtropicalWeakHemiFracDiag, state.N),
+    subtropicalWeakHemiFloorOverhangDiagFrac: arrayOrZeros(state.subtropicalWeakHemiFloorOverhangDiag, state.N),
+    subtropicalWeakHemiFloorTaperAppliedDiagFrac: arrayOrZeros(state.subtropicalWeakHemiFloorTaperAppliedDiag, state.N),
     resolvedAscentCloudBirthPotentialKgM2: arrayOrZeros(state.resolvedAscentCloudBirthPotential, state.N),
     largeScaleCondensationSourceKgM2: arrayOrZeros(state.largeScaleCondensationSource, state.N),
     saturationAdjustmentMaintenanceCandidateMassKgM2: arrayOrZeros(state.saturationAdjustmentMaintenanceCandidateMass, state.N),

@@ -77,6 +77,7 @@ let returnFlowCouplingPatchMode = 'default';
 let dryingOmegaBridgePatchMode = 'default';
 let equatorialEdgeSubsidenceGuardPatchMode = 'default';
 let northsideFanoutLeakPenaltyPatchMode = 'default';
+let weakHemiCrossHemiFloorTaperPatchMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -130,6 +131,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--equatorial-edge-subsidence-guard-patch=')) equatorialEdgeSubsidenceGuardPatchMode = arg.slice('--equatorial-edge-subsidence-guard-patch='.length);
   else if (arg === '--northside-fanout-leak-penalty-patch' && argv[i + 1]) northsideFanoutLeakPenaltyPatchMode = argv[++i];
   else if (arg.startsWith('--northside-fanout-leak-penalty-patch=')) northsideFanoutLeakPenaltyPatchMode = arg.slice('--northside-fanout-leak-penalty-patch='.length);
+  else if (arg === '--weak-hemi-cross-hemi-floor-taper-patch' && argv[i + 1]) weakHemiCrossHemiFloorTaperPatchMode = argv[++i];
+  else if (arg.startsWith('--weak-hemi-cross-hemi-floor-taper-patch=')) weakHemiCrossHemiFloorTaperPatchMode = arg.slice('--weak-hemi-cross-hemi-floor-taper-patch='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--trusted-baseline' && argv[i + 1]) trustedBaselinePath = path.resolve(argv[++i]);
   else if (arg.startsWith('--trusted-baseline=')) trustedBaselinePath = path.resolve(arg.slice('--trusted-baseline='.length));
@@ -181,6 +184,16 @@ circulationReboundPatchMode = circulationReboundPatchMode === 'off'
 equatorialEdgeSubsidenceGuardPatchMode = equatorialEdgeSubsidenceGuardPatchMode === 'off'
   ? 'off'
   : equatorialEdgeSubsidenceGuardPatchMode === 'on'
+    ? 'on'
+    : 'default';
+northsideFanoutLeakPenaltyPatchMode = northsideFanoutLeakPenaltyPatchMode === 'off'
+  ? 'off'
+  : northsideFanoutLeakPenaltyPatchMode === 'on'
+    ? 'on'
+    : 'default';
+weakHemiCrossHemiFloorTaperPatchMode = weakHemiCrossHemiFloorTaperPatchMode === 'off'
+  ? 'off'
+  : weakHemiCrossHemiFloorTaperPatchMode === 'on'
     ? 'on'
     : 'default';
 
@@ -602,6 +615,7 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
     circulationReboundPatchMode,
     equatorialEdgeSubsidenceGuardPatchMode,
     northsideFanoutLeakPenaltyPatchMode,
+    weakHemiCrossHemiFloorTaperPatchMode,
     instrumentationMode: core.getInstrumentationMode ? core.getInstrumentationMode() : instrumentationMode,
     sampleTargetsDays,
     targetSeconds: targetsSeconds,
@@ -1321,6 +1335,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     subtropicalMeanTropicalSourceDiagFrac,
     subtropicalCrossHemiFloorShareDiagFrac,
     subtropicalWeakHemiFracDiag,
+    subtropicalWeakHemiFloorOverhangDiagFrac,
+    subtropicalWeakHemiFloorTaperAppliedDiagFrac,
     surfaceEvapPotentialRateMmHr,
     surfaceEvapTransferCoeff,
     surfaceEvapWindSpeedMs,
@@ -1803,6 +1819,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalSubtropicalMeanTropicalSource = zonalMean(subtropicalMeanTropicalSourceDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubtropicalCrossHemiFloorShare = zonalMean(subtropicalCrossHemiFloorShareDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubtropicalWeakHemiFrac = zonalMean(subtropicalWeakHemiFracDiag || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSubtropicalWeakHemiFloorOverhang = zonalMean(subtropicalWeakHemiFloorOverhangDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSubtropicalWeakHemiFloorTaperApplied = zonalMean(subtropicalWeakHemiFloorTaperAppliedDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const northTransitionSubtropicalSourceDriverMean = weightedBandMean(zonalSubtropicalSourceDriver, latitudesDeg, rowWeights, 12, 22);
   const southTransitionSubtropicalSourceDriverMean = weightedBandMean(zonalSubtropicalSourceDriver, latitudesDeg, rowWeights, -22, -12);
   const northDryBeltSubtropicalSourceDriverMean = weightedBandMean(zonalSubtropicalSourceDriver, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
@@ -1817,6 +1835,10 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const southTransitionSubtropicalCrossHemiFloorShareMean = weightedBandMean(zonalSubtropicalCrossHemiFloorShare, latitudesDeg, rowWeights, -22, -12);
   const northTransitionSubtropicalWeakHemiFracMean = weightedBandMean(zonalSubtropicalWeakHemiFrac, latitudesDeg, rowWeights, 12, 22);
   const southTransitionSubtropicalWeakHemiFracMean = weightedBandMean(zonalSubtropicalWeakHemiFrac, latitudesDeg, rowWeights, -22, -12);
+  const northTransitionSubtropicalWeakHemiFloorOverhangMean = weightedBandMean(zonalSubtropicalWeakHemiFloorOverhang, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionSubtropicalWeakHemiFloorOverhangMean = weightedBandMean(zonalSubtropicalWeakHemiFloorOverhang, latitudesDeg, rowWeights, -22, -12);
+  const northTransitionSubtropicalWeakHemiFloorTaperAppliedMean = weightedBandMean(zonalSubtropicalWeakHemiFloorTaperApplied, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionSubtropicalWeakHemiFloorTaperAppliedMean = weightedBandMean(zonalSubtropicalWeakHemiFloorTaperApplied, latitudesDeg, rowWeights, -22, -12);
   const northDryBeltLandResolvedAscentCloudBirthPotential = weightedFieldBandMean(resolvedAscentCloudBirthPotentialKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
   const northDryBeltOceanResolvedAscentCloudBirthPotential = weightedFieldBandMean(resolvedAscentCloudBirthPotentialKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'ocean');
   const northDryBeltLandImportedAnvilPersistence = weightedFieldBandMean(importedAnvilPersistenceMassKgM2 || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT, landMask, 'land');
@@ -2047,6 +2069,10 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       southTransitionSubtropicalCrossHemiFloorShareMeanFrac: round(southTransitionSubtropicalCrossHemiFloorShareMean, 5),
       northTransitionSubtropicalWeakHemiFracMean: round(northTransitionSubtropicalWeakHemiFracMean, 5),
       southTransitionSubtropicalWeakHemiFracMean: round(southTransitionSubtropicalWeakHemiFracMean, 5),
+      northTransitionSubtropicalWeakHemiFloorOverhangMeanFrac: round(northTransitionSubtropicalWeakHemiFloorOverhangMean, 5),
+      southTransitionSubtropicalWeakHemiFloorOverhangMeanFrac: round(southTransitionSubtropicalWeakHemiFloorOverhangMean, 5),
+      northTransitionSubtropicalWeakHemiFloorTaperAppliedMeanFrac: round(northTransitionSubtropicalWeakHemiFloorTaperAppliedMean, 5),
+      southTransitionSubtropicalWeakHemiFloorTaperAppliedMeanFrac: round(southTransitionSubtropicalWeakHemiFloorTaperAppliedMean, 5),
       northDryBeltConvectiveDetrainmentCloudSourceMeanKgM2: round(northDryBeltConvectiveDetrainment, 5),
       northDryBeltImportedAnvilPersistenceMeanKgM2: round(northDryBeltImportedAnvilPersistence, 5),
       northDryBeltLandImportedAnvilPersistenceMeanKgM2: round(northDryBeltLandImportedAnvilPersistence, 5),
@@ -2178,6 +2204,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         equatorialEdgeNorthsideLeakRiskDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakRisk, 5),
         equatorialEdgeNorthsideLeakAdmissionRiskDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakAdmissionRisk, 5),
         equatorialEdgeNorthsideLeakPenaltyDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakPenalty, 5),
+        subtropicalWeakHemiFloorOverhangDiagFrac: roundSeries(zonalSubtropicalWeakHemiFloorOverhang, 5),
+        subtropicalWeakHemiFloorTaperAppliedDiagFrac: roundSeries(zonalSubtropicalWeakHemiFloorTaperApplied, 5),
         freshSubtropicalBandDiagFrac: roundSeries(zonalMean(freshSubtropicalBandDiagFrac || new Array(nx * ny).fill(0), nx, ny), 5),
         freshShoulderLatitudeWindowDiagFrac: roundSeries(zonalFreshShoulderLatitudeWindow, 5),
         freshShoulderEquatorialEdgeWindowDiagFrac: roundSeries(zonalFreshShoulderEquatorialEdgeWindow, 5),
@@ -4957,6 +4985,8 @@ export async function main() {
   else if (equatorialEdgeSubsidenceGuardPatchMode === 'on') core.vertParams.enableEquatorialEdgeSubsidenceGuard = true;
   if (northsideFanoutLeakPenaltyPatchMode === 'off') core.vertParams.enableNorthsideFanoutLeakPenalty = false;
   else if (northsideFanoutLeakPenaltyPatchMode === 'on') core.vertParams.enableNorthsideFanoutLeakPenalty = true;
+  if (weakHemiCrossHemiFloorTaperPatchMode === 'off') core.vertParams.enableWeakHemiCrossHemiFloorTaper = false;
+  else if (weakHemiCrossHemiFloorTaperPatchMode === 'on') core.vertParams.enableWeakHemiCrossHemiFloorTaper = true;
   if (softLiveGatePatchMode === 'off') core.microParams.enableSoftLiveStateMaintenanceSuppression = false;
   else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
   if (shoulderAbsorptionGuardPatchMode === 'off') core.microParams.enableShoulderAbsorptionGuard = false;

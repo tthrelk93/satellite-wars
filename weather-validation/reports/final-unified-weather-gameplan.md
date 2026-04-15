@@ -1549,6 +1549,21 @@ Status:
   - the right next patch is to taper the weak-hemisphere cross-hemi floor in the subtropical source-driver path, not add a south-local humidity or omega sink
 - next active phase: `Phase 1ZV: Implement Weak-Hemisphere Cross-Hemi Floor Taper Patch`
 
+Status:
+- complete in [phase1zv-weak-hemi-cross-hemi-floor-taper-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zv-weak-hemi-cross-hemi-floor-taper-patch.md)
+- verdict: `guardrail_improvement_with_north_source_rebound`
+- keep patch: `true`
+- key conclusions:
+  - the weak-hemi floor taper improves the main 30-day guardrails inside the live edge-guard stack:
+    - `itczWidthDeg: -0.072`
+    - `subtropicalDryNorthRatio: -0.024`
+    - `subtropicalDrySouthRatio: -0.004`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: -0.01518`
+  - the south weak-hemi floor share and overhang both fall materially
+  - the remaining blocker is no longer the south compensation lane itself
+  - the residual is now a narrower north-source rebound at `11.25°N`
+- next active phase: `Phase 1ZW: North Source Rebound Attribution`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

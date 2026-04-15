@@ -292,6 +292,37 @@ export const computeEquatorialEdgeNorthsideLeakAdmissionRiskFrac = ({
   if (!(sourceWindow > 1e-12) || !(fanoutRisk > 0)) return 0;
   return clamp01(fanoutRisk / sourceWindow);
 };
+export const computeWeakHemiCrossHemiFloorTaperFrac = ({
+  enabled,
+  meanTropicalSource,
+  hemiSource,
+  sourceDriverFloor,
+  weakHemiFrac,
+  crossHemiFloorShare,
+  northsideLeakPenaltySignal,
+  penalty0,
+  penalty1,
+  overhang0,
+  overhang1,
+  maxFrac
+}) => {
+  if (!enabled) return 0;
+  if (!(meanTropicalSource > 1e-12) || !(sourceDriverFloor > hemiSource)) return 0;
+  if (!(weakHemiFrac > 0) || !(crossHemiFloorShare > 0) || !(northsideLeakPenaltySignal > 0)) return 0;
+  const effectiveFloorFrac = sourceDriverFloor / meanTropicalSource;
+  const neutralFloorFrac = hemiSource / meanTropicalSource;
+  const overhangFrac = Math.max(0, effectiveFloorFrac - neutralFloorFrac);
+  if (!(overhangFrac > 0)) return 0;
+  const leakGate = smoothstep(penalty0, penalty1, northsideLeakPenaltySignal);
+  const weakGate = smoothstep(0.15, 0.45, weakHemiFrac);
+  const floorGate = smoothstep(0.05, 0.2, crossHemiFloorShare);
+  const overhangGate = smoothstep(overhang0, overhang1, overhangFrac);
+  return clamp(
+    Math.min(overhangFrac, maxFrac) * leakGate * weakGate * floorGate * overhangGate,
+    0,
+    Math.min(overhangFrac, maxFrac)
+  );
+};
 export const computeEquatorialEdgeSubsidenceGuardTargetWeight = ({
   enabled,
   latAbs,
@@ -422,6 +453,12 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'northsideFanoutLeakPenaltyLat1',
   'northsideFanoutLeakPenaltyRisk0',
   'northsideFanoutLeakPenaltyRisk1',
+  'enableWeakHemiCrossHemiFloorTaper',
+  'weakHemiCrossHemiFloorTaperPenalty0',
+  'weakHemiCrossHemiFloorTaperPenalty1',
+  'weakHemiCrossHemiFloorTaperOverhang0',
+  'weakHemiCrossHemiFloorTaperOverhang1',
+  'weakHemiCrossHemiFloorTaperMaxFrac',
   'enableCarryInputDominanceOverride',
   'carryInputSubtropicalSuppressionMin',
   'carryInputOrganizedSupportMax',
@@ -578,6 +615,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     northsideFanoutLeakPenaltyLat1 = 13,
     northsideFanoutLeakPenaltyRisk0 = 0.32,
     northsideFanoutLeakPenaltyRisk1 = 0.5,
+    enableWeakHemiCrossHemiFloorTaper = false,
+    weakHemiCrossHemiFloorTaperPenalty0 = 0.02,
+    weakHemiCrossHemiFloorTaperPenalty1 = 0.06,
+    weakHemiCrossHemiFloorTaperOverhang0 = 0.06,
+    weakHemiCrossHemiFloorTaperOverhang1 = 0.12,
+    weakHemiCrossHemiFloorTaperMaxFrac = 0.145,
     enableCarryInputDominanceOverride = true,
     carryInputSubtropicalSuppressionMin = 0.74243,
     carryInputOrganizedSupportMax = 0.22504,
@@ -640,6 +683,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.subtropicalMeanTropicalSourceDiag || state.subtropicalMeanTropicalSourceDiag.length !== N) state.subtropicalMeanTropicalSourceDiag = new Float32Array(N);
   if (!state.subtropicalCrossHemiFloorShareDiag || state.subtropicalCrossHemiFloorShareDiag.length !== N) state.subtropicalCrossHemiFloorShareDiag = new Float32Array(N);
   if (!state.subtropicalWeakHemiFracDiag || state.subtropicalWeakHemiFracDiag.length !== N) state.subtropicalWeakHemiFracDiag = new Float32Array(N);
+  if (!state.subtropicalWeakHemiFloorOverhangDiag || state.subtropicalWeakHemiFloorOverhangDiag.length !== N) state.subtropicalWeakHemiFloorOverhangDiag = new Float32Array(N);
+  if (!state.subtropicalWeakHemiFloorTaperAppliedDiag || state.subtropicalWeakHemiFloorTaperAppliedDiag.length !== N) state.subtropicalWeakHemiFloorTaperAppliedDiag = new Float32Array(N);
   if (!state._freshPotentialTarget || state._freshPotentialTarget.length !== N) state._freshPotentialTarget = new Float32Array(N);
   if (!state._freshOrganizedSupport || state._freshOrganizedSupport.length !== N) state._freshOrganizedSupport = new Float32Array(N);
   if (!state._freshSubtropicalSuppression || state._freshSubtropicalSuppression.length !== N) state._freshSubtropicalSuppression = new Float32Array(N);
@@ -765,6 +810,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const subtropicalMeanTropicalSourceDiag = state.subtropicalMeanTropicalSourceDiag;
   const subtropicalCrossHemiFloorShareDiag = state.subtropicalCrossHemiFloorShareDiag;
   const subtropicalWeakHemiFracDiag = state.subtropicalWeakHemiFracDiag;
+  const subtropicalWeakHemiFloorOverhangDiag = state.subtropicalWeakHemiFloorOverhangDiag;
+  const subtropicalWeakHemiFloorTaperAppliedDiag = state.subtropicalWeakHemiFloorTaperAppliedDiag;
   const freshPotentialTargetDiag = state._freshPotentialTarget;
   const freshOrganizedSupportDiag = state._freshOrganizedSupport;
   const freshSubtropicalSuppressionDiag = state._freshSubtropicalSuppression;
@@ -867,6 +914,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   subtropicalMeanTropicalSourceDiag.fill(0);
   subtropicalCrossHemiFloorShareDiag.fill(0);
   subtropicalWeakHemiFracDiag.fill(0);
+  subtropicalWeakHemiFloorOverhangDiag.fill(0);
+  subtropicalWeakHemiFloorTaperAppliedDiag.fill(0);
   freshPotentialTargetDiag.fill(0);
   freshOrganizedSupportDiag.fill(0);
   freshSubtropicalSuppressionDiag.fill(0);
@@ -1868,6 +1917,51 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       nhTransitionSuppressedSource = nhTransitionWeight > 0 ? nhTransitionSuppressedSource / nhTransitionWeight : 0;
       shTransitionSuppressedSource = shTransitionWeight > 0 ? shTransitionSuppressedSource / shTransitionWeight : 0;
       const meanTropicalSource = (nhSource * nhWeight + shSource * shWeight) / Math.max(eps, nhWeight + shWeight);
+      let northsideLeakPenaltySignalMean = 0;
+      if (enableWeakHemiCrossHemiFloorTaper && enableNorthsideFanoutLeakPenalty) {
+        let northsideLeakPenaltySum = 0;
+        let northsideLeakPenaltyWeightSum = 0;
+        for (let j = 0; j < ny; j++) {
+          const lat = latDeg[j];
+          if (!(lat > 0)) continue;
+          const row = j * nx;
+          for (let i = 0; i < nx; i++) {
+            const k = row + i;
+            const sourceWindow = computeEquatorialEdgeNorthsideLeakSourceWindowFrac({
+              enabled: true,
+              latDeg: lat,
+              lat0: northsideFanoutLeakPenaltyLat0,
+              lat1: northsideFanoutLeakPenaltyLat1
+            });
+            if (!(sourceWindow > 0)) continue;
+            const fanoutRisk = computeEquatorialEdgeNorthsideLeakRiskFrac({
+              enabled: true,
+              subtropicalBand: freshSubtropicalBandPublicDiag[k] || 0,
+              neutralToSubsidingSupport: freshNeutralToSubsidingSupportPublicDiag[k] || 0,
+              existingOmegaPaS: lowLevelOmegaEffective[k]
+            });
+            const admissionRisk = computeEquatorialEdgeNorthsideLeakAdmissionRiskFrac({
+              enabled: true,
+              sourceWindow,
+              fanoutRisk
+            });
+            const penaltyFrac = computeEquatorialEdgeNorthsideLeakPenaltyFrac({
+              enabled: true,
+              sourceWindow,
+              admissionRisk,
+              risk0: northsideFanoutLeakPenaltyRisk0,
+              risk1: northsideFanoutLeakPenaltyRisk1,
+              maxFrac: northsideFanoutLeakPenaltyMaxFrac
+            });
+            const weight = sourceWindow * cosLat[j];
+            northsideLeakPenaltySum += penaltyFrac * weight;
+            northsideLeakPenaltyWeightSum += weight;
+          }
+        }
+        northsideLeakPenaltySignalMean = northsideLeakPenaltyWeightSum > eps
+          ? northsideLeakPenaltySum / northsideLeakPenaltyWeightSum
+          : 0;
+      }
       const subtropicalAlpha = 1 - Math.exp(-dt / Math.max(subtropicalSubsidenceTau, eps));
       const subtropicalMidSigma = 0.5 * (subtropicalSubsidenceTopSigma + subtropicalSubsidenceBottomSigma);
       const levS = nz - 1;
@@ -1890,9 +1984,33 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         const weakHemiFrac = meanTropicalSource > eps
           ? clamp01((meanTropicalSource - hemiSource) / Math.max(meanTropicalSource, eps))
           : 0;
-        const sourceDriverFloor = Math.max(
+        const sourceDriverFloorBase = Math.max(
           hemiSource,
           meanTropicalSource * clamp(subtropicalSubsidenceCrossHemiFloorFrac, 0, 1)
+        );
+        const crossHemiFloorShareBase = sourceDriverFloorBase > eps
+          ? clamp01(Math.max(0, sourceDriverFloorBase - hemiSource) / sourceDriverFloorBase)
+          : 0;
+        const weakHemiFloorOverhangFrac = meanTropicalSource > eps
+          ? Math.max(0, (sourceDriverFloorBase / Math.max(meanTropicalSource, eps)) - (hemiSource / Math.max(meanTropicalSource, eps)))
+          : 0;
+        const weakHemiFloorTaperFrac = computeWeakHemiCrossHemiFloorTaperFrac({
+          enabled: enableWeakHemiCrossHemiFloorTaper,
+          meanTropicalSource,
+          hemiSource,
+          sourceDriverFloor: sourceDriverFloorBase,
+          weakHemiFrac,
+          crossHemiFloorShare: crossHemiFloorShareBase,
+          northsideLeakPenaltySignal: northsideLeakPenaltySignalMean,
+          penalty0: weakHemiCrossHemiFloorTaperPenalty0,
+          penalty1: weakHemiCrossHemiFloorTaperPenalty1,
+          overhang0: weakHemiCrossHemiFloorTaperOverhang0,
+          overhang1: weakHemiCrossHemiFloorTaperOverhang1,
+          maxFrac: weakHemiCrossHemiFloorTaperMaxFrac
+        });
+        const sourceDriverFloor = Math.max(
+          hemiSource,
+          sourceDriverFloorBase - meanTropicalSource * weakHemiFloorTaperFrac
         );
         const sourceDriver = sourceDriverFloor * (
           1 + clamp(subtropicalSubsidenceWeakHemiBoost, 0, 1.5) * weakHemiFrac
@@ -1922,6 +2040,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           subtropicalLocalHemiSourceDiag[k] = hemiSource;
           subtropicalMeanTropicalSourceDiag[k] = meanTropicalSource;
           subtropicalWeakHemiFracDiag[k] = weakHemiFrac;
+          subtropicalWeakHemiFloorOverhangDiag[k] = weakHemiFloorOverhangFrac;
+          subtropicalWeakHemiFloorTaperAppliedDiag[k] = weakHemiFloorTaperFrac;
           circulationReturnFlowOpportunityDiag[k] = returnFlowOpportunity;
           circulationReturnFlowCouplingAppliedDiag[k] = coupledSourceDriver - sourceDriver;
           subtropicalCrossHemiFloorShareDiag[k] = sourceDriverFloor > eps

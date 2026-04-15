@@ -570,6 +570,12 @@ export class WeatherCore5 {
       northsideFanoutLeakPenaltyLat1: 13,
       northsideFanoutLeakPenaltyRisk0: 0.32,
       northsideFanoutLeakPenaltyRisk1: 0.5,
+      enableWeakHemiCrossHemiFloorTaper: false,
+      weakHemiCrossHemiFloorTaperPenalty0: 0.02,
+      weakHemiCrossHemiFloorTaperPenalty1: 0.06,
+      weakHemiCrossHemiFloorTaperOverhang0: 0.06,
+      weakHemiCrossHemiFloorTaperOverhang1: 0.12,
+      weakHemiCrossHemiFloorTaperMaxFrac: 0.145,
       eps: 1e-12,
       debugConservation: false
     };

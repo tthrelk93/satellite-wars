@@ -12,6 +12,7 @@ import {
   computeEquatorialEdgeNorthsideLeakSourceWindowFrac,
   computeEquatorialEdgeSubsidenceGuardSourceSupport,
   computeEquatorialEdgeSubsidenceGuardTargetWeight,
+  computeWeakHemiCrossHemiFloorTaperFrac,
   computeTransitionReturnFlowCouplingFrac,
   stepVertical5
 } from './vertical5.js';
@@ -844,6 +845,73 @@ test('computeEquatorialEdgeNorthsideLeakAdmissionRiskFrac normalizes leak risk b
 
   assert.ok(Math.abs(normalized - 0.3689) < 1e-4);
   assert.equal(noWindow, 0);
+});
+
+test('computeWeakHemiCrossHemiFloorTaperFrac only trims weak-hemi cross-hemi overhang when the north leak gate is live', () => {
+  assert.equal(
+    computeWeakHemiCrossHemiFloorTaperFrac({
+      enabled: false,
+      meanTropicalSource: 0.10765,
+      hemiSource: 0.04689,
+      sourceDriverFloor: 0.06244,
+      weakHemiFrac: 0.56444,
+      crossHemiFloorShare: 0.24904,
+      northsideLeakPenaltySignal: 0.06225,
+      penalty0: 0.02,
+      penalty1: 0.06,
+      overhang0: 0.06,
+      overhang1: 0.12,
+      maxFrac: 0.145
+    }),
+    0
+  );
+
+  const active = computeWeakHemiCrossHemiFloorTaperFrac({
+    enabled: true,
+    meanTropicalSource: 0.10765,
+    hemiSource: 0.04689,
+    sourceDriverFloor: 0.06244,
+    weakHemiFrac: 0.56444,
+    crossHemiFloorShare: 0.24904,
+    northsideLeakPenaltySignal: 0.06225,
+    penalty0: 0.02,
+    penalty1: 0.06,
+    overhang0: 0.06,
+    overhang1: 0.12,
+    maxFrac: 0.145
+  });
+  const strongHemi = computeWeakHemiCrossHemiFloorTaperFrac({
+    enabled: true,
+    meanTropicalSource: 0.10765,
+    hemiSource: 0.16841,
+    sourceDriverFloor: 0.16841,
+    weakHemiFrac: 0,
+    crossHemiFloorShare: 0,
+    northsideLeakPenaltySignal: 0.06225,
+    penalty0: 0.02,
+    penalty1: 0.06,
+    overhang0: 0.06,
+    overhang1: 0.12,
+    maxFrac: 0.145
+  });
+  const deadLeakGate = computeWeakHemiCrossHemiFloorTaperFrac({
+    enabled: true,
+    meanTropicalSource: 0.10765,
+    hemiSource: 0.04689,
+    sourceDriverFloor: 0.06244,
+    weakHemiFrac: 0.56444,
+    crossHemiFloorShare: 0.24904,
+    northsideLeakPenaltySignal: 0,
+    penalty0: 0.02,
+    penalty1: 0.06,
+    overhang0: 0.06,
+    overhang1: 0.12,
+    maxFrac: 0.145
+  });
+
+  assert.ok(active > 0.14);
+  assert.equal(strongHemi, 0);
+  assert.equal(deadLeakGate, 0);
 });
 
 test('equatorial-edge guard windows are mirrored by absolute latitude rather than NH-only shoulder geometry', () => {
