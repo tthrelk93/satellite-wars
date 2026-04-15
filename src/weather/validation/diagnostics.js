@@ -2261,6 +2261,8 @@ export function buildValidationDiagnostics(core, { pressureLevelsPa = DEFAULT_PR
     northSourceConcentrationAppliedDiag: arrayOrZeros(state.northSourceConcentrationAppliedDiag, state.N),
     atlanticDryCoreReceiverTaperDiagFrac: arrayOrZeros(state.atlanticDryCoreReceiverTaperDiag, state.N),
     atlanticDryCoreReceiverTaperAppliedDiag: arrayOrZeros(state.atlanticDryCoreReceiverTaperAppliedDiag, state.N),
+    atlanticTransitionCarryoverContainmentDiagFrac: arrayOrZeros(state.atlanticTransitionCarryoverContainmentDiag, state.N),
+    atlanticTransitionCarryoverContainmentAppliedDiag: arrayOrZeros(state.atlanticTransitionCarryoverContainmentAppliedDiag, state.N),
     subtropicalSourceDriverDiagFrac: arrayOrZeros(state.subtropicalSourceDriverDiag, state.N),
     subtropicalSourceDriverFloorDiagFrac: arrayOrZeros(state.subtropicalSourceDriverFloorDiag, state.N),
     subtropicalLocalHemiSourceDiagFrac: arrayOrZeros(state.subtropicalLocalHemiSourceDiag, state.N),

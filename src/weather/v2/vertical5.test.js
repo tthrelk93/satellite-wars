@@ -12,6 +12,7 @@ import {
   computeEquatorialEdgeNorthsideLeakSourceWindowFrac,
   computeNorthSourceConcentrationPenaltyFrac,
   computeAtlanticDryCoreReceiverTaperFrac,
+  computeAtlanticTransitionCarryoverContainmentFrac,
   computeEquatorialEdgeSubsidenceGuardSourceSupport,
   computeEquatorialEdgeSubsidenceGuardTargetWeight,
   computeWeakHemiCrossHemiFloorTaperFrac,
@@ -293,6 +294,122 @@ test('computeAtlanticDryCoreReceiverTaperFrac only activates in the Atlantic oce
     omega0: 0.12,
     omega1: 0.26,
     maxFrac: 0.16
+  }), 0);
+});
+
+test('computeAtlanticTransitionCarryoverContainmentFrac only activates in the Atlantic ocean transition lane when the receiver bundle is active', () => {
+  const active = computeAtlanticTransitionCarryoverContainmentFrac({
+    enabled: true,
+    receiverPatchEnabled: true,
+    latDeg: 18.75,
+    lonDeg: -45,
+    isLand: false,
+    carrierSignal: 0.064,
+    overlapMass: 0.16,
+    dryDriver: 0.21,
+    existingOmegaPaS: 0.22,
+    signal0: 0.04,
+    signal1: 0.075,
+    lat0: 18,
+    lat1: 22.5,
+    overlap0: 0.08,
+    overlap1: 0.18,
+    dry0: 0.12,
+    dry1: 0.24,
+    omega0: 0.12,
+    omega1: 0.26,
+    maxFrac: 0.18
+  });
+  assert.ok(active > 0);
+  assert.ok(active <= 0.18);
+
+  assert.equal(computeAtlanticTransitionCarryoverContainmentFrac({
+    enabled: false,
+    receiverPatchEnabled: true,
+    latDeg: 18.75,
+    lonDeg: -45,
+    isLand: false,
+    carrierSignal: 0.064,
+    overlapMass: 0.16,
+    dryDriver: 0.21,
+    existingOmegaPaS: 0.22,
+    signal0: 0.04,
+    signal1: 0.075,
+    lat0: 18,
+    lat1: 22.5,
+    overlap0: 0.08,
+    overlap1: 0.18,
+    dry0: 0.12,
+    dry1: 0.24,
+    omega0: 0.12,
+    omega1: 0.26,
+    maxFrac: 0.18
+  }), 0);
+  assert.equal(computeAtlanticTransitionCarryoverContainmentFrac({
+    enabled: true,
+    receiverPatchEnabled: false,
+    latDeg: 18.75,
+    lonDeg: -45,
+    isLand: false,
+    carrierSignal: 0.064,
+    overlapMass: 0.16,
+    dryDriver: 0.21,
+    existingOmegaPaS: 0.22,
+    signal0: 0.04,
+    signal1: 0.075,
+    lat0: 18,
+    lat1: 22.5,
+    overlap0: 0.08,
+    overlap1: 0.18,
+    dry0: 0.12,
+    dry1: 0.24,
+    omega0: 0.12,
+    omega1: 0.26,
+    maxFrac: 0.18
+  }), 0);
+  assert.equal(computeAtlanticTransitionCarryoverContainmentFrac({
+    enabled: true,
+    receiverPatchEnabled: true,
+    latDeg: 18.75,
+    lonDeg: -120,
+    isLand: false,
+    carrierSignal: 0.064,
+    overlapMass: 0.16,
+    dryDriver: 0.21,
+    existingOmegaPaS: 0.22,
+    signal0: 0.04,
+    signal1: 0.075,
+    lat0: 18,
+    lat1: 22.5,
+    overlap0: 0.08,
+    overlap1: 0.18,
+    dry0: 0.12,
+    dry1: 0.24,
+    omega0: 0.12,
+    omega1: 0.26,
+    maxFrac: 0.18
+  }), 0);
+  assert.equal(computeAtlanticTransitionCarryoverContainmentFrac({
+    enabled: true,
+    receiverPatchEnabled: true,
+    latDeg: 26.25,
+    lonDeg: -45,
+    isLand: false,
+    carrierSignal: 0.064,
+    overlapMass: 0.16,
+    dryDriver: 0.21,
+    existingOmegaPaS: 0.22,
+    signal0: 0.04,
+    signal1: 0.075,
+    lat0: 18,
+    lat1: 22.5,
+    overlap0: 0.08,
+    overlap1: 0.18,
+    dry0: 0.12,
+    dry1: 0.24,
+    omega0: 0.12,
+    omega1: 0.26,
+    maxFrac: 0.18
   }), 0);
 });
 

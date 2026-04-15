@@ -80,6 +80,7 @@ let northsideFanoutLeakPenaltyPatchMode = 'default';
 let weakHemiCrossHemiFloorTaperPatchMode = 'default';
 let northSourceConcentrationPenaltyPatchMode = 'default';
 let atlanticDryCoreReceiverTaperPatchMode = 'default';
+let atlanticTransitionCarryoverContainmentPatchMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -139,6 +140,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--north-source-concentration-penalty-patch=')) northSourceConcentrationPenaltyPatchMode = arg.slice('--north-source-concentration-penalty-patch='.length);
   else if (arg === '--atlantic-dry-core-receiver-taper-patch' && argv[i + 1]) atlanticDryCoreReceiverTaperPatchMode = argv[++i];
   else if (arg.startsWith('--atlantic-dry-core-receiver-taper-patch=')) atlanticDryCoreReceiverTaperPatchMode = arg.slice('--atlantic-dry-core-receiver-taper-patch='.length);
+  else if (arg === '--atlantic-transition-carryover-containment-patch' && argv[i + 1]) atlanticTransitionCarryoverContainmentPatchMode = argv[++i];
+  else if (arg.startsWith('--atlantic-transition-carryover-containment-patch=')) atlanticTransitionCarryoverContainmentPatchMode = arg.slice('--atlantic-transition-carryover-containment-patch='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--trusted-baseline' && argv[i + 1]) trustedBaselinePath = path.resolve(argv[++i]);
   else if (arg.startsWith('--trusted-baseline=')) trustedBaselinePath = path.resolve(arg.slice('--trusted-baseline='.length));
@@ -1351,6 +1354,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     northSourceConcentrationAppliedDiag,
     atlanticDryCoreReceiverTaperDiagFrac,
     atlanticDryCoreReceiverTaperAppliedDiag,
+    atlanticTransitionCarryoverContainmentDiagFrac,
+    atlanticTransitionCarryoverContainmentAppliedDiag,
     subtropicalSourceDriverDiagFrac,
     subtropicalSourceDriverFloorDiagFrac,
     subtropicalLocalHemiSourceDiagFrac,
@@ -1458,6 +1463,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalNorthSourceConcentrationApplied = zonalMean(northSourceConcentrationAppliedDiag || new Array(nx * ny).fill(0), nx, ny);
   const zonalAtlanticDryCoreReceiverTaper = zonalMean(atlanticDryCoreReceiverTaperDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalAtlanticDryCoreReceiverApplied = zonalMean(atlanticDryCoreReceiverTaperAppliedDiag || new Array(nx * ny).fill(0), nx, ny);
+  const zonalAtlanticTransitionCarryoverContainment = zonalMean(atlanticTransitionCarryoverContainmentDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalAtlanticTransitionCarryoverContainmentApplied = zonalMean(atlanticTransitionCarryoverContainmentAppliedDiag || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSurfaceEvap = zonalMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny);
@@ -2234,6 +2241,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         northSourceConcentrationAppliedDiag: roundSeries(zonalNorthSourceConcentrationApplied, 5),
         atlanticDryCoreReceiverTaperDiagFrac: roundSeries(zonalAtlanticDryCoreReceiverTaper, 5),
         atlanticDryCoreReceiverTaperAppliedDiag: roundSeries(zonalAtlanticDryCoreReceiverApplied, 5),
+        atlanticTransitionCarryoverContainmentDiagFrac: roundSeries(zonalAtlanticTransitionCarryoverContainment, 5),
+        atlanticTransitionCarryoverContainmentAppliedDiag: roundSeries(zonalAtlanticTransitionCarryoverContainmentApplied, 5),
         subtropicalWeakHemiFloorOverhangDiagFrac: roundSeries(zonalSubtropicalWeakHemiFloorOverhang, 5),
         subtropicalWeakHemiFloorTaperAppliedDiagFrac: roundSeries(zonalSubtropicalWeakHemiFloorTaperApplied, 5),
         freshSubtropicalBandDiagFrac: roundSeries(zonalMean(freshSubtropicalBandDiagFrac || new Array(nx * ny).fill(0), nx, ny), 5),
@@ -5021,6 +5030,8 @@ export async function main() {
   else if (northSourceConcentrationPenaltyPatchMode === 'on') core.vertParams.enableNorthSourceConcentrationPenalty = true;
   if (atlanticDryCoreReceiverTaperPatchMode === 'off') core.vertParams.enableAtlanticDryCoreReceiverTaper = false;
   else if (atlanticDryCoreReceiverTaperPatchMode === 'on') core.vertParams.enableAtlanticDryCoreReceiverTaper = true;
+  if (atlanticTransitionCarryoverContainmentPatchMode === 'off') core.vertParams.enableAtlanticTransitionCarryoverContainment = false;
+  else if (atlanticTransitionCarryoverContainmentPatchMode === 'on') core.vertParams.enableAtlanticTransitionCarryoverContainment = true;
   if (softLiveGatePatchMode === 'off') core.microParams.enableSoftLiveStateMaintenanceSuppression = false;
   else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
   if (shoulderAbsorptionGuardPatchMode === 'off') core.microParams.enableShoulderAbsorptionGuard = false;

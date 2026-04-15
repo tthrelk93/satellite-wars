@@ -1748,6 +1748,26 @@ Status update:
   - it should not retune Atlantic receiver geometry or add a fresh low-level humidity sink
 - next active phase: `Phase 1ZZE: Implement Atlantic Transition Carryover Containment Patch`
 
+Status update:
+- completed in [phase1zze-atlantic-transition-carryover-containment-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zze-atlantic-transition-carryover-containment-patch.md)
+- outcome:
+  - verdict: `atlantic_transition_carryover_containment_with_residual_redistribution`
+  - keep patch: `false`
+  - the live Atlantic transition lane never actually admits the new containment taper at `18.75°N`:
+    - containment frac `0`
+    - containment applied `0`
+  - the same-branch 30-day climate therefore stays as a mild redistribution, not an active containment win:
+    - `26.25°N` receiver condensation delta `+0.00032`
+    - `18.75°N` transition spillover delta `+0.00166`
+    - `11.25°N` source delta `-0.0051`
+    - `3.75°N` edge delta `-0.00869`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2` delta `+0.00129`
+- decision:
+  - do not enable the Atlantic transition carryover containment bundle by default
+  - do not increase its amplitude, because the live issue is admission, not strength
+  - keep the `26.25°N` Atlantic receiver taper work in place and move to transition-lane admission attribution
+- next active phase: `Phase 1ZZF: Transition Carryover Admission Attribution`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.

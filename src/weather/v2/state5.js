@@ -85,6 +85,8 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const northSourceConcentrationAppliedDiag = makeArray(N);
   const atlanticDryCoreReceiverTaperDiag = makeArray(N);
   const atlanticDryCoreReceiverTaperAppliedDiag = makeArray(N);
+  const atlanticTransitionCarryoverContainmentDiag = makeArray(N);
+  const atlanticTransitionCarryoverContainmentAppliedDiag = makeArray(N);
   const subtropicalSourceDriverDiag = makeArray(N);
   const subtropicalSourceDriverFloorDiag = makeArray(N);
   const subtropicalLocalHemiSourceDiag = makeArray(N);
@@ -372,6 +374,8 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     northSourceConcentrationAppliedDiag,
     atlanticDryCoreReceiverTaperDiag,
     atlanticDryCoreReceiverTaperAppliedDiag,
+    atlanticTransitionCarryoverContainmentDiag,
+    atlanticTransitionCarryoverContainmentAppliedDiag,
     subtropicalSourceDriverDiag,
     subtropicalSourceDriverFloorDiag,
     subtropicalLocalHemiSourceDiag,

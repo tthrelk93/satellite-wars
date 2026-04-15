@@ -379,6 +379,45 @@ export const computeAtlanticDryCoreReceiverTaperFrac = ({
     maxFrac
   );
 };
+export const computeAtlanticTransitionCarryoverContainmentFrac = ({
+  enabled,
+  receiverPatchEnabled,
+  latDeg,
+  lonDeg,
+  isLand,
+  carrierSignal,
+  overlapMass,
+  dryDriver,
+  existingOmegaPaS,
+  signal0,
+  signal1,
+  lat0,
+  lat1,
+  overlap0,
+  overlap1,
+  dry0,
+  dry1,
+  omega0,
+  omega1,
+  maxFrac
+}) => {
+  if (!enabled || !receiverPatchEnabled || !(latDeg > 0) || isLand) return 0;
+  if (classifyNhDryBeltSector({ lonDeg, isLand }) !== 'atlantic') return 0;
+  const latAbs = Math.abs(latDeg);
+  const latSupport = smoothstep(lat0 - 1.5, lat0 + 1.5, latAbs)
+    * (1 - smoothstep(lat1 - 1.5, lat1 + 1.5, latAbs));
+  if (!(latSupport > 0)) return 0;
+  return clamp(
+    maxFrac
+      * latSupport
+      * smoothstep(signal0, signal1, carrierSignal)
+      * smoothstep(overlap0, overlap1, overlapMass)
+      * smoothstep(dry0, dry1, dryDriver)
+      * smoothstep(omega0, omega1, Math.max(0, existingOmegaPaS)),
+    0,
+    maxFrac
+  );
+};
 export const computeEquatorialEdgeSubsidenceGuardTargetWeight = ({
   enabled,
   latAbs,
@@ -703,6 +742,18 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     atlanticDryCoreReceiverTaperOmega0 = 0.12,
     atlanticDryCoreReceiverTaperOmega1 = 0.26,
     atlanticDryCoreReceiverTaperMaxFrac = 0.16,
+    enableAtlanticTransitionCarryoverContainment = false,
+    atlanticTransitionCarryoverContainmentSignal0 = 0.04,
+    atlanticTransitionCarryoverContainmentSignal1 = 0.075,
+    atlanticTransitionCarryoverContainmentLat0 = 18,
+    atlanticTransitionCarryoverContainmentLat1 = 22.5,
+    atlanticTransitionCarryoverContainmentOverlap0 = 0.08,
+    atlanticTransitionCarryoverContainmentOverlap1 = 0.18,
+    atlanticTransitionCarryoverContainmentDry0 = 0.12,
+    atlanticTransitionCarryoverContainmentDry1 = 0.24,
+    atlanticTransitionCarryoverContainmentOmega0 = 0.12,
+    atlanticTransitionCarryoverContainmentOmega1 = 0.26,
+    atlanticTransitionCarryoverContainmentMaxFrac = 0.18,
     enableWeakHemiCrossHemiFloorTaper = false,
     weakHemiCrossHemiFloorTaperPenalty0 = 0.02,
     weakHemiCrossHemiFloorTaperPenalty1 = 0.06,
@@ -769,6 +820,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.northSourceConcentrationAppliedDiag || state.northSourceConcentrationAppliedDiag.length !== N) state.northSourceConcentrationAppliedDiag = new Float32Array(N);
   if (!state.atlanticDryCoreReceiverTaperDiag || state.atlanticDryCoreReceiverTaperDiag.length !== N) state.atlanticDryCoreReceiverTaperDiag = new Float32Array(N);
   if (!state.atlanticDryCoreReceiverTaperAppliedDiag || state.atlanticDryCoreReceiverTaperAppliedDiag.length !== N) state.atlanticDryCoreReceiverTaperAppliedDiag = new Float32Array(N);
+  if (!state.atlanticTransitionCarryoverContainmentDiag || state.atlanticTransitionCarryoverContainmentDiag.length !== N) state.atlanticTransitionCarryoverContainmentDiag = new Float32Array(N);
+  if (!state.atlanticTransitionCarryoverContainmentAppliedDiag || state.atlanticTransitionCarryoverContainmentAppliedDiag.length !== N) state.atlanticTransitionCarryoverContainmentAppliedDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverDiag || state.subtropicalSourceDriverDiag.length !== N) state.subtropicalSourceDriverDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverFloorDiag || state.subtropicalSourceDriverFloorDiag.length !== N) state.subtropicalSourceDriverFloorDiag = new Float32Array(N);
   if (!state.subtropicalLocalHemiSourceDiag || state.subtropicalLocalHemiSourceDiag.length !== N) state.subtropicalLocalHemiSourceDiag = new Float32Array(N);
@@ -900,6 +953,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const northSourceConcentrationAppliedDiag = state.northSourceConcentrationAppliedDiag;
   const atlanticDryCoreReceiverTaperDiag = state.atlanticDryCoreReceiverTaperDiag;
   const atlanticDryCoreReceiverTaperAppliedDiag = state.atlanticDryCoreReceiverTaperAppliedDiag;
+  const atlanticTransitionCarryoverContainmentDiag = state.atlanticTransitionCarryoverContainmentDiag;
+  const atlanticTransitionCarryoverContainmentAppliedDiag = state.atlanticTransitionCarryoverContainmentAppliedDiag;
   const subtropicalSourceDriverDiag = state.subtropicalSourceDriverDiag;
   const subtropicalSourceDriverFloorDiag = state.subtropicalSourceDriverFloorDiag;
   const subtropicalLocalHemiSourceDiag = state.subtropicalLocalHemiSourceDiag;
@@ -1006,6 +1061,10 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   equatorialEdgeNorthsideLeakPenaltyDiag.fill(0);
   northSourceConcentrationPenaltyDiag.fill(0);
   northSourceConcentrationAppliedDiag.fill(0);
+  atlanticDryCoreReceiverTaperDiag.fill(0);
+  atlanticDryCoreReceiverTaperAppliedDiag.fill(0);
+  atlanticTransitionCarryoverContainmentDiag.fill(0);
+  atlanticTransitionCarryoverContainmentAppliedDiag.fill(0);
   subtropicalSourceDriverDiag.fill(0);
   subtropicalSourceDriverFloorDiag.fill(0);
   subtropicalLocalHemiSourceDiag.fill(0);
@@ -1539,6 +1598,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     }
   }
 
+  let northsideLeakCarrierSignalMean = 0;
+
   // Deep convection with entrainment/detrainment
   if (enableConvection) {
     if (!state._omegaPosScratch) state._omegaPosScratch = new Float32Array(N);
@@ -2069,7 +2130,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       shTransitionSuppressedSource = shTransitionWeight > 0 ? shTransitionSuppressedSource / shTransitionWeight : 0;
       const meanTropicalSource = (nhSource * nhWeight + shSource * shWeight) / Math.max(eps, nhWeight + shWeight);
       let northsideLeakPenaltySignalMean = 0;
-      if (enableWeakHemiCrossHemiFloorTaper && enableNorthsideFanoutLeakPenalty) {
+      {
         let northsideLeakPenaltySum = 0;
         let northsideLeakPenaltyWeightSum = 0;
         for (let j = 0; j < ny; j++) {
@@ -2109,8 +2170,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             northsideLeakPenaltyWeightSum += weight;
           }
         }
-        northsideLeakPenaltySignalMean = northsideLeakPenaltyWeightSum > eps
+        northsideLeakCarrierSignalMean = northsideLeakPenaltyWeightSum > eps
           ? northsideLeakPenaltySum / northsideLeakPenaltyWeightSum
+          : 0;
+        northsideLeakPenaltySignalMean = (enableWeakHemiCrossHemiFloorTaper && enableNorthsideFanoutLeakPenalty)
+          ? northsideLeakCarrierSignalMean
           : 0;
       }
       const subtropicalAlpha = 1 - Math.exp(-dt / Math.max(subtropicalSubsidenceTau, eps));
@@ -2214,7 +2278,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             latDeg: lat,
             lonDeg: lonDeg?.[i] || 0,
             isLand: landMask?.[k] === 1,
-            northsideLeakPenaltySignal: northsideLeakPenaltySignalMean,
+            northsideLeakPenaltySignal: enableNorthsideFanoutLeakPenalty
+              ? northsideLeakPenaltySignalMean
+              : northsideLeakCarrierSignalMean,
             dryDriver,
             existingOmegaPaS: lowLevelOmegaEffective[k],
             signal0: atlanticDryCoreReceiverTaperSignal0,
@@ -2549,7 +2615,43 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     }
     upperCloudPath[k] = upperCloudMass;
     const previousUpperCloudMass = prevUpperCloudPath[k] || 0;
-    const overlap = Math.min(prevUpperCloudPath[k] || 0, upperCloudMass);
+    const lat = grid.latDeg?.[Math.floor(k / nx)] ?? 0;
+    const lon = lonDeg?.[k % nx] ?? 0;
+    const candidateOverlap = Math.min(previousUpperCloudMass, upperCloudMass);
+    const atlanticTransitionCarryoverContainmentFrac = computeAtlanticTransitionCarryoverContainmentFrac({
+      enabled: enableAtlanticTransitionCarryoverContainment,
+      receiverPatchEnabled: enableAtlanticDryCoreReceiverTaper,
+      latDeg: lat,
+      lonDeg: lon,
+      isLand: landMask?.[k] === 1,
+      carrierSignal: northsideLeakCarrierSignalMean,
+      overlapMass: candidateOverlap,
+      dryDriver: subtropicalSubsidenceDrying[k] || 0,
+      existingOmegaPaS: lowLevelOmegaEffective[k],
+      signal0: atlanticTransitionCarryoverContainmentSignal0,
+      signal1: atlanticTransitionCarryoverContainmentSignal1,
+      lat0: atlanticTransitionCarryoverContainmentLat0,
+      lat1: atlanticTransitionCarryoverContainmentLat1,
+      overlap0: atlanticTransitionCarryoverContainmentOverlap0,
+      overlap1: atlanticTransitionCarryoverContainmentOverlap1,
+      dry0: atlanticTransitionCarryoverContainmentDry0,
+      dry1: atlanticTransitionCarryoverContainmentDry1,
+      omega0: atlanticTransitionCarryoverContainmentOmega0,
+      omega1: atlanticTransitionCarryoverContainmentOmega1,
+      maxFrac: atlanticTransitionCarryoverContainmentMaxFrac
+    });
+    atlanticTransitionCarryoverContainmentDiag[k] = atlanticTransitionCarryoverContainmentFrac;
+    if (atlanticTransitionCarryoverContainmentFrac > 0 && upperCloudMass > eps && candidateOverlap > 0) {
+      const removalMass = Math.min(candidateOverlap * atlanticTransitionCarryoverContainmentFrac, upperCloudMass);
+      const keepFrac = Math.max(0, (upperCloudMass - removalMass) / Math.max(upperCloudMass, eps));
+      scaleUpperCloudMassAtCell(state, sigmaHalf, nz, k, keepFrac);
+      upperCloudMass *= keepFrac;
+      for (let bandIndex = 0; bandIndex < CLOUD_BIRTH_LEVEL_BAND_COUNT; bandIndex += 1) {
+        upperCloudBandMass[bandIndex] *= keepFrac;
+      }
+      atlanticTransitionCarryoverContainmentAppliedDiag[k] = removalMass;
+    }
+    const overlap = Math.min(previousUpperCloudMass, upperCloudMass);
     carriedOverUpperCloudMass[k] = overlap;
     const weakLocalOrganization = 1 - smoothstep(0.12, 0.42, convectiveOrganization[k]);
     const weakLocalMassFlux = 1 - smoothstep(5e-4, 0.004, convectiveMassFlux[k]);
