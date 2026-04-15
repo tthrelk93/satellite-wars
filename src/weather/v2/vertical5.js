@@ -323,6 +323,27 @@ export const computeWeakHemiCrossHemiFloorTaperFrac = ({
     Math.min(overhangFrac, maxFrac)
   );
 };
+export const computeNorthSourceConcentrationPenaltyFrac = ({
+  enabled,
+  latDeg,
+  leakPenaltyFrac,
+  sourceSupport,
+  signal0,
+  signal1,
+  support0,
+  support1,
+  maxFrac
+}) => {
+  if (!enabled) return 0;
+  if (!(latDeg > 0) || !(leakPenaltyFrac > 0) || !(sourceSupport > 0)) return 0;
+  return clamp(
+    maxFrac
+      * smoothstep(signal0, signal1, leakPenaltyFrac)
+      * smoothstep(support0, support1, sourceSupport),
+    0,
+    maxFrac
+  );
+};
 export const computeEquatorialEdgeSubsidenceGuardTargetWeight = ({
   enabled,
   latAbs,
@@ -453,6 +474,12 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'northsideFanoutLeakPenaltyLat1',
   'northsideFanoutLeakPenaltyRisk0',
   'northsideFanoutLeakPenaltyRisk1',
+  'enableNorthSourceConcentrationPenalty',
+  'northSourceConcentrationPenaltySignal0',
+  'northSourceConcentrationPenaltySignal1',
+  'northSourceConcentrationPenaltySupport0',
+  'northSourceConcentrationPenaltySupport1',
+  'northSourceConcentrationPenaltyMaxFrac',
   'enableWeakHemiCrossHemiFloorTaper',
   'weakHemiCrossHemiFloorTaperPenalty0',
   'weakHemiCrossHemiFloorTaperPenalty1',
@@ -615,6 +642,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     northsideFanoutLeakPenaltyLat1 = 13,
     northsideFanoutLeakPenaltyRisk0 = 0.32,
     northsideFanoutLeakPenaltyRisk1 = 0.5,
+    enableNorthSourceConcentrationPenalty = false,
+    northSourceConcentrationPenaltySignal0 = 0.035,
+    northSourceConcentrationPenaltySignal1 = 0.065,
+    northSourceConcentrationPenaltySupport0 = 0.08,
+    northSourceConcentrationPenaltySupport1 = 0.16,
+    northSourceConcentrationPenaltyMaxFrac = 0.14,
     enableWeakHemiCrossHemiFloorTaper = false,
     weakHemiCrossHemiFloorTaperPenalty0 = 0.02,
     weakHemiCrossHemiFloorTaperPenalty1 = 0.06,
@@ -677,6 +710,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.equatorialEdgeNorthsideLeakRiskDiag || state.equatorialEdgeNorthsideLeakRiskDiag.length !== N) state.equatorialEdgeNorthsideLeakRiskDiag = new Float32Array(N);
   if (!state.equatorialEdgeNorthsideLeakAdmissionRiskDiag || state.equatorialEdgeNorthsideLeakAdmissionRiskDiag.length !== N) state.equatorialEdgeNorthsideLeakAdmissionRiskDiag = new Float32Array(N);
   if (!state.equatorialEdgeNorthsideLeakPenaltyDiag || state.equatorialEdgeNorthsideLeakPenaltyDiag.length !== N) state.equatorialEdgeNorthsideLeakPenaltyDiag = new Float32Array(N);
+  if (!state.northSourceConcentrationPenaltyDiag || state.northSourceConcentrationPenaltyDiag.length !== N) state.northSourceConcentrationPenaltyDiag = new Float32Array(N);
+  if (!state.northSourceConcentrationAppliedDiag || state.northSourceConcentrationAppliedDiag.length !== N) state.northSourceConcentrationAppliedDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverDiag || state.subtropicalSourceDriverDiag.length !== N) state.subtropicalSourceDriverDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverFloorDiag || state.subtropicalSourceDriverFloorDiag.length !== N) state.subtropicalSourceDriverFloorDiag = new Float32Array(N);
   if (!state.subtropicalLocalHemiSourceDiag || state.subtropicalLocalHemiSourceDiag.length !== N) state.subtropicalLocalHemiSourceDiag = new Float32Array(N);
@@ -804,6 +839,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const equatorialEdgeNorthsideLeakRiskDiag = state.equatorialEdgeNorthsideLeakRiskDiag;
   const equatorialEdgeNorthsideLeakAdmissionRiskDiag = state.equatorialEdgeNorthsideLeakAdmissionRiskDiag;
   const equatorialEdgeNorthsideLeakPenaltyDiag = state.equatorialEdgeNorthsideLeakPenaltyDiag;
+  const northSourceConcentrationPenaltyDiag = state.northSourceConcentrationPenaltyDiag;
+  const northSourceConcentrationAppliedDiag = state.northSourceConcentrationAppliedDiag;
   const subtropicalSourceDriverDiag = state.subtropicalSourceDriverDiag;
   const subtropicalSourceDriverFloorDiag = state.subtropicalSourceDriverFloorDiag;
   const subtropicalLocalHemiSourceDiag = state.subtropicalLocalHemiSourceDiag;
@@ -908,6 +945,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   equatorialEdgeNorthsideLeakRiskDiag.fill(0);
   equatorialEdgeNorthsideLeakAdmissionRiskDiag.fill(0);
   equatorialEdgeNorthsideLeakPenaltyDiag.fill(0);
+  northSourceConcentrationPenaltyDiag.fill(0);
+  northSourceConcentrationAppliedDiag.fill(0);
   subtropicalSourceDriverDiag.fill(0);
   subtropicalSourceDriverFloorDiag.fill(0);
   subtropicalLocalHemiSourceDiag.fill(0);
@@ -1713,11 +1752,64 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         + 0.75 * convMassFluxSupport
       );
       const suppressedSourceContribution = rawSourceContribution * circulationReboundContainment.sourceSuppressFrac;
+      const equatorialEdgeSourceSupport = computeEquatorialEdgeSubsidenceGuardSourceSupport({
+        enabled: enableEquatorialEdgeSubsidenceGuard,
+        latAbs,
+        sourceLat0: equatorialEdgeSubsidenceGuardSourceLat0,
+        sourceLat1: equatorialEdgeSubsidenceGuardSourceLat1,
+        sourceWindow: clamp01(
+          smoothstep(equatorialEdgeSubsidenceGuardSourceLat0 - 2, equatorialEdgeSubsidenceGuardSourceLat0 + 2, latAbs)
+            * (1 - smoothstep(equatorialEdgeSubsidenceGuardSourceLat1 - 2, equatorialEdgeSubsidenceGuardSourceLat1 + 2, latAbs))
+        ),
+        subtropicalBand,
+        neutralToSubsidingSupport,
+        existingOmegaPaS: omegaLow
+      });
+      const northsideLeakSourceWindow = computeEquatorialEdgeNorthsideLeakSourceWindowFrac({
+        enabled: enableNorthsideFanoutLeakPenalty,
+        latDeg: latDeg?.[rowIndex] ?? 0,
+        lat0: northsideFanoutLeakPenaltyLat0,
+        lat1: northsideFanoutLeakPenaltyLat1
+      });
+      const northsideLeakRisk = computeEquatorialEdgeNorthsideLeakRiskFrac({
+        enabled: enableNorthsideFanoutLeakPenalty,
+        subtropicalBand,
+        neutralToSubsidingSupport,
+        existingOmegaPaS: omegaLow
+      });
+      const northsideLeakAdmissionRisk = computeEquatorialEdgeNorthsideLeakAdmissionRiskFrac({
+        enabled: enableNorthsideFanoutLeakPenalty,
+        sourceWindow: northsideLeakSourceWindow,
+        fanoutRisk: northsideLeakRisk
+      });
+      const northsideLeakPenaltyFrac = computeEquatorialEdgeNorthsideLeakPenaltyFrac({
+        enabled: enableNorthsideFanoutLeakPenalty,
+        sourceWindow: northsideLeakSourceWindow,
+        admissionRisk: northsideLeakAdmissionRisk,
+        risk0: northsideFanoutLeakPenaltyRisk0,
+        risk1: northsideFanoutLeakPenaltyRisk1,
+        maxFrac: northsideFanoutLeakPenaltyMaxFrac
+      });
+      const northSourceConcentrationPenaltyFrac = computeNorthSourceConcentrationPenaltyFrac({
+        enabled: enableNorthSourceConcentrationPenalty,
+        latDeg: latDeg?.[rowIndex] ?? 0,
+        leakPenaltyFrac: northsideLeakPenaltyFrac,
+        sourceSupport: equatorialEdgeSourceSupport,
+        signal0: northSourceConcentrationPenaltySignal0,
+        signal1: northSourceConcentrationPenaltySignal1,
+        support0: northSourceConcentrationPenaltySupport0,
+        support1: northSourceConcentrationPenaltySupport1,
+        maxFrac: northSourceConcentrationPenaltyMaxFrac
+      });
+      const retainedSourceContribution = rawSourceContribution - suppressedSourceContribution;
+      const concentrationPenaltyContribution = Math.max(0, retainedSourceContribution) * northSourceConcentrationPenaltyFrac;
       rowConvectiveSourceRaw[rowIndex] += rawSourceContribution;
       rowTransitionSuppressedSource[rowIndex] += suppressedSourceContribution;
-      rowConvectiveSource[rowIndex] += rawSourceContribution - suppressedSourceContribution;
+      rowConvectiveSource[rowIndex] += retainedSourceContribution - concentrationPenaltyContribution;
       circulationReboundRawSourceDiag[k] = rawSourceContribution;
       circulationReboundSuppressedSourceDiag[k] = suppressedSourceContribution;
+      northSourceConcentrationPenaltyDiag[k] = northSourceConcentrationPenaltyFrac;
+      northSourceConcentrationAppliedDiag[k] = concentrationPenaltyContribution;
       if (mu <= 1e-6 || massSurface <= 0) continue;
 
       const entrainEff = clamp(

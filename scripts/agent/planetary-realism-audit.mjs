@@ -78,6 +78,7 @@ let dryingOmegaBridgePatchMode = 'default';
 let equatorialEdgeSubsidenceGuardPatchMode = 'default';
 let northsideFanoutLeakPenaltyPatchMode = 'default';
 let weakHemiCrossHemiFloorTaperPatchMode = 'default';
+let northSourceConcentrationPenaltyPatchMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -133,6 +134,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--northside-fanout-leak-penalty-patch=')) northsideFanoutLeakPenaltyPatchMode = arg.slice('--northside-fanout-leak-penalty-patch='.length);
   else if (arg === '--weak-hemi-cross-hemi-floor-taper-patch' && argv[i + 1]) weakHemiCrossHemiFloorTaperPatchMode = argv[++i];
   else if (arg.startsWith('--weak-hemi-cross-hemi-floor-taper-patch=')) weakHemiCrossHemiFloorTaperPatchMode = arg.slice('--weak-hemi-cross-hemi-floor-taper-patch='.length);
+  else if (arg === '--north-source-concentration-penalty-patch' && argv[i + 1]) northSourceConcentrationPenaltyPatchMode = argv[++i];
+  else if (arg.startsWith('--north-source-concentration-penalty-patch=')) northSourceConcentrationPenaltyPatchMode = arg.slice('--north-source-concentration-penalty-patch='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--trusted-baseline' && argv[i + 1]) trustedBaselinePath = path.resolve(argv[++i]);
   else if (arg.startsWith('--trusted-baseline=')) trustedBaselinePath = path.resolve(arg.slice('--trusted-baseline='.length));
@@ -194,6 +197,11 @@ northsideFanoutLeakPenaltyPatchMode = northsideFanoutLeakPenaltyPatchMode === 'o
 weakHemiCrossHemiFloorTaperPatchMode = weakHemiCrossHemiFloorTaperPatchMode === 'off'
   ? 'off'
   : weakHemiCrossHemiFloorTaperPatchMode === 'on'
+    ? 'on'
+    : 'default';
+northSourceConcentrationPenaltyPatchMode = northSourceConcentrationPenaltyPatchMode === 'off'
+  ? 'off'
+  : northSourceConcentrationPenaltyPatchMode === 'on'
     ? 'on'
     : 'default';
 
@@ -616,6 +624,7 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
     equatorialEdgeSubsidenceGuardPatchMode,
     northsideFanoutLeakPenaltyPatchMode,
     weakHemiCrossHemiFloorTaperPatchMode,
+    northSourceConcentrationPenaltyPatchMode,
     instrumentationMode: core.getInstrumentationMode ? core.getInstrumentationMode() : instrumentationMode,
     sampleTargetsDays,
     targetSeconds: targetsSeconds,
@@ -1329,6 +1338,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     equatorialEdgeNorthsideLeakRiskDiagFrac,
     equatorialEdgeNorthsideLeakAdmissionRiskDiagFrac,
     equatorialEdgeNorthsideLeakPenaltyDiagFrac,
+    northSourceConcentrationPenaltyDiagFrac,
+    northSourceConcentrationAppliedDiag,
     subtropicalSourceDriverDiagFrac,
     subtropicalSourceDriverFloorDiagFrac,
     subtropicalLocalHemiSourceDiagFrac,
@@ -1432,6 +1443,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalEquatorialEdgeNorthsideLeakRisk = zonalMean(equatorialEdgeNorthsideLeakRiskDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalEquatorialEdgeNorthsideLeakAdmissionRisk = zonalMean(equatorialEdgeNorthsideLeakAdmissionRiskDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalEquatorialEdgeNorthsideLeakPenalty = zonalMean(equatorialEdgeNorthsideLeakPenaltyDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalNorthSourceConcentrationPenalty = zonalMean(northSourceConcentrationPenaltyDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalNorthSourceConcentrationApplied = zonalMean(northSourceConcentrationAppliedDiag || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSurfaceEvap = zonalMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny);
@@ -2204,6 +2217,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         equatorialEdgeNorthsideLeakRiskDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakRisk, 5),
         equatorialEdgeNorthsideLeakAdmissionRiskDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakAdmissionRisk, 5),
         equatorialEdgeNorthsideLeakPenaltyDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakPenalty, 5),
+        northSourceConcentrationPenaltyDiagFrac: roundSeries(zonalNorthSourceConcentrationPenalty, 5),
+        northSourceConcentrationAppliedDiag: roundSeries(zonalNorthSourceConcentrationApplied, 5),
         subtropicalWeakHemiFloorOverhangDiagFrac: roundSeries(zonalSubtropicalWeakHemiFloorOverhang, 5),
         subtropicalWeakHemiFloorTaperAppliedDiagFrac: roundSeries(zonalSubtropicalWeakHemiFloorTaperApplied, 5),
         freshSubtropicalBandDiagFrac: roundSeries(zonalMean(freshSubtropicalBandDiagFrac || new Array(nx * ny).fill(0), nx, ny), 5),
@@ -4987,6 +5002,8 @@ export async function main() {
   else if (northsideFanoutLeakPenaltyPatchMode === 'on') core.vertParams.enableNorthsideFanoutLeakPenalty = true;
   if (weakHemiCrossHemiFloorTaperPatchMode === 'off') core.vertParams.enableWeakHemiCrossHemiFloorTaper = false;
   else if (weakHemiCrossHemiFloorTaperPatchMode === 'on') core.vertParams.enableWeakHemiCrossHemiFloorTaper = true;
+  if (northSourceConcentrationPenaltyPatchMode === 'off') core.vertParams.enableNorthSourceConcentrationPenalty = false;
+  else if (northSourceConcentrationPenaltyPatchMode === 'on') core.vertParams.enableNorthSourceConcentrationPenalty = true;
   if (softLiveGatePatchMode === 'off') core.microParams.enableSoftLiveStateMaintenanceSuppression = false;
   else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
   if (shoulderAbsorptionGuardPatchMode === 'off') core.microParams.enableShoulderAbsorptionGuard = false;

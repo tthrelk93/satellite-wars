@@ -10,6 +10,7 @@ import {
   computeEquatorialEdgeNorthsideLeakPenaltyFrac,
   computeEquatorialEdgeNorthsideLeakRiskFrac,
   computeEquatorialEdgeNorthsideLeakSourceWindowFrac,
+  computeNorthSourceConcentrationPenaltyFrac,
   computeEquatorialEdgeSubsidenceGuardSourceSupport,
   computeEquatorialEdgeSubsidenceGuardTargetWeight,
   computeWeakHemiCrossHemiFloorTaperFrac,
@@ -912,6 +913,61 @@ test('computeWeakHemiCrossHemiFloorTaperFrac only trims weak-hemi cross-hemi ove
   assert.ok(active > 0.14);
   assert.equal(strongHemi, 0);
   assert.equal(deadLeakGate, 0);
+});
+
+test('computeNorthSourceConcentrationPenaltyFrac only activates for a live NH source signal', () => {
+  assert.equal(
+    computeNorthSourceConcentrationPenaltyFrac({
+      enabled: false,
+      latDeg: 11.25,
+      leakPenaltyFrac: 0.06339,
+      sourceSupport: 0.13789,
+      signal0: 0.035,
+      signal1: 0.065,
+      support0: 0.08,
+      support1: 0.16,
+      maxFrac: 0.14
+    }),
+    0
+  );
+
+  const active = computeNorthSourceConcentrationPenaltyFrac({
+    enabled: true,
+    latDeg: 11.25,
+    leakPenaltyFrac: 0.06339,
+    sourceSupport: 0.13789,
+    signal0: 0.035,
+    signal1: 0.065,
+    support0: 0.08,
+    support1: 0.16,
+    maxFrac: 0.14
+  });
+  const southMirror = computeNorthSourceConcentrationPenaltyFrac({
+    enabled: true,
+    latDeg: -11.25,
+    leakPenaltyFrac: 0.06339,
+    sourceSupport: 0.13789,
+    signal0: 0.035,
+    signal1: 0.065,
+    support0: 0.08,
+    support1: 0.16,
+    maxFrac: 0.14
+  });
+  const deadSignal = computeNorthSourceConcentrationPenaltyFrac({
+    enabled: true,
+    latDeg: 11.25,
+    leakPenaltyFrac: 0,
+    sourceSupport: 0.13789,
+    signal0: 0.035,
+    signal1: 0.065,
+    support0: 0.08,
+    support1: 0.16,
+    maxFrac: 0.14
+  });
+
+  assert.ok(active > 0.08);
+  assert.equal(southMirror, 0);
+  assert.equal(deadSignal, 0);
 });
 
 test('equatorial-edge guard windows are mirrored by absolute latitude rather than NH-only shoulder geometry', () => {

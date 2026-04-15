@@ -1600,6 +1600,29 @@ Status:
   - do not add a local humidity/omega boost and do not globally reduce source amplitude
 - next active phase: `Phase 1ZY: Implement Capped North Source Concentration Penalty Patch`
 
+Status:
+- complete in [phase1zy-capped-north-source-concentration-penalty-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zy-capped-north-source-concentration-penalty-patch.md)
+- verdict: `north_source_relief_with_dry_core_redistribution`
+- keep patch: `false`
+- key conclusions:
+  - the new capped source penalty is live at `11.25°N`:
+    - concentration penalty frac: `0.00583`
+    - applied source reduction: `0.0022`
+  - it does reduce the target source-row condensation:
+    - `11.25°N: -0.0306 kg/m²`
+    - `18.75°N: -0.00425 kg/m²`
+  - but the response is redistributed into the wrong lanes:
+    - `26.25°N: +0.0084 kg/m²`
+    - `3.75°N: +0.00749 kg/m²`
+    - `-11.25°: +0.02652 kg/m²`
+  - the main climate guardrails improve only slightly while the NH dry-belt ocean condensation mean gets worse:
+    - `itczWidthDeg: -0.028`
+    - `subtropicalDryNorthRatio: -0.004`
+    - `subtropicalDrySouthRatio: 0`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: +0.00199`
+  - that means the phase succeeded as a source-lane experiment but failed as a keepable default climate fix
+- next active phase: `Phase 1ZZ: Source-Cap Redistribution Attribution`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
