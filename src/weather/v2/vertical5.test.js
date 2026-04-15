@@ -11,6 +11,7 @@ import {
   computeEquatorialEdgeNorthsideLeakRiskFrac,
   computeEquatorialEdgeNorthsideLeakSourceWindowFrac,
   computeNorthSourceConcentrationPenaltyFrac,
+  computeAtlanticDryCoreReceiverTaperFrac,
   computeEquatorialEdgeSubsidenceGuardSourceSupport,
   computeEquatorialEdgeSubsidenceGuardTargetWeight,
   computeWeakHemiCrossHemiFloorTaperFrac,
@@ -197,6 +198,102 @@ test('stepVertical5 tracks imported upper-cloud persistence when cloud lingers w
   assert.ok(state.upperCloudBlockedErosionAccumMass[0] >= 0);
   assert.ok(Array.from(state.carryOverUpperCloudEnteringByBandMass).some((value) => value > 0));
   assert.ok(Array.from(state.carryOverUpperCloudSurvivingByBandMass).some((value) => value > 0));
+});
+
+test('computeAtlanticDryCoreReceiverTaperFrac only activates in the Atlantic ocean dry-core receiver lane', () => {
+  const active = computeAtlanticDryCoreReceiverTaperFrac({
+    enabled: true,
+    latDeg: 26.25,
+    lonDeg: -45,
+    isLand: false,
+    northsideLeakPenaltySignal: 0.064,
+    dryDriver: 0.21,
+    existingOmegaPaS: 0.22,
+    signal0: 0.04,
+    signal1: 0.075,
+    lat0: 22,
+    lat1: 30,
+    dry0: 0.12,
+    dry1: 0.24,
+    omega0: 0.12,
+    omega1: 0.26,
+    maxFrac: 0.16
+  });
+  assert.ok(active > 0);
+  assert.ok(active <= 0.16);
+
+  assert.equal(computeAtlanticDryCoreReceiverTaperFrac({
+    enabled: false,
+    latDeg: 26.25,
+    lonDeg: -45,
+    isLand: false,
+    northsideLeakPenaltySignal: 0.064,
+    dryDriver: 0.21,
+    existingOmegaPaS: 0.22,
+    signal0: 0.04,
+    signal1: 0.075,
+    lat0: 22,
+    lat1: 30,
+    dry0: 0.12,
+    dry1: 0.24,
+    omega0: 0.12,
+    omega1: 0.26,
+    maxFrac: 0.16
+  }), 0);
+  assert.equal(computeAtlanticDryCoreReceiverTaperFrac({
+    enabled: true,
+    latDeg: 26.25,
+    lonDeg: -45,
+    isLand: true,
+    northsideLeakPenaltySignal: 0.064,
+    dryDriver: 0.21,
+    existingOmegaPaS: 0.22,
+    signal0: 0.04,
+    signal1: 0.075,
+    lat0: 22,
+    lat1: 30,
+    dry0: 0.12,
+    dry1: 0.24,
+    omega0: 0.12,
+    omega1: 0.26,
+    maxFrac: 0.16
+  }), 0);
+  assert.equal(computeAtlanticDryCoreReceiverTaperFrac({
+    enabled: true,
+    latDeg: 26.25,
+    lonDeg: -120,
+    isLand: false,
+    northsideLeakPenaltySignal: 0.064,
+    dryDriver: 0.21,
+    existingOmegaPaS: 0.22,
+    signal0: 0.04,
+    signal1: 0.075,
+    lat0: 22,
+    lat1: 30,
+    dry0: 0.12,
+    dry1: 0.24,
+    omega0: 0.12,
+    omega1: 0.26,
+    maxFrac: 0.16
+  }), 0);
+  assert.equal(computeAtlanticDryCoreReceiverTaperFrac({
+    enabled: true,
+    latDeg: -26.25,
+    lonDeg: -45,
+    isLand: false,
+    northsideLeakPenaltySignal: 0.064,
+    dryDriver: 0.21,
+    existingOmegaPaS: 0.22,
+    signal0: 0.04,
+    signal1: 0.075,
+    lat0: 22,
+    lat1: 30,
+    dry0: 0.12,
+    dry1: 0.24,
+    omega0: 0.12,
+    omega1: 0.26,
+    maxFrac: 0.16
+  }), 0);
 });
 
 test('stepVertical5 populates the upper-cloud handoff ledger for a simple carried-cloud case', () => {

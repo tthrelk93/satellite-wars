@@ -1,0 +1,38 @@
+{
+  "schema": "satellite-wars.phase1zzb-atlantic-receiver-efficiency-taper-patch.v1",
+  "generatedAt": "2026-04-15T01:52:25.563Z",
+  "paths": {
+    "offPath": "/tmp/phase1zzb-off.json",
+    "onPath": "/tmp/phase1zzb-on.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zzb-atlantic-receiver-efficiency-taper-patch.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zzb-atlantic-receiver-efficiency-taper-patch.json"
+  },
+  "verdict": "atlantic_receiver_relief_with_transition_spillover",
+  "keepPatch": false,
+  "nextPhase": "Phase 1ZZC: Atlantic Receiver Spillover Attribution",
+  "recommendation": "Do not enable the Atlantic receiver taper by default. It relieves the Atlantic-facing 26.25°N dry-core receiver, but the improvement is reabsorbed into 18.75°N spillover and the climate guardrails get slightly worse.",
+  "metrics": {
+    "itczWidthDeg": 0.077,
+    "subtropicalDryNorthRatio": 0.017,
+    "subtropicalDrySouthRatio": 0.003,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": -0.00039,
+    "midlatitudeWesterliesNorthU10Ms": 0
+  },
+  "laneDeltas": {
+    "atlanticReceiver26N": -0.0097,
+    "spillover18N": 0.00891,
+    "source11N": 0.00146,
+    "edge3N": -0.00869,
+    "southSource11S": -0.03123
+  },
+  "liveState": {
+    "atlanticReceiverTaper26N": 0.00595,
+    "atlanticReceiverApplied26N": 0.00164,
+    "tcw26NDelta": 0.308,
+    "lowerOmega26NDelta": -0.00626,
+    "midRh26NDelta": 0.014,
+    "tcw18NDelta": 0.342,
+    "lowerOmega18NDelta": 0.00268,
+    "midRh18NDelta": 0.011
+  }
+}

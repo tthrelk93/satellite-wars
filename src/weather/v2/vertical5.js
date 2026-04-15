@@ -10,6 +10,7 @@ import {
   findInstrumentationLevelBandIndex,
   instrumentationBandOffset
 } from './instrumentationBands5.js';
+import { classifyNhDryBeltSector } from './sourceTracing5.js';
 
 const P0 = 100000;
 const KAPPA = Rd / Cp;
@@ -344,6 +345,40 @@ export const computeNorthSourceConcentrationPenaltyFrac = ({
     maxFrac
   );
 };
+export const computeAtlanticDryCoreReceiverTaperFrac = ({
+  enabled,
+  latDeg,
+  lonDeg,
+  isLand,
+  northsideLeakPenaltySignal,
+  dryDriver,
+  existingOmegaPaS,
+  signal0,
+  signal1,
+  lat0,
+  lat1,
+  dry0,
+  dry1,
+  omega0,
+  omega1,
+  maxFrac
+}) => {
+  if (!enabled || !(latDeg > 0) || isLand) return 0;
+  if (classifyNhDryBeltSector({ lonDeg, isLand }) !== 'atlantic') return 0;
+  const latAbs = Math.abs(latDeg);
+  const latSupport = smoothstep(lat0 - 1.5, lat0 + 1.5, latAbs)
+    * (1 - smoothstep(lat1 - 1.5, lat1 + 1.5, latAbs));
+  if (!(latSupport > 0)) return 0;
+  return clamp(
+    maxFrac
+      * latSupport
+      * smoothstep(signal0, signal1, northsideLeakPenaltySignal)
+      * smoothstep(dry0, dry1, dryDriver)
+      * smoothstep(omega0, omega1, Math.max(0, existingOmegaPaS)),
+    0,
+    maxFrac
+  );
+};
 export const computeEquatorialEdgeSubsidenceGuardTargetWeight = ({
   enabled,
   latAbs,
@@ -480,6 +515,16 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'northSourceConcentrationPenaltySupport0',
   'northSourceConcentrationPenaltySupport1',
   'northSourceConcentrationPenaltyMaxFrac',
+  'enableAtlanticDryCoreReceiverTaper',
+  'atlanticDryCoreReceiverTaperSignal0',
+  'atlanticDryCoreReceiverTaperSignal1',
+  'atlanticDryCoreReceiverTaperLat0',
+  'atlanticDryCoreReceiverTaperLat1',
+  'atlanticDryCoreReceiverTaperDry0',
+  'atlanticDryCoreReceiverTaperDry1',
+  'atlanticDryCoreReceiverTaperOmega0',
+  'atlanticDryCoreReceiverTaperOmega1',
+  'atlanticDryCoreReceiverTaperMaxFrac',
   'enableWeakHemiCrossHemiFloorTaper',
   'weakHemiCrossHemiFloorTaperPenalty0',
   'weakHemiCrossHemiFloorTaperPenalty1',
@@ -648,6 +693,16 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     northSourceConcentrationPenaltySupport0 = 0.08,
     northSourceConcentrationPenaltySupport1 = 0.16,
     northSourceConcentrationPenaltyMaxFrac = 0.14,
+    enableAtlanticDryCoreReceiverTaper = false,
+    atlanticDryCoreReceiverTaperSignal0 = 0.04,
+    atlanticDryCoreReceiverTaperSignal1 = 0.075,
+    atlanticDryCoreReceiverTaperLat0 = 22,
+    atlanticDryCoreReceiverTaperLat1 = 30,
+    atlanticDryCoreReceiverTaperDry0 = 0.12,
+    atlanticDryCoreReceiverTaperDry1 = 0.24,
+    atlanticDryCoreReceiverTaperOmega0 = 0.12,
+    atlanticDryCoreReceiverTaperOmega1 = 0.26,
+    atlanticDryCoreReceiverTaperMaxFrac = 0.16,
     enableWeakHemiCrossHemiFloorTaper = false,
     weakHemiCrossHemiFloorTaperPenalty0 = 0.02,
     weakHemiCrossHemiFloorTaperPenalty1 = 0.06,
@@ -666,8 +721,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     eps = 1e-12
   } = params;
 
-  const { nx, ny, invDx, invDy, cosLat } = grid;
-  const { N, nz, u, v, omega, theta, qv, qc, qi, qr, qs, T, pHalf, pMid, sigmaHalf, dpsDtApplied } = state;
+  const { nx, ny, invDx, invDy, cosLat, lonDeg } = grid;
+  const { N, nz, u, v, omega, theta, qv, qc, qi, qr, qs, T, pHalf, pMid, sigmaHalf, dpsDtApplied, landMask } = state;
 
   // Persistent organized-convection state used by both plume physics and microphysics.
   if (!state.convMask || state.convMask.length !== N) state.convMask = new Uint8Array(N);
@@ -712,6 +767,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.equatorialEdgeNorthsideLeakPenaltyDiag || state.equatorialEdgeNorthsideLeakPenaltyDiag.length !== N) state.equatorialEdgeNorthsideLeakPenaltyDiag = new Float32Array(N);
   if (!state.northSourceConcentrationPenaltyDiag || state.northSourceConcentrationPenaltyDiag.length !== N) state.northSourceConcentrationPenaltyDiag = new Float32Array(N);
   if (!state.northSourceConcentrationAppliedDiag || state.northSourceConcentrationAppliedDiag.length !== N) state.northSourceConcentrationAppliedDiag = new Float32Array(N);
+  if (!state.atlanticDryCoreReceiverTaperDiag || state.atlanticDryCoreReceiverTaperDiag.length !== N) state.atlanticDryCoreReceiverTaperDiag = new Float32Array(N);
+  if (!state.atlanticDryCoreReceiverTaperAppliedDiag || state.atlanticDryCoreReceiverTaperAppliedDiag.length !== N) state.atlanticDryCoreReceiverTaperAppliedDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverDiag || state.subtropicalSourceDriverDiag.length !== N) state.subtropicalSourceDriverDiag = new Float32Array(N);
   if (!state.subtropicalSourceDriverFloorDiag || state.subtropicalSourceDriverFloorDiag.length !== N) state.subtropicalSourceDriverFloorDiag = new Float32Array(N);
   if (!state.subtropicalLocalHemiSourceDiag || state.subtropicalLocalHemiSourceDiag.length !== N) state.subtropicalLocalHemiSourceDiag = new Float32Array(N);
@@ -841,6 +898,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const equatorialEdgeNorthsideLeakPenaltyDiag = state.equatorialEdgeNorthsideLeakPenaltyDiag;
   const northSourceConcentrationPenaltyDiag = state.northSourceConcentrationPenaltyDiag;
   const northSourceConcentrationAppliedDiag = state.northSourceConcentrationAppliedDiag;
+  const atlanticDryCoreReceiverTaperDiag = state.atlanticDryCoreReceiverTaperDiag;
+  const atlanticDryCoreReceiverTaperAppliedDiag = state.atlanticDryCoreReceiverTaperAppliedDiag;
   const subtropicalSourceDriverDiag = state.subtropicalSourceDriverDiag;
   const subtropicalSourceDriverFloorDiag = state.subtropicalSourceDriverFloorDiag;
   const subtropicalLocalHemiSourceDiag = state.subtropicalLocalHemiSourceDiag;
@@ -2150,10 +2209,31 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
               * localMoistureExportSupport
               * (1 - 0.24 * convectivePotential[k])
           );
-          subtropicalSubsidenceDrying[k] = dryDriver;
+          const atlanticDryCoreReceiverTaperFrac = computeAtlanticDryCoreReceiverTaperFrac({
+            enabled: enableAtlanticDryCoreReceiverTaper,
+            latDeg: lat,
+            lonDeg: lonDeg?.[i] || 0,
+            isLand: landMask?.[k] === 1,
+            northsideLeakPenaltySignal: northsideLeakPenaltySignalMean,
+            dryDriver,
+            existingOmegaPaS: lowLevelOmegaEffective[k],
+            signal0: atlanticDryCoreReceiverTaperSignal0,
+            signal1: atlanticDryCoreReceiverTaperSignal1,
+            lat0: atlanticDryCoreReceiverTaperLat0,
+            lat1: atlanticDryCoreReceiverTaperLat1,
+            dry0: atlanticDryCoreReceiverTaperDry0,
+            dry1: atlanticDryCoreReceiverTaperDry1,
+            omega0: atlanticDryCoreReceiverTaperOmega0,
+            omega1: atlanticDryCoreReceiverTaperOmega1,
+            maxFrac: atlanticDryCoreReceiverTaperMaxFrac
+          });
+          const taperedDryDriver = dryDriver * (1 - atlanticDryCoreReceiverTaperFrac);
+          atlanticDryCoreReceiverTaperDiag[k] = atlanticDryCoreReceiverTaperFrac;
+          atlanticDryCoreReceiverTaperAppliedDiag[k] = dryDriver - taperedDryDriver;
+          subtropicalSubsidenceDrying[k] = taperedDryDriver;
           const omegaBridgePaS = computeDryingOmegaBridgePaS({
             enabled: enableDryingOmegaBridge,
-            dryDriver,
+            dryDriver: taperedDryDriver,
             suppressedSource: hemiTransitionSuppressedSource,
             latShape,
             organizedSupport: convectiveOrganization[k],
@@ -2190,9 +2270,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             omega[levS * N + k] += localOmegaBridgePaS;
             if (levS > 0) omega[(levS - 1) * N + k] += localOmegaBridgePaS * 0.35;
           }
-          if (dryDriver <= 0) continue;
+          if (taperedDryDriver <= 0) continue;
           const dryFracBase = clamp(
-            subtropicalAlpha * dryDriver * (1.12 + 0.42 * latShape),
+            subtropicalAlpha * taperedDryDriver * (1.12 + 0.42 * latShape),
             0,
             subtropicalSubsidenceMaxDryFrac
           );
@@ -2211,7 +2291,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             qv[idx] = Math.max(0, qv[idx] - dq);
             theta[idx] += subtropicalSubsidenceThetaStepK * dryFrac * (0.65 + 0.55 * layerWeight);
           }
-          subsidenceDryingWeightedSum += dryDriver * cosLat[j];
+          subsidenceDryingWeightedSum += taperedDryDriver * cosLat[j];
         }
       }
 

@@ -79,6 +79,7 @@ let equatorialEdgeSubsidenceGuardPatchMode = 'default';
 let northsideFanoutLeakPenaltyPatchMode = 'default';
 let weakHemiCrossHemiFloorTaperPatchMode = 'default';
 let northSourceConcentrationPenaltyPatchMode = 'default';
+let atlanticDryCoreReceiverTaperPatchMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -136,6 +137,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--weak-hemi-cross-hemi-floor-taper-patch=')) weakHemiCrossHemiFloorTaperPatchMode = arg.slice('--weak-hemi-cross-hemi-floor-taper-patch='.length);
   else if (arg === '--north-source-concentration-penalty-patch' && argv[i + 1]) northSourceConcentrationPenaltyPatchMode = argv[++i];
   else if (arg.startsWith('--north-source-concentration-penalty-patch=')) northSourceConcentrationPenaltyPatchMode = arg.slice('--north-source-concentration-penalty-patch='.length);
+  else if (arg === '--atlantic-dry-core-receiver-taper-patch' && argv[i + 1]) atlanticDryCoreReceiverTaperPatchMode = argv[++i];
+  else if (arg.startsWith('--atlantic-dry-core-receiver-taper-patch=')) atlanticDryCoreReceiverTaperPatchMode = arg.slice('--atlantic-dry-core-receiver-taper-patch='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--trusted-baseline' && argv[i + 1]) trustedBaselinePath = path.resolve(argv[++i]);
   else if (arg.startsWith('--trusted-baseline=')) trustedBaselinePath = path.resolve(arg.slice('--trusted-baseline='.length));
@@ -202,6 +205,11 @@ weakHemiCrossHemiFloorTaperPatchMode = weakHemiCrossHemiFloorTaperPatchMode === 
 northSourceConcentrationPenaltyPatchMode = northSourceConcentrationPenaltyPatchMode === 'off'
   ? 'off'
   : northSourceConcentrationPenaltyPatchMode === 'on'
+    ? 'on'
+    : 'default';
+atlanticDryCoreReceiverTaperPatchMode = atlanticDryCoreReceiverTaperPatchMode === 'off'
+  ? 'off'
+  : atlanticDryCoreReceiverTaperPatchMode === 'on'
     ? 'on'
     : 'default';
 
@@ -625,6 +633,7 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
     northsideFanoutLeakPenaltyPatchMode,
     weakHemiCrossHemiFloorTaperPatchMode,
     northSourceConcentrationPenaltyPatchMode,
+    atlanticDryCoreReceiverTaperPatchMode,
     instrumentationMode: core.getInstrumentationMode ? core.getInstrumentationMode() : instrumentationMode,
     sampleTargetsDays,
     targetSeconds: targetsSeconds,
@@ -1340,6 +1349,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     equatorialEdgeNorthsideLeakPenaltyDiagFrac,
     northSourceConcentrationPenaltyDiagFrac,
     northSourceConcentrationAppliedDiag,
+    atlanticDryCoreReceiverTaperDiagFrac,
+    atlanticDryCoreReceiverTaperAppliedDiag,
     subtropicalSourceDriverDiagFrac,
     subtropicalSourceDriverFloorDiagFrac,
     subtropicalLocalHemiSourceDiagFrac,
@@ -1445,6 +1456,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalEquatorialEdgeNorthsideLeakPenalty = zonalMean(equatorialEdgeNorthsideLeakPenaltyDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalNorthSourceConcentrationPenalty = zonalMean(northSourceConcentrationPenaltyDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalNorthSourceConcentrationApplied = zonalMean(northSourceConcentrationAppliedDiag || new Array(nx * ny).fill(0), nx, ny);
+  const zonalAtlanticDryCoreReceiverTaper = zonalMean(atlanticDryCoreReceiverTaperDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalAtlanticDryCoreReceiverApplied = zonalMean(atlanticDryCoreReceiverTaperAppliedDiag || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowerRh = zonalMean(lowerTroposphericRhFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSurfaceEvap = zonalMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny);
@@ -2219,6 +2232,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         equatorialEdgeNorthsideLeakPenaltyDiagFrac: roundSeries(zonalEquatorialEdgeNorthsideLeakPenalty, 5),
         northSourceConcentrationPenaltyDiagFrac: roundSeries(zonalNorthSourceConcentrationPenalty, 5),
         northSourceConcentrationAppliedDiag: roundSeries(zonalNorthSourceConcentrationApplied, 5),
+        atlanticDryCoreReceiverTaperDiagFrac: roundSeries(zonalAtlanticDryCoreReceiverTaper, 5),
+        atlanticDryCoreReceiverTaperAppliedDiag: roundSeries(zonalAtlanticDryCoreReceiverApplied, 5),
         subtropicalWeakHemiFloorOverhangDiagFrac: roundSeries(zonalSubtropicalWeakHemiFloorOverhang, 5),
         subtropicalWeakHemiFloorTaperAppliedDiagFrac: roundSeries(zonalSubtropicalWeakHemiFloorTaperApplied, 5),
         freshSubtropicalBandDiagFrac: roundSeries(zonalMean(freshSubtropicalBandDiagFrac || new Array(nx * ny).fill(0), nx, ny), 5),
@@ -5004,6 +5019,8 @@ export async function main() {
   else if (weakHemiCrossHemiFloorTaperPatchMode === 'on') core.vertParams.enableWeakHemiCrossHemiFloorTaper = true;
   if (northSourceConcentrationPenaltyPatchMode === 'off') core.vertParams.enableNorthSourceConcentrationPenalty = false;
   else if (northSourceConcentrationPenaltyPatchMode === 'on') core.vertParams.enableNorthSourceConcentrationPenalty = true;
+  if (atlanticDryCoreReceiverTaperPatchMode === 'off') core.vertParams.enableAtlanticDryCoreReceiverTaper = false;
+  else if (atlanticDryCoreReceiverTaperPatchMode === 'on') core.vertParams.enableAtlanticDryCoreReceiverTaper = true;
   if (softLiveGatePatchMode === 'off') core.microParams.enableSoftLiveStateMaintenanceSuppression = false;
   else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
   if (shoulderAbsorptionGuardPatchMode === 'off') core.microParams.enableShoulderAbsorptionGuard = false;

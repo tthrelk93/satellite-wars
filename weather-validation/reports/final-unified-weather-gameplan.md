@@ -1678,6 +1678,27 @@ Status:
     - do not strengthen the source cap or globally ablate Atlantic carryover/birth
 - next active phase: `Phase 1ZZB: Implement Atlantic Receiver Efficiency Taper Patch`
 
+Status update:
+- completed with live diagnostics, runtime toggle, and same-branch `off/on` compare in [phase1zzb-atlantic-receiver-efficiency-taper-patch.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zzb-atlantic-receiver-efficiency-taper-patch.md)
+- outcome:
+  - the Atlantic-facing dry-core receiver lane at `26.25°N` is genuinely relieved:
+    - condensation delta `-0.0097`
+    - taper frac `0.00595`
+    - applied taper `0.00164`
+  - but the win is reabsorbed into the adjacent transition spillover lane:
+    - `18.75°N` condensation delta `+0.00891`
+    - `18.75°N` total-column-water delta `+0.342`
+    - `18.75°N` mid-RH delta `+0.011`
+  - main guardrails worsen slightly:
+    - `itczWidthDeg: 25.812 -> 25.889`
+    - `subtropicalDryNorthRatio: 1.507 -> 1.524`
+    - `subtropicalDrySouthRatio: 1.195 -> 1.198`
+- decision:
+  - the Atlantic receiver taper is **rejected as a kept default patch**
+  - the receiver-side instrumentation and runtime toggle stay in place
+  - the next blocker is not Atlantic receiver admission anymore; it is Atlantic-receiver spillover into `18.75°N`
+- next active phase: `Phase 1ZZC: Atlantic Receiver Spillover Attribution`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
