@@ -1582,6 +1582,24 @@ Status:
   - the next fix should stay in `vertical5.js` / `core5.js` and contain source-row concentration around `9–13°N`, not add another local humidity or omega boost
 - next active phase: `Phase 1ZX: North Source Concentration Patch Design`
 
+Status:
+- complete in [phase1zx-north-source-concentration-patch-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zx-north-source-concentration-patch-design.md)
+- verdict: `live_leak_signal_driven_source_cap_preferred`
+- keep patch: `true`
+- key conclusions:
+  - the residual `11.25°N` rebound is still not local recharge:
+    - condensation rises `+0.02481 kg/m²`
+    - total column water falls `-0.085 kg/m²`
+    - BL/lower/mid RH all fall
+    - lower/mid omega both weaken slightly
+  - the already-live northside leak signal is now the best carrier for the next patch:
+    - live leak penalty on `11.25°N`: `0.06339`
+    - adjacent dry-lane relief remains real at `18.75°N` and `26.25°N`
+    - export weakening and reduced re-evap both support a source-row concentration interpretation
+  - the next patch should be a capped north-source concentration penalty in the `9–13°N` source loop, driven by the live leak signal itself rather than another admission gate
+  - do not add a local humidity/omega boost and do not globally reduce source amplitude
+- next active phase: `Phase 1ZY: Implement Capped North Source Concentration Penalty Patch`
+
 ### Phase 2: Return To The Original Climate Roadmap And Finish Moisture Partitioning
 
 This is where we return once Phase 1 proves and lands the upstream fix.
