@@ -369,7 +369,17 @@ Pass only if:
 
 ## Immediate Next Step
 
-The next active phase is:
-- `Phase 0: Base-State Recovery Decision`
+Phase 0 is now complete and failed to produce a clean canonical base:
+- current branch wins on `ITCZ width` and `NH dry-belt ratio`
+- rollback archive wins on `SH dry-belt ratio`, `NH westerlies`, and `cross-equatorial vapor flux`
+- no branch clears the full Phase 0 gate cleanly
 
-That is the only correct next step if the goal is realistic Earth weather rather than another local patch campaign.
+So the next active step is no longer branch selection.
+
+It is:
+- `Architecture A: circulation-preserving dry-belt partition redesign`
+
+That architecture lane should be framed as:
+- keep the current branch’s stronger NH dry-belt moisture-partitioning behavior in scope
+- recover the rollback branch’s stronger NH jet / cross-equatorial circulation behavior
+- test only broad integrated families, not local residual patches

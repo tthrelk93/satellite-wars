@@ -111,6 +111,22 @@ That roadmap replaces the old lettered micro-phase ladder with the real top-leve
 - `Phase 6: Multi-Year Stability And Drift`
 - `Phase 7: Scientific Review And Ship Readiness`
 
+Phase 0 has now been executed in:
+- [earth-weather-phase0-branch-benchmark.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-phase0-branch-benchmark.md)
+
+Result:
+- current branch wins on `ITCZ width` and `NH dry-belt ratio`
+- rollback archive wins on `SH dry-belt ratio`, `NH westerlies`, and `cross-equatorial vapor flux`
+- no clean canonical base was found
+
+So the active next move is now:
+- `Architecture A: circulation-preserving dry-belt partition redesign`
+
+That means:
+- stop local residual patching
+- stop trying to promote either branch as-is
+- design one broader integrated architecture lane that preserves the current branch's NH dry-belt gains while recovering the rollback branch's circulation strength
+
 That decision should be made with only two approved paths:
 
 1. `Rollback path`
