@@ -579,8 +579,26 @@ Architecture C30 is now complete in [earth-weather-architecture-c30-weak-restore
 - but the main blocker is still live:
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
 
+Architecture C31 is now complete in [earth-weather-architecture-c31-weak-restore-carry-input-recapture-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c31-weak-restore-carry-input-recapture-attribution.md):
+- verdict: `carry_input_recapture_recovers_dry_belt_and_zonal_mean_but_reloads_equatorial_eddy_export_recirculation`
+- C31 made the split explicit:
+  - receiver side improved: ocean condensation `0.15539 -> 0.12693`, carryover `0.24485 -> 0.2187`, persistence `0.24284 -> 0.21701`
+  - zonal-mean branch improved at lower/mid/upper levels
+  - but eddy/export got worse across the board and cloud recirculation rose `0.74157 -> 1.18525`
+
+Architecture C32 is now complete in [earth-weather-architecture-c32-organized-support-carry-input-carveout-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c32-organized-support-carry-input-carveout-experiment.md):
+- verdict: `quick_reject`
+- restoring stricter organized-support / potential caps preserved the broad quick-shape gains and improved NH dry-belt ocean condensation even further:
+  - `itczWidthDeg: 25.91 -> 23.374`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+- but it still failed on the same live blocker:
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+
 So the next active move is now:
-- `Architecture C31: weak-restore carry-input recapture attribution`
+- `Architecture C33: organized-support carry-input carveout attribution`
 
 ## Hard Rules Going Forward
 

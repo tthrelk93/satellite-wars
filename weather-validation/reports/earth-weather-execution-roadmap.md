@@ -1183,6 +1183,63 @@ Keep the C28 weak shoulder geometry fixed and strengthen only the dry-belt carry
   - but it did not solve the equatorial transport-sign inversion and slightly worsened the cross-equatorial flux relative to C28, so the next move needs attribution rather than more brute-force carry-input tuning
 - Consequence: the next active move is now `Architecture C31: weak-restore carry-input recapture attribution`.
 
+## Architecture C31: Weak-Restore Carry-Input Recapture Attribution
+
+### Objective
+
+Explain what the stronger C30 carry-input recapture actually fixed and what it damaged, so the next experiment can protect the helpful dry-belt/zonal-mean side without reopening the same eddy/export defect.
+
+### Result
+
+- Status: completed
+- Verdict: `carry_input_recapture_recovers_dry_belt_and_zonal_mean_but_reloads_equatorial_eddy_export_recirculation`
+- What C31 proved:
+  - C30 materially improved the receiver side relative to C28:
+    - NH dry-belt ocean condensation: `0.15539 -> 0.12693`
+    - carried-over upper cloud: `0.24485 -> 0.2187`
+    - imported anvil persistence: `0.24284 -> 0.21701`
+    - dominant vapor import: `-25.51113 -> -22.82573`
+  - C30 also improved the equatorial zonal-mean branch:
+    - lower zonal-mean transport: `-14.49379 -> -14.10166`
+    - mid zonal-mean transport: `-14.12323 -> -12.98794`
+    - upper zonal-mean transport: `-8.8185 -> -7.84381`
+  - but the remaining failure is concentrated in the eddy/export side:
+    - cross-equatorial vapor flux north: `-323.23581 -> -353.96486`
+    - lower eddy transport: `-2.44586 -> -3.88858`
+    - mid eddy transport: `-0.68108 -> -3.6845`
+    - upper eddy transport: `-2.40458 -> -5.10272`
+    - cloud recirculation proxy: `0.74157 -> 1.18525`
+- Interpretation:
+  - the stronger recapture was not wrong globally; it was helpful on the receiver and zonal-mean branches
+  - the defect now looks like over-admission of organized equatorial cells into that stronger recapture layer
+- Consequence: the next active move is now `Architecture C32: organized-support carry-input carveout experiment`.
+
+## Architecture C32: Organized-Support Carry-Input Carveout Experiment
+
+### Objective
+
+Keep the C30 recapture base fixed and restore stricter organized-support / potential caps so organized equatorial cells are carved out of the stronger recapture without giving back the receiver relief.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.374`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+- Interpretation:
+  - restoring the stricter organized-support / potential caps kept the broad quick-shape gains and improved NH dry-belt ocean condensation even further
+  - but it still did not fix the transport-sign inversion and slightly worsened the cross-equatorial defect relative to C30, so more cap retuning is not justified without another attribution pass
+- Consequence: the next active move is now `Architecture C33: organized-support carry-input carveout attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

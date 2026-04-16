@@ -43,6 +43,8 @@ Updated: 2026-04-16
 - Architecture C28 Weak Partial Shoulder Restore Experiment: FAILED (`quick_reject`)
 - Architecture C29 Weak Partial Shoulder Restore Attribution: COMPLETED
 - Architecture C30 Weak Restore Carry-Input Recapture Experiment: FAILED (`quick_reject`)
+- Architecture C31 Weak Restore Carry-Input Recapture Attribution: COMPLETED
+- Architecture C32 Organized-Support Carry-Input Carveout Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -728,6 +730,50 @@ Updated: 2026-04-16
   - strengthening the carry-input recapture recovered the NH dry-belt receiver side relative to C28 while preserving most of the broad quick-shape wins
   - but it did not repair the transport-sign inversion and actually made the cross-equatorial defect slightly worse than C28, so the next step is attribution rather than more blind recapture tuning
 - Next active phase: `Architecture C31: weak-restore carry-input recapture attribution`
+
+## Architecture C31 decision
+
+- Verdict: `carry_input_recapture_recovers_dry_belt_and_zonal_mean_but_reloads_equatorial_eddy_export_recirculation`
+- Decision report: [earth-weather-architecture-c31-weak-restore-carry-input-recapture-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c31-weak-restore-carry-input-recapture-attribution.md)
+- What changed relative to C28:
+  - recovered:
+    - NH dry-belt ocean condensation: `0.15539 -> 0.12693`
+    - carried-over upper cloud: `0.24485 -> 0.2187`
+    - imported anvil persistence: `0.24284 -> 0.21701`
+    - equator lower zonal-mean transport: `-14.49379 -> -14.10166`
+    - equator mid zonal-mean transport: `-14.12323 -> -12.98794`
+    - equator upper zonal-mean transport: `-8.8185 -> -7.84381`
+  - worsened:
+    - cross-equatorial vapor flux north: `-323.23581 -> -353.96486`
+    - equator lower eddy transport: `-2.44586 -> -3.88858`
+    - equator mid eddy transport: `-0.68108 -> -3.6845`
+    - equator upper eddy transport: `-2.40458 -> -5.10272`
+    - cloud recirculation proxy: `0.74157 -> 1.18525`
+    - return-branch mass flux: `3444.87796 -> 3500.90278`
+- Interpretation:
+  - the stronger recapture fixed the receiver side and improved the zonal-mean branch
+  - but it overpaid through the equatorial eddy/export side, so the next move had to protect organized equatorial cells rather than undoing the whole recapture layer
+- Next active phase: `Architecture C32: organized-support carry-input carveout experiment`
+
+## Architecture C32 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c32-organized-support-carry-input-carveout-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c32-organized-support-carry-input-carveout-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - bounded outcome:
+    - `itczWidthDeg: 25.91 -> 23.374`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+- Interpretation:
+  - restoring stricter organized-support and potential caps preserved the broad quick-shape gains and improved NH dry-belt ocean condensation even further
+  - but it still failed on the same cross-equatorial sign defect, and the defect was marginally worse than C30, so the next step is another attribution pass rather than more cap tuning
+- Next active phase: `Architecture C33: organized-support carry-input carveout attribution`
 
 ## Day-365 benchmark summary
 
