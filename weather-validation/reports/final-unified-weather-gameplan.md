@@ -98,6 +98,19 @@ The next active step is no longer another micro-phase.
 It is:
 - `Reset R3: choose rollback or architecture change`
 
+The execution version of that reset is now captured in:
+- [earth-weather-execution-roadmap.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-execution-roadmap.md)
+
+That roadmap replaces the old lettered micro-phase ladder with the real top-level phases needed to reach emergent Earth-realistic weather:
+- `Phase 0: Base-State Recovery Decision`
+- `Phase 1: Climate Base Recovery`
+- `Phase 2: Seasonal Earth Realism`
+- `Phase 3: Regional Weather-Regime Realism`
+- `Phase 4: Tropical Cyclone Environment Realism`
+- `Phase 5: Emergent Storm Realism`
+- `Phase 6: Multi-Year Stability And Drift`
+- `Phase 7: Scientific Review And Ship Readiness`
+
 That decision should be made with only two approved paths:
 
 1. `Rollback path`
