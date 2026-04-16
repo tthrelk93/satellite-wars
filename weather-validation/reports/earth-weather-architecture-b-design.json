@@ -1,0 +1,163 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-b-design.v1",
+  "generatedAt": "2026-04-16T01:30:18.828Z",
+  "benchmarkPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-phase0-branch-benchmark.json",
+  "architectureA2Path": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-a2-partition-port.json",
+  "archiveBranch": "codex/world-class-weather-loop-archive-20260407-0745",
+  "currentBranch": "codex/world-class-weather-loop",
+  "diffEntries": [
+    {
+      "file": "scripts/agent/planetary-realism-audit.mjs",
+      "added": 5807,
+      "deleted": 0,
+      "churn": 5807
+    },
+    {
+      "file": "src/weather/v2/vertical5.js",
+      "added": 2380,
+      "deleted": 69,
+      "churn": 2449
+    },
+    {
+      "file": "src/weather/validation/diagnostics.js",
+      "added": 2279,
+      "deleted": 9,
+      "churn": 2288
+    },
+    {
+      "file": "src/weather/v2/core5.js",
+      "added": 1193,
+      "deleted": 66,
+      "churn": 1259
+    },
+    {
+      "file": "src/weather/v2/microphysics5.js",
+      "added": 889,
+      "deleted": 16,
+      "churn": 905
+    },
+    {
+      "file": "src/weather/v2/state5.js",
+      "added": 505,
+      "deleted": 1,
+      "churn": 506
+    },
+    {
+      "file": "src/weather/v2/radiation2d.js",
+      "added": 92,
+      "deleted": 1,
+      "churn": 93
+    }
+  ],
+  "design": {
+    "verdict": "circulation_scaffold_rebuild_required",
+    "summary": "Architecture A proved that selective relaxation of current-branch dampers can preserve some partition gains, but it cannot recover the circulation scaffold. The next architecture must rebuild circulation first and only then re-port partition behavior.",
+    "preserveFromCurrent": [
+      {
+        "key": "itczWidthDeg",
+        "label": "ITCZ width"
+      },
+      {
+        "key": "subtropicalDryNorthRatio",
+        "label": "NH dry-belt ratio"
+      }
+    ],
+    "recoverFromArchive": [
+      {
+        "key": "subtropicalDrySouthRatio",
+        "label": "SH dry-belt ratio"
+      },
+      {
+        "key": "midlatitudeWesterliesNorthU10Ms",
+        "label": "NH midlatitude westerlies"
+      },
+      {
+        "key": "crossEquatorialVaporFluxNorthKgM_1S",
+        "label": "Cross-equatorial vapor flux north"
+      }
+    ],
+    "failedArchitectureA2Mode": "ported-floor-soft-containment",
+    "failedCirculationRecoveries": [
+      {
+        "key": "subtropicalDrySouthRatio",
+        "label": "SH dry-belt ratio",
+        "off": 1.199,
+        "on": 1.2,
+        "improved": false
+      },
+      {
+        "key": "midlatitudeWesterliesNorthU10Ms",
+        "label": "NH midlatitude westerlies",
+        "off": 0.531,
+        "on": 0.531,
+        "improved": false
+      },
+      {
+        "key": "crossEquatorialVaporFluxNorthKgM_1S",
+        "label": "Cross-equatorial vapor flux north",
+        "off": 143.95306,
+        "on": 144.63218,
+        "improved": false
+      }
+    ],
+    "codeOwnershipRank": [
+      {
+        "file": "src/weather/v2/vertical5.js",
+        "added": 2380,
+        "deleted": 69,
+        "churn": 2449
+      },
+      {
+        "file": "src/weather/validation/diagnostics.js",
+        "added": 2279,
+        "deleted": 9,
+        "churn": 2288
+      },
+      {
+        "file": "src/weather/v2/core5.js",
+        "added": 1193,
+        "deleted": 66,
+        "churn": 1259
+      },
+      {
+        "file": "src/weather/v2/microphysics5.js",
+        "added": 889,
+        "deleted": 16,
+        "churn": 905
+      },
+      {
+        "file": "src/weather/v2/state5.js",
+        "added": 505,
+        "deleted": 1,
+        "churn": 506
+      }
+    ],
+    "primaryImplementationFiles": [
+      "src/weather/v2/vertical5.js",
+      "src/weather/v2/core5.js",
+      "src/weather/v2/microphysics5.js",
+      "src/weather/v2/state5.js",
+      "src/weather/validation/diagnostics.js",
+      "scripts/agent/planetary-realism-audit.mjs"
+    ],
+    "designContract": [
+      "Rebuild the subtropical circulation scaffold before attempting another partition-port.",
+      "Treat the vertical subtropical drying scaffold as the primary Architecture B lever, not the microphysics suppressor families.",
+      "Keep the current branch partition microphysics available as a protected layer, but do not let it dictate the circulation scaffold.",
+      "Promote only bounded scaffold experiments that are judged by the full six-metric climate objective."
+    ],
+    "boundedExperimentFamilies": [
+      {
+        "key": "B1-circulation-scaffold-rebuild",
+        "label": "Circulation scaffold rebuild",
+        "description": "Rebuild the subtropical vertical scaffold by resetting the floor/boost dependence and attenuating the drying/theta application before re-porting partition behavior."
+      },
+      {
+        "key": "B2-partition-report-on-rebuilt-scaffold",
+        "label": "Partition re-port on rebuilt scaffold",
+        "description": "Once a circulation-first scaffold clears the quick gate, re-port only the current branch partition layers that still preserve the recovered circulation metrics."
+      }
+    ],
+    "nextImplementationPhase": "Architecture B1: implement circulation scaffold rebuild experiment"
+  }
+}

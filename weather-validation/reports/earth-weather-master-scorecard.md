@@ -8,7 +8,9 @@ Updated: 2026-04-16
 - Architecture A Circulation-Preserving Dry-Belt Partition Redesign: COMPLETED
 - Architecture A1 Explicit Subtropical Balance Contract Experiment: FAILED (`quick_reject`)
 - Architecture A2 Circulation-Preserving Partition Port: FAILED (`quick_reject`)
-- Architecture B Circulation-First Partition Rebuild: NEXT
+- Architecture B Circulation-First Partition Rebuild: COMPLETED
+- Architecture B1 Circulation Scaffold Rebuild: FAILED (`quick_reject`)
+- Architecture B2 Explicit Circulation-State Port: NEXT
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -61,6 +63,34 @@ Updated: 2026-04-16
     - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.14845`
     - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 144.63218`
 - Next active phase: `Architecture B: circulation-first partition rebuild`
+
+## Architecture B decision
+
+- Verdict: `circulation_scaffold_rebuild_required`
+- Decision report: [earth-weather-architecture-b-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b-design.md)
+- Summary:
+  - Architecture A could preserve some partition gains
+  - Architecture A could not recover SH dry-belt ratio, NH westerlies, or cross-equatorial vapor flux
+  - the next family must rebuild circulation first, then re-port partition behavior
+- Next active phase: `Architecture B1: circulation scaffold rebuild`
+
+## Architecture B1 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-b1-circulation-scaffold.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b1-circulation-scaffold.md)
+- Best quick candidate: `narrow-band-soft-containment`
+- Quick result:
+  - improved metrics: `1 / 6`
+  - severe regressions: `itczWidthDeg`
+  - partial movement:
+    - `subtropicalDryNorthRatio: 1.534 -> 1.504`
+  - failed circulation recovery:
+    - `itczWidthDeg: 25.91 -> 26.218`
+    - `subtropicalDrySouthRatio: 1.199 -> 1.201`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.16433`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 147.25094`
+- Next active phase: `Architecture B2: explicit circulation-state port`
 
 ## Day-365 benchmark summary
 

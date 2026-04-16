@@ -180,6 +180,36 @@ That means:
 - treat Architecture A as exhausted
 - redesign the circulation scaffold first, then re-port only the partition behavior that survives under that rebuilt circulation base
 
+Architecture B is now completed in:
+- [earth-weather-architecture-b-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b-design.md)
+
+Its verdict is:
+- `circulation_scaffold_rebuild_required`
+- Architecture A proved that relaxing current dampers can preserve some partition behavior
+- but it cannot recover the circulation scaffold
+
+Architecture B1 is now completed in:
+- [earth-weather-architecture-b1-circulation-scaffold.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b1-circulation-scaffold.md)
+
+Its result is another clean bounded reject:
+- verdict: `quick_reject`
+- best quick candidate: `narrow-band-soft-containment`
+- partial movement:
+  - `subtropicalDryNorthRatio: 1.534 -> 1.504`
+- but the circulation recovery still did not happen:
+  - `itczWidthDeg: 25.91 -> 26.218`
+  - `subtropicalDrySouthRatio: 1.199 -> 1.201`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.16433`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 147.25094`
+
+So the active next move is now:
+- `Architecture B2: explicit circulation-state port`
+
+That means:
+- broad lightening or narrowing of the subtropical drying scaffold is not enough
+- the next bounded family needs to port or reconstruct explicit circulation-state behavior, not just rescale the current scaffold
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow

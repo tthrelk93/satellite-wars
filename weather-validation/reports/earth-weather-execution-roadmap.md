@@ -233,6 +233,77 @@ Keep the current branch partition microphysics, but test rollback-leaning circul
     - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 144.63218`
 - Consequence: Architecture A is now exhausted as a bounded family. Move to `Architecture B: circulation-first partition rebuild`.
 
+## Architecture B: Circulation-First Partition Rebuild
+
+### Objective
+
+Rebuild the circulation scaffold first, then only re-port partition behavior that survives under that rebuilt scaffold.
+
+### Primary files and outputs
+
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [earth-weather-architecture-b-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b-design.md)
+- [earth-weather-architecture-b-design.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b-design.json)
+
+### Design contract
+
+- Rebuild the subtropical circulation scaffold before attempting another partition-port.
+- Treat the vertical subtropical drying scaffold as the primary Architecture B lever, not the microphysics suppressor families.
+- Keep the current branch partition microphysics available as a protected layer, but do not let it dictate the circulation scaffold.
+- Promote only bounded scaffold experiments that are judged by the full six-metric climate objective.
+
+### Preferred bounded experiment families
+
+- `B1-circulation-scaffold-rebuild`
+- `B2-explicit-circulation-state-port`
+
+### Result
+
+- Status: completed
+- Verdict: `circulation_scaffold_rebuild_required`
+- Active next move: `Architecture B1: implement circulation scaffold rebuild experiment`
+
+## Architecture B1: Circulation Scaffold Rebuild
+
+### Objective
+
+Test whether the circulation split can be improved by resetting floor/boost inheritance and attenuating or narrowing the subtropical drying scaffold before any new partition re-port.
+
+### Primary files and outputs
+
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [earth-weather-architecture-b1-circulation-scaffold.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/earth-weather-architecture-b1-circulation-scaffold.mjs)
+- [earth-weather-architecture-b1-circulation-scaffold.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b1-circulation-scaffold.md)
+
+### Candidate family
+
+- `floor-reset-light-drying`
+- `narrow-band-light-drying`
+- `narrow-band-soft-containment`
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Best quick candidate: `narrow-band-soft-containment`
+- Quick screen outcome:
+  - improved metrics: `1 / 6`
+  - severe regressions: `itczWidthDeg`
+  - partial movement:
+    - `subtropicalDryNorthRatio: 1.534 -> 1.504`
+  - but the circulation scaffold still did not recover:
+    - `itczWidthDeg: 25.91 -> 26.218`
+    - `subtropicalDrySouthRatio: 1.199 -> 1.201`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.16433`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 147.25094`
+- Consequence: broad scaffold lightening is not enough. Move to `Architecture B2: explicit circulation-state port`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective
