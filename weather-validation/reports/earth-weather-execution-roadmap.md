@@ -100,10 +100,10 @@ Choose the canonical branch that we will use as the new foundation.
 
 ### Required checklist
 
-- [ ] Select the current branch plus the best trusted rollback candidate(s).
-- [ ] Run the `30`-day audit on each branch.
-- [ ] Run the `365`-day audit on each branch.
-- [ ] Compare only full-objective climate metrics.
+- [x] Select the current branch plus the best trusted rollback candidate(s).
+- [x] Run the `30`-day audit on each branch.
+- [x] Run the `365`-day audit on each branch.
+- [x] Compare only full-objective climate metrics.
 - [ ] Choose exactly one canonical base branch.
 
 ### Metrics
@@ -124,6 +124,53 @@ Fail if:
 - or every branch still fails the annual climate objective badly
 
 If Phase 0 fails, do not continue patching. Move directly to a broader architecture reset.
+
+### Result
+
+- Status: completed
+- Decision report: [earth-weather-phase0-branch-benchmark.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-phase0-branch-benchmark.md)
+- Verdict: `no_clear_winner`
+- Consequence: neither branch is acceptable as-is, so the program moves into the Architecture A redesign lane before Phase 1 resumes
+
+## Architecture A: Circulation-Preserving Dry-Belt Partition Redesign
+
+### Objective
+
+Preserve the current branch's NH dry-belt partition gains while recovering the rollback archive's stronger circulation.
+
+### Primary files and outputs
+
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [earth-weather-architecture-a-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-a-design.md)
+- [earth-weather-architecture-a-design.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-a-design.json)
+
+### Design contract
+
+- Preserve from current:
+  - `itczWidthDeg`
+  - `subtropicalDryNorthRatio`
+- Recover from rollback archive:
+  - `subtropicalDrySouthRatio`
+  - `midlatitudeWesterliesNorthU10Ms`
+  - `crossEquatorialVaporFluxNorthKgM_1S`
+- Replace stacked local suppressor logic with one explicit subtropical partition/circulation contract shared between vertical and microphysics.
+- Promote only annualized integrated experiments.
+
+### Preferred bounded experiment families
+
+- `A1-explicit-subtropical-balance-contract`
+- `A2-circulation-preserving-partition-port`
+
+### Result
+
+- Status: completed
+- Verdict: `integrated_partition_circulation_split_required`
+- Active next move: `Architecture A1: implement explicit subtropical balance contract experiment`
 
 ## Phase 1: Climate Base Recovery
 

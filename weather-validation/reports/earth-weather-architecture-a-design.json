@@ -1,0 +1,156 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-a-design.v1",
+  "generatedAt": "2026-04-16T00:41:46.205Z",
+  "benchmarkPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-phase0-branch-benchmark.json",
+  "resetPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1-reset-system-experiments.json",
+  "archiveBranch": "codex/world-class-weather-loop-archive-20260407-0745",
+  "currentBranch": "codex/world-class-weather-loop",
+  "diffEntries": [
+    {
+      "file": "scripts/agent/planetary-realism-audit.mjs",
+      "added": 5748,
+      "deleted": 0,
+      "churn": 5748
+    },
+    {
+      "file": "src/weather/v2/vertical5.js",
+      "added": 2328,
+      "deleted": 69,
+      "churn": 2397
+    },
+    {
+      "file": "src/weather/validation/diagnostics.js",
+      "added": 2276,
+      "deleted": 9,
+      "churn": 2285
+    },
+    {
+      "file": "src/weather/v2/core5.js",
+      "added": 1191,
+      "deleted": 66,
+      "churn": 1257
+    },
+    {
+      "file": "src/weather/v2/microphysics5.js",
+      "added": 821,
+      "deleted": 16,
+      "churn": 837
+    },
+    {
+      "file": "src/weather/v2/state5.js",
+      "added": 499,
+      "deleted": 1,
+      "churn": 500
+    },
+    {
+      "file": "src/weather/v2/radiation2d.js",
+      "added": 92,
+      "deleted": 1,
+      "churn": 93
+    }
+  ],
+  "design": {
+    "verdict": "integrated_partition_circulation_split_required",
+    "summary": "The current branch is stronger on NH dry-belt partitioning while the rollback archive is stronger on circulation. The next architecture must preserve partition gains without continuing to damp circulation.",
+    "preserveFromCurrent": [
+      {
+        "key": "itczWidthDeg",
+        "label": "ITCZ width"
+      },
+      {
+        "key": "subtropicalDryNorthRatio",
+        "label": "NH dry-belt ratio"
+      }
+    ],
+    "recoverFromArchive": [
+      {
+        "key": "subtropicalDrySouthRatio",
+        "label": "SH dry-belt ratio"
+      },
+      {
+        "key": "midlatitudeWesterliesNorthU10Ms",
+        "label": "NH midlatitude westerlies"
+      },
+      {
+        "key": "crossEquatorialVaporFluxNorthKgM_1S",
+        "label": "Cross-equatorial vapor flux north"
+      }
+    ],
+    "ruledOutByReset": [
+      {
+        "key": "upper-cloud-persistence-collapse",
+        "label": "R2A Upper-cloud persistence collapse",
+        "combinedScore": 0
+      },
+      {
+        "key": "annual-numerical-hardening",
+        "label": "R2B Annual numerical hardening",
+        "combinedScore": -0.28035
+      },
+      {
+        "key": "hydrology-balance-repartition",
+        "label": "R2C Hydrology balance repartition",
+        "combinedScore": -0.39065
+      }
+    ],
+    "codeOwnershipRank": [
+      {
+        "file": "src/weather/v2/vertical5.js",
+        "added": 2328,
+        "deleted": 69,
+        "churn": 2397
+      },
+      {
+        "file": "src/weather/validation/diagnostics.js",
+        "added": 2276,
+        "deleted": 9,
+        "churn": 2285
+      },
+      {
+        "file": "src/weather/v2/core5.js",
+        "added": 1191,
+        "deleted": 66,
+        "churn": 1257
+      },
+      {
+        "file": "src/weather/v2/microphysics5.js",
+        "added": 821,
+        "deleted": 16,
+        "churn": 837
+      },
+      {
+        "file": "src/weather/v2/state5.js",
+        "added": 499,
+        "deleted": 1,
+        "churn": 500
+      }
+    ],
+    "primaryImplementationFiles": [
+      "src/weather/v2/vertical5.js",
+      "src/weather/v2/core5.js",
+      "src/weather/v2/microphysics5.js",
+      "src/weather/v2/state5.js",
+      "src/weather/validation/diagnostics.js",
+      "scripts/agent/planetary-realism-audit.mjs"
+    ],
+    "designContract": [
+      "Keep the current branch dry-belt partition gains as the protected side of the redesign.",
+      "Recover rollback-like NH jet and cross-equatorial circulation behavior without restoring the rollback NH dry-belt wet bias.",
+      "Replace stacked local suppressor families with one explicit subtropical partition/circulation contract shared between vertical and microphysics.",
+      "Promote only annualized integrated experiments; do not resume local residual patching."
+    ],
+    "boundedExperimentFamilies": [
+      {
+        "key": "A1-explicit-subtropical-balance-contract",
+        "label": "Explicit subtropical balance contract",
+        "description": "Create a single vertical-state circulation/partition contract in vertical5, then let microphysics consume it instead of re-deriving many local gates."
+      },
+      {
+        "key": "A2-circulation-preserving-partition-port",
+        "label": "Circulation-preserving partition port",
+        "description": "Port only the current branch partition improvements that still make sense under rollback-like circulation support, instead of carrying all current-branch circulation dampers forward."
+      }
+    ],
+    "nextImplementationPhase": "Architecture A1: implement explicit subtropical balance contract experiment"
+  }
+}

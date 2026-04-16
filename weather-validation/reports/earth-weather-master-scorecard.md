@@ -4,7 +4,8 @@ Updated: 2026-04-16
 
 ## Top-level phase status
 
-- Phase 0 Base-State Recovery Decision: FAILED
+- Phase 0 Base-State Recovery Decision: COMPLETED (`no_clear_winner`)
+- Architecture A Circulation-Preserving Dry-Belt Partition Redesign: COMPLETED
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -20,6 +21,18 @@ Updated: 2026-04-16
 - Verdict: `no_clear_winner`
 - Selected base: none
 
+## Architecture A decision
+
+- Verdict: `integrated_partition_circulation_split_required`
+- Preserve from current:
+  - `itczWidthDeg`
+  - `subtropicalDryNorthRatio`
+- Recover from rollback archive:
+  - `subtropicalDrySouthRatio`
+  - `midlatitudeWesterliesNorthU10Ms`
+  - `crossEquatorialVaporFluxNorthKgM_1S`
+- Next active phase: `Architecture A1: implement explicit subtropical balance contract experiment`
+
 ## Day-365 benchmark summary
 
 - ITCZ width: current 24.875, rollback 25.613, winner current
@@ -28,4 +41,3 @@ Updated: 2026-04-16
 - NH midlatitude westerlies: current 0.524, rollback 1.139, winner candidate
 - NH dry-belt ocean condensation: current 0.277, rollback 0, winner n/a
 - Cross-equatorial vapor flux north: current 326.338, rollback 176.877, winner candidate
-

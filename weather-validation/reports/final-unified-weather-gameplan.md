@@ -119,27 +119,37 @@ Result:
 - rollback archive wins on `SH dry-belt ratio`, `NH westerlies`, and `cross-equatorial vapor flux`
 - no clean canonical base was found
 
+Architecture A is now completed in:
+- [earth-weather-architecture-a-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-a-design.md)
+
+Its verdict is:
+- `integrated_partition_circulation_split_required`
+- preserve from current:
+  - `itczWidthDeg`
+  - `subtropicalDryNorthRatio`
+- recover from rollback archive:
+  - `subtropicalDrySouthRatio`
+  - `midlatitudeWesterliesNorthU10Ms`
+  - `crossEquatorialVaporFluxNorthKgM_1S`
+
 So the active next move is now:
-- `Architecture A: circulation-preserving dry-belt partition redesign`
+- `Architecture A1: implement explicit subtropical balance contract experiment`
 
 That means:
 - stop local residual patching
 - stop trying to promote either branch as-is
-- design one broader integrated architecture lane that preserves the current branch's NH dry-belt gains while recovering the rollback branch's circulation strength
+- implement one broader integrated architecture lane that preserves the current branch's NH dry-belt gains while recovering the rollback branch's circulation strength
 
-That decision should be made with only two approved paths:
+Architecture A narrowed the approved implementation paths to:
 
-1. `Rollback path`
-- identify the best trusted climate state that predates the late patch spiral
-- benchmark that state against the current branch with the same annual objective suite
-- decide whether to restore it as the shipping base
+1. `Architecture A1`
+- implement an explicit subtropical balance contract in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- make [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js) consume that shared contract instead of re-deriving many local gates
+- judge the result only by the annual climate objective
 
-2. `Architecture-change path`
-- if rollback is not acceptable, define one broader redesign lane instead of more local patches
-- examples:
-  - rework upper-cloud maintenance / overlap survival architecture
-  - rework subtropical dry-belt condensation partitioning architecture
-  - rework cross-equatorial transport and return-flow coupling architecture
+2. `Architecture A2`
+- if A1 fails, port only the current branch partition gains that remain compatible with rollback-like circulation support
+- do not restore the stacked suppressor and receiver patch families wholesale
 
 ## Hard Rules Going Forward
 
