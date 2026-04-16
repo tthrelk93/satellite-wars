@@ -2288,3 +2288,25 @@ That architecture lane should be framed as:
 - keep the current branch’s stronger NH dry-belt moisture-partitioning behavior in scope
 - recover the rollback branch’s stronger NH jet / cross-equatorial circulation behavior
 - test only broad integrated families, not local residual patches
+
+## Current Architecture C Status
+
+- C61 completed with verdict `stronger_receiver_containment_relieves_equatorial_export_and_recaptures_26p25_carryover_but_reloads_33p75_poleward_shoulder_and_nh_ocean_maintenance`
+- C61 conclusion:
+  - the stronger `26.25°` receiver containment is a real middle state
+  - it improves the sign defect and unloads `26.25°` carryover
+  - but it repays that win by reloading the `33.75°` poleward shoulder and NH dry-belt ocean upper-cloud maintenance
+- C62 completed with verdict `quick_reject`
+- C62 quick metrics:
+  - `itczWidthDeg: 25.91 -> 23.386`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.057`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.487`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.214`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13629`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -318.32449`
+- C62 conclusion:
+  - the narrow `33.75°` poleward-shoulder carryover containment is active
+  - it meaningfully recaptures the NH ocean rebound from C60
+  - but the cross-equatorial sign defect is still severe, so the quick gate remains red
+- Active next move:
+  - `Architecture C63: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment attribution`

@@ -428,7 +428,8 @@ function main() {
   }
 }
 
-const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === __filename;
-if (isDirectRun) {
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === __filename;
+
+if (isMain) {
   main();
 }

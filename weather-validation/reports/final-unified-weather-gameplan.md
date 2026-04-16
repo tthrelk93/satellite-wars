@@ -822,6 +822,23 @@ Architecture C60 is now complete:
 So the next active move is now:
 - `Architecture C61: stronger 26p25 receiver carryover containment on top of 18p75 transition carry-input preserve attribution`
 
+Architecture C61 is now complete:
+- verdict: `stronger_receiver_containment_relieves_equatorial_export_and_recaptures_26p25_carryover_but_reloads_33p75_poleward_shoulder_and_nh_ocean_maintenance`
+- interpretation: C60 is a real middle state; it relieves the sign defect and unloads `26.25°` carryover, but it repays that win by reloading the `33.75°` shoulder and the NH dry-belt ocean upper-cloud maintenance family
+
+Architecture C62 is now complete:
+- verdict: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.386`
+- `subtropicalDryNorthRatio: 1.534 -> 1.057`
+- `subtropicalDrySouthRatio: 1.199 -> 0.487`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.214`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13629`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -318.32449`
+- interpretation: the narrow `33.75°` poleward-shoulder carryover containment is active and recaptures much of the NH ocean rebound from C60, but the cross-equatorial sign defect is still severe so the quick gate remains red
+
+So the next active move is now:
+- `Architecture C63: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment attribution`
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow

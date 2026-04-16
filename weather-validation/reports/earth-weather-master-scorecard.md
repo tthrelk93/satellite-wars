@@ -1046,7 +1046,23 @@ Updated: 2026-04-16
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.15491`
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -318.81218`
   - interpretation: stronger `26.25°` receiver carryover containment materially improves the sign defect and broad quick-shape metrics relative to C58, but it worsens NH dry-belt ocean condensation sharply
-- Next active phase: `Architecture C61: stronger 26p25 receiver carryover containment on top of 18p75 transition carry-input preserve attribution`
+- C61 result:
+  - verdict: `stronger_receiver_containment_relieves_equatorial_export_and_recaptures_26p25_carryover_but_reloads_33p75_poleward_shoulder_and_nh_ocean_maintenance`
+  - equator lower/mid/upper transport all improve versus C58
+  - `18.75°` transition row improves and `26.25°` carryover is recaptured
+  - but `33.75°` carryover/path reloads and NH ocean maintenance rebounds sharply
+  - interpretation: C60 is a real middle state, and its main repayment lane is now localized to the poleward shoulder / NH ocean upper-cloud maintenance family
+- C62 result:
+  - verdict: `quick_reject`
+  - `itczWidthDeg: 25.91 -> 23.386`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.057`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.487`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.214`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13629`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -318.32449`
+  - relative to C60, NH ocean condensation improves `0.15491 -> 0.13629` and cross-equatorial flux improves slightly `-318.81218 -> -318.32449`
+  - interpretation: the narrow `33.75°` poleward-shoulder carveout is active and meaningfully recaptures the NH ocean rebound, but the cross-equatorial sign defect is still severe so the full quick gate remains red
+- Next active phase: `Architecture C63: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment attribution`
 
 ## Day-365 benchmark summary
 
