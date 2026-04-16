@@ -648,6 +648,8 @@ export class WeatherCore5 {
       enableSoftLiveStateMaintenanceSuppression: true,
       softLiveStateMaintenanceSuppressionScale: 2.0,
       softLiveStateMaintenanceSuppressionMaxFrac: 0.4,
+      enableExplicitSubtropicalBalanceContract: false,
+      explicitSubtropicalBalanceContractScale: 1.0,
       enableShoulderAbsorptionGuard: true,
       shoulderAbsorptionGuardScale: 1.6,
       shoulderAbsorptionGuardMaxFrac: 0.2,

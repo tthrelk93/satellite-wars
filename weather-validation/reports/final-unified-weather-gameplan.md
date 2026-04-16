@@ -132,22 +132,28 @@ Its verdict is:
   - `midlatitudeWesterliesNorthU10Ms`
   - `crossEquatorialVaporFluxNorthKgM_1S`
 
+Architecture A1 is now completed in:
+- [earth-weather-architecture-a1-balance-contract.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-a1-balance-contract.md)
+
+Its result is a clean bounded reject:
+- verdict: `quick_reject`
+- the shared contract is live, but the quick screen regressed:
+  - `itczWidthDeg: 25.91 -> 26.404`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.743`
+  - `subtropicalDrySouthRatio: 1.199 -> 1.306`
+- only `midlatitudeWesterliesNorthU10Ms` improved, and only trivially: `0.531 -> 0.532`
+
 So the active next move is now:
-- `Architecture A1: implement explicit subtropical balance contract experiment`
+- `Architecture A2: circulation-preserving partition port`
 
 That means:
 - stop local residual patching
 - stop trying to promote either branch as-is
 - implement one broader integrated architecture lane that preserves the current branch's NH dry-belt gains while recovering the rollback branch's circulation strength
 
-Architecture A narrowed the approved implementation paths to:
+Architecture A has now narrowed the approved implementation path to one remaining bounded family:
 
-1. `Architecture A1`
-- implement an explicit subtropical balance contract in [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
-- make [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js) consume that shared contract instead of re-deriving many local gates
-- judge the result only by the annual climate objective
-
-2. `Architecture A2`
+1. `Architecture A2`
 - if A1 fails, port only the current branch partition gains that remain compatible with rollback-like circulation support
 - do not restore the stacked suppressor and receiver patch families wholesale
 

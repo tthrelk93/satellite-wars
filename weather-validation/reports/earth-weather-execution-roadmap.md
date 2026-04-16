@@ -172,6 +172,31 @@ Preserve the current branch's NH dry-belt partition gains while recovering the r
 - Verdict: `integrated_partition_circulation_split_required`
 - Active next move: `Architecture A1: implement explicit subtropical balance contract experiment`
 
+## Architecture A1: Explicit Subtropical Balance Contract Experiment
+
+### Objective
+
+Use one vertical-state subtropical partition/circulation contract as the shared microphysics admission carrier instead of re-deriving the same decision from many local proxies.
+
+### Primary files and outputs
+
+- [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+- [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [earth-weather-architecture-a1-balance-contract.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/earth-weather-architecture-a1-balance-contract.mjs)
+- [earth-weather-architecture-a1-balance-contract.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-a1-balance-contract.md)
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick screen outcome:
+  - only `1 / 6` core metrics improved
+  - severe regressions in `itczWidthDeg`, `subtropicalDryNorthRatio`, and `subtropicalDrySouthRatio`
+- Consequence: do not continue with A1 tuning; move directly to `Architecture A2: circulation-preserving partition port`
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

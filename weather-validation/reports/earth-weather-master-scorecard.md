@@ -6,6 +6,7 @@ Updated: 2026-04-16
 
 - Phase 0 Base-State Recovery Decision: COMPLETED (`no_clear_winner`)
 - Architecture A Circulation-Preserving Dry-Belt Partition Redesign: COMPLETED
+- Architecture A1 Explicit Subtropical Balance Contract Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -31,7 +32,15 @@ Updated: 2026-04-16
   - `subtropicalDrySouthRatio`
   - `midlatitudeWesterliesNorthU10Ms`
   - `crossEquatorialVaporFluxNorthKgM_1S`
-- Next active phase: `Architecture A1: implement explicit subtropical balance contract experiment`
+
+## Architecture A1 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-a1-balance-contract.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-a1-balance-contract.md)
+- Quick result:
+  - improved metrics: `1 / 6`
+  - severe regressions: `itczWidthDeg`, `subtropicalDryNorthRatio`, `subtropicalDrySouthRatio`
+- Next active phase: `Architecture A2: circulation-preserving partition port`
 
 ## Day-365 benchmark summary
 

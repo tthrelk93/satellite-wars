@@ -129,6 +129,8 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
     enableSoftLiveStateMaintenanceSuppression = false,
     softLiveStateMaintenanceSuppressionScale = 2.0,
     softLiveStateMaintenanceSuppressionMaxFrac = 0.4,
+    enableExplicitSubtropicalBalanceContract = false,
+    explicitSubtropicalBalanceContractScale = 1.0,
     enableShoulderAbsorptionGuard = false,
     shoulderAbsorptionGuardScale = 1.6,
     shoulderAbsorptionGuardMaxFrac = 0.2,
@@ -574,6 +576,35 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               1
             )
           : 0;
+        const explicitBalancePartitionSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              Number.isFinite(state.subtropicalBalancePartitionSupportDiag?.[k])
+                ? state.subtropicalBalancePartitionSupportDiag[k]
+                : 0,
+              0,
+              1
+            )
+          : 0;
+        const explicitBalanceCirculationSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              Number.isFinite(state.subtropicalBalanceCirculationSupportDiag?.[k])
+                ? state.subtropicalBalanceCirculationSupportDiag[k]
+                : 0,
+              0,
+              1
+            )
+          : 0;
+        const explicitBalanceContractSupport = enableConvectiveOutcome && isOceanColumn
+          ? clamp(
+              (
+                Number.isFinite(state.subtropicalBalanceContractSupportDiag?.[k])
+                  ? state.subtropicalBalanceContractSupportDiag[k]
+                  : 0
+              ) * Math.max(0, explicitSubtropicalBalanceContractScale),
+              0,
+              1
+            )
+          : 0;
         const freshShoulderEquatorialEdgeGateSupport = enableConvectiveOutcome && isOceanColumn
           ? clamp(
               Number.isFinite(state.freshShoulderEquatorialEdgeGateSupportDiag?.[k])
@@ -611,11 +642,32 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               1
             )
           : 0;
+        const balanceContractCarrierSupport = enableConvectiveOutcome && isOceanColumn && enableExplicitSubtropicalBalanceContract
+          ? clamp(
+              explicitBalanceContractSupport
+                * (0.65 + 0.35 * explicitBalancePartitionSupport),
+              0,
+              1
+            )
+          : 0;
+        const balanceContractAscentModulation = enableConvectiveOutcome && isOceanColumn && enableExplicitSubtropicalBalanceContract
+          ? clamp(
+              0.45
+                + 0.35 * explicitBalanceCirculationSupport
+                + 0.2 * Math.max(freshNeutralToSubsidingSupport, explicitBalanceCirculationSupport),
+              0.45,
+              1
+            )
+          : 0;
         const maintenanceSupport = enableConvectiveOutcome && isOceanColumn
           ? clamp(
               SUBTROPICAL_MAINTENANCE_DIAG.suppressMax
                 * (1 + SUBTROPICAL_MAINTENANCE_DIAG.oceanBoost)
-                * subtropicalSupport
+                * (
+                  enableExplicitSubtropicalBalanceContract
+                    ? balanceContractCarrierSupport
+                    : subtropicalSupport
+                )
                 * weakEngineSupport
                 * weakAscentSupport
                 * marginalSupersaturationSupport
@@ -628,7 +680,11 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
           ? clamp(
               SUBTROPICAL_MAINTENANCE_DIAG.suppressMax
                 * (1 + SUBTROPICAL_MAINTENANCE_DIAG.oceanBoost)
-                * freshSubtropicalSuppression
+                * (
+                  enableExplicitSubtropicalBalanceContract
+                    ? balanceContractCarrierSupport
+                    : freshSubtropicalSuppression
+                )
                 * weakEngineSupport
                 * weakAscentSupport
                 * marginalSupersaturationSupport
@@ -638,25 +694,37 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
             )
           : 0;
         const softLiveGateSelectorSupport = enableConvectiveOutcome && isOceanColumn
-          ? clamp(
-              freshSubtropicalSuppression
-                * (0.6 + 0.4 * freshSubtropicalBand)
-                * weakEngineSupport
-                * (1 - 0.5 * freshOrganizedSupport)
-                * marginalSupersaturationSupport
-                * (0.45 + 0.55 * maintenanceLayerSupport),
-              0,
-              1
-            )
+          ? enableExplicitSubtropicalBalanceContract
+            ? clamp(
+                balanceContractCarrierSupport
+                  * weakEngineSupport
+                  * (1 - 0.45 * freshOrganizedSupport)
+                  * marginalSupersaturationSupport
+                  * (0.45 + 0.55 * maintenanceLayerSupport),
+                0,
+                1
+              )
+            : clamp(
+                freshSubtropicalSuppression
+                  * (0.6 + 0.4 * freshSubtropicalBand)
+                  * weakEngineSupport
+                  * (1 - 0.5 * freshOrganizedSupport)
+                  * marginalSupersaturationSupport
+                  * (0.45 + 0.55 * maintenanceLayerSupport),
+                0,
+                1
+              )
           : 0;
         const softLiveGateAscentModulation = enableConvectiveOutcome && isOceanColumn
-          ? clamp(
-              0.35
-                + 0.45 * weakAscentSupport
-                + 0.2 * Math.max(freshNeutralToSubsidingSupport, weakAscentSupport),
-              0.35,
-              1
-            )
+          ? enableExplicitSubtropicalBalanceContract
+            ? balanceContractAscentModulation
+            : clamp(
+                0.35
+                  + 0.45 * weakAscentSupport
+                  + 0.2 * Math.max(freshNeutralToSubsidingSupport, weakAscentSupport),
+                0.35,
+                1
+              )
           : 0;
         const softLiveGateSupport = enableConvectiveOutcome && isOceanColumn
           ? clamp(

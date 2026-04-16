@@ -199,6 +199,57 @@ test('microphysics redesign surfaces live-state subtropical support when legacy 
   assert.ok(state.saturationAdjustmentLiveGateEventCount[0] > 0);
 });
 
+test('microphysics explicit subtropical balance contract can admit a shared-contract marine event without fresh suppression', () => {
+  const makeState = () => {
+    const state = setupState(279);
+    state.qv.fill(0.002);
+    state.qc.fill(0);
+    state.qi.fill(0);
+    state.qr.fill(0);
+    state.qs.fill(0);
+    state.landMask[0] = 0;
+    state.convectiveOrganization[0] = 0.04;
+    state.convectiveMassFlux[0] = 2e-4;
+    state.convectiveAnvilSource[0] = 0.02;
+    state.subtropicalSubsidenceDrying[0] = 0.0;
+    state.freshSubtropicalSuppressionDiag[0] = 0.0;
+    state.freshSubtropicalBandDiag[0] = 0.0;
+    state.freshNeutralToSubsidingSupportDiag[0] = 0.24;
+    state.freshOrganizedSupportDiag[0] = 0.14;
+    state.freshRhMidSupportDiag[0] = 0.58;
+    state.subtropicalBalancePartitionSupportDiag[0] = 0.72;
+    state.subtropicalBalanceCirculationSupportDiag[0] = 0.64;
+    state.subtropicalBalanceContractSupportDiag[0] = 0.46;
+    state.omega.fill(-0.03);
+    state.qv[1] = 0.011;
+    return state;
+  };
+
+  const contractOff = makeState();
+  const contractOn = makeState();
+
+  stepMicrophysics5({
+    dt: 900,
+    state: contractOff,
+    params: {
+      enableConvectiveOutcome: true,
+      enableExplicitSubtropicalBalanceContract: false
+    }
+  });
+  stepMicrophysics5({
+    dt: 900,
+    state: contractOn,
+    params: {
+      enableConvectiveOutcome: true,
+      enableExplicitSubtropicalBalanceContract: true
+    }
+  });
+
+  assert.equal(contractOff.saturationAdjustmentLiveGateCandidateMass[0], 0);
+  assert.ok(contractOn.saturationAdjustmentLiveGateCandidateMass[0] > 0);
+  assert.ok(contractOn.saturationAdjustmentLiveGatePotentialSuppressedMass[0] > 0);
+});
+
 test('microphysics soft live-state gate admits weak-ascent marine events without relying on the strict live gate', () => {
   const state = setupState(279);
   state.qv.fill(0.002);

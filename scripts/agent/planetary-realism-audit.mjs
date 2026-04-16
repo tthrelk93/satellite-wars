@@ -83,6 +83,7 @@ let weakHemiCrossHemiFloorTaperPatchMode = 'default';
 let northSourceConcentrationPenaltyPatchMode = 'default';
 let atlanticDryCoreReceiverTaperPatchMode = 'default';
 let atlanticTransitionCarryoverContainmentPatchMode = 'default';
+let architectureA1BalanceContractMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -144,6 +145,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--atlantic-dry-core-receiver-taper-patch=')) atlanticDryCoreReceiverTaperPatchMode = arg.slice('--atlantic-dry-core-receiver-taper-patch='.length);
   else if (arg === '--atlantic-transition-carryover-containment-patch' && argv[i + 1]) atlanticTransitionCarryoverContainmentPatchMode = argv[++i];
   else if (arg.startsWith('--atlantic-transition-carryover-containment-patch=')) atlanticTransitionCarryoverContainmentPatchMode = arg.slice('--atlantic-transition-carryover-containment-patch='.length);
+  else if (arg === '--architecture-a1-balance-contract' && argv[i + 1]) architectureA1BalanceContractMode = argv[++i];
+  else if (arg.startsWith('--architecture-a1-balance-contract=')) architectureA1BalanceContractMode = arg.slice('--architecture-a1-balance-contract='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--quiet') quiet = true;
   else if (arg === '--system-experiment' && argv[i + 1]) systemExperiment = argv[++i];
@@ -218,6 +221,11 @@ northSourceConcentrationPenaltyPatchMode = northSourceConcentrationPenaltyPatchM
 atlanticDryCoreReceiverTaperPatchMode = atlanticDryCoreReceiverTaperPatchMode === 'off'
   ? 'off'
   : atlanticDryCoreReceiverTaperPatchMode === 'on'
+    ? 'on'
+    : 'default';
+architectureA1BalanceContractMode = architectureA1BalanceContractMode === 'off'
+  ? 'off'
+  : architectureA1BalanceContractMode === 'on'
     ? 'on'
     : 'default';
 systemExperiment = [
@@ -1452,6 +1460,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     subtropicalLocalHemiSourceDiagFrac,
     subtropicalMeanTropicalSourceDiagFrac,
     subtropicalCrossHemiFloorShareDiagFrac,
+    subtropicalBalancePartitionSupportDiagFrac,
+    subtropicalBalanceCirculationSupportDiagFrac,
+    subtropicalBalanceContractSupportDiagFrac,
     subtropicalWeakHemiFracDiag,
     subtropicalWeakHemiFloorOverhangDiagFrac,
     subtropicalWeakHemiFloorTaperAppliedDiagFrac,
@@ -1942,6 +1953,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalSubtropicalLocalHemiSource = zonalMean(subtropicalLocalHemiSourceDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubtropicalMeanTropicalSource = zonalMean(subtropicalMeanTropicalSourceDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubtropicalCrossHemiFloorShare = zonalMean(subtropicalCrossHemiFloorShareDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSubtropicalBalancePartitionSupport = zonalMean(subtropicalBalancePartitionSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSubtropicalBalanceCirculationSupport = zonalMean(subtropicalBalanceCirculationSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSubtropicalBalanceContractSupport = zonalMean(subtropicalBalanceContractSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubtropicalWeakHemiFrac = zonalMean(subtropicalWeakHemiFracDiag || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubtropicalWeakHemiFloorOverhang = zonalMean(subtropicalWeakHemiFloorOverhangDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSubtropicalWeakHemiFloorTaperApplied = zonalMean(subtropicalWeakHemiFloorTaperAppliedDiagFrac || new Array(nx * ny).fill(0), nx, ny);
@@ -1957,6 +1971,14 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const southTransitionSubtropicalMeanTropicalSourceMean = weightedBandMean(zonalSubtropicalMeanTropicalSource, latitudesDeg, rowWeights, -22, -12);
   const northTransitionSubtropicalCrossHemiFloorShareMean = weightedBandMean(zonalSubtropicalCrossHemiFloorShare, latitudesDeg, rowWeights, 12, 22);
   const southTransitionSubtropicalCrossHemiFloorShareMean = weightedBandMean(zonalSubtropicalCrossHemiFloorShare, latitudesDeg, rowWeights, -22, -12);
+  const northTransitionSubtropicalBalancePartitionSupportMean = weightedBandMean(zonalSubtropicalBalancePartitionSupport, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionSubtropicalBalancePartitionSupportMean = weightedBandMean(zonalSubtropicalBalancePartitionSupport, latitudesDeg, rowWeights, -22, -12);
+  const northTransitionSubtropicalBalanceCirculationSupportMean = weightedBandMean(zonalSubtropicalBalanceCirculationSupport, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionSubtropicalBalanceCirculationSupportMean = weightedBandMean(zonalSubtropicalBalanceCirculationSupport, latitudesDeg, rowWeights, -22, -12);
+  const northTransitionSubtropicalBalanceContractSupportMean = weightedBandMean(zonalSubtropicalBalanceContractSupport, latitudesDeg, rowWeights, 12, 22);
+  const southTransitionSubtropicalBalanceContractSupportMean = weightedBandMean(zonalSubtropicalBalanceContractSupport, latitudesDeg, rowWeights, -22, -12);
+  const northDryBeltSubtropicalBalanceContractSupportMean = weightedBandMean(zonalSubtropicalBalanceContractSupport, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltSubtropicalBalanceContractSupportMean = weightedBandMean(zonalSubtropicalBalanceContractSupport, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
   const northTransitionSubtropicalWeakHemiFracMean = weightedBandMean(zonalSubtropicalWeakHemiFrac, latitudesDeg, rowWeights, 12, 22);
   const southTransitionSubtropicalWeakHemiFracMean = weightedBandMean(zonalSubtropicalWeakHemiFrac, latitudesDeg, rowWeights, -22, -12);
   const northTransitionSubtropicalWeakHemiFloorOverhangMean = weightedBandMean(zonalSubtropicalWeakHemiFloorOverhang, latitudesDeg, rowWeights, 12, 22);
@@ -2192,6 +2214,14 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       southTransitionSubtropicalMeanTropicalSourceMeanFrac: round(southTransitionSubtropicalMeanTropicalSourceMean, 5),
       northTransitionSubtropicalCrossHemiFloorShareMeanFrac: round(northTransitionSubtropicalCrossHemiFloorShareMean, 5),
       southTransitionSubtropicalCrossHemiFloorShareMeanFrac: round(southTransitionSubtropicalCrossHemiFloorShareMean, 5),
+      northTransitionSubtropicalBalancePartitionSupportMeanFrac: round(northTransitionSubtropicalBalancePartitionSupportMean, 5),
+      southTransitionSubtropicalBalancePartitionSupportMeanFrac: round(southTransitionSubtropicalBalancePartitionSupportMean, 5),
+      northTransitionSubtropicalBalanceCirculationSupportMeanFrac: round(northTransitionSubtropicalBalanceCirculationSupportMean, 5),
+      southTransitionSubtropicalBalanceCirculationSupportMeanFrac: round(southTransitionSubtropicalBalanceCirculationSupportMean, 5),
+      northTransitionSubtropicalBalanceContractSupportMeanFrac: round(northTransitionSubtropicalBalanceContractSupportMean, 5),
+      southTransitionSubtropicalBalanceContractSupportMeanFrac: round(southTransitionSubtropicalBalanceContractSupportMean, 5),
+      northDryBeltSubtropicalBalanceContractSupportMeanFrac: round(northDryBeltSubtropicalBalanceContractSupportMean, 5),
+      southDryBeltSubtropicalBalanceContractSupportMeanFrac: round(southDryBeltSubtropicalBalanceContractSupportMean, 5),
       northTransitionSubtropicalWeakHemiFracMean: round(northTransitionSubtropicalWeakHemiFracMean, 5),
       southTransitionSubtropicalWeakHemiFracMean: round(southTransitionSubtropicalWeakHemiFracMean, 5),
       northTransitionSubtropicalWeakHemiFloorOverhangMeanFrac: round(northTransitionSubtropicalWeakHemiFloorOverhangMean, 5),
@@ -5127,6 +5157,8 @@ export async function main() {
   else if (atlanticTransitionCarryoverContainmentPatchMode === 'on') core.vertParams.enableAtlanticTransitionCarryoverContainment = true;
   if (softLiveGatePatchMode === 'off') core.microParams.enableSoftLiveStateMaintenanceSuppression = false;
   else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
+  if (architectureA1BalanceContractMode === 'off') core.microParams.enableExplicitSubtropicalBalanceContract = false;
+  else if (architectureA1BalanceContractMode === 'on') core.microParams.enableExplicitSubtropicalBalanceContract = true;
   if (shoulderAbsorptionGuardPatchMode === 'off') core.microParams.enableShoulderAbsorptionGuard = false;
   else if (shoulderAbsorptionGuardPatchMode === 'on') core.microParams.enableShoulderAbsorptionGuard = true;
   core.microParams.shoulderAbsorptionGuardSuppressedMassMode = shoulderGuardFateMode;

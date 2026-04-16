@@ -13,6 +13,7 @@ import {
   computeNorthSourceConcentrationPenaltyFrac,
   computeAtlanticDryCoreReceiverTaperFrac,
   computeAtlanticTransitionCarryoverContainmentFrac,
+  computeSubtropicalBalanceContract,
   computeEquatorialEdgeSubsidenceGuardSourceSupport,
   computeEquatorialEdgeSubsidenceGuardTargetWeight,
   computeWeakHemiCrossHemiFloorTaperFrac,
@@ -411,6 +412,37 @@ test('computeAtlanticTransitionCarryoverContainmentFrac only activates in the At
     omega1: 0.26,
     maxFrac: 0.18
   }), 0);
+});
+
+test('computeSubtropicalBalanceContract favors columns with both partition and circulation support', () => {
+  const active = computeSubtropicalBalanceContract({
+    dryDriver: 0.18,
+    sourceDriver: 0.22,
+    latShape: 0.8,
+    descentSupport: 0.72,
+    existingOmegaPaS: 0.14,
+    crossHemiFloorShare: 0.18,
+    weakHemiFloorTaperFrac: 0.08,
+    organizedSupport: 0.16,
+    convectivePotential: 0.12
+  });
+  assert.ok(active.partitionSupport > 0);
+  assert.ok(active.circulationSupport > 0);
+  assert.ok(active.contractSupport > 0);
+
+  const weakCirculation = computeSubtropicalBalanceContract({
+    dryDriver: 0.18,
+    sourceDriver: 0.22,
+    latShape: 0.8,
+    descentSupport: 0.05,
+    existingOmegaPaS: 0.01,
+    crossHemiFloorShare: 0.82,
+    weakHemiFloorTaperFrac: 0,
+    organizedSupport: 0.72,
+    convectivePotential: 0.68
+  });
+  assert.ok(weakCirculation.partitionSupport > 0);
+  assert.ok(weakCirculation.contractSupport < active.contractSupport);
 });
 
 test('stepVertical5 populates the upper-cloud handoff ledger for a simple carried-cloud case', () => {

@@ -92,6 +92,9 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const subtropicalLocalHemiSourceDiag = makeArray(N);
   const subtropicalMeanTropicalSourceDiag = makeArray(N);
   const subtropicalCrossHemiFloorShareDiag = makeArray(N);
+  const subtropicalBalancePartitionSupportDiag = makeArray(N);
+  const subtropicalBalanceCirculationSupportDiag = makeArray(N);
+  const subtropicalBalanceContractSupportDiag = makeArray(N);
   const subtropicalWeakHemiFracDiag = makeArray(N);
   const subtropicalWeakHemiFloorOverhangDiag = makeArray(N);
   const subtropicalWeakHemiFloorTaperAppliedDiag = makeArray(N);
@@ -381,6 +384,9 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     subtropicalLocalHemiSourceDiag,
     subtropicalMeanTropicalSourceDiag,
     subtropicalCrossHemiFloorShareDiag,
+    subtropicalBalancePartitionSupportDiag,
+    subtropicalBalanceCirculationSupportDiag,
+    subtropicalBalanceContractSupportDiag,
     subtropicalWeakHemiFracDiag,
     subtropicalWeakHemiFloorOverhangDiag,
     subtropicalWeakHemiFloorTaperAppliedDiag,

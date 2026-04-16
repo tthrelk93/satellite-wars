@@ -130,6 +130,35 @@ export const computeTransitionReturnFlowCouplingFrac = ({
     maxFrac
   );
 };
+export const computeSubtropicalBalanceContract = ({
+  dryDriver,
+  sourceDriver,
+  latShape,
+  descentSupport,
+  existingOmegaPaS,
+  crossHemiFloorShare,
+  weakHemiFloorTaperFrac,
+  organizedSupport,
+  convectivePotential
+}) => {
+  const partitionSupport = clamp01(
+    0.55 * smoothstep(0.04, 0.18, dryDriver)
+      + 0.25 * clamp01(latShape)
+      + 0.2 * smoothstep(0.06, 0.24, sourceDriver)
+  );
+  const circulationSupport = clamp01(
+    0.4 * clamp01(descentSupport)
+      + 0.2 * smoothstep(0.04, 0.18, Math.max(0, existingOmegaPaS))
+      + 0.15 * (1 - clamp01(crossHemiFloorShare))
+      + 0.1 * smoothstep(0.015, 0.11, weakHemiFloorTaperFrac)
+      + 0.15 * (1 - clamp01(0.55 * organizedSupport + 0.45 * convectivePotential))
+  );
+  return {
+    partitionSupport,
+    circulationSupport,
+    contractSupport: clamp01(partitionSupport * (0.4 + 0.6 * circulationSupport))
+  };
+};
 export const computeDryingOmegaBridgePaS = ({
   enabled,
   dryDriver,
@@ -829,6 +858,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.subtropicalLocalHemiSourceDiag || state.subtropicalLocalHemiSourceDiag.length !== N) state.subtropicalLocalHemiSourceDiag = new Float32Array(N);
   if (!state.subtropicalMeanTropicalSourceDiag || state.subtropicalMeanTropicalSourceDiag.length !== N) state.subtropicalMeanTropicalSourceDiag = new Float32Array(N);
   if (!state.subtropicalCrossHemiFloorShareDiag || state.subtropicalCrossHemiFloorShareDiag.length !== N) state.subtropicalCrossHemiFloorShareDiag = new Float32Array(N);
+  if (!state.subtropicalBalancePartitionSupportDiag || state.subtropicalBalancePartitionSupportDiag.length !== N) state.subtropicalBalancePartitionSupportDiag = new Float32Array(N);
+  if (!state.subtropicalBalanceCirculationSupportDiag || state.subtropicalBalanceCirculationSupportDiag.length !== N) state.subtropicalBalanceCirculationSupportDiag = new Float32Array(N);
+  if (!state.subtropicalBalanceContractSupportDiag || state.subtropicalBalanceContractSupportDiag.length !== N) state.subtropicalBalanceContractSupportDiag = new Float32Array(N);
   if (!state.subtropicalWeakHemiFracDiag || state.subtropicalWeakHemiFracDiag.length !== N) state.subtropicalWeakHemiFracDiag = new Float32Array(N);
   if (!state.subtropicalWeakHemiFloorOverhangDiag || state.subtropicalWeakHemiFloorOverhangDiag.length !== N) state.subtropicalWeakHemiFloorOverhangDiag = new Float32Array(N);
   if (!state.subtropicalWeakHemiFloorTaperAppliedDiag || state.subtropicalWeakHemiFloorTaperAppliedDiag.length !== N) state.subtropicalWeakHemiFloorTaperAppliedDiag = new Float32Array(N);
@@ -962,6 +994,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const subtropicalLocalHemiSourceDiag = state.subtropicalLocalHemiSourceDiag;
   const subtropicalMeanTropicalSourceDiag = state.subtropicalMeanTropicalSourceDiag;
   const subtropicalCrossHemiFloorShareDiag = state.subtropicalCrossHemiFloorShareDiag;
+  const subtropicalBalancePartitionSupportDiag = state.subtropicalBalancePartitionSupportDiag;
+  const subtropicalBalanceCirculationSupportDiag = state.subtropicalBalanceCirculationSupportDiag;
+  const subtropicalBalanceContractSupportDiag = state.subtropicalBalanceContractSupportDiag;
   const subtropicalWeakHemiFracDiag = state.subtropicalWeakHemiFracDiag;
   const subtropicalWeakHemiFloorOverhangDiag = state.subtropicalWeakHemiFloorOverhangDiag;
   const subtropicalWeakHemiFloorTaperAppliedDiag = state.subtropicalWeakHemiFloorTaperAppliedDiag;
@@ -1072,6 +1107,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   subtropicalLocalHemiSourceDiag.fill(0);
   subtropicalMeanTropicalSourceDiag.fill(0);
   subtropicalCrossHemiFloorShareDiag.fill(0);
+  subtropicalBalancePartitionSupportDiag.fill(0);
+  subtropicalBalanceCirculationSupportDiag.fill(0);
+  subtropicalBalanceContractSupportDiag.fill(0);
   subtropicalWeakHemiFracDiag.fill(0);
   subtropicalWeakHemiFloorOverhangDiag.fill(0);
   subtropicalWeakHemiFloorTaperAppliedDiag.fill(0);
@@ -2301,6 +2339,20 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           atlanticDryCoreReceiverTaperDiag[k] = atlanticDryCoreReceiverTaperFrac;
           atlanticDryCoreReceiverTaperAppliedDiag[k] = dryDriver - taperedDryDriver;
           subtropicalSubsidenceDrying[k] = taperedDryDriver;
+          const balanceContract = computeSubtropicalBalanceContract({
+            dryDriver: taperedDryDriver,
+            sourceDriver: coupledSourceDriver,
+            latShape,
+            descentSupport,
+            existingOmegaPaS: lowLevelOmegaEffective[k],
+            crossHemiFloorShare: subtropicalCrossHemiFloorShareDiag[k],
+            weakHemiFloorTaperFrac,
+            organizedSupport: convectiveOrganization[k],
+            convectivePotential: convectivePotential[k]
+          });
+          subtropicalBalancePartitionSupportDiag[k] = balanceContract.partitionSupport;
+          subtropicalBalanceCirculationSupportDiag[k] = balanceContract.circulationSupport;
+          subtropicalBalanceContractSupportDiag[k] = balanceContract.contractSupport;
           const omegaBridgePaS = computeDryingOmegaBridgePaS({
             enabled: enableDryingOmegaBridge,
             dryDriver: taperedDryDriver,
