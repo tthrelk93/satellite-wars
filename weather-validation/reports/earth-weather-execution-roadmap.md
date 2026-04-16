@@ -1130,6 +1130,59 @@ Keep the C24 inner-core narrowing fixed and test a weaker outer shoulder restore
   - but it gave back the NH dry-belt ocean condensation win and still failed the quick gate, so the remaining tradeoff is now sharply concentrated between transport-sign recovery and dry-belt condensation control
 - Consequence: the next active move is now `Architecture C29: weak partial shoulder restore attribution`.
 
+## Architecture C29: Weak Partial Shoulder Restore Attribution
+
+### Objective
+
+Explain exactly what the weak partial shoulder restore in C28 fixed and what it broke, so the next experiment can target the reopened dry-belt receiver side without undoing the equatorial export relief.
+
+### Result
+
+- Status: completed
+- Verdict: `weak_restore_relieves_equatorial_eddy_export_but_reopens_dry_belt_carryover_condensation`
+- What C29 proved:
+  - C28 materially relieved the equatorial export side relative to C26:
+    - cross-equatorial vapor flux north: `-353.85346 -> -323.23581`
+    - equator lower total-water flux north: `-18.00423 -> -16.93964`
+    - equator mid total-water flux north: `-16.6919 -> -14.80431`
+    - equator upper total-water flux north: `-13.23333 -> -11.22308`
+  - but it reopened the dry-belt receiver/carryover side:
+    - NH dry-belt ocean condensation: `0.11952 -> 0.15539`
+    - carryover upper cloud: `0.2348 -> 0.24485`
+    - imported anvil persistence: `0.23307 -> 0.24284`
+    - weak-erosion cloud survival: `0.22509 -> 0.23434`
+    - cloud recirculation proxy: `0.60796 -> 0.74157`
+- Interpretation:
+  - the weak restore geometry was directionally right for the equatorial eddy/export problem
+  - the remaining rebound was no longer on the shoulder itself, but on the dry-belt carry-input / carryover receiver lane
+- Consequence: the next active move is now `Architecture C30: weak restore carry-input recapture experiment`.
+
+## Architecture C30: Weak Restore Carry-Input Recapture Experiment
+
+### Objective
+
+Keep the C28 weak shoulder geometry fixed and strengthen only the dry-belt carry-input recapture contract so the hybrid can regain NH dry-belt condensation control without re-strengthening the shoulder.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.315`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.093`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.502`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.232`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12693`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
+- Interpretation:
+  - the carry-input recapture tuning did recover NH dry-belt ocean condensation relative to C28 while preserving most of the broad quick-shape gains
+  - but it did not solve the equatorial transport-sign inversion and slightly worsened the cross-equatorial flux relative to C28, so the next move needs attribution rather than more brute-force carry-input tuning
+- Consequence: the next active move is now `Architecture C31: weak-restore carry-input recapture attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

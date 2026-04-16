@@ -41,6 +41,8 @@ Updated: 2026-04-16
 - Architecture C26 Partial Equatorial Shoulder Restore Experiment: FAILED (`quick_reject`)
 - Architecture C27 Partial Equatorial Shoulder Restore Attribution: COMPLETED
 - Architecture C28 Weak Partial Shoulder Restore Experiment: FAILED (`quick_reject`)
+- Architecture C29 Weak Partial Shoulder Restore Attribution: COMPLETED
+- Architecture C30 Weak Restore Carry-Input Recapture Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -686,6 +688,46 @@ Updated: 2026-04-16
   - weakening the shoulder restore materially improved the sign defect and relieved the equatorial eddy branch relative to C26
   - but it gave back the NH dry-belt ocean-condensation improvement and still failed the quick gate, so the remaining blocker is now a sharper transport-vs-condensation tradeoff
 - Next active phase: `Architecture C29: weak partial shoulder restore attribution`
+
+## Architecture C29 decision
+
+- Verdict: `weak_restore_relieves_equatorial_eddy_export_but_reopens_dry_belt_carryover_condensation`
+- Decision report: [earth-weather-architecture-c29-weak-partial-shoulder-restore-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c29-weak-partial-shoulder-restore-attribution.md)
+- What changed relative to C26:
+  - relieved:
+    - cross-equatorial vapor flux north: `-353.85346 -> -323.23581`
+    - equator lower total-water flux north: `-18.00423 -> -16.93964`
+    - equator mid total-water flux north: `-16.6919 -> -14.80431`
+    - equator upper total-water flux north: `-13.23333 -> -11.22308`
+  - reopened:
+    - NH dry-belt ocean condensation: `0.11952 -> 0.15539`
+    - carryover upper cloud: `0.2348 -> 0.24485`
+    - imported anvil persistence: `0.23307 -> 0.24284`
+    - cloud recirculation proxy: `0.60796 -> 0.74157`
+- Interpretation:
+  - weakening the shoulder restore really did relieve the equatorial eddy/export side
+  - but it paid for that by reopening dry-belt carryover and ocean condensation, so the next move had to target carry-input recapture rather than the shoulder geometry itself
+- Next active phase: `Architecture C30: weak restore carry-input recapture experiment`
+
+## Architecture C30 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c30-weak-restore-carry-input-recapture-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c30-weak-restore-carry-input-recapture-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - bounded outcome:
+    - `itczWidthDeg: 25.91 -> 23.315`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.093`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.502`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.232`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12693`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
+- Interpretation:
+  - strengthening the carry-input recapture recovered the NH dry-belt receiver side relative to C28 while preserving most of the broad quick-shape wins
+  - but it did not repair the transport-sign inversion and actually made the cross-equatorial defect slightly worse than C28, so the next step is attribution rather than more blind recapture tuning
+- Next active phase: `Architecture C31: weak-restore carry-input recapture attribution`
 
 ## Day-365 benchmark summary
 

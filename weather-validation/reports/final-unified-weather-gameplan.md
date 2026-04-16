@@ -560,8 +560,27 @@ Architecture C28 is now complete in [earth-weather-architecture-c28-weak-partial
 - but it paid for that by giving back the dry-belt ocean-condensation win:
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.11952 -> 0.15539`
 
+Architecture C29 is now complete in [earth-weather-architecture-c29-weak-partial-shoulder-restore-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c29-weak-partial-shoulder-restore-attribution.md):
+- verdict: `weak_restore_relieves_equatorial_eddy_export_but_reopens_dry_belt_carryover_condensation`
+- C29 made the tradeoff explicit:
+  - cross-equatorial vapor flux north improved `-353.85346 -> -323.23581`
+  - equator lower/mid/upper total-water flux north all improved
+  - but NH dry-belt ocean condensation worsened `0.11952 -> 0.15539`
+  - and carryover / persistence / cloud recirculation all rose
+
+Architecture C30 is now complete in [earth-weather-architecture-c30-weak-restore-carry-input-recapture-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c30-weak-restore-carry-input-recapture-experiment.md):
+- verdict: `quick_reject`
+- strengthening the carry-input recapture did recover the dry-belt receiver side while preserving most quick-shape wins:
+  - `itczWidthDeg: 25.91 -> 23.315`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.093`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.502`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.232`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12693`
+- but the main blocker is still live:
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
+
 So the next active move is now:
-- `Architecture C29: weak partial shoulder restore attribution`
+- `Architecture C31: weak-restore carry-input recapture attribution`
 
 ## Hard Rules Going Forward
 
