@@ -400,8 +400,21 @@ Architecture C15 is now complete in [earth-weather-architecture-c15-equatorial-v
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -364.55266`
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.15331`
 
+Architecture C16 is now complete in [earth-weather-architecture-c16-vertical-contract-implementation-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c16-vertical-contract-implementation-attribution.md):
+- verdict: `zonal_mean_relief_offset_by_upper_cloud_carryover_recirculation`
+- the current vertical overlay helped one real thing:
+  - equator zonal-mean vapor flux north: `-301.63909 -> -274.13377`
+- and it also relieved the 35° dry-belt import burden:
+  - `-467.08734 -> -360.61691`
+- but it reintroduced a large upper-cloud maintenance family that more than canceled that benefit:
+  - equator eddy vapor flux north: `-34.29106 -> -96.97265`
+  - NH dry-belt carried-over upper cloud: `0 -> 0.39867`
+  - NH dry-belt imported anvil persistence: `0 -> 0.39786`
+  - NH dry-belt weak-erosion survival: `0 -> 0.38477`
+  - NH dry-belt cloud recirculation proxy: `0 -> 2.22467`
+
 So the next active move is now:
-- `Architecture C16: vertical-contract implementation attribution`
+- `Architecture C17: zonal-mean-preserving upper-cloud carryover carveout experiment`
 
 ## Hard Rules Going Forward
 

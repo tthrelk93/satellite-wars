@@ -411,6 +411,24 @@ Updated: 2026-04-16
   - it also weakened some of the stronger C13 improvements, so the vertical lane now needs narrower implementation attribution rather than a broader overlay
 - Next active phase: `Architecture C16: vertical-contract implementation attribution`
 
+## Architecture C16 decision
+
+- Verdict: `zonal_mean_relief_offset_by_upper_cloud_carryover_recirculation`
+- Decision report: [earth-weather-architecture-c16-vertical-contract-implementation-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c16-vertical-contract-implementation-attribution.md)
+- Attribution result:
+  - equator zonal-mean vapor flux north: `-301.63909 -> -274.13377`
+  - equator eddy vapor flux north: `-34.29106 -> -96.97265`
+  - equator mid/upper vapor flux north: `-203.65605 -> -239.13535`
+  - 35° interface vapor flux north: `-467.08734 -> -360.61691`
+  - NH dry-belt carried-over upper cloud: `0 -> 0.39867`
+  - NH dry-belt imported anvil persistence: `0 -> 0.39786`
+  - NH dry-belt weak-erosion survival: `0 -> 0.38477`
+  - NH dry-belt cloud recirculation proxy: `0 -> 2.22467`
+- Interpretation:
+  - C15 helped the zonal-mean equatorial branch and relieved north dry-belt import burden
+  - but it reintroduced a strong upper-cloud carryover / persistence pathway that worsened the eddy-side and mid-upper transport enough to make the total cross-equatorial flux more negative
+- Next active phase: `Architecture C17: zonal-mean-preserving upper-cloud carryover carveout experiment`
+
 ## Day-365 benchmark summary
 
 - ITCZ width: current 24.875, rollback 25.613, winner current

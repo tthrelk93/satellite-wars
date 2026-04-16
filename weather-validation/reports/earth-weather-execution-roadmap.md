@@ -763,6 +763,37 @@ Test the bounded current-vertical overlay on top of the donor/current hybrid by 
   - so the next phase should attribute which part of the vertical implementation is driving the regression instead of broadening the overlay family further
 - Consequence: the next active move is now `Architecture C16: vertical-contract implementation attribution`.
 
+## Architecture C16: Vertical-Contract Implementation Attribution
+
+### Objective
+
+Determine whether the C15 regression means the current vertical overlay is fundamentally wrong for this hybrid family, or whether a narrower carveout can keep the helpful zonal-mean relief while removing the new upper-cloud maintenance pathway it reintroduced.
+
+### Result
+
+- Status: completed
+- Verdict: `zonal_mean_relief_offset_by_upper_cloud_carryover_recirculation`
+- What C16 proved:
+  - C15 did improve the equatorial zonal-mean branch relative to C13:
+    - equator zonal-mean vapor flux north: `-301.63909 -> -274.13377`
+  - C15 also relieved the 35° dry-belt import burden:
+    - 35° interface vapor flux north: `-467.08734 -> -360.61691`
+  - but the total equatorial result got worse because the overlay reintroduced a much stronger eddy / mid-upper transport failure:
+    - equator eddy vapor flux north: `-34.29106 -> -96.97265`
+    - equator mid/upper vapor flux north: `-203.65605 -> -239.13535`
+    - cross-equatorial vapor flux north: `-330.9854 -> -364.55266`
+  - the new regression aligns with a reactivated upper-cloud persistence family in the NH dry belt:
+    - carried-over upper cloud: `0 -> 0.39867`
+    - imported anvil persistence: `0 -> 0.39786`
+    - weak-erosion cloud survival: `0 -> 0.38477`
+    - cloud recirculation proxy: `0 -> 2.22467`
+- Interpretation:
+  - the full current vertical overlay is not the right keep candidate
+  - but it revealed a useful split:
+    - some vertical-state terms help the zonal-mean branch
+    - the upper-cloud carryover / persistence lane is what pays for that help with a larger eddy-side regression
+- Consequence: the next active move is now `Architecture C17: zonal-mean-preserving upper-cloud carryover carveout experiment`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective
