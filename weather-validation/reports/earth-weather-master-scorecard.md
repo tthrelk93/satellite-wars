@@ -35,6 +35,8 @@ Updated: 2026-04-16
 - Architecture C20 Zonal-Mean-Preserving Eddy Nudge Softening Experiment: FAILED (`quick_reject`)
 - Architecture C21 Eddy-Softening Implementation Attribution: COMPLETED
 - Architecture C22 Equatorial-Band Eddy Softening Carveout Experiment: FAILED (`quick_reject`)
+- Architecture C23 Equatorial-Band Eddy Softening Attribution: COMPLETED
+- Architecture C24 Inner-Core Equatorial Eddy Softening Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -556,6 +558,47 @@ Updated: 2026-04-16
   - narrowing the softening to the equatorial band preserved the broad quick-shape wins and improved NH dry-belt ocean condensation
   - but it still failed the quick gate because the cross-equatorial transport sign stayed inverted
 - Next active phase: `Architecture C23: equatorial-band eddy softening attribution`
+
+## Architecture C23 decision
+
+- Verdict: `equatorial_band_softening_preserves_dry_belt_relief_but_deepens_lower_mid_zonal_branch`
+- Decision report: [earth-weather-architecture-c23-equatorial-band-eddy-softening-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c23-equatorial-band-eddy-softening-attribution.md)
+- What changed relative to C17:
+  - dry-belt containment stayed relieved:
+    - carried-over upper cloud: `0.22666 -> 0.22097`
+    - imported anvil persistence: `0.22501 -> 0.21933`
+    - weak-erosion survival: `0.21732 -> 0.21143`
+    - cloud recirculation proxy: `0.39988 -> 0.39849`
+    - return-branch mass flux: `3368.15697 -> 3348.50751`
+  - upper transport relieved slightly:
+    - equator upper total-water flux north: `-13.44686 -> -13.3117`
+  - lower/mid zonal branches worsened:
+    - equator lower zonal vapor flux north: `-13.99991 -> -14.07888`
+    - equator mid zonal vapor flux north: `-12.93476 -> -13.11577`
+- Interpretation:
+  - the C22 carveout preserved the dry-belt relief we wanted
+  - but the remaining export defect is now concentrated in the inner equatorial core, especially the lower/mid zonal branch
+- Next active phase: `Architecture C24: inner-core equatorial eddy softening experiment`
+
+## Architecture C24 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c24-inner-core-equatorial-eddy-softening-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c24-inner-core-equatorial-eddy-softening-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - bounded outcome:
+    - `itczWidthDeg: 25.91 -> 23.275`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.091`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.506`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.214`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12705`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -358.07208`
+- Interpretation:
+  - the inner-core narrowing improved ITCZ width and both dry-belt ratios relative to C22 and eased parts of the lower/mid equatorial branch
+  - but it gave back some upper-branch relief, reintroduced carryover/return-branch rebound, and the transport-sign defect remained severe
+- Next active phase: `Architecture C25: inner-core equatorial eddy softening attribution`
 
 ## Day-365 benchmark summary
 

@@ -963,6 +963,62 @@ Keep the C17 carryover carveout fixed and soften eddy-energy rescaling only insi
   - but the cross-equatorial transport sign is still inverted, so this family is not yet a keep candidate
 - Consequence: the next active move is now `Architecture C23: equatorial-band eddy softening attribution`.
 
+## Architecture C23: Equatorial-Band Eddy Softening Attribution
+
+### Objective
+
+Explain exactly what the C22 equatorial-band carveout changed relative to C17 so we can tell whether the remaining defect lives in the lower/mid zonal branch, the upper branch, or the dry-belt containment side effects.
+
+### Result
+
+- Status: completed
+- Verdict: `equatorial_band_softening_preserves_dry_belt_relief_but_deepens_lower_mid_zonal_branch`
+- What C23 proved:
+  - relative to C17, C22 preserved the dry-belt containment side:
+    - carried-over upper cloud: `0.22666 -> 0.22097`
+    - imported anvil persistence: `0.22501 -> 0.21933`
+    - weak-erosion survival: `0.21732 -> 0.21143`
+    - cloud recirculation proxy: `0.39988 -> 0.39849`
+    - return-branch mass flux: `3368.15697 -> 3348.50751`
+  - and it modestly relieved the upper branch:
+    - equator upper total-water flux north: `-13.44686 -> -13.3117`
+  - but it deepened the lower and mid equatorial branches, mostly through the zonal-mean side:
+    - equator boundary-layer total-water flux north: `-4.91319 -> -5.01709`
+    - equator lower total-water flux north: `-17.72549 -> -17.83744`
+    - equator mid total-water flux north: `-16.60787 -> -16.77592`
+    - equator lower zonal vapor flux north: `-13.99991 -> -14.07888`
+    - equator mid zonal vapor flux north: `-12.93476 -> -13.11577`
+- Interpretation:
+  - the equatorial-band carveout was directionally useful because it preserved dry-belt relief and did not reopen the carryover family
+  - but the remaining export defect is now concentrated in the inner equatorial core, especially the lower/mid zonal branch
+- Consequence: the next active move is now `Architecture C24: inner-core equatorial eddy softening experiment`.
+
+## Architecture C24: Inner-Core Equatorial Eddy Softening Experiment
+
+### Objective
+
+Keep the C17 carryover carveout and the C22 dry-belt containment contract fixed, then narrow the eddy softening footprint into the inner equatorial core so the lower/mid zonal branch is perturbed less aggressively.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.275`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.091`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.506`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.214`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12705`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -358.07208`
+- Interpretation:
+  - narrowing to the inner core improved ITCZ width and both dry-belt ratios relative to C22, and it modestly relieved parts of the lower/mid equatorial transport burden
+  - but it gave back some of the upper-branch and dry-belt condensation relief, reintroduced carryover/return-branch rebound, and the cross-equatorial sign inversion stayed severe
+- Consequence: the next active move is now `Architecture C25: inner-core equatorial eddy softening attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

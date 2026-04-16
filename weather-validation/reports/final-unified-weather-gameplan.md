@@ -492,8 +492,31 @@ Architecture C22 is now complete in [earth-weather-architecture-c22-equatorial-b
 - but the blocker is still the same transport-sign defect:
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.11907`
 
+Architecture C23 is now complete in [earth-weather-architecture-c23-equatorial-band-eddy-softening-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c23-equatorial-band-eddy-softening-attribution.md):
+- verdict: `equatorial_band_softening_preserves_dry_belt_relief_but_deepens_lower_mid_zonal_branch`
+- the C22 carveout really did preserve the dry-belt relief:
+  - carried-over upper cloud: `0.22666 -> 0.22097`
+  - imported anvil persistence: `0.22501 -> 0.21933`
+  - weak-erosion survival: `0.21732 -> 0.21143`
+  - cloud recirculation proxy: `0.39988 -> 0.39849`
+  - return-branch mass flux: `3368.15697 -> 3348.50751`
+- but the remaining export defect is now concentrated in the inner equatorial core:
+  - equator lower zonal vapor flux north: `-13.99991 -> -14.07888`
+  - equator mid zonal vapor flux north: `-12.93476 -> -13.11577`
+
+Architecture C24 is now complete in [earth-weather-architecture-c24-inner-core-equatorial-eddy-softening-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c24-inner-core-equatorial-eddy-softening-experiment.md):
+- verdict: `quick_reject`
+- narrowing the softening into the inner core kept the same broad quick wins:
+  - `itczWidthDeg: 25.91 -> 23.275`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.091`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.506`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.214`
+- but it gave back some upper-branch and dry-belt condensation relief:
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12705`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -358.07208`
+
 So the next active move is now:
-- `Architecture C23: equatorial-band eddy softening attribution`
+- `Architecture C25: inner-core equatorial eddy softening attribution`
 
 ## Hard Rules Going Forward
 
