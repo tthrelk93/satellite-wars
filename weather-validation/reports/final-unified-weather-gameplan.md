@@ -839,6 +839,23 @@ Architecture C62 is now complete:
 So the next active move is now:
 - `Architecture C63: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment attribution`
 
+Architecture C63 is now complete:
+- verdict: `poleward_shoulder_containment_recaptures_receiver_and_nh_ocean_rebound_but_35deg_eddy_import_remains_primary_blocker`
+- interpretation: C62 really does recapture the `26.25°` receiver and `33.75°` shoulder lanes, and the remaining live blocker is now the `35°` eddy-import branch rather than the broader zonal-mean scaffold
+
+Architecture C64 is now complete:
+- verdict: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.237`
+- `subtropicalDryNorthRatio: 1.534 -> 1.14`
+- `subtropicalDrySouthRatio: 1.199 -> 0.518`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.216`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13472`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -361.01`
+- interpretation: the narrow `35°` interface eddy softening is active and does help the targeted import lane, but it shifts the repayment back into the equatorial / transition export core and worsens the overall sign defect
+
+So the next active move is now:
+- `Architecture C65: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment and 35deg interface eddy softening attribution`
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow

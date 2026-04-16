@@ -2308,5 +2308,22 @@ That architecture lane should be framed as:
   - the narrow `33.75°` poleward-shoulder carryover containment is active
   - it meaningfully recaptures the NH ocean rebound from C60
   - but the cross-equatorial sign defect is still severe, so the quick gate remains red
+- C63 completed with verdict `poleward_shoulder_containment_recaptures_receiver_and_nh_ocean_rebound_but_35deg_eddy_import_remains_primary_blocker`
+- C63 conclusion:
+  - C62 genuinely recaptures the `26.25°` receiver lane and the `33.75°` poleward shoulder
+  - NH dry-belt ocean maintenance rebounds are materially recovered relative to C60
+  - the remaining live blocker is now the `35°` eddy-import branch, not the `35°` zonal-mean branch
+- C64 completed with verdict `quick_reject`
+- C64 quick metrics:
+  - `itczWidthDeg: 25.91 -> 23.237`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.14`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.518`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.216`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13472`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -361.01`
+- C64 conclusion:
+  - the narrow `35°` interface eddy softening is active
+  - it improves the targeted `35°` import branch and slightly improves NH dry-belt ocean condensation relative to C62
+  - but it reloads the equatorial / transition export defect strongly enough that the cross-equatorial sign error worsens sharply
 - Active next move:
-  - `Architecture C63: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment attribution`
+  - `Architecture C65: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment and 35deg interface eddy softening attribution`

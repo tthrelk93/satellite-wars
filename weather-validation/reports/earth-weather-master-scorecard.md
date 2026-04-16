@@ -1062,7 +1062,22 @@ Updated: 2026-04-16
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -318.32449`
   - relative to C60, NH ocean condensation improves `0.15491 -> 0.13629` and cross-equatorial flux improves slightly `-318.81218 -> -318.32449`
   - interpretation: the narrow `33.75°` poleward-shoulder carveout is active and meaningfully recaptures the NH ocean rebound, but the cross-equatorial sign defect is still severe so the full quick gate remains red
-- Next active phase: `Architecture C63: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment attribution`
+- C63 result:
+  - verdict: `poleward_shoulder_containment_recaptures_receiver_and_nh_ocean_rebound_but_35deg_eddy_import_remains_primary_blocker`
+  - C62 recaptures `26.25°` carryover, unloads the `33.75°` shoulder, and materially recovers NH dry-belt ocean maintenance relative to C60
+  - the remaining blocker is now sharper: the `35°` zonal-mean branch improves, but the `35°` eddy branch worsens across lower, mid, and upper levels
+  - interpretation: the live blocker after C62 is the `35°` eddy-import branch, not the broader receiver or zonal-mean scaffold
+- C64 result:
+  - verdict: `quick_reject`
+  - `itczWidthDeg: 25.91 -> 23.237`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.14`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.518`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.216`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13472`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -361.01`
+  - relative to C62, `35°` interface softening slightly improves NH ocean condensation `0.13629 -> 0.13472`, but cross-equatorial vapor flux worsens sharply `-318.32449 -> -361.01`
+  - interpretation: the targeted `35°` interface eddy softening is active, but it repays the local import relief by collapsing the equatorial / transition export side more severely
+- Next active phase: `Architecture C65: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment and 35deg interface eddy softening attribution`
 
 ## Day-365 benchmark summary
 
