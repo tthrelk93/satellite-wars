@@ -61,6 +61,8 @@ Updated: 2026-04-16
 - Architecture C46 26p25-33p75 Coupled Organized-Support Restore Experiment: FAILED (`quick_reject`)
 - Architecture C47 26p25-33p75 Coupled Organized-Support Restore Attribution: COMPLETED
 - Architecture C48 Tapered Poleward-Shoulder Organized-Support Restore Experiment: FAILED (`quick_reject`)
+- Architecture C49 Tapered Poleward-Shoulder Organized-Support Restore Attribution: COMPLETED
+- Architecture C50 Partial 26p25 Receiver-Guard Transition-Band Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -900,7 +902,7 @@ Updated: 2026-04-16
 - Interpretation:
   - the inner-core restore was also inert at the quick-score level relative to the strict C32 carveout
   - so the blocked subset is not being reached by the simple inner-core geometry
-- Next active phase: `Architecture C49: tapered poleward-shoulder organized-support restore attribution`
+- Next active phase: `Architecture C51: partial 26p25 receiver-guard transition-band attribution`
 - C39 result:
   - verdict: `inner_core_restore_inert_active_override_targets_outside_restore_band`
   - the live carry-input override rows stayed fixed at `18.75°`, `26.25°`, `33.75°` and mirrored southern rows, outside the C38 inner-core taper
@@ -964,6 +966,19 @@ Updated: 2026-04-16
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
   - interpretation: tapering the `33.75°` shoulder reproduces the earlier C40 transition-band regime exactly rather than creating a new intermediate state
+- C49 result:
+  - verdict: `tapered_poleward_shoulder_exactly_reproduces_c40_transition_regime`
+  - C48 matches the earlier C40 transition-band restore regime across quick metrics, moisture attribution, transport interfaces, and shoulder-row diagnostics
+  - interpretation: the remaining live question is the modest `26.25°` receiver reload inside that regime, not the poleward-shoulder taper itself
+- C50 result:
+  - verdict: `quick_reject`
+  - `itczWidthDeg: 25.91 -> 23.386`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.128`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.49`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
+  - interpretation: the modest `26.25°` receiver guard is inert; C50 reproduces the earlier C40/C48 transition-band regime exactly
 
 ## Day-365 benchmark summary
 

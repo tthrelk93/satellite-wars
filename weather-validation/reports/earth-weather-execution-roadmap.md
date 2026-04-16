@@ -1693,6 +1693,62 @@ Keep the strict C32 core carveout fixed, keep `26.25°` fully restored, taper th
   - that means the remaining live question is no longer whether tapering works, but why the C40/C48 regime still cannot clear the equatorial sign defect
 - Consequence: the next active move is now `Architecture C49: tapered poleward-shoulder organized-support restore attribution`.
 
+## Architecture C49: Tapered Poleward-Shoulder Organized-Support Restore Attribution
+
+### Objective
+
+Determine whether C48 created a genuinely new middle state or whether it simply reproduced the earlier C40 transition-band restore regime exactly.
+
+### Contract
+
+Compare C48 against C40 across the quick score, moisture attribution, transport interfaces, and shoulder-row diagnostics. If C48 matches C40 exactly, then the remaining live lever is no longer poleward-shoulder amplitude itself but the modest `26.25°` receiver reload that survives inside that regime.
+
+### Result
+
+- Status: completed
+- Verdict: `tapered_poleward_shoulder_exactly_reproduces_c40_transition_regime`
+- Key evidence:
+  - C40 vs C48 quick metrics are identical to reporting precision
+  - C40 vs C48 moisture attribution is identical for persistence, carryover, weak-erosion survival, and cross-equatorial flux
+  - C40 vs C48 transport interfaces are identical at the equator and `35°`
+  - C40 vs C48 shoulder rows are identical at `18.75°`, `26.25°`, and `33.75°`
+- Interpretation:
+  - C48 is not a new family state
+  - it reproduces the earlier C40 transition-band restore regime exactly
+  - the remaining live question is the modest `26.25°` receiver reload inside that regime, not the poleward-shoulder taper itself
+- Consequence: the next active move became `Architecture C50: partial 26p25 receiver-guard transition-band experiment`.
+
+## Architecture C50: Partial 26p25 Receiver-Guard Transition-Band Experiment
+
+### Objective
+
+Keep the proven C40 transition-band restore geometry active while partially guarding the `26.25°` receiver lane so the small sign-relief signal might survive without fully reopening that inner dry-belt row.
+
+### Contract
+
+Keep the strict C32 core carveout fixed, preserve the C40 transition-band restore geometry, and add only a modest `26.25°` centered receiver guard penalty while leaving the `33.75°` shoulder at the proven C40-level amplitude.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.386`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.128`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.49`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
+- Interpretation:
+  - the modest `26.25°` guard penalty is effectively inert
+  - C50 reproduces the earlier C40/C48 transition-band regime exactly, including the latitude-resolved `18.75°`, `26.25°`, and `33.75°` shoulder rows
+  - that means the live binder is not below this simple `26.25°` guard threshold
+- Consequence: the next active move is now `Architecture C51: partial 26p25 receiver-guard transition-band attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

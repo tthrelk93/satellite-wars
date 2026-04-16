@@ -1,0 +1,158 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c50-partial-26p25-receiver-guard-transition-band-experiment.v1",
+  "generatedAt": "2026-04-16T17:01:15.031Z",
+  "archiveBranch": "codex/world-class-weather-loop-archive-20260407-0745",
+  "currentQuickPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c7-current-off-quick.json",
+  "hybridQuickPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c50-partial-26p25-receiver-guard-transition-band-quick.json",
+  "hybridAnnualPath": null,
+  "bridgeSummary": {
+    "bridgedFiles": [
+      "src/weather/WeatherLogger.js",
+      "src/weather/v2/analysisIncrement5.test.js",
+      "src/weather/v2/climo2d.js",
+      "src/weather/v2/core5.js",
+      "src/weather/v2/grid.js",
+      "src/weather/v2/vertical5.test.js"
+    ],
+    "rewrittenImportCount": 27,
+    "missingCoreMethodsAfterBridge": []
+  },
+  "patchSummary": {
+    "patchedPaths": [
+      "src/weather/v2/core5.js",
+      "src/weather/v2/vertical5.js",
+      "src/weather/v2/windEddyNudge5.js",
+      "src/weather/v2/vertical5.js",
+      "src/weather/v2/vertical5.js",
+      "src/weather/v2/vertical5.js"
+    ],
+    "patchedParams": [
+      "nudgeParams.tauQvS",
+      "nudgeParams.tauQvColumn",
+      "nudgeParams organized/subsidence relief quartet",
+      "windNudgeParams.tauSurfaceSeconds",
+      "vertParams.rhTrig",
+      "vertParams.rhMidMin",
+      "vertParams.omegaTrig",
+      "vertParams.instabTrig",
+      "vertParams.qvTrig",
+      "vertParams.thetaeCoeff",
+      "vertParams convective potential/organization timing block",
+      "vertParams tropicalOrganizationBandDeg",
+      "vertParams subtropicalSubsidence contract",
+      "vertical5.carryInputSubtropicalSuppressionMin",
+      "vertical5.carryInputOrganizedSupportMax",
+      "vertical5.carryInputPotentialMax",
+      "vertical5.carryInputDominanceMin",
+      "vertical5.carryInputMinResidualMassKgM2",
+      "windEddyParams.enableEquatorialBandSoftening",
+      "windEddyParams.equatorialSofteningLat0Deg",
+      "windEddyParams.equatorialSofteningLat1Deg",
+      "windEddyParams.equatorialBlendToUnityFrac",
+      "windEddyNudge5 equatorial band softening branch",
+      "windEddyParams.innerCoreEquatorialSofteningLat0Deg",
+      "windEddyParams.innerCoreEquatorialSofteningLat1Deg",
+      "windEddyParams.innerCoreEquatorialBlendToUnityFrac",
+      "windEddyParams.weakPartialShoulderRestoreLat1Deg",
+      "windEddyParams.weakPartialShoulderRestoreBlendToUnityFrac",
+      "vertical5.weakRestoreCarryInputRecaptureSubtropicalSuppressionMin",
+      "vertical5.weakRestoreCarryInputRecaptureOrganizedSupportMax",
+      "vertical5.weakRestoreCarryInputRecapturePotentialMax",
+      "vertical5.weakRestoreCarryInputRecaptureDominanceMin",
+      "vertical5.weakRestoreCarryInputRecaptureMinResidualMassKgM2",
+      "vertical5.organizedSupportCarryInputCarveoutMax",
+      "vertical5.potentialCarryInputCarveoutMax",
+      "vertical5.transitionBandOrganizedSupportRestoreLat0Deg",
+      "vertical5.transitionBandOrganizedSupportRestoreLat1Deg",
+      "vertical5.transitionBandOrganizedSupportRestoreLat2Deg",
+      "vertical5.transitionBandOrganizedSupportRestoreLat3Deg",
+      "vertical5.transitionBand26p25ReceiverGuardLat0Deg",
+      "vertical5.transitionBand26p25ReceiverGuardLat1Deg",
+      "vertical5.transitionBand26p25ReceiverGuardLat2Deg",
+      "vertical5.transitionBand26p25ReceiverGuardLat3Deg",
+      "vertical5.transitionBand26p25ReceiverGuardPenalty"
+    ]
+  },
+  "supportingArtifacts": {
+    "monthlyClimatologyJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c50-partial-26p25-receiver-guard-transition-band-quick-monthly-climatology.json",
+    "moistureAttributionJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c50-partial-26p25-receiver-guard-transition-band-quick-moisture-attribution.json",
+    "transportInterfaceBudgetJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c50-partial-26p25-receiver-guard-transition-band-quick-transport-interface-budget.json",
+    "hadleyPartitionSummaryJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c50-partial-26p25-receiver-guard-transition-band-quick-hadley-partition-summary.json",
+    "thermodynamicSupportSummaryJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c50-partial-26p25-receiver-guard-transition-band-quick-thermodynamic-support-summary.json",
+    "nhDryBeltSourceSectorSummaryJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c50-partial-26p25-receiver-guard-transition-band-quick-nh-dry-belt-source-sector-summary.json"
+  },
+  "quickRows": [
+    {
+      "key": "itczWidthDeg",
+      "label": "ITCZ width",
+      "off": 25.91,
+      "on": 23.386,
+      "offDistance": 2.264,
+      "onDistance": 0.26,
+      "improved": true,
+      "severeRegression": false
+    },
+    {
+      "key": "subtropicalDryNorthRatio",
+      "label": "NH dry-belt ratio",
+      "off": 1.534,
+      "on": 1.128,
+      "offDistance": 0.434,
+      "onDistance": 0.028,
+      "improved": true,
+      "severeRegression": false
+    },
+    {
+      "key": "subtropicalDrySouthRatio",
+      "label": "SH dry-belt ratio",
+      "off": 1.199,
+      "on": 0.49,
+      "offDistance": 0.68,
+      "onDistance": 0.029,
+      "improved": true,
+      "severeRegression": false
+    },
+    {
+      "key": "midlatitudeWesterliesNorthU10Ms",
+      "label": "NH midlatitude westerlies",
+      "off": 0.531,
+      "on": 1.225,
+      "offDistance": 0.661,
+      "onDistance": 0.033,
+      "improved": true,
+      "severeRegression": false
+    },
+    {
+      "key": "northDryBeltOceanLargeScaleCondensationMeanKgM2",
+      "label": "NH dry-belt ocean condensation",
+      "off": 0.1413,
+      "on": 0.11898,
+      "offDistance": null,
+      "onDistance": null,
+      "improved": false,
+      "severeRegression": false
+    },
+    {
+      "key": "crossEquatorialVaporFluxNorthKgM_1S",
+      "label": "Cross-equatorial vapor flux north",
+      "off": 143.95306,
+      "on": -355.94778,
+      "offDistance": 0,
+      "onDistance": 430.94778,
+      "improved": false,
+      "severeRegression": true
+    }
+  ],
+  "quickGate": {
+    "improvedCount": 4,
+    "severeRegressions": [
+      "crossEquatorialVaporFluxNorthKgM_1S"
+    ],
+    "pass": false
+  },
+  "annualGate": null,
+  "decision": {
+    "verdict": "quick_reject",
+    "nextMove": "Architecture C51: partial 26p25 receiver-guard transition-band attribution"
+  }
+}

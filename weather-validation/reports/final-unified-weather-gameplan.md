@@ -726,8 +726,22 @@ Architecture C48 is now complete:
 - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
 - interpretation: tapering the `33.75°` shoulder does not create a new middle state; it reproduces the earlier C40 transition-band restore regime to reporting precision
 
+Architecture C49 is now complete:
+- verdict: `tapered_poleward_shoulder_exactly_reproduces_c40_transition_regime`
+- interpretation: C48 is exactly the earlier C40 transition-band regime, so the remaining live question is the modest `26.25°` receiver reload inside that state
+
+Architecture C50 is now complete:
+- verdict: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.386`
+- `subtropicalDryNorthRatio: 1.534 -> 1.128`
+- `subtropicalDrySouthRatio: 1.199 -> 0.49`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
+- interpretation: the modest `26.25°` receiver guard is inert and reproduces the same C40/C48 transition-band regime exactly
+
 So the next active move is now:
-- `Architecture C49: tapered poleward-shoulder organized-support restore attribution`
+- `Architecture C51: partial 26p25 receiver-guard transition-band attribution`
 
 ## Hard Rules Going Forward
 
