@@ -306,8 +306,21 @@ Architecture C3 is now complete in [earth-weather-architecture-c3-hybrid-integra
 - keep the donor-base-first splice contract from Architecture C1 intact
 - rerun Architecture C2 immediately after that bridge lands
 
+Architecture C4 is now complete in [earth-weather-architecture-c4-donor-core-integration-bridge.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c4-donor-core-integration-bridge.md):
+- verdict: `bridge_implemented_ready_for_rerun`
+- the donor weather bundle was bridged to explicit `.js` imports
+- donor-core compatibility methods were added for the current audit stack
+- missing donor-core compatibility methods after the bridge: `none`
+
+Architecture C5 is now complete in [earth-weather-architecture-c5-bridged-hybrid-rerun-benchmark.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c5-bridged-hybrid-rerun-benchmark.md), and the honest result is mixed:
+- verdict: `hybrid_boot_failure`
+- the bridged donor/current hybrid is no longer blocked by the original donor-core ESM/core-API seam
+- but it still exits without producing the expected quick benchmark summary artifact
+- failure message:
+  - `Audit completed without expected summary artifact ... Matching files: none`
+
 So the next active move is now:
-- `Architecture C4: donor-core integration bridge implementation`
+- `Architecture C6: bridged hybrid attribution design`
 
 ## Hard Rules Going Forward
 

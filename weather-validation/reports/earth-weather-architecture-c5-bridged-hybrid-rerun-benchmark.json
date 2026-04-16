@@ -1,0 +1,44 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c5-bridged-hybrid-rerun-benchmark.v1",
+  "generatedAt": "2026-04-16T05:33:04.281Z",
+  "archiveBranch": "codex/world-class-weather-loop-archive-20260407-0745",
+  "overlayFiles": [
+    "src/weather/v2/microphysics5.js",
+    "src/weather/v2/state5.js",
+    "src/weather/v2/cloudBirthTracing5.js",
+    "src/weather/v2/sourceTracing5.js",
+    "src/weather/v2/instrumentationBands5.js",
+    "src/weather/validation/diagnostics.js",
+    "scripts/agent/planetary-realism-audit.mjs",
+    "scripts/agent/headless-terrain-fixture.mjs",
+    "scripts/agent/plan-guard.mjs"
+  ],
+  "trustedBaselinePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-hadley-second-pass-restore-v4.json",
+  "currentQuickPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c5-current-off-quick.json",
+  "hybridQuickPath": null,
+  "hybridAnnualPath": null,
+  "bridgeSummary": {
+    "bridgedFiles": [
+      "src/weather/WeatherLogger.js",
+      "src/weather/v2/analysisIncrement5.test.js",
+      "src/weather/v2/climo2d.js",
+      "src/weather/v2/core5.js",
+      "src/weather/v2/grid.js",
+      "src/weather/v2/vertical5.test.js"
+    ],
+    "rewrittenImportCount": 27,
+    "missingCoreMethodsAfterBridge": []
+  },
+  "quickRows": null,
+  "quickGate": null,
+  "failure": {
+    "message": "Audit completed without expected summary artifact at /var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c5-0Yngl3/bridged-worktree/weather-validation/output/earth-weather-architecture-c5-bridged-hybrid-quick.json. Matching files: none",
+    "stderr": "",
+    "stdout": "",
+    "classification": "hybrid_boot_failure"
+  },
+  "decision": {
+    "verdict": "hybrid_boot_failure",
+    "nextMove": "Architecture C6: bridged hybrid attribution design"
+  }
+}

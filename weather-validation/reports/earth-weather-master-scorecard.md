@@ -16,6 +16,8 @@ Updated: 2026-04-16
 - Architecture C1 Hybrid Seam Contract: COMPLETED
 - Architecture C2 Donor-Base Hybrid Worktree Benchmark: FAILED (`integration_blocked_missing_dependency`)
 - Architecture C3 Hybrid Integration Bridge Design: COMPLETED
+- Architecture C4 Donor-Core Integration Bridge Implementation: COMPLETED
+- Architecture C5 Bridged Donor-Base Hybrid Rerun Benchmark: FAILED (`hybrid_boot_failure`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -205,9 +207,36 @@ Updated: 2026-04-16
     - `loadStateSnapshot`
     - `setReplayDisabledModules`
     - `clearReplayDisabledModules`
-  - preserve the C1 donor-base-first splice contract
-  - rerun C2 immediately after bridge implementation
+- preserve the C1 donor-base-first splice contract
+- rerun C2 immediately after bridge implementation
 - Next active phase: `Architecture C4: donor-core integration bridge implementation`
+
+## Architecture C4 decision
+
+- Verdict: `bridge_implemented_ready_for_rerun`
+- Decision report: [earth-weather-architecture-c4-donor-core-integration-bridge.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c4-donor-core-integration-bridge.md)
+- Bridge implementation:
+  - donor runtime rewritten to explicit `.js` relative imports where required
+  - donor-core compatibility methods added for the current audit stack
+  - donor-base-first splice contract preserved
+- Bridge summary:
+  - rewritten relative import count: `29`
+  - missing donor-core compatibility methods after bridge: `none`
+- Next active phase: `Architecture C5: bridged donor-base hybrid rerun benchmark`
+
+## Architecture C5 decision
+
+- Verdict: `hybrid_boot_failure`
+- Decision report: [earth-weather-architecture-c5-bridged-hybrid-rerun-benchmark.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c5-bridged-hybrid-rerun-benchmark.md)
+- Benchmark outcome:
+  - the bridged hybrid cleared the original donor-core ESM and missing-method bootstrap blockers
+  - the bridged hybrid still did not produce the expected quick benchmark summary artifact
+  - failure message:
+    - `Audit completed without expected summary artifact ... Matching files: none`
+- Interpretation:
+  - Architecture C is no longer blocked by the original donor-core import/API seam
+  - the next boundary is now why the bridged hybrid exits without yielding a benchmark artifact
+- Next active phase: `Architecture C6: bridged hybrid attribution design`
 
 ## Day-365 benchmark summary
 

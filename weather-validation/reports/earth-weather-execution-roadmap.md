@@ -501,9 +501,46 @@ Convert the C2 bootstrap failure into the smallest bridge contract required befo
 - Bridge contract:
   - patch rollback donor [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js) to explicit `.js` ESM imports
   - add compatibility methods on donor core for the current audit stack
-  - keep the donor-base-first contract from C1 intact
-  - rerun Architecture C2 immediately after the bridge implementation
+- keep the donor-base-first contract from C1 intact
+- rerun Architecture C2 immediately after the bridge implementation
 - Consequence: the next active move is now `Architecture C4: donor-core integration bridge implementation`.
+
+## Architecture C4: Donor-Core Integration Bridge Implementation
+
+### Objective
+
+Implement the donor-side runtime bridge required to make the rollback/current hybrid runnable under the current Node and audit environment.
+
+### Result
+
+- Status: completed
+- Verdict: `bridge_implemented_ready_for_rerun`
+- Bridge implementation:
+  - rewrite donor relative imports to explicit `.js` ESM specifiers across the donor weather bundle
+  - inject donor-core compatibility methods for the current audit stack
+  - preserve the donor-base-first splice contract from C1
+- Bridge summary:
+  - rewritten relative import count: `29`
+  - missing donor-core compatibility methods after bridge: `none`
+- Consequence: the next active move is now `Architecture C5: bridged donor-base hybrid rerun benchmark`.
+
+## Architecture C5: Bridged Donor-Base Hybrid Rerun Benchmark
+
+### Objective
+
+Rerun the donor-base hybrid benchmark after the Architecture C4 bridge lands and determine whether the hybrid is now a real climate candidate.
+
+### Result
+
+- Status: completed
+- Verdict: `hybrid_boot_failure`
+- What improved:
+  - the hybrid is no longer blocked by the original donor-core ESM import mismatch
+  - donor-core compatibility methods are no longer missing after the bridge
+- Residual failure:
+  - the bridged hybrid still did not produce a quick benchmark summary artifact
+  - failure message: `Audit completed without expected summary artifact ... Matching files: none`
+- Consequence: the next active move is now `Architecture C6: bridged hybrid attribution design`.
 
 ## Phase 1: Climate Base Recovery
 
