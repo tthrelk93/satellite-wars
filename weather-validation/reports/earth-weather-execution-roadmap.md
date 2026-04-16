@@ -1355,6 +1355,60 @@ Keep the strict potential cap fixed, partially relax only organized support, and
     - the cross-equatorial sign defect remains severe
 - Consequence: the next active move is now `Architecture C37: organized-support half-relax carry-input attribution`.
 
+## Architecture C37: Organized-Support Half-Relax Carry-Input Attribution
+
+### Objective
+
+Determine whether the C36 organized-support half-relax is a meaningful intermediate state or just a threshold cliff back to the broader C30 carry-input regime.
+
+### Result
+
+- Status: completed
+- Verdict: `organized_support_half_relax_inert_threshold_cliff_reverts_to_c30`
+- What C37 proved:
+  - C36 reproduces the full C30 quick score:
+    - `itczWidthDeg: 23.315 -> 23.315`
+    - `subtropicalDryNorthRatio: 1.093 -> 1.093`
+    - `subtropicalDrySouthRatio: 0.502 -> 0.502`
+    - `midlatitudeWesterliesNorthU10Ms: 1.232 -> 1.232`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.12693 -> 0.12693`
+    - `crossEquatorialVaporFluxNorthKgM_1S: -353.96486 -> -353.96486`
+  - C36 also reproduces the full C30 transport and receiver signatures:
+    - equator lower total-water flux north: `-17.99024 -> -17.99024`
+    - 35° lower vapor import: `-22.46949 -> -22.46949`
+    - carryover upper cloud: `0.2187 -> 0.2187`
+    - cloud recirculation proxy: `1.18525 -> 1.18525`
+- Interpretation:
+  - scalar organized-support half-relax is a threshold cliff, not a usable intermediate control
+  - once the blocked subset is re-admitted, the hybrid snaps back to the broader C30 recapture regime
+- Consequence: the next active move is now `Architecture C38: inner-core organized-support restore experiment`.
+
+## Architecture C38: Inner-Core Organized-Support Restore Experiment
+
+### Objective
+
+Keep the strict C32 organized-support / potential carveout outside the equatorial core, but restore organized-support admission only inside the inner equatorial core so the blocked lower-mid transport can recover without reopening the whole receiver side.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.374`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+- Interpretation:
+  - the simple inner-core restore is also inert at the quick-score level relative to C32
+  - that means the blocked subset is not being reached by this basic inner-core latitude taper
+- Consequence: the next active move is now `Architecture C39: inner-core organized-support restore attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

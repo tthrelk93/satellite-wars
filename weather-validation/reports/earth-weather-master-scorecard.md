@@ -49,6 +49,8 @@ Updated: 2026-04-16
 - Architecture C34 Potential-Half-Relax Carry-Input Experiment: FAILED (`quick_reject`)
 - Architecture C35 Potential-Half-Relax Carry-Input Attribution: COMPLETED
 - Architecture C36 Organized-Support Half-Relax Carry-Input Experiment: FAILED (`quick_reject`)
+- Architecture C37 Organized-Support Half-Relax Carry-Input Attribution: COMPLETED
+- Architecture C38 Inner-Core Organized-Support Restore Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -857,6 +859,38 @@ Updated: 2026-04-16
     - some receiver-side relief is given back
     - the cross-equatorial sign defect remains severe
 - Next active phase: `Architecture C37: organized-support half-relax carry-input attribution`
+
+## Architecture C37 decision
+
+- Verdict: `organized_support_half_relax_inert_threshold_cliff_reverts_to_c30`
+- Decision report: [earth-weather-architecture-c37-organized-support-half-relax-carry-input-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c37-organized-support-half-relax-carry-input-attribution.md)
+- Attribution result:
+  - C36 reproduces the full C30 climate, transport, receiver, and thermodynamic signature to reporting precision
+  - the organized-support half-relax is therefore a threshold cliff, not a usable intermediate scalar control
+- Interpretation:
+  - once the organized-support cap is loosened enough to re-admit the blocked subset, the hybrid snaps back to the whole C30 regime
+  - the next bounded move has to change the geometry of the restore, not just the scalar threshold
+- Next active phase: `Architecture C38: inner-core organized-support restore experiment`
+
+## Architecture C38 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c38-inner-core-organized-support-restore-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c38-inner-core-organized-support-restore-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - bounded outcome:
+    - `itczWidthDeg: 25.91 -> 23.374`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+- Interpretation:
+  - the inner-core restore was also inert at the quick-score level relative to the strict C32 carveout
+  - so the blocked subset is not being reached by the simple inner-core geometry
+- Next active phase: `Architecture C39: inner-core organized-support restore attribution`
 
 ## Day-365 benchmark summary
 

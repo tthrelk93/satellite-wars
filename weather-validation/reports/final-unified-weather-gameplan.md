@@ -632,8 +632,25 @@ Architecture C36 is now complete in [earth-weather-architecture-c36-organized-su
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
 - so organized support is a live lever, but this half-relax still does not clear the sign defect
 
+Architecture C37 is now complete in [earth-weather-architecture-c37-organized-support-half-relax-carry-input-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c37-organized-support-half-relax-carry-input-attribution.md):
+- verdict: `organized_support_half_relax_inert_threshold_cliff_reverts_to_c30`
+- C37 made the C36 result much sharper:
+  - C36 reproduces the full C30 climate, transport, and receiver signature to reporting precision
+  - so scalar organized-support half-relax is a threshold cliff, not a usable intermediate control
+
+Architecture C38 is now complete in [earth-weather-architecture-c38-inner-core-organized-support-restore-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c38-inner-core-organized-support-restore-experiment.md):
+- verdict: `quick_reject`
+- the first geometry-based restore was also inert at the quick-score level:
+  - `itczWidthDeg: 25.91 -> 23.374`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+- so the blocked subset is not being reached by this simple inner-core latitude taper either
+
 So the next active move is now:
-- `Architecture C37: organized-support half-relax carry-input attribution`
+- `Architecture C39: inner-core organized-support restore attribution`
 
 ## Hard Rules Going Forward
 
