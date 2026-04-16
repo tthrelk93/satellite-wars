@@ -794,6 +794,63 @@ Determine whether the C15 regression means the current vertical overlay is funda
     - the upper-cloud carryover / persistence lane is what pays for that help with a larger eddy-side regression
 - Consequence: the next active move is now `Architecture C17: zonal-mean-preserving upper-cloud carryover carveout experiment`.
 
+## Architecture C17: Zonal-Mean-Preserving Upper-Cloud Carryover Carveout Experiment
+
+### Objective
+
+Keep the C15 vertical-state contract pieces that improved the zonal-mean equatorial branch, but relax only the carry-input dominance override so NH dry-belt upper-cloud carryover gets cleared earlier instead of recirculating.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.454`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.121`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.511`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.202`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.14144`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.31687`
+- Interpretation:
+  - the carveout was not inert
+  - it materially improved the C15 dry-belt and ITCZ metrics while keeping NH westerlies strong
+  - but the equatorial vapor-flux sign defect remained severe enough to block annual promotion
+- Consequence: the next active move is now `Architecture C18: carryover carveout implementation attribution`.
+
+## Architecture C18: Carryover Carveout Implementation Attribution
+
+### Objective
+
+Determine whether C17 failed because the carryover carveout still was not binding enough, or because it succeeded and exposed a different remaining transport blocker.
+
+### Result
+
+- Status: completed
+- Verdict: `carryover_carveout_relief_preserves_zonal_mean_but_eddy_export_remains_primary_blocker`
+- What C18 proved:
+  - C17 materially relieved the carryover-maintenance family:
+    - carried-over upper cloud: `0.39867 -> 0.22666`
+    - imported anvil persistence: `0.39786 -> 0.22501`
+    - weak-erosion survival: `0.38477 -> 0.21732`
+    - cloud recirculation proxy: `2.22467 -> 0.39988`
+  - C17 also improved the zonal-mean and mid/upper equatorial transport branches relative to C15:
+    - equator zonal-mean vapor flux north: `-274.13377 -> -249.95949`
+    - equator mid/upper vapor flux north: `-239.13535 -> -226.72426`
+    - cross-equatorial vapor flux north: `-364.55266 -> -353.31687`
+  - but the remaining blocker moved into the eddy/export lane:
+    - equator eddy vapor flux north: `-96.97265 -> -109.90385`
+    - equator low-level velocity mean: `-20.23835 -> -20.79729`
+    - 35° interface vapor flux north: `-360.61691 -> -373.49016`
+- Interpretation:
+  - the upper-cloud carryover carveout is now a real improvement worth keeping in the comparison base
+  - it is no longer the dominant blocker
+  - the next bounded family must explain the unresolved equatorial eddy export / low-level velocity sign defect
+- Consequence: the next active move is now `Architecture C19: zonal-mean-preserving eddy export attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

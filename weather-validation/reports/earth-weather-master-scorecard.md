@@ -24,6 +24,13 @@ Updated: 2026-04-16
 - Architecture C9 Donor-Worktree Runtime Fixture Repair: COMPLETED
 - Architecture C10 Cycled Hybrid Benchmark Rerun: FAILED (`quick_reject`)
 - Architecture C11 Cycled Hybrid Flux Inversion Attribution: COMPLETED
+- Architecture C12 Equatorial Overturning Sign Contract Design: COMPLETED
+- Architecture C13 Equatorial Overturning Sign Contract Experiment: FAILED (`quick_reject`)
+- Architecture C14 Sign Contract Implementation Attribution: COMPLETED
+- Architecture C15 Equatorial Vertical-State Contract Experiment: FAILED (`quick_reject`)
+- Architecture C16 Vertical-Contract Implementation Attribution: COMPLETED
+- Architecture C17 Zonal-Mean-Preserving Upper-Cloud Carryover Carveout Experiment: FAILED (`quick_reject`)
+- Architecture C18 Carryover Carveout Implementation Attribution: COMPLETED
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -428,6 +435,44 @@ Updated: 2026-04-16
   - C15 helped the zonal-mean equatorial branch and relieved north dry-belt import burden
   - but it reintroduced a strong upper-cloud carryover / persistence pathway that worsened the eddy-side and mid-upper transport enough to make the total cross-equatorial flux more negative
 - Next active phase: `Architecture C17: zonal-mean-preserving upper-cloud carryover carveout experiment`
+
+## Architecture C17 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c17-zonal-mean-preserving-upper-cloud-carryover-carveout-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c17-zonal-mean-preserving-upper-cloud-carryover-carveout-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - bounded outcome:
+    - `itczWidthDeg: 25.91 -> 23.454`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.121`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.511`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.202`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.14144`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.31687`
+- Interpretation:
+  - the carryover carveout is live and materially better than C15 on the surface quick metrics
+  - but the transport-sign blocker still survives, so the carveout needs attribution rather than annual promotion
+- Next active phase: `Architecture C18: carryover carveout implementation attribution`
+
+## Architecture C18 decision
+
+- Verdict: `carryover_carveout_relief_preserves_zonal_mean_but_eddy_export_remains_primary_blocker`
+- Decision report: [earth-weather-architecture-c18-carryover-carveout-implementation-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c18-carryover-carveout-implementation-attribution.md)
+- Attribution result:
+  - NH dry-belt carried-over upper cloud: `0.39867 -> 0.22666`
+  - NH dry-belt imported anvil persistence: `0.39786 -> 0.22501`
+  - NH dry-belt weak-erosion survival: `0.38477 -> 0.21732`
+  - NH dry-belt cloud recirculation proxy: `2.22467 -> 0.39988`
+  - equator zonal-mean vapor flux north: `-274.13377 -> -249.95949`
+  - equator mid/upper vapor flux north: `-239.13535 -> -226.72426`
+  - equator eddy vapor flux north: `-96.97265 -> -109.90385`
+  - 35° interface vapor flux north: `-360.61691 -> -373.49016`
+- Interpretation:
+  - C17 really did relieve the upper-cloud carryover lane and preserve the zonal-mean relief
+  - the remaining dominant blocker is now the equatorial eddy export / low-level velocity branch, not upper-cloud carryover
+- Next active phase: `Architecture C19: zonal-mean-preserving eddy export attribution`
 
 ## Day-365 benchmark summary
 

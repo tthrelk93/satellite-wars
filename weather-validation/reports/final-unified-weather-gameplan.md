@@ -413,8 +413,33 @@ Architecture C16 is now complete in [earth-weather-architecture-c16-vertical-con
   - NH dry-belt weak-erosion survival: `0 -> 0.38477`
   - NH dry-belt cloud recirculation proxy: `0 -> 2.22467`
 
+Architecture C17 is now complete in [earth-weather-architecture-c17-zonal-mean-preserving-upper-cloud-carryover-carveout-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c17-zonal-mean-preserving-upper-cloud-carryover-carveout-experiment.md):
+- verdict: `quick_reject`
+- but it is a materially stronger hybrid than C15:
+  - `itczWidthDeg: 25.91 -> 23.454`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.121`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.511`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.202`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.14144`
+- the blocker is still cross-equatorial transport sign:
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.31687`
+
+Architecture C18 is now complete in [earth-weather-architecture-c18-carryover-carveout-implementation-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c18-carryover-carveout-implementation-attribution.md):
+- verdict: `carryover_carveout_relief_preserves_zonal_mean_but_eddy_export_remains_primary_blocker`
+- C17 did what C16 asked for:
+  - NH dry-belt carried-over upper cloud: `0.39867 -> 0.22666`
+  - NH dry-belt imported anvil persistence: `0.39786 -> 0.22501`
+  - NH dry-belt weak-erosion survival: `0.38477 -> 0.21732`
+  - NH dry-belt cloud recirculation proxy: `2.22467 -> 0.39988`
+- and it preserved the helpful zonal-mean side:
+  - equator zonal-mean vapor flux north: `-274.13377 -> -249.95949`
+  - equator mid/upper vapor flux north: `-239.13535 -> -226.72426`
+- but the remaining failure is now concentrated in the eddy/export lane:
+  - equator eddy vapor flux north: `-96.97265 -> -109.90385`
+  - 35° interface vapor flux north: `-360.61691 -> -373.49016`
+
 So the next active move is now:
-- `Architecture C17: zonal-mean-preserving upper-cloud carryover carveout experiment`
+- `Architecture C19: zonal-mean-preserving eddy export attribution`
 
 ## Hard Rules Going Forward
 
