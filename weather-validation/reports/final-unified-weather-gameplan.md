@@ -382,8 +382,26 @@ Architecture C13 is now complete in [earth-weather-architecture-c13-equatorial-o
 - but the remaining blocker is still transport polarity:
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -330.9854`
 
+Architecture C14 is now complete in [earth-weather-architecture-c14-sign-contract-implementation-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c14-sign-contract-implementation-attribution.md):
+- verdict: `zonal_mean_equatorial_reversal_still_vertical_scaffold_controlled`
+- C13 improved the eddy-side equatorial failure but not the zonal-mean branch:
+  - eddy vapor flux north: `-105.45284 -> -34.29106`
+  - zonal-mean vapor flux north: `-274.70821 -> -301.63909`
+- so the next bounded move became a current-vertical overlay experiment rather than more low-level nudging work
+
+Architecture C15 is now complete in [earth-weather-architecture-c15-equatorial-vertical-state-contract-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c15-equatorial-vertical-state-contract-experiment.md):
+- verdict: `quick_reject`
+- the current vertical-state overlay still improved `4 / 6` quick metrics:
+  - `itczWidthDeg: 25.91 -> 24.094`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.404`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.589`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.209`
+- but it did not fix the real blocker and it gave back some C13 strength:
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -364.55266`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.15331`
+
 So the next active move is now:
-- `Architecture C14: sign-contract implementation attribution`
+- `Architecture C16: vertical-contract implementation attribution`
 
 ## Hard Rules Going Forward
 

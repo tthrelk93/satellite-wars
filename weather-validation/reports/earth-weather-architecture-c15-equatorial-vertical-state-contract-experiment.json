@@ -1,0 +1,120 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c15-equatorial-vertical-state-contract-experiment.v1",
+  "generatedAt": "2026-04-16T06:33:18.972Z",
+  "archiveBranch": "codex/world-class-weather-loop-archive-20260407-0745",
+  "currentQuickPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c7-current-off-quick.json",
+  "hybridQuickPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c15-vertical-contract-quick.json",
+  "hybridAnnualPath": null,
+  "bridgeSummary": {
+    "bridgedFiles": [
+      "src/weather/WeatherLogger.js",
+      "src/weather/v2/analysisIncrement5.test.js",
+      "src/weather/v2/climo2d.js",
+      "src/weather/v2/core5.js",
+      "src/weather/v2/grid.js",
+      "src/weather/v2/vertical5.test.js"
+    ],
+    "rewrittenImportCount": 27,
+    "missingCoreMethodsAfterBridge": []
+  },
+  "patchSummary": {
+    "patchedCorePath": "src/weather/v2/core5.js",
+    "patchedParams": [
+      "nudgeParams.tauQvS",
+      "nudgeParams.tauQvColumn",
+      "nudgeParams organized/subsidence relief quartet",
+      "windNudgeParams.tauSurfaceSeconds",
+      "vertParams.rhTrig",
+      "vertParams.rhMidMin",
+      "vertParams.omegaTrig",
+      "vertParams.instabTrig",
+      "vertParams.qvTrig",
+      "vertParams.thetaeCoeff",
+      "vertParams convective potential/organization timing block",
+      "vertParams tropicalOrganizationBandDeg",
+      "vertParams subtropicalSubsidence contract"
+    ]
+  },
+  "supportingArtifacts": {
+    "monthlyClimatologyJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c15-vertical-contract-quick-monthly-climatology.json",
+    "moistureAttributionJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c15-vertical-contract-quick-moisture-attribution.json",
+    "transportInterfaceBudgetJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c15-vertical-contract-quick-transport-interface-budget.json",
+    "hadleyPartitionSummaryJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c15-vertical-contract-quick-hadley-partition-summary.json",
+    "thermodynamicSupportSummaryJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c15-vertical-contract-quick-thermodynamic-support-summary.json",
+    "nhDryBeltSourceSectorSummaryJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c15-vertical-contract-quick-nh-dry-belt-source-sector-summary.json"
+  },
+  "quickRows": [
+    {
+      "key": "itczWidthDeg",
+      "label": "ITCZ width",
+      "off": 25.91,
+      "on": 24.094,
+      "offDistance": 2.264,
+      "onDistance": 0.448,
+      "improved": true,
+      "severeRegression": false
+    },
+    {
+      "key": "subtropicalDryNorthRatio",
+      "label": "NH dry-belt ratio",
+      "off": 1.534,
+      "on": 1.404,
+      "offDistance": 0.434,
+      "onDistance": 0.304,
+      "improved": true,
+      "severeRegression": false
+    },
+    {
+      "key": "subtropicalDrySouthRatio",
+      "label": "SH dry-belt ratio",
+      "off": 1.199,
+      "on": 0.589,
+      "offDistance": 0.68,
+      "onDistance": 0.07,
+      "improved": true,
+      "severeRegression": false
+    },
+    {
+      "key": "midlatitudeWesterliesNorthU10Ms",
+      "label": "NH midlatitude westerlies",
+      "off": 0.531,
+      "on": 1.209,
+      "offDistance": 0.661,
+      "onDistance": 0.017,
+      "improved": true,
+      "severeRegression": false
+    },
+    {
+      "key": "northDryBeltOceanLargeScaleCondensationMeanKgM2",
+      "label": "NH dry-belt ocean condensation",
+      "off": 0.1413,
+      "on": 0.15331,
+      "offDistance": null,
+      "onDistance": null,
+      "improved": false,
+      "severeRegression": false
+    },
+    {
+      "key": "crossEquatorialVaporFluxNorthKgM_1S",
+      "label": "Cross-equatorial vapor flux north",
+      "off": 143.95306,
+      "on": -364.55266,
+      "offDistance": 0,
+      "onDistance": 439.55266,
+      "improved": false,
+      "severeRegression": true
+    }
+  ],
+  "quickGate": {
+    "improvedCount": 4,
+    "severeRegressions": [
+      "crossEquatorialVaporFluxNorthKgM_1S"
+    ],
+    "pass": false
+  },
+  "annualGate": null,
+  "decision": {
+    "verdict": "quick_reject",
+    "nextMove": "Architecture C16: vertical-contract implementation attribution"
+  }
+}

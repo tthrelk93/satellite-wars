@@ -716,6 +716,53 @@ Test whether preserving the current low-level momentum/nudging layer on top of t
   - the next work should attribute the implementation lane that still flips transport polarity instead of broadening the hybrid family again
 - Consequence: the next active move is now `Architecture C14: sign-contract implementation attribution`.
 
+## Architecture C14: Sign-Contract Implementation Attribution
+
+### Objective
+
+Determine whether the remaining C13 polarity defect is still coming from the preserved current low-level nudging layer or from the donor-controlled vertical overturning scaffold.
+
+### Result
+
+- Status: completed
+- Verdict: `zonal_mean_equatorial_reversal_still_vertical_scaffold_controlled`
+- What C14 proved:
+  - C13 improved the eddy side of the equatorial failure relative to C10:
+    - eddy vapor flux north: `-105.45284 -> -34.29106`
+  - but it did not fix the zonal-mean branch:
+    - zonal-mean vapor flux north: `-274.70821 -> -301.63909`
+  - the total cross-equatorial flux stayed strongly southward:
+    - `-371.9765 -> -330.9854`
+  - `dynamics5.js` is not the divergence lane between current and archive, while current [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js) consumes modern cross-hemi/subsidence contract terms that the archive donor vertical scaffold does not
+- Consequence: the next active move is now `Architecture C15: equatorial vertical-state contract experiment`.
+
+## Architecture C15: Equatorial Vertical-State Contract Experiment
+
+### Objective
+
+Test the bounded current-vertical overlay on top of the donor/current hybrid by combining current [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js) with the current low-level preserve layer and an explicit donor-core vertical-state contract patch.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 24.094`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.404`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.589`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.209`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.15331`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -364.55266`
+- Interpretation:
+  - the current vertical-state overlay did not restore northward equatorial overturning
+  - it also gave back some of the stronger C13 wins in NH dry-belt ratio, NH westerlies, and dry-belt ocean condensation
+  - so the next phase should attribute which part of the vertical implementation is driving the regression instead of broadening the overlay family further
+- Consequence: the next active move is now `Architecture C16: vertical-contract implementation attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

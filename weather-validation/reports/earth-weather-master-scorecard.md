@@ -377,6 +377,40 @@ Updated: 2026-04-16
   - the remaining blocker is now specific to sign-contract implementation rather than generic hybrid viability
 - Next active phase: `Architecture C14: sign-contract implementation attribution`
 
+## Architecture C14 decision
+
+- Verdict: `zonal_mean_equatorial_reversal_still_vertical_scaffold_controlled`
+- Decision report: [earth-weather-architecture-c14-sign-contract-implementation-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c14-sign-contract-implementation-attribution.md)
+- Attribution result:
+  - total cross-equatorial vapor flux north: `-371.9765 -> -330.9854`
+  - equatorial low-level velocity mean: `-20.46744 -> -19.4512`
+  - equatorial zonal-mean vapor flux north: `-274.70821 -> -301.63909`
+  - equatorial eddy vapor flux north: `-105.45284 -> -34.29106`
+- Interpretation:
+  - C13 improved the eddy-side failure but not the zonal-mean overturning branch
+  - the remaining blocker is now best explained by donor-controlled vertical-scaffold behavior, not the preserved low-level nudging layer
+- Next active phase: `Architecture C15: equatorial vertical-state contract experiment`
+
+## Architecture C15 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c15-equatorial-vertical-state-contract-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c15-equatorial-vertical-state-contract-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - bounded outcome:
+    - `itczWidthDeg: 25.91 -> 24.094`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.404`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.589`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.209`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.15331`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -364.55266`
+- Interpretation:
+  - the current vertical-state overlay did not restore northward equatorial overturning
+  - it also weakened some of the stronger C13 improvements, so the vertical lane now needs narrower implementation attribution rather than a broader overlay
+- Next active phase: `Architecture C16: vertical-contract implementation attribution`
+
 ## Day-365 benchmark summary
 
 - ITCZ width: current 24.875, rollback 25.613, winner current

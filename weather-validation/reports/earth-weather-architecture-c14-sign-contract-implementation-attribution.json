@@ -1,0 +1,47 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c14-sign-contract-implementation-attribution.v1",
+  "generatedAt": "2026-04-16T06:30:48.470Z",
+  "archiveBranch": "codex/world-class-weather-loop-archive-20260407-0745",
+  "decision": {
+    "verdict": "zonal_mean_equatorial_reversal_still_vertical_scaffold_controlled",
+    "nextMove": "Architecture C15: equatorial vertical-state contract experiment"
+  },
+  "comparison": {
+    "c10CrossEq": -371.9765,
+    "c13CrossEq": -330.9854,
+    "c10Velocity": -20.46744,
+    "c13Velocity": -19.4512,
+    "c10Zonal": -274.70821,
+    "c13Zonal": -301.63909,
+    "c10Eddy": -105.45284,
+    "c13Eddy": -34.29106
+  },
+  "contract": {
+    "overlayFiles": [
+      "src/weather/v2/vertical5.js",
+      "src/weather/v2/windNudge5.js",
+      "src/weather/v2/windEddyNudge5.js",
+      "src/weather/v2/nudging5.js"
+    ],
+    "coreParamPorts": [
+      "vertParams.rhTrig: 0.75 -> 0.72",
+      "vertParams.rhMidMin: 0.25 -> 0.22",
+      "vertParams.omegaTrig: 0.3 -> 0.2",
+      "vertParams.instabTrig: 3 -> 2.5",
+      "vertParams.qvTrig: 0.002 -> 0.0018",
+      "vertParams.thetaeCoeff: 10 -> 10.5",
+      "vertParams convective potential/organization timing block from current vertical contract",
+      "vertParams tropicalOrganizationBandDeg and subtropicalSubsidence contract from current vertical contract"
+    ],
+    "evidenceLines": [
+      "C13 softened the eddy reversal relative to C10: `-105.45284` -> `-34.29106`, but the zonal-mean branch worsened: `-274.70821` -> `-301.63909`.",
+      "Current vertical scaffold includes the modern cross-hemi subtropical contract: `true`; archive donor vertical scaffold includes it: `false`.",
+      "Current vs archive dynamics diff exists: `false`; this keeps the next experiment out of the dynamics lane and inside the vertical-scaffold lane."
+    ]
+  },
+  "verticalContractPresence": {
+    "currentVerticalHasContract": true,
+    "archiveVerticalHasContract": false
+  },
+  "dynamicsChanged": false
+}
