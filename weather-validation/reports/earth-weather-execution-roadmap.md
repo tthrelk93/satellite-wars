@@ -2325,5 +2325,22 @@ That architecture lane should be framed as:
   - the narrow `35°` interface eddy softening is active
   - it improves the targeted `35°` import branch and slightly improves NH dry-belt ocean condensation relative to C62
   - but it reloads the equatorial / transition export defect strongly enough that the cross-equatorial sign error worsens sharply
+- C65 completed with verdict `35deg_interface_eddy_softening_relieves_targeted_import_but_overcorrects_equatorial_eddy_export_and_reloads_transition_shoulder_maintenance`
+- C65 conclusion:
+  - C64 is not inert and does relieve the targeted `35°` import branch, including the lower, mid, and upper eddy components
+  - but that relief is repaid mainly through a harder collapse in the equatorial eddy branch, not the zonal-mean branch
+  - the repayment also reloads the `11.25°`, `18.75°`, `26.25°`, and `33.75°` transition / shoulder maintenance family
+- C66 completed with verdict `quick_reject`
+- C66 quick metrics:
+  - `itczWidthDeg: 25.91 -> 23.232`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.112`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.492`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.218`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12975`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.31833`
+- C66 conclusion:
+  - tightening the base equatorial eddy-softening lane is active and preserves the broad quick-shape gains
+  - it modestly relieves the C64 cross-equatorial sign defect, but nowhere near enough to clear the quick gate
+  - the `35°` import relief still repays through a severe equatorial export failure, so the next step is attribution, not promotion
 - Active next move:
-  - `Architecture C65: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment and 35deg interface eddy softening attribution`
+  - `Architecture C67: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, and equatorial eddy guard attribution`

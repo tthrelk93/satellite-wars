@@ -1,0 +1,72 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c65-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-and-35deg-interface-eddy-softening-attribution.v1",
+  "generatedAt": "2026-04-16T19:03:24.787Z",
+  "quickComparison": {
+    "c62CrossEq": -318.32449,
+    "c64CrossEq": -361.01,
+    "c62ItczWidth": 23.386,
+    "c64ItczWidth": 23.237,
+    "c62DryNorth": 1.057,
+    "c64DryNorth": 1.14,
+    "c62DrySouth": 0.487,
+    "c64DrySouth": 0.518,
+    "c62Westerlies": 1.214,
+    "c64Westerlies": 1.216,
+    "c62OceanCond": 0.13629,
+    "c64OceanCond": 0.13472
+  },
+  "moistureComparison": {
+    "c62OceanPersistence": 0.10603,
+    "c64OceanPersistence": 0.11553,
+    "c62OceanCarryover": 0.10614,
+    "c64OceanCarryover": 0.11565,
+    "c62OceanWeakErosion": 0.10274,
+    "c64OceanWeakErosion": 0.11239,
+    "c62UpperCloudPath": 0.19383,
+    "c64UpperCloudPath": 0.22208,
+    "c62TransitionFlux": -194.66814,
+    "c64TransitionFlux": -209.7579
+  },
+  "transportComparison": {
+    "c62DominantImport": -24.15339,
+    "c64DominantImport": -22.91649,
+    "c62North35LowerTotal": -24.0294,
+    "c64North35LowerTotal": -22.68515,
+    "c62North35LowerEddy": -6.31372,
+    "c64North35LowerEddy": -5.1482,
+    "c62North35MidTotal": -18.58665,
+    "c64North35MidTotal": -17.19035,
+    "c62North35MidEddy": -3.60499,
+    "c64North35MidEddy": -2.91285,
+    "c62North35UpperTotal": -8.08452,
+    "c64North35UpperTotal": -6.54308,
+    "c62North35UpperEddy": -0.7501,
+    "c64North35UpperEddy": -0.26832,
+    "c62EqLowerZonal": -14.60903,
+    "c64EqLowerZonal": -14.52385,
+    "c62EqLowerEddy": -2.35139,
+    "c64EqLowerEddy": -4.03894,
+    "c62EqMidZonal": -14.14109,
+    "c64EqMidZonal": -13.27803,
+    "c62EqMidEddy": -0.51992,
+    "c64EqMidEddy": -3.78764,
+    "c62EqUpperZonal": -8.87963,
+    "c64EqUpperZonal": -7.9437,
+    "c62EqUpperEddy": -2.32334,
+    "c64EqUpperEddy": -5.01791
+  },
+  "rowComparison": {
+    "c6211Flux": -223.159,
+    "c6411Flux": -251.14,
+    "c6218Flux": -233.953,
+    "c6418Flux": -237.499,
+    "c6226Carryover": 0.062,
+    "c6426Carryover": 0.073,
+    "c6233Carryover": 0.418,
+    "c6433Carryover": 0.468
+  },
+  "decision": {
+    "verdict": "35deg_interface_eddy_softening_relieves_targeted_import_but_overcorrects_equatorial_eddy_export_and_reloads_transition_shoulder_maintenance",
+    "nextMove": "Architecture C66: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, and equatorial eddy guard experiment"
+  }
+}

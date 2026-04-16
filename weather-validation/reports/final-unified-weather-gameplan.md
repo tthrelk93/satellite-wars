@@ -856,6 +856,24 @@ Architecture C64 is now complete:
 So the next active move is now:
 - `Architecture C65: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment and 35deg interface eddy softening attribution`
 
+Architecture C65 is now complete in [earth-weather-architecture-c65-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-and-35deg-interface-eddy-softening-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c65-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-and-35deg-interface-eddy-softening-attribution.md):
+- verdict: `35deg_interface_eddy_softening_relieves_targeted_import_but_overcorrects_equatorial_eddy_export_and_reloads_transition_shoulder_maintenance`
+- the narrow `35°` interface eddy-softening lane is genuinely active and does relieve the targeted `35°` import branch
+- but that local relief is repaid through a much harder collapse in the equatorial eddy branch plus renewed transition / shoulder maintenance at `11.25°`, `18.75°`, `26.25°`, and `33.75°`
+
+Architecture C66 is now complete in [earth-weather-architecture-c66-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-and-equatorial-eddy-guard-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c66-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-and-equatorial-eddy-guard-experiment.md):
+- decision: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.232`
+- `subtropicalDryNorthRatio: 1.534 -> 1.112`
+- `subtropicalDrySouthRatio: 1.199 -> 0.492`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.218`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12975`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.31833`
+- interpretation: tightening the base equatorial eddy-softening lane is active and does modestly relieve the C64 sign defect, but the cross-equatorial vapor-flux inversion is still severe enough that the quick gate stays red
+
+So the next active move is now:
+- `Architecture C67: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, and equatorial eddy guard attribution`
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow
