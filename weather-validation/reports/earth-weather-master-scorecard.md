@@ -39,6 +39,8 @@ Updated: 2026-04-16
 - Architecture C24 Inner-Core Equatorial Eddy Softening Experiment: FAILED (`quick_reject`)
 - Architecture C25 Inner-Core Equatorial Eddy Softening Attribution: COMPLETED
 - Architecture C26 Partial Equatorial Shoulder Restore Experiment: FAILED (`quick_reject`)
+- Architecture C27 Partial Equatorial Shoulder Restore Attribution: COMPLETED
+- Architecture C28 Weak Partial Shoulder Restore Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -644,6 +646,46 @@ Updated: 2026-04-16
   - restoring a modest shoulder improved NH dry-belt ocean condensation and slightly reduced the cross-equatorial defect relative to C24
   - but it still failed the quick gate because the transport-sign inversion remained severe and some C24 dry-belt/ITCZ gains were given back
 - Next active phase: `Architecture C27: partial equatorial shoulder restore attribution`
+
+## Architecture C27 decision
+
+- Verdict: `partial_shoulder_restore_recovers_upper_branch_and_return_flow_but_reloads_lower_import_and_cloud_recirculation`
+- Decision report: [earth-weather-architecture-c27-partial-equatorial-shoulder-restore-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c27-partial-equatorial-shoulder-restore-attribution.md)
+- What changed relative to C24:
+  - recovered:
+    - cross-equatorial vapor flux north: `-358.07208 -> -353.85346`
+    - equator upper total-water flux north: `-13.59209 -> -13.23333`
+    - return-branch mass flux: `3447.36194 -> 3383.23239`
+    - NH dry-belt ocean condensation: `0.12705 -> 0.11952`
+  - reloaded:
+    - equator lower total-water flux north: `-17.49403 -> -18.00423`
+    - 35° lower vapor import: `-22.69662 -> -22.99819`
+    - 35° mid vapor import: `-17.16362 -> -17.27508`
+    - cloud recirculation proxy: `0.49385 -> 0.60796`
+- Interpretation:
+  - C26 moved in the right direction on the upper/return-flow side
+  - but it over-restored the shoulder and reloaded the lower/import side, so the next move should weaken that restore instead of discarding it
+- Next active phase: `Architecture C28: weak partial shoulder restore experiment`
+
+## Architecture C28 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c28-weak-partial-shoulder-restore-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c28-weak-partial-shoulder-restore-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - bounded outcome:
+    - `itczWidthDeg: 25.91 -> 23.321`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.097`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.487`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.202`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.15539`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -323.23581`
+- Interpretation:
+  - weakening the shoulder restore materially improved the sign defect and relieved the equatorial eddy branch relative to C26
+  - but it gave back the NH dry-belt ocean-condensation improvement and still failed the quick gate, so the remaining blocker is now a sharper transport-vs-condensation tradeoff
+- Next active phase: `Architecture C29: weak partial shoulder restore attribution`
 
 ## Day-365 benchmark summary
 

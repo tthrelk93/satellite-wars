@@ -1078,6 +1078,58 @@ Keep the C24 inner-core narrowing as the base contract and restore only a modest
   - but it also gave back some of the C24 ITCZ and dry-belt-ratio gains, and the cross-equatorial transport sign is still severely inverted
 - Consequence: the next active move is now `Architecture C27: partial equatorial shoulder restore attribution`.
 
+## Architecture C27: Partial Equatorial Shoulder Restore Attribution
+
+### Objective
+
+Explain exactly what the C26 shoulder restore helped and hurt relative to the C24 inner-core baseline so the next experiment can weaken only the part of the restore that overcorrected.
+
+### Result
+
+- Status: completed
+- Verdict: `partial_shoulder_restore_recovers_upper_branch_and_return_flow_but_reloads_lower_import_and_cloud_recirculation`
+- What C27 proved:
+  - C26 did recover useful circulation support relative to C24:
+    - cross-equatorial vapor flux north: `-358.07208 -> -353.85346`
+    - equator upper total-water flux north: `-13.59209 -> -13.23333`
+    - return-branch mass flux: `3447.36194 -> 3383.23239`
+    - NH dry-belt ocean condensation: `0.12705 -> 0.11952`
+  - but it also reloaded the wrong branch:
+    - equator lower total-water flux north: `-17.49403 -> -18.00423`
+    - 35° lower vapor import: `-22.69662 -> -22.99819`
+    - 35° mid vapor import: `-17.16362 -> -17.27508`
+    - cloud recirculation proxy: `0.49385 -> 0.60796`
+- Interpretation:
+  - the shoulder-restore direction was useful
+  - but C26 restored too much shoulder support, so the next move should be a weaker partial restore rather than another full-strength shoulder experiment
+- Consequence: the next active move is now `Architecture C28: weak partial shoulder restore experiment`.
+
+## Architecture C28: Weak Partial Shoulder Restore Experiment
+
+### Objective
+
+Keep the C24 inner-core narrowing fixed and test a weaker outer shoulder restore than C26 so the hybrid can retain some upper-branch relief while trimming the lower-branch reload.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.321`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.097`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.487`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.202`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.15539`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -323.23581`
+- Interpretation:
+  - weakening the shoulder restore did substantially improve the cross-equatorial sign defect relative to C26 and relieved the equatorial eddy branch, especially in the mid and upper layers
+  - but it gave back the NH dry-belt ocean condensation win and still failed the quick gate, so the remaining tradeoff is now sharply concentrated between transport-sign recovery and dry-belt condensation control
+- Consequence: the next active move is now `Architecture C29: weak partial shoulder restore attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

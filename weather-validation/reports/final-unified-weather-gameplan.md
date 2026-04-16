@@ -539,8 +539,29 @@ Architecture C26 is now complete in [earth-weather-architecture-c26-partial-equa
   - `subtropicalDrySouthRatio: 1.199 -> 0.515`
   - `crossEquatorialVaporFluxNorthKgM_1S` remained a severe regression against the trusted positive target
 
+Architecture C27 is now complete in [earth-weather-architecture-c27-partial-equatorial-shoulder-restore-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c27-partial-equatorial-shoulder-restore-attribution.md):
+- verdict: `partial_shoulder_restore_recovers_upper_branch_and_return_flow_but_reloads_lower_import_and_cloud_recirculation`
+- C26 was directionally useful on the upper/return-flow side:
+  - cross-equatorial vapor flux north: `-358.07208 -> -353.85346`
+  - equator upper total-water flux north: `-13.59209 -> -13.23333`
+  - return-branch mass flux: `3447.36194 -> 3383.23239`
+- but it over-restored the shoulder and reloaded the wrong side:
+  - equator lower total-water flux north: `-17.49403 -> -18.00423`
+  - 35° lower vapor import: `-22.69662 -> -22.99819`
+  - cloud recirculation proxy: `0.49385 -> 0.60796`
+
+Architecture C28 is now complete in [earth-weather-architecture-c28-weak-partial-shoulder-restore-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c28-weak-partial-shoulder-restore-experiment.md):
+- verdict: `quick_reject`
+- weakening the restore did split the difference in a meaningful way:
+  - `crossEquatorialVaporFluxNorthKgM_1S: -353.85346 -> -323.23581`
+  - `itczWidthDeg: 23.412 -> 23.321`
+  - `subtropicalDryNorthRatio: 1.119 -> 1.097`
+  - `subtropicalDrySouthRatio: 0.515 -> 0.487`
+- but it paid for that by giving back the dry-belt ocean-condensation win:
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.11952 -> 0.15539`
+
 So the next active move is now:
-- `Architecture C27: partial equatorial shoulder restore attribution`
+- `Architecture C29: weak partial shoulder restore attribution`
 
 ## Hard Rules Going Forward
 
