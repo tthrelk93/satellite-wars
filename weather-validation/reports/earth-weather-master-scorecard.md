@@ -14,7 +14,8 @@ Updated: 2026-04-16
 - Architecture B3 Direct Rollback Circulation Splice: FAILED (`quick_reject`)
 - Architecture C Code-Level Hybridization Design: COMPLETED
 - Architecture C1 Hybrid Seam Contract: COMPLETED
-- Architecture C2 Donor-Base Hybrid Worktree Benchmark: NEXT
+- Architecture C2 Donor-Base Hybrid Worktree Benchmark: FAILED (`integration_blocked_missing_dependency`)
+- Architecture C3 Hybrid Integration Bridge Design: COMPLETED
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -162,8 +163,51 @@ Updated: 2026-04-16
     - `src/weather/v2/state5.js`
     - `src/weather/validation/diagnostics.js`
     - `scripts/agent/planetary-realism-audit.mjs`
-  - exclude current `core5.js` and `vertical5.js` as the starting point for the first hybrid benchmark
+- exclude current `core5.js` and `vertical5.js` as the starting point for the first hybrid benchmark
 - Next active phase: `Architecture C2: donor-base hybrid worktree benchmark`
+
+## Architecture C2 decision
+
+- Verdict: `integration_blocked_missing_dependency`
+- Decision report: [earth-weather-architecture-c2-donor-base-hybrid-benchmark.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c2-donor-base-hybrid-benchmark.md)
+- Overlay bundle:
+  - `src/weather/v2/microphysics5.js`
+  - `src/weather/v2/state5.js`
+  - `src/weather/v2/cloudBirthTracing5.js`
+  - `src/weather/v2/sourceTracing5.js`
+  - `src/weather/v2/instrumentationBands5.js`
+  - `src/weather/validation/diagnostics.js`
+  - `scripts/agent/planetary-realism-audit.mjs`
+- Benchmark outcome:
+  - hybrid quick run did not start because donor `core5.js` still uses extensionless ESM imports under the current Node runtime
+  - first live blocker: missing module resolution for `./grid`
+  - donor-core compatibility gaps also remain:
+    - `getCloudTransitionLedgerRaw`
+    - `resetCloudTransitionLedger`
+    - `getModuleTimingSummary`
+    - `getConservationSummary`
+    - `loadStateSnapshot`
+    - `setReplayDisabledModules`
+    - `clearReplayDisabledModules`
+- Next active phase: `Architecture C3: hybrid integration bridge design`
+
+## Architecture C3 decision
+
+- Verdict: `esm_and_core_api_bridge_required`
+- Decision report: [earth-weather-architecture-c3-hybrid-integration-bridge-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c3-hybrid-integration-bridge-design.md)
+- Required bridge work:
+  - convert donor-core extensionless imports to explicit `.js` ESM specifiers
+  - add donor-core compatibility methods required by the current audit stack:
+    - `getCloudTransitionLedgerRaw`
+    - `resetCloudTransitionLedger`
+    - `getModuleTimingSummary`
+    - `getConservationSummary`
+    - `loadStateSnapshot`
+    - `setReplayDisabledModules`
+    - `clearReplayDisabledModules`
+  - preserve the C1 donor-base-first splice contract
+  - rerun C2 immediately after bridge implementation
+- Next active phase: `Architecture C4: donor-core integration bridge implementation`
 
 ## Day-365 benchmark summary
 

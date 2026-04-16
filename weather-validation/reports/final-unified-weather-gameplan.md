@@ -287,13 +287,27 @@ Its result gives us the first concrete splice contract:
   - `scripts/agent/planetary-realism-audit.mjs`
 - do not start from current `core5.js` / `vertical5.js` for the first hybrid benchmark
 
-So the next active move is now:
-- `Architecture C2: donor-base hybrid worktree benchmark`
+Architecture C2 is now complete in [earth-weather-architecture-c2-donor-base-hybrid-benchmark.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c2-donor-base-hybrid-benchmark.md), and it gave us a clean bootstrap boundary:
+- verdict: `integration_blocked_missing_dependency`
+- the donor-base hybrid worktree fails before the first quick climate benchmark because donor [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js) still uses extensionless ESM imports under the current Node runtime
+- donor-core compatibility gaps also remain for the current audit stack:
+  - `getCloudTransitionLedgerRaw`
+  - `resetCloudTransitionLedger`
+  - `getModuleTimingSummary`
+  - `getConservationSummary`
+  - `loadStateSnapshot`
+  - `setReplayDisabledModules`
+  - `clearReplayDisabledModules`
 
-That means:
-- we finally have a concrete non-parameter path forward
-- the next benchmark should be donor-base-first, not current-branch-first
-- no new tuning should happen before we measure that first hybrid worktree
+Architecture C3 is now complete in [earth-weather-architecture-c3-hybrid-integration-bridge-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c3-hybrid-integration-bridge-design.md), and it turns that boundary into the next concrete contract:
+- verdict: `esm_and_core_api_bridge_required`
+- patch rollback donor [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js) to explicit `.js` ESM imports
+- add donor-core compatibility methods required by the current audit stack
+- keep the donor-base-first splice contract from Architecture C1 intact
+- rerun Architecture C2 immediately after that bridge lands
+
+So the next active move is now:
+- `Architecture C4: donor-core integration bridge implementation`
 
 ## Hard Rules Going Forward
 

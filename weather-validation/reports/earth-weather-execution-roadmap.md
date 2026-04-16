@@ -440,6 +440,71 @@ Turn the Architecture C donor/preserve/adapter split into the explicit implement
 - Verdict: `rollback_vertical_core_current_partition_adapter_contract`
 - Consequence: the next active move is now `Architecture C2: donor-base hybrid worktree benchmark`.
 
+## Architecture C2: Donor-Base Hybrid Worktree Benchmark
+
+### Objective
+
+Run the first donor-base hybrid benchmark from the rollback circulation scaffold plus the current partition-preserve and adapter bundles.
+
+### Bundle
+
+- donor archive branch:
+  - `codex/world-class-weather-loop-archive-20260407-0745`
+- donor scaffold files:
+  - [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+  - [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- overlaid current preserve and adapter files:
+  - [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+  - [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+  - [cloudBirthTracing5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/cloudBirthTracing5.js)
+  - [sourceTracing5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/sourceTracing5.js)
+  - [instrumentationBands5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/instrumentationBands5.js)
+  - [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+  - [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+
+### Result
+
+- Status: completed
+- Verdict: `integration_blocked_missing_dependency`
+- Immediate blocker:
+  - donor [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js) still uses extensionless ESM imports, so the hybrid worktree fails before the first quick climate benchmark
+- Additional donor-core compatibility gaps:
+  - `getCloudTransitionLedgerRaw`
+  - `resetCloudTransitionLedger`
+  - `getModuleTimingSummary`
+  - `getConservationSummary`
+  - `loadStateSnapshot`
+  - `setReplayDisabledModules`
+  - `clearReplayDisabledModules`
+- Consequence: the next active move is now `Architecture C3: hybrid integration bridge design`.
+
+## Architecture C3: Hybrid Integration Bridge Design
+
+### Objective
+
+Convert the C2 bootstrap failure into the smallest bridge contract required before retrying the donor-base hybrid benchmark.
+
+### Result
+
+- Status: completed
+- Verdict: `esm_and_core_api_bridge_required`
+- Immediate blockers:
+  - donor-core extensionless ESM imports: `./grid`, `./state5`, `./hydrostatic`, `./dynamics5`, `./windEddyNudge5`, `./windNudge5`, `./mass5`, `./advect5`, `./vertical5`, `./microphysics5`, `./surface2d`, `./climo2d`, `./radiation2d`, `./diagnostics2d`, `./initializeFromClimo`, `./nudging5`, `./verticalGrid`, `../WeatherLogger`
+  - missing donor-core compatibility methods:
+    - `getCloudTransitionLedgerRaw`
+    - `resetCloudTransitionLedger`
+    - `getModuleTimingSummary`
+    - `getConservationSummary`
+    - `loadStateSnapshot`
+    - `setReplayDisabledModules`
+    - `clearReplayDisabledModules`
+- Bridge contract:
+  - patch rollback donor [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js) to explicit `.js` ESM imports
+  - add compatibility methods on donor core for the current audit stack
+  - keep the donor-base-first contract from C1 intact
+  - rerun Architecture C2 immediately after the bridge implementation
+- Consequence: the next active move is now `Architecture C4: donor-core integration bridge implementation`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

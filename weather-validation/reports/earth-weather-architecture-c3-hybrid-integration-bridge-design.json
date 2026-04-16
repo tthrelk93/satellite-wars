@@ -1,0 +1,39 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c3-hybrid-integration-bridge-design.v1",
+  "generatedAt": "2026-04-16T05:16:17.388Z",
+  "c2JsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c2-donor-base-hybrid-benchmark.json",
+  "archiveBranch": "codex/world-class-weather-loop-archive-20260407-0745",
+  "decision": {
+    "verdict": "esm_and_core_api_bridge_required",
+    "extensionlessImports": [
+      "./grid",
+      "./state5",
+      "./hydrostatic",
+      "./dynamics5",
+      "./windEddyNudge5",
+      "./windNudge5",
+      "./mass5",
+      "./advect5",
+      "./vertical5",
+      "./microphysics5",
+      "./surface2d",
+      "./climo2d",
+      "./radiation2d",
+      "./diagnostics2d",
+      "./initializeFromClimo",
+      "./nudging5",
+      "./verticalGrid",
+      "../WeatherLogger"
+    ],
+    "missingCoreMethods": [
+      "getCloudTransitionLedgerRaw",
+      "resetCloudTransitionLedger",
+      "getModuleTimingSummary",
+      "getConservationSummary",
+      "loadStateSnapshot",
+      "setReplayDisabledModules",
+      "clearReplayDisabledModules"
+    ],
+    "nextMove": "Architecture C4: donor-core integration bridge implementation"
+  }
+}
