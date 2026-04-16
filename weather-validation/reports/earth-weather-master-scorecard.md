@@ -20,6 +20,8 @@ Updated: 2026-04-16
 - Architecture C5 Bridged Donor-Base Hybrid Rerun Benchmark: FAILED (`hybrid_boot_failure`)
 - Architecture C6 Bridged Hybrid Attribution Design: COMPLETED
 - Architecture C7 Bridged Hybrid Artifact Contract Repair: FAILED (`cycle_guard_contract_block`)
+- Architecture C8 Donor-Worktree Cycle Contract Repair: COMPLETED
+- Architecture C9 Donor-Worktree Runtime Fixture Repair: COMPLETED
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -270,6 +272,34 @@ Updated: 2026-04-16
   - Architecture C is no longer blocked by donor-core import/API compatibility
   - the next blocker is the heavy-command cycle contract in donor worktrees
 - Next active phase: `Architecture C8: donor-worktree cycle contract repair`
+
+## Architecture C8 decision
+
+- Verdict: `post_cycle_runtime_failure`
+- Decision report: [earth-weather-architecture-c8-donor-worktree-cycle-contract-repair.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c8-donor-worktree-cycle-contract-repair.md)
+- Repair result:
+  - the donor-worktree cycle contract was created successfully
+  - the bridged audit moved past plan-guard and into runtime execution
+  - the first post-cycle runtime blocker was:
+    - `ENOENT` for `scripts/agent/fixtures/headless-terrain-180x90.json`
+- Interpretation:
+  - the cycle contract is no longer the active blocker
+  - the next missing boundary is the donor-worktree terrain fixture bundle
+- Next active phase: `Architecture C9: donor-worktree runtime fixture repair`
+
+## Architecture C9 decision
+
+- Verdict: `runtime_fixture_contract_restored`
+- Decision report: [earth-weather-architecture-c9-donor-worktree-runtime-fixture-repair.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c9-donor-worktree-runtime-fixture-repair.md)
+- Repair result:
+  - the terrain fixture bundle was restored into the donor worktree
+  - the bridged quick audit exited `0`
+  - the requested quick artifact was emitted:
+    - [earth-weather-architecture-c9-bridged-hybrid-quick.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c9-bridged-hybrid-quick.json)
+- Interpretation:
+  - donor hybrid runtime contracts are now restored far enough to resume actual benchmark work
+  - the next bounded move is now climate benchmarking, not more integration surgery
+- Next active phase: `Architecture C10: cycled hybrid benchmark rerun`
 
 ## Day-365 benchmark summary
 

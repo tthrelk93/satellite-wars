@@ -332,8 +332,21 @@ Architecture C7 is now complete in [earth-weather-architecture-c7-bridged-hybrid
 - failure message:
   - `[agent plan guard] agent:planetary-realism-audit requires an active cycle directory with plan.md before it can run.`
 
+Architecture C8 is now complete in [earth-weather-architecture-c8-donor-worktree-cycle-contract-repair.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c8-donor-worktree-cycle-contract-repair.md):
+- verdict: `post_cycle_runtime_failure`
+- the donor-worktree cycle contract is now real enough to clear the earlier plan-guard block
+- the first post-cycle runtime blocker is a missing terrain fixture asset:
+  - `scripts/agent/fixtures/headless-terrain-180x90.json`
+
+Architecture C9 is now complete in [earth-weather-architecture-c9-donor-worktree-runtime-fixture-repair.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c9-donor-worktree-runtime-fixture-repair.md):
+- verdict: `runtime_fixture_contract_restored`
+- the donor-worktree terrain fixture bundle was restored
+- the bridged quick audit now exits `0`
+- the requested quick artifact is live again:
+  - [earth-weather-architecture-c9-bridged-hybrid-quick.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c9-bridged-hybrid-quick.json)
+
 So the next active move is now:
-- `Architecture C8: donor-worktree cycle contract repair`
+- `Architecture C10: cycled hybrid benchmark rerun`
 
 ## Hard Rules Going Forward
 

@@ -580,6 +580,44 @@ Repair the bridged-hybrid artifact contract by invoking the bridged audit throug
   - `[agent plan guard] agent:planetary-realism-audit requires an active cycle directory with plan.md before it can run.`
 - Consequence: the next active move is now `Architecture C8: donor-worktree cycle contract repair`.
 
+## Architecture C8: Donor-Worktree Cycle Contract Repair
+
+### Objective
+
+Repair the donor-worktree heavy-command contract by creating a real guarded cycle before invoking the bridged audit.
+
+### Result
+
+- Status: completed
+- Verdict: `post_cycle_runtime_failure`
+- What C8 proved:
+  - the donor-worktree cycle contract is now real enough to clear the earlier plan-guard block
+  - the bridged audit got past cycle admission and entered runtime execution
+  - the next blocker is a missing runtime asset, not the cycle contract anymore
+- First post-cycle failure:
+  - `ENOENT: no such file or directory, open '.../scripts/agent/fixtures/headless-terrain-180x90.json'`
+- Consequence: the next active move is now `Architecture C9: donor-worktree runtime fixture repair`.
+
+## Architecture C9: Donor-Worktree Runtime Fixture Repair
+
+### Objective
+
+Restore the donor-worktree runtime fixture contract by forward-porting the headless terrain fixture bundle and rerun the bridged quick audit under the repaired cycle flow.
+
+### Result
+
+- Status: completed
+- Verdict: `runtime_fixture_contract_restored`
+- What C9 proved:
+  - the donor-worktree no longer fails on the missing terrain fixture asset
+  - the bridged quick audit now exits `0`
+  - the requested quick summary artifact is emitted again
+- Quick artifact:
+  - [earth-weather-architecture-c9-bridged-hybrid-quick.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c9-bridged-hybrid-quick.json)
+- Residual note:
+  - the bridged rerun still emits the existing `MODULE_TYPELESS_PACKAGE_JSON` warning, but it is no longer blocking execution
+- Consequence: the next active move is now `Architecture C10: cycled hybrid benchmark rerun`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective
