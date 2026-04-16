@@ -84,6 +84,7 @@ let northSourceConcentrationPenaltyPatchMode = 'default';
 let atlanticDryCoreReceiverTaperPatchMode = 'default';
 let atlanticTransitionCarryoverContainmentPatchMode = 'default';
 let architectureA1BalanceContractMode = 'default';
+let architectureA2PartitionPortMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -147,6 +148,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--atlantic-transition-carryover-containment-patch=')) atlanticTransitionCarryoverContainmentPatchMode = arg.slice('--atlantic-transition-carryover-containment-patch='.length);
   else if (arg === '--architecture-a1-balance-contract' && argv[i + 1]) architectureA1BalanceContractMode = argv[++i];
   else if (arg.startsWith('--architecture-a1-balance-contract=')) architectureA1BalanceContractMode = arg.slice('--architecture-a1-balance-contract='.length);
+  else if (arg === '--architecture-a2-partition-port' && argv[i + 1]) architectureA2PartitionPortMode = argv[++i];
+  else if (arg.startsWith('--architecture-a2-partition-port=')) architectureA2PartitionPortMode = arg.slice('--architecture-a2-partition-port='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--quiet') quiet = true;
   else if (arg === '--system-experiment' && argv[i + 1]) systemExperiment = argv[++i];
@@ -228,6 +231,15 @@ architectureA1BalanceContractMode = architectureA1BalanceContractMode === 'off'
   : architectureA1BalanceContractMode === 'on'
     ? 'on'
     : 'default';
+architectureA2PartitionPortMode = [
+  'default',
+  'off',
+  'containment-off',
+  'ported-floor',
+  'ported-floor-soft-containment'
+].includes(architectureA2PartitionPortMode)
+  ? architectureA2PartitionPortMode
+  : 'default';
 systemExperiment = [
   'baseline',
   'upper-cloud-persistence-collapse',
@@ -5159,6 +5171,21 @@ export async function main() {
   else if (softLiveGatePatchMode === 'on') core.microParams.enableSoftLiveStateMaintenanceSuppression = true;
   if (architectureA1BalanceContractMode === 'off') core.microParams.enableExplicitSubtropicalBalanceContract = false;
   else if (architectureA1BalanceContractMode === 'on') core.microParams.enableExplicitSubtropicalBalanceContract = true;
+  if (architectureA2PartitionPortMode === 'containment-off') {
+    core.vertParams.enableCirculationReboundContainment = false;
+  } else if (architectureA2PartitionPortMode === 'ported-floor') {
+    core.vertParams.enableCirculationReboundContainment = false;
+    core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac = 0.42;
+    core.vertParams.subtropicalSubsidenceWeakHemiBoost = 0.15;
+  } else if (architectureA2PartitionPortMode === 'ported-floor-soft-containment') {
+    core.vertParams.enableCirculationReboundContainment = true;
+    core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac = 0.42;
+    core.vertParams.subtropicalSubsidenceWeakHemiBoost = 0.15;
+    core.vertParams.circulationReboundContainmentScale = 0.7;
+    core.vertParams.circulationReboundOrganizationScale = 0.25;
+    core.vertParams.circulationReboundActivityScale = 0.18;
+    core.vertParams.circulationReboundSourceScale = 0.4;
+  }
   if (shoulderAbsorptionGuardPatchMode === 'off') core.microParams.enableShoulderAbsorptionGuard = false;
   else if (shoulderAbsorptionGuardPatchMode === 'on') core.microParams.enableShoulderAbsorptionGuard = true;
   core.microParams.shoulderAbsorptionGuardSuppressedMassMode = shoulderGuardFateMode;

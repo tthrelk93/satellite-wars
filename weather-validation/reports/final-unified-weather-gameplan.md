@@ -157,6 +157,29 @@ Architecture A has now narrowed the approved implementation path to one remainin
 - if A1 fails, port only the current branch partition gains that remain compatible with rollback-like circulation support
 - do not restore the stacked suppressor and receiver patch families wholesale
 
+Architecture A2 is now completed in:
+- [earth-weather-architecture-a2-partition-port.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-a2-partition-port.md)
+
+Its result is another clean bounded reject:
+- verdict: `quick_reject`
+- best quick candidate: `ported-floor-soft-containment`
+- partial partition preservation:
+  - `itczWidthDeg: 25.91 -> 25.826`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.507`
+- but the circulation-recovery side did not move:
+  - `subtropicalDrySouthRatio: 1.199 -> 1.2`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.14845`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 144.63218`
+
+So the active next move is now:
+- `Architecture B: circulation-first partition rebuild`
+
+That means:
+- stop trying to recover rollback-like circulation by selectively relaxing current-branch dampers
+- treat Architecture A as exhausted
+- redesign the circulation scaffold first, then re-port only the partition behavior that survives under that rebuilt circulation base
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow

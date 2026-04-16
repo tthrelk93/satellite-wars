@@ -7,6 +7,8 @@ Updated: 2026-04-16
 - Phase 0 Base-State Recovery Decision: COMPLETED (`no_clear_winner`)
 - Architecture A Circulation-Preserving Dry-Belt Partition Redesign: COMPLETED
 - Architecture A1 Explicit Subtropical Balance Contract Experiment: FAILED (`quick_reject`)
+- Architecture A2 Circulation-Preserving Partition Port: FAILED (`quick_reject`)
+- Architecture B Circulation-First Partition Rebuild: NEXT
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -41,6 +43,24 @@ Updated: 2026-04-16
   - improved metrics: `1 / 6`
   - severe regressions: `itczWidthDeg`, `subtropicalDryNorthRatio`, `subtropicalDrySouthRatio`
 - Next active phase: `Architecture A2: circulation-preserving partition port`
+
+## Architecture A2 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-a2-partition-port.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-a2-partition-port.md)
+- Best quick candidate: `ported-floor-soft-containment`
+- Quick result:
+  - improved metrics: `2 / 6`
+  - severe regressions: none
+  - preserved only partial current-branch partition gains:
+    - `itczWidthDeg: 25.91 -> 25.826`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.507`
+  - failed the circulation-recovery half of the contract:
+    - `subtropicalDrySouthRatio: 1.199 -> 1.2`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.14845`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 144.63218`
+- Next active phase: `Architecture B: circulation-first partition rebuild`
 
 ## Day-365 benchmark summary
 

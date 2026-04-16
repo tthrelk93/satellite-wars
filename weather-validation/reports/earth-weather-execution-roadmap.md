@@ -197,6 +197,42 @@ Use one vertical-state subtropical partition/circulation contract as the shared 
   - severe regressions in `itczWidthDeg`, `subtropicalDryNorthRatio`, and `subtropicalDrySouthRatio`
 - Consequence: do not continue with A1 tuning; move directly to `Architecture A2: circulation-preserving partition port`
 
+## Architecture A2: Circulation-Preserving Partition Port
+
+### Objective
+
+Keep the current branch partition microphysics, but test rollback-leaning circulation support variants instead of carrying the full current-branch circulation damper stack forward.
+
+### Primary files and outputs
+
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [earth-weather-architecture-a2-partition-port.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/earth-weather-architecture-a2-partition-port.mjs)
+- [earth-weather-architecture-a2-partition-port.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-a2-partition-port.md)
+
+### Candidate family
+
+- `containment-off`
+- `ported-floor`
+- `ported-floor-soft-containment`
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Best quick candidate: `ported-floor-soft-containment`
+- Quick screen outcome:
+  - improved metrics: `2 / 6`
+  - no severe regressions
+  - preserved only partial current-branch partition gains:
+    - `itczWidthDeg: 25.91 -> 25.826`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.507`
+  - but failed the circulation-recovery side of the contract:
+    - `subtropicalDrySouthRatio: 1.199 -> 1.2`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.14845`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 144.63218`
+- Consequence: Architecture A is now exhausted as a bounded family. Move to `Architecture B: circulation-first partition rebuild`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective
