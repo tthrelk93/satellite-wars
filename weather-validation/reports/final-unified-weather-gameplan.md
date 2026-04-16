@@ -892,6 +892,24 @@ Architecture C68 is now complete in [earth-weather-architecture-c68-stronger-26p
 So the next active move is now:
 - `Architecture C69: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, and narrower equatorial-core guard attribution`
 
+Architecture C69 is now complete in [earth-weather-architecture-c69-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-and-narrower-equatorial-core-guard-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c69-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-and-narrower-equatorial-core-guard-attribution.md):
+- verdict: `narrower_core_guard_relieves_transition_rows_and_nh_maintenance_but_overwithdraws_equatorial_upper_support_and_dominant_import`
+- C68 really does relieve the outer transition / shoulder repayment family and improve the NH maintenance family
+- but it pays for that by over-withdrawing equatorial upper support and weakening dominant NH dry-belt import strength
+
+Architecture C70 is now complete in [earth-weather-architecture-c70-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-narrower-equatorial-core-guard-and-stronger-inner-core-blend-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c70-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-narrower-equatorial-core-guard-and-stronger-inner-core-blend-experiment.md):
+- decision: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.438`
+- `subtropicalDryNorthRatio: 1.534 -> 1.13`
+- `subtropicalDrySouthRatio: 1.199 -> 0.514`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.226`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13037`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -348.97338`
+- interpretation: strengthening the inner-core blend is active and does improve the sign defect relative to C68, but the severe cross-equatorial inversion is still live and the quick gate remains red
+
+So the next active move is now:
+- `Architecture C71: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, narrower equatorial-core guard, and stronger inner-core blend attribution`
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow

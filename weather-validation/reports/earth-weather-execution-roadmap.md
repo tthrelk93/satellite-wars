@@ -2359,5 +2359,22 @@ That architecture lane should be framed as:
   - narrowing the equatorial guard inward is active and further improves the broad shape metrics plus NH dry-belt ocean condensation
   - but the cross-equatorial sign defect gets slightly worse again relative to C66, so the remaining blocker is not simply the outer shoulder width of the guard
   - the next step is attribution on that tradeoff, not immediate promotion
+- C69 completed with verdict `narrower_core_guard_relieves_transition_rows_and_nh_maintenance_but_overwithdraws_equatorial_upper_support_and_dominant_import`
+- C69 conclusion:
+  - C68 clearly relieves the outer transition / shoulder repayment family and further improves the NH maintenance family
+  - but it pays for that by over-withdrawing equatorial upper support and weakening dominant NH dry-belt import strength
+  - the next bounded move is to strengthen support inside the preserved core, not widen the guard back out
+- C70 completed with verdict `quick_reject`
+- C70 quick metrics:
+  - `itczWidthDeg: 25.91 -> 23.438`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.13`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.514`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.226`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13037`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -348.97338`
+- C70 conclusion:
+  - strengthening the inner-core blend on top of C68 is active and improves the cross-equatorial sign defect relative to C68 while keeping the broad quick-shape gains alive
+  - but the sign defect is still severe enough that the quick gate stays red, and some of the stronger NH ocean-condensation relief from C68 is given back
+  - the next step is attribution on that tradeoff, not promotion
 - Active next move:
-  - `Architecture C69: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, and narrower equatorial-core guard attribution`
+  - `Architecture C71: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, narrower equatorial-core guard, and stronger inner-core blend attribution`

@@ -81,6 +81,8 @@ Updated: 2026-04-16
 - Architecture C66 Stronger 26p25 Receiver Carryover Containment With 33p75 Poleward Shoulder Carryover Containment 35deg Interface Eddy Softening And Equatorial Eddy Guard Experiment: FAILED (`quick_reject`)
 - Architecture C67 Stronger 26p25 Receiver Carryover Containment With 33p75 Poleward Shoulder Carryover Containment 35deg Interface Eddy Softening And Equatorial Eddy Guard Attribution: COMPLETED
 - Architecture C68 Stronger 26p25 Receiver Carryover Containment With 33p75 Poleward Shoulder Carryover Containment 35deg Interface Eddy Softening And Narrower Equatorial-Core Guard Experiment: FAILED (`quick_reject`)
+- Architecture C69 Stronger 26p25 Receiver Carryover Containment With 33p75 Poleward Shoulder Carryover Containment 35deg Interface Eddy Softening And Narrower Equatorial-Core Guard Attribution: COMPLETED
+- Architecture C70 Stronger 26p25 Receiver Carryover Containment With 33p75 Poleward Shoulder Carryover Containment 35deg Interface Eddy Softening Narrower Equatorial-Core Guard And Stronger Inner-Core Blend Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
