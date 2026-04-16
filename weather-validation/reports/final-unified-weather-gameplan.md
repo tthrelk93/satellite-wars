@@ -754,8 +754,22 @@ Architecture C52 is now complete:
 - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
 - interpretation: even the strong `26.25°` receiver guard reproduces the same C40/C50 transition-band regime, so the live binder is not simple scalar guard amplitude in that lane
 
+Architecture C53 is now complete:
+- verdict: `strong_26p25_receiver_guard_inert_receiver_reload_maintained_by_downstream_carryover`
+- interpretation: C40 and C52 are identical while the `26.25°` receiver row stays elevated relative to strict C32, so the remaining reload is downstream carryover-maintained rather than fresh organized-support admitted
+
+Architecture C54 is now complete:
+- verdict: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.333`
+- `subtropicalDryNorthRatio: 1.534 -> 1.124`
+- `subtropicalDrySouthRatio: 1.199 -> 0.496`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.201`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12942`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -362.46654`
+- interpretation: the `26.25°` carryover-containment lane is active, but it worsens the core sign defect and gives back part of the receiver-side relief
+
 So the next active move is now:
-- `Architecture C53: strong 26p25 receiver-guard transition-band attribution`
+- `Architecture C55: 26p25 receiver carryover containment transition-band attribution`
 
 ## Hard Rules Going Forward
 

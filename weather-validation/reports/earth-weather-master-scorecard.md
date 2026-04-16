@@ -902,7 +902,7 @@ Updated: 2026-04-16
 - Interpretation:
   - the inner-core restore was also inert at the quick-score level relative to the strict C32 carveout
   - so the blocked subset is not being reached by the simple inner-core geometry
-- Next active phase: `Architecture C53: strong 26p25 receiver-guard transition-band attribution`
+- Next active phase: `Architecture C55: 26p25 receiver carryover containment transition-band attribution`
 - C39 result:
   - verdict: `inner_core_restore_inert_active_override_targets_outside_restore_band`
   - the live carry-input override rows stayed fixed at `18.75°`, `26.25°`, `33.75°` and mirrored southern rows, outside the C38 inner-core taper
@@ -992,6 +992,19 @@ Updated: 2026-04-16
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
   - interpretation: even a strong `26.25°` receiver guard reproduces the same C40/C50 transition-band regime exactly, so the remaining binder is not simple scalar guard amplitude
+- C53 result:
+  - verdict: `strong_26p25_receiver_guard_inert_receiver_reload_maintained_by_downstream_carryover`
+  - C40 and C52 are identical across the quick score, moisture attribution, and transport interfaces while the `26.25°` receiver row stays elevated relative to strict C32
+  - interpretation: the strong organized-support guard is inert, and the remaining receiver reload is maintained downstream by carryover / persistence rather than fresh organized-support admission
+- C54 result:
+  - verdict: `quick_reject`
+  - `itczWidthDeg: 25.91 -> 23.333`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.124`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.496`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.201`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12942`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -362.46654`
+  - interpretation: the 26.25° carryover-containment lane is active but still worsens the core sign defect and gives back part of the receiver-side relief
 
 ## Day-365 benchmark summary
 

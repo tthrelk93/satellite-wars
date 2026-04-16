@@ -1805,6 +1805,62 @@ Preserve the strict C32 equatorial-core carveout, preserve the C40 transition-ba
   - that means the remaining live binder is not controlled by simple scalar `26.25°` receiver-guard amplitude inside this transition-band family
 - Consequence: the next active move is now `Architecture C53: strong 26p25 receiver-guard transition-band attribution`.
 
+## Architecture C53: Strong 26p25 Receiver-Guard Transition-Band Attribution
+
+### Objective
+
+Prove whether the stronger `26.25°` guard actually touched the live transition-band regime, or whether the remaining receiver reload is maintained downstream of fresh organized-support admission.
+
+### Contract
+
+Compare C52 directly against C40 across the quick score, moisture attribution, transport interfaces, and latitude-resolved receiver-row diagnostics, while keeping strict C32 as the receiver-row baseline for context.
+
+### Result
+
+- Status: completed
+- Verdict: `strong_26p25_receiver_guard_inert_receiver_reload_maintained_by_downstream_carryover`
+- Key evidence:
+  - C40 vs C52 quick metrics are identical to reporting precision
+  - C40 vs C52 moisture attribution is identical for imported-anvil persistence, carried-over upper cloud, and weak-erosion survival
+  - C40 vs C52 transport interfaces are identical at the equator and `35°`
+  - `26.25°` override hits and carryover stay elevated relative to strict C32, but are unchanged between C40 and C52
+- Interpretation:
+  - even the strong organized-support guard does not move the live receiver row
+  - the remaining receiver reload is no longer controlled by fresh organized-support admission in this family
+  - the next bounded move has to target downstream upper-cloud carryover / persistence maintenance in the `26.25°` receiver lane
+- Consequence: the next active move became `Architecture C54: 26p25 receiver carryover containment transition-band experiment`.
+
+## Architecture C54: 26p25 Receiver Carryover Containment Transition-Band Experiment
+
+### Objective
+
+Keep the live C40 transition-band organized-support restore fixed, but directly contain upper-cloud carryover only in the `26.25°` receiver lane so we can test whether downstream persistence is the real remaining binder.
+
+### Contract
+
+Preserve the strict C32 equatorial-core carveout, preserve the C40 transition-band organized-support restore geometry, and add narrow `26.25°` carryover containment based on overlap mass, subsidence drying, and low-level omega.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.333`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.124`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.496`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.201`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12942`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -362.46654`
+- Interpretation:
+  - this lane is active and does create a new transition-band state, so it is not another inert threshold
+  - but the `26.25°` carryover containment worsens the core cross-equatorial sign defect and gives back part of the receiver-side relief
+  - the next bounded move is attribution, not another immediate geometry guess
+- Consequence: the next active move is now `Architecture C55: 26p25 receiver carryover containment transition-band attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective
