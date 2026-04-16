@@ -1,0 +1,50 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c7-bridged-hybrid-artifact-contract-repair.v1",
+  "generatedAt": "2026-04-16T05:47:12.780Z",
+  "archiveBranch": "codex/world-class-weather-loop-archive-20260407-0745",
+  "overlayFiles": [
+    "src/weather/v2/microphysics5.js",
+    "src/weather/v2/state5.js",
+    "src/weather/v2/cloudBirthTracing5.js",
+    "src/weather/v2/sourceTracing5.js",
+    "src/weather/v2/instrumentationBands5.js",
+    "src/weather/validation/diagnostics.js",
+    "scripts/agent/planetary-realism-audit.mjs",
+    "scripts/agent/headless-terrain-fixture.mjs",
+    "scripts/agent/plan-guard.mjs"
+  ],
+  "trustedBaselinePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-hadley-second-pass-restore-v4.json",
+  "currentQuickPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c7-current-off-quick.json",
+  "hybridQuickPath": null,
+  "hybridAnnualPath": null,
+  "bridgeSummary": {
+    "bridgedFiles": [
+      "src/weather/WeatherLogger.js",
+      "src/weather/v2/analysisIncrement5.test.js",
+      "src/weather/v2/climo2d.js",
+      "src/weather/v2/core5.js",
+      "src/weather/v2/grid.js",
+      "src/weather/v2/vertical5.test.js"
+    ],
+    "rewrittenImportCount": 27,
+    "missingCoreMethodsAfterBridge": []
+  },
+  "quickRows": null,
+  "quickGate": null,
+  "runContext": {
+    "exitCode": 1,
+    "signal": null,
+    "stdoutSnippet": "",
+    "stderrSnippet": "file:///private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c7-7lTKkp/bridged-worktree/scripts/agent/plan-guard.mjs:112\n    throw new Error(`[agent plan guard] ${commandName || 'agent command'} requires an active cycle directory with plan.md before it can run.`);\n          ^\n\nError: [agent plan guard] agent:planetary-realism-audit requires an active cycle directory with plan.md b"
+  },
+  "failure": {
+    "message": "file:///private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c7-7lTKkp/bridged-worktree/scripts/agent/plan-guard.mjs:112\n    throw new Error(`[agent plan guard] ${commandName || 'agent command'} requires an active cycle directory with plan.md before it can run.`);\n          ^\n\nError: [agent plan guard] agent:planetary-realism-audit requires an active cycle directory with plan.md before it can run.\n    at ensureCyclePlanReady (file:///private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c7-7lTKkp/bridged-worktree/scripts/agent/plan-guard.mjs:112:11)\n    at Module.main (file:///private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c7-7lTKkp/bridged-worktree/scripts/agent/planetary-realism-audit.mjs:5172:3)\n    at file:///private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c7-7lTKkp/bridged-worktree/[eval1]:7:11\n\nNode.js v22.22.0\n",
+    "stderr": "file:///private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c7-7lTKkp/bridged-worktree/scripts/agent/plan-guard.mjs:112\n    throw new Error(`[agent plan guard] ${commandName || 'agent command'} requires an active cycle directory with plan.md before it can run.`);\n          ^\n\nError: [agent plan guard] agent:planetary-realism-audit requires an active cycle directory with plan.md before it can run.\n    at ensureCyclePlanReady (file:///private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c7-7lTKkp/bridged-worktree/scripts/agent/plan-guard.mjs:112:11)\n    at Module.main (file:///private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c7-7lTKkp/bridged-worktree/scripts/agent/planetary-realism-audit.mjs:5172:3)\n    at file:///private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c7-7lTKkp/bridged-worktree/[eval1]:7:11\n\nNode.js v22.22.0",
+    "stdout": "",
+    "classification": "cycle_guard_contract_block"
+  },
+  "decision": {
+    "verdict": "cycle_guard_contract_block",
+    "nextMove": "Architecture C8: donor-worktree cycle contract repair"
+  }
+}

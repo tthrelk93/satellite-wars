@@ -542,6 +542,44 @@ Rerun the donor-base hybrid benchmark after the Architecture C4 bridge lands and
   - failure message: `Audit completed without expected summary artifact ... Matching files: none`
 - Consequence: the next active move is now `Architecture C6: bridged hybrid attribution design`.
 
+## Architecture C6: Bridged Hybrid Attribution Design
+
+### Objective
+
+Prove why the bridged donor/current hybrid exits successfully yet still fails to yield the requested quick benchmark artifact.
+
+### Result
+
+- Status: completed
+- Verdict: `silent_no_artifact_exit`
+- Key findings:
+  - exit code: `0`
+  - expected summary artifact: missing
+  - fallback default report artifact: missing
+  - cycle violation artifact: missing
+  - stdout summary JSON: absent
+  - new worktree artifacts: none
+  - only emitted process output was a `MODULE_TYPELESS_PACKAGE_JSON` warning while loading bridged donor modules
+- Consequence: the next active move is now `Architecture C7: bridged hybrid artifact contract repair`.
+
+## Architecture C7: Bridged Hybrid Artifact Contract Repair
+
+### Objective
+
+Repair the bridged-hybrid artifact contract by invoking the bridged audit through its exported `main()` path and determine whether the hybrid now yields a real benchmark artifact.
+
+### Result
+
+- Status: completed
+- Verdict: `cycle_guard_contract_block`
+- What C7 proved:
+  - the earlier silent exit in C5/C6 was not a climate result
+  - forcing the bridged audit through explicit `main()` execution surfaced the real blocker
+  - the bridged donor worktree is being stopped by [plan-guard.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/plan-guard.mjs), not by the donor/core hybrid physics seam
+- Failure message:
+  - `[agent plan guard] agent:planetary-realism-audit requires an active cycle directory with plan.md before it can run.`
+- Consequence: the next active move is now `Architecture C8: donor-worktree cycle contract repair`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

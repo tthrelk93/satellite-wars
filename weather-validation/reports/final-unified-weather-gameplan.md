@@ -319,8 +319,21 @@ Architecture C5 is now complete in [earth-weather-architecture-c5-bridged-hybrid
 - failure message:
   - `Audit completed without expected summary artifact ... Matching files: none`
 
+Architecture C6 is now complete in [earth-weather-architecture-c6-bridged-hybrid-attribution-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c6-bridged-hybrid-attribution-design.md):
+- verdict: `silent_no_artifact_exit`
+- exit code was still `0`
+- no expected summary artifact, no fallback artifact, no cycle-violation artifact, and no stdout summary JSON were produced
+- the only emitted process output was a `MODULE_TYPELESS_PACKAGE_JSON` warning
+
+Architecture C7 is now complete in [earth-weather-architecture-c7-bridged-hybrid-artifact-contract-repair.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c7-bridged-hybrid-artifact-contract-repair.md), and it gave us the real blocker:
+- verdict: `cycle_guard_contract_block`
+- forcing the bridged audit through explicit `main()` invocation removed the silent-exit ambiguity
+- the bridged donor worktree is being stopped by [plan-guard.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/plan-guard.mjs)
+- failure message:
+  - `[agent plan guard] agent:planetary-realism-audit requires an active cycle directory with plan.md before it can run.`
+
 So the next active move is now:
-- `Architecture C6: bridged hybrid attribution design`
+- `Architecture C8: donor-worktree cycle contract repair`
 
 ## Hard Rules Going Forward
 

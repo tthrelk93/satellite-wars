@@ -18,6 +18,8 @@ Updated: 2026-04-16
 - Architecture C3 Hybrid Integration Bridge Design: COMPLETED
 - Architecture C4 Donor-Core Integration Bridge Implementation: COMPLETED
 - Architecture C5 Bridged Donor-Base Hybrid Rerun Benchmark: FAILED (`hybrid_boot_failure`)
+- Architecture C6 Bridged Hybrid Attribution Design: COMPLETED
+- Architecture C7 Bridged Hybrid Artifact Contract Repair: FAILED (`cycle_guard_contract_block`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -237,6 +239,37 @@ Updated: 2026-04-16
   - Architecture C is no longer blocked by the original donor-core import/API seam
   - the next boundary is now why the bridged hybrid exits without yielding a benchmark artifact
 - Next active phase: `Architecture C6: bridged hybrid attribution design`
+
+## Architecture C6 decision
+
+- Verdict: `silent_no_artifact_exit`
+- Decision report: [earth-weather-architecture-c6-bridged-hybrid-attribution-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c6-bridged-hybrid-attribution-design.md)
+- Attribution result:
+  - exit code: `0`
+  - expected summary artifact: missing
+  - fallback default report artifact: missing
+  - cycle violation artifact: missing
+  - stdout summary JSON: absent
+  - new worktree artifacts: none
+  - only emitted process output was a `MODULE_TYPELESS_PACKAGE_JSON` warning
+- Interpretation:
+  - the bridged donor/current hybrid was no longer failing on the original ESM/core-API seam
+  - the next question was artifact-contract execution, not climate behavior yet
+- Next active phase: `Architecture C7: bridged hybrid artifact contract repair`
+
+## Architecture C7 decision
+
+- Verdict: `cycle_guard_contract_block`
+- Decision report: [earth-weather-architecture-c7-bridged-hybrid-artifact-contract-repair.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c7-bridged-hybrid-artifact-contract-repair.md)
+- Repair result:
+  - explicit `main()` invocation removed the earlier silent-exit ambiguity
+  - the bridged donor worktree is now blocked by [plan-guard.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/plan-guard.mjs)
+  - failure message:
+    - `[agent plan guard] agent:planetary-realism-audit requires an active cycle directory with plan.md before it can run.`
+- Interpretation:
+  - Architecture C is no longer blocked by donor-core import/API compatibility
+  - the next blocker is the heavy-command cycle contract in donor worktrees
+- Next active phase: `Architecture C8: donor-worktree cycle contract repair`
 
 ## Day-365 benchmark summary
 
