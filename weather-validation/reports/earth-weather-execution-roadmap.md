@@ -1019,6 +1019,65 @@ Keep the C17 carryover carveout and the C22 dry-belt containment contract fixed,
   - but it gave back some of the upper-branch and dry-belt condensation relief, reintroduced carryover/return-branch rebound, and the cross-equatorial sign inversion stayed severe
 - Consequence: the next active move is now `Architecture C25: inner-core equatorial eddy softening attribution`.
 
+## Architecture C25: Inner-Core Equatorial Eddy Softening Attribution
+
+### Objective
+
+Attribute the C24 inner-core narrowing relative to C22 so we can tell whether the narrower footprint relieved the right branch or simply traded lower-mid burden for upper-branch and carryover rebound.
+
+### Result
+
+- Status: completed
+- Verdict: `inner_core_narrowing_relieves_lower_mid_core_but_reopens_upper_carryover_shoulder`
+- What C25 proved:
+  - C24 improved the broad quick-shape metrics relative to C22:
+    - `itczWidthDeg: 23.499 -> 23.275`
+    - `subtropicalDryNorthRatio: 1.137 -> 1.091`
+    - `subtropicalDrySouthRatio: 0.51 -> 0.506`
+  - and it relieved the boundary/lower/mid equatorial burden:
+    - equator boundary-layer total-water flux north: `-5.01709 -> -4.84216`
+    - equator lower total-water flux north: `-17.83744 -> -17.49403`
+    - equator mid total-water flux north: `-16.77592 -> -16.75772`
+    - equator lower zonal vapor flux north: `-14.07888 -> -13.80457`
+    - equator mid zonal vapor flux north: `-13.11577 -> -12.99397`
+  - but it gave back upper-branch and carryover support:
+    - equator upper total-water flux north: `-13.3117 -> -13.59209`
+    - carried-over upper cloud: `0.22097 -> 0.23253`
+    - imported anvil persistence: `0.21933 -> 0.23079`
+    - weak-erosion survival: `0.21143 -> 0.22243`
+    - cloud recirculation proxy: `0.39849 -> 0.49385`
+    - return-branch mass flux: `3348.50751 -> 3447.36194`
+- Interpretation:
+  - the inner-core narrowing relieved the lower-mid equatorial core the way we wanted
+  - but the 10–16° shoulder was still carrying useful upper-branch and dry-belt containment support
+- Consequence: the next active move is now `Architecture C26: partial equatorial shoulder restore experiment`.
+
+## Architecture C26: Partial Equatorial Shoulder Restore Experiment
+
+### Objective
+
+Keep the C24 inner-core narrowing as the base contract and restore only a modest amount of outer shoulder support so the hybrid can test whether some 10–12°/12–14° relief helps the upper branch without recreating the full C22 lower-mid drag.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.412`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.119`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.515`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11952`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.85346`
+- Interpretation:
+  - the partial shoulder restore did improve NH dry-belt ocean condensation and slightly reduced the magnitude of the cross-equatorial sign defect relative to C24
+  - but it also gave back some of the C24 ITCZ and dry-belt-ratio gains, and the cross-equatorial transport sign is still severely inverted
+- Consequence: the next active move is now `Architecture C27: partial equatorial shoulder restore attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

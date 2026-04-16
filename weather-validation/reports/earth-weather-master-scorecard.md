@@ -37,6 +37,8 @@ Updated: 2026-04-16
 - Architecture C22 Equatorial-Band Eddy Softening Carveout Experiment: FAILED (`quick_reject`)
 - Architecture C23 Equatorial-Band Eddy Softening Attribution: COMPLETED
 - Architecture C24 Inner-Core Equatorial Eddy Softening Experiment: FAILED (`quick_reject`)
+- Architecture C25 Inner-Core Equatorial Eddy Softening Attribution: COMPLETED
+- Architecture C26 Partial Equatorial Shoulder Restore Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -599,6 +601,49 @@ Updated: 2026-04-16
   - the inner-core narrowing improved ITCZ width and both dry-belt ratios relative to C22 and eased parts of the lower/mid equatorial branch
   - but it gave back some upper-branch relief, reintroduced carryover/return-branch rebound, and the transport-sign defect remained severe
 - Next active phase: `Architecture C25: inner-core equatorial eddy softening attribution`
+
+## Architecture C25 decision
+
+- Verdict: `inner_core_narrowing_relieves_lower_mid_core_but_reopens_upper_carryover_shoulder`
+- Decision report: [earth-weather-architecture-c25-inner-core-equatorial-eddy-softening-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c25-inner-core-equatorial-eddy-softening-attribution.md)
+- What changed relative to C22:
+  - broad quick-shape metrics improved:
+    - `itczWidthDeg: 23.499 -> 23.275`
+    - `subtropicalDryNorthRatio: 1.137 -> 1.091`
+    - `subtropicalDrySouthRatio: 0.51 -> 0.506`
+  - boundary/lower/mid equatorial burden eased:
+    - equator boundary-layer total-water flux north: `-5.01709 -> -4.84216`
+    - equator lower total-water flux north: `-17.83744 -> -17.49403`
+    - equator mid total-water flux north: `-16.77592 -> -16.75772`
+  - but upper-branch and carryover support rebounded:
+    - equator upper total-water flux north: `-13.3117 -> -13.59209`
+    - carried-over upper cloud: `0.22097 -> 0.23253`
+    - cloud recirculation proxy: `0.39849 -> 0.49385`
+    - return-branch mass flux: `3348.50751 -> 3447.36194`
+- Interpretation:
+  - the inner-core narrowing helped the lower-mid core
+  - but it removed too much useful shoulder support from the upper branch and dry-belt containment side
+- Next active phase: `Architecture C26: partial equatorial shoulder restore experiment`
+
+## Architecture C26 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c26-partial-equatorial-shoulder-restore-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c26-partial-equatorial-shoulder-restore-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - bounded outcome:
+    - `itczWidthDeg: 25.91 -> 23.412`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.119`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.515`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11952`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.85346`
+- Interpretation:
+  - restoring a modest shoulder improved NH dry-belt ocean condensation and slightly reduced the cross-equatorial defect relative to C24
+  - but it still failed the quick gate because the transport-sign inversion remained severe and some C24 dry-belt/ITCZ gains were given back
+- Next active phase: `Architecture C27: partial equatorial shoulder restore attribution`
 
 ## Day-365 benchmark summary
 

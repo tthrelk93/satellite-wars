@@ -515,8 +515,32 @@ Architecture C24 is now complete in [earth-weather-architecture-c24-inner-core-e
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12705`
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -358.07208`
 
+Architecture C25 is now complete in [earth-weather-architecture-c25-inner-core-equatorial-eddy-softening-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c25-inner-core-equatorial-eddy-softening-attribution.md):
+- verdict: `inner_core_narrowing_relieves_lower_mid_core_but_reopens_upper_carryover_shoulder`
+- C24 really did relieve the lower-mid equatorial core relative to C22:
+  - equator boundary-layer total-water flux north: `-5.01709 -> -4.84216`
+  - equator lower total-water flux north: `-17.83744 -> -17.49403`
+  - equator mid total-water flux north: `-16.77592 -> -16.75772`
+- but it also reopened useful shoulder-side support:
+  - equator upper total-water flux north: `-13.3117 -> -13.59209`
+  - carried-over upper cloud: `0.22097 -> 0.23253`
+  - cloud recirculation proxy: `0.39849 -> 0.49385`
+  - return-branch mass flux: `3348.50751 -> 3447.36194`
+
+Architecture C26 is now complete in [earth-weather-architecture-c26-partial-equatorial-shoulder-restore-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c26-partial-equatorial-shoulder-restore-experiment.md):
+- verdict: `quick_reject`
+- the modest shoulder restore did help a few things relative to C24:
+  - `midlatitudeWesterliesNorthU10Ms: 1.214 -> 1.225`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.12705 -> 0.11952`
+  - `crossEquatorialVaporFluxNorthKgM_1S: -358.07208 -> -353.85346`
+- but it still did not cross the real gate:
+  - `itczWidthDeg: 25.91 -> 23.412`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.119`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.515`
+  - `crossEquatorialVaporFluxNorthKgM_1S` remained a severe regression against the trusted positive target
+
 So the next active move is now:
-- `Architecture C25: inner-core equatorial eddy softening attribution`
+- `Architecture C27: partial equatorial shoulder restore attribution`
 
 ## Hard Rules Going Forward
 
