@@ -47,6 +47,8 @@ Updated: 2026-04-16
 - Architecture C32 Organized-Support Carry-Input Carveout Experiment: FAILED (`quick_reject`)
 - Architecture C33 Organized-Support Carry-Input Carveout Attribution: COMPLETED
 - Architecture C34 Potential-Half-Relax Carry-Input Experiment: FAILED (`quick_reject`)
+- Architecture C35 Potential-Half-Relax Carry-Input Attribution: COMPLETED
+- Architecture C36 Organized-Support Half-Relax Carry-Input Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -818,6 +820,43 @@ Updated: 2026-04-16
   - the potential half-relax was effectively inert at the quick-score level relative to C32
   - that means the strict organized-support cap or some other upstream admission condition is likely still the active binder, so the next step is attribution rather than more potential-cap nudging
 - Next active phase: `Architecture C35: potential-half-relax carry-input attribution`
+
+## Architecture C35 decision
+
+- Verdict: `potential_half_relax_inert_potential_cap_not_primary_binder`
+- Decision report: [earth-weather-architecture-c35-potential-half-relax-carry-input-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c35-potential-half-relax-carry-input-attribution.md)
+- Attribution result:
+  - C34 is unchanged from C32 to reporting precision across:
+    - quick score
+    - equatorial transport
+    - dry-belt receiver containment
+    - thermodynamic regime classification
+  - the strict potential cap is therefore not the live binder in this family
+- Interpretation:
+  - the remaining lower-mid equatorial core defect is being set by the strict organized-support admission side, not the potential cap
+- Next active phase: `Architecture C36: organized-support half-relax carry-input experiment`
+
+## Architecture C36 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c36-organized-support-half-relax-carry-input-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c36-organized-support-half-relax-carry-input-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - bounded outcome:
+    - `itczWidthDeg: 25.91 -> 23.315`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.093`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.502`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.232`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12693`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
+- Interpretation:
+  - half-relaxing organized support is active, unlike C34
+  - but it mostly collapses back toward the earlier C30 tradeoff:
+    - some receiver-side relief is given back
+    - the cross-equatorial sign defect remains severe
+- Next active phase: `Architecture C37: organized-support half-relax carry-input attribution`
 
 ## Day-365 benchmark summary
 

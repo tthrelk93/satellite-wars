@@ -615,8 +615,25 @@ Architecture C34 is now complete in [earth-weather-architecture-c34-potential-ha
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
 - so the live binder is probably not the potential cap by itself
 
+Architecture C35 is now complete in [earth-weather-architecture-c35-potential-half-relax-carry-input-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c35-potential-half-relax-carry-input-attribution.md):
+- verdict: `potential_half_relax_inert_potential_cap_not_primary_binder`
+- C35 made the C34 result explicit:
+  - C34 is unchanged from C32 to reporting precision across the quick score, transport stack, and receiver containment
+  - so the strict potential cap is not the live binder in this family
+
+Architecture C36 is now complete in [earth-weather-architecture-c36-organized-support-half-relax-carry-input-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c36-organized-support-half-relax-carry-input-experiment.md):
+- verdict: `quick_reject`
+- the organized-support half-relax is active, but it mostly collapses back toward the older C30 tradeoff:
+  - `itczWidthDeg: 25.91 -> 23.315`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.093`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.502`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.232`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12693`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
+- so organized support is a live lever, but this half-relax still does not clear the sign defect
+
 So the next active move is now:
-- `Architecture C35: potential-half-relax carry-input attribution`
+- `Architecture C37: organized-support half-relax carry-input attribution`
 
 ## Hard Rules Going Forward
 

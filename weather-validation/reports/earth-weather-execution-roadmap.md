@@ -1296,6 +1296,65 @@ Keep the C32 strict organized-support cap fixed and only half-relax the convecti
   - that means the potential cap was not the main active binder in the admitted subset, so more potential-cap tuning is not justified without another attribution pass
 - Consequence: the next active move is now `Architecture C35: potential-half-relax carry-input attribution`.
 
+## Architecture C35: Potential-Half-Relax Carry-Input Attribution
+
+### Objective
+
+Prove whether the C34 potential half-relax changed any live climate or transport state at all, so the next experiment targets the real active binder instead of continuing to retune an inert cap.
+
+### Result
+
+- Status: completed
+- Verdict: `potential_half_relax_inert_potential_cap_not_primary_binder`
+- What C35 proved:
+  - C34 is unchanged from C32 to reporting precision across the quick screen:
+    - `itczWidthDeg: 23.374 -> 23.374`
+    - `subtropicalDryNorthRatio: 1.122 -> 1.122`
+    - `subtropicalDrySouthRatio: 0.493 -> 0.493`
+    - `midlatitudeWesterliesNorthU10Ms: 1.219 -> 1.219`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.10807 -> 0.10807`
+    - `crossEquatorialVaporFluxNorthKgM_1S: -356.96839 -> -356.96839`
+  - the equatorial transport stack is also unchanged:
+    - lower total-water flux north: `-18.3439 -> -18.3439`
+    - mid total-water flux north: `-16.74764 -> -16.74764`
+    - upper total-water flux north: `-12.82647 -> -12.82647`
+  - dry-belt receiver containment is unchanged:
+    - carryover upper cloud: `0.17351 -> 0.17351`
+    - imported anvil persistence: `0.17183 -> 0.17183`
+    - cloud recirculation proxy: `0.44108 -> 0.44108`
+- Interpretation:
+  - the half-relaxed potential cap is inert in this family
+  - the strict organized-support cap is the remaining live binder, not the potential cap
+- Consequence: the next active move is now `Architecture C36: organized-support half-relax carry-input experiment`.
+
+## Architecture C36: Organized-Support Half-Relax Carry-Input Experiment
+
+### Objective
+
+Keep the strict potential cap fixed, partially relax only organized support, and test whether the lower-mid equatorial core can recover without fully reopening the dry-belt receiver side.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.315`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.093`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.502`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.232`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12693`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
+- Interpretation:
+  - organized-support half-relax is active, unlike C34
+  - but it mostly returns the hybrid to the older C30 tradeoff:
+    - some receiver-side containment is given back
+    - the cross-equatorial sign defect remains severe
+- Consequence: the next active move is now `Architecture C37: organized-support half-relax carry-input attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective
