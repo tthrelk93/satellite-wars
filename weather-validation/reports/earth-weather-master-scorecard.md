@@ -51,6 +51,14 @@ Updated: 2026-04-16
 - Architecture C36 Organized-Support Half-Relax Carry-Input Experiment: FAILED (`quick_reject`)
 - Architecture C37 Organized-Support Half-Relax Carry-Input Attribution: COMPLETED
 - Architecture C38 Inner-Core Organized-Support Restore Experiment: FAILED (`quick_reject`)
+- Architecture C39 Inner-Core Organized-Support Restore Attribution: COMPLETED
+- Architecture C40 Transition-Band Organized-Support Restore Experiment: FAILED (`quick_reject`)
+- Architecture C41 Transition-Band Organized-Support Restore Attribution: COMPLETED
+- Architecture C42 Equatorward-Transition Organized-Support Restore Experiment: FAILED (`quick_reject`)
+- Architecture C43 Equatorward-Transition Organized-Support Restore Attribution: COMPLETED
+- Architecture C44 26p25-Centered Organized-Support Restore Experiment: FAILED (`quick_reject`)
+- Architecture C45 26p25-Centered Organized-Support Restore Attribution: COMPLETED
+- Architecture C46 26p25-33p75 Coupled Organized-Support Restore Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -890,7 +898,7 @@ Updated: 2026-04-16
 - Interpretation:
   - the inner-core restore was also inert at the quick-score level relative to the strict C32 carveout
   - so the blocked subset is not being reached by the simple inner-core geometry
-- Next active phase: `Architecture C45: 26p25-centered organized-support restore attribution`
+- Next active phase: `Architecture C47: 26p25-33p75 coupled organized-support restore attribution`
 - C39 result:
   - verdict: `inner_core_restore_inert_active_override_targets_outside_restore_band`
   - the live carry-input override rows stayed fixed at `18.75°`, `26.25°`, `33.75°` and mirrored southern rows, outside the C38 inner-core taper
@@ -928,6 +936,19 @@ Updated: 2026-04-16
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
   - interpretation: the isolated `26.25°` lane is necessary but not sufficient; by itself it also snaps back to C32
+- C45 result:
+  - verdict: `isolated_26p25_restore_insufficient_c40_signal_requires_poleward_shoulder_coupling`
+  - C44 matches the strict C32 quick climate exactly
+  - the live C40 signal depends on coupling between the `26.25°` lane and the poleward shoulder
+- C46 result:
+  - verdict: `quick_reject`
+  - `itczWidthDeg: 25.91 -> 23.315`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.093`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.502`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.232`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12693`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
+  - interpretation: the coupled `26.25°–33.75°` shoulder is active, but it reproduces the older C30 weak-restore recapture regime rather than the smaller C40 sign-relief signal
 
 ## Day-365 benchmark summary
 

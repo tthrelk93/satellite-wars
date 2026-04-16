@@ -697,8 +697,23 @@ Architecture C44 is now complete:
 - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
 - interpretation: the isolated `26.25°` lane is not sufficient on its own, so the small C40 sign-relief signal depends on broader transition geometry coupling
 
+Architecture C45 is now complete:
+- verdict: `isolated_26p25_restore_insufficient_c40_signal_requires_poleward_shoulder_coupling`
+- C44 reproduces the strict C32 quick climate exactly
+- interpretation: the isolated `26.25°` lane is necessary but not sufficient, so the next honest lever is the coupled `26.25°–33.75°` poleward shoulder
+
+Architecture C46 is now complete:
+- verdict: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.315`
+- `subtropicalDryNorthRatio: 1.534 -> 1.093`
+- `subtropicalDrySouthRatio: 1.199 -> 0.502`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.232`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12693`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
+- interpretation: the coupled `26.25°–33.75°` shoulder is active, but it reproduces the broader C30 weak-restore carry-input recapture state instead of the smaller C40 sign-relief state
+
 So the next active move is now:
-- `Architecture C45: 26p25-centered organized-support restore attribution`
+- `Architecture C47: 26p25-33p75 coupled organized-support restore attribution`
 
 ## Hard Rules Going Forward
 

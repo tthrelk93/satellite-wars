@@ -1580,6 +1580,62 @@ Keep the strict C32 carveout fixed everywhere except a centered restore around t
   - so the live C40 relief requires broader transition-geometry coupling, not just the `26.25°` lane in isolation
 - Consequence: the next active move is now `Architecture C45: 26p25-centered organized-support restore attribution`.
 
+## Architecture C45: 26p25-Centered Organized-Support Restore Attribution
+
+### Objective
+
+Prove whether the isolated `26.25°` restore is merely too weak or whether it fundamentally cannot carry the live C40 signal by itself.
+
+### Contract
+
+Compare C44 against both the strict C32 carveout and the broader C40 transition-band restore. If C44 fully matches C32 while both the `26.25°` and `33.75°` lanes revert from C40, then the honest next move is a coupled poleward-shoulder restore instead of any more single-lane tuning.
+
+### Result
+
+- Status: completed
+- Verdict: `isolated_26p25_restore_insufficient_c40_signal_requires_poleward_shoulder_coupling`
+- Key evidence:
+  - C32 vs C44 quick metrics are identical to reporting precision
+  - `26.25°` override hits: C40 `18.667`, C44 `18.625`
+  - `26.25°` carried-over upper cloud: C40 `0.06`, C44 `0.05`
+  - `33.75°` override hits: C40 `5.51`, C44 `5.698`
+  - `33.75°` carried-over upper cloud: C40 `0.424`, C44 `0.429`
+- Interpretation:
+  - the isolated `26.25°` lane is necessary but not sufficient
+  - the live C40 signal depends on coupling between the `26.25°` lane and the poleward shoulder rather than on `26.25°` alone
+- Consequence: the next active move became `Architecture C46: 26p25-33p75 coupled organized-support restore experiment`.
+
+## Architecture C46: 26p25-33p75 Coupled Organized-Support Restore Experiment
+
+### Objective
+
+Test whether restoring organized-support only across the coupled `26.25°–33.75°` poleward shoulder is sufficient to reproduce the only live C40 sign-relief signal without reopening the full broad transition band.
+
+### Contract
+
+Keep the strict C32 organized-support / potential carveout fixed in the equatorial core and restore organized-support only across the coupled poleward shoulder. Leave `18.75°` and the equatorial core outside the active restore geometry.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.315`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.093`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.502`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.232`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12693`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
+- Interpretation:
+  - the coupled `26.25°–33.75°` shoulder is a real active lever, unlike the inert single-lane C44 restore
+  - but it does not recreate the smaller C40 sign-relief state
+  - instead it reproduces the broader C30 weak-restore carry-input recapture regime to reporting precision
+- Consequence: the next active move is now `Architecture C47: 26p25-33p75 coupled organized-support restore attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective
