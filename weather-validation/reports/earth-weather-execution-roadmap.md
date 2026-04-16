@@ -1918,6 +1918,62 @@ Preserve the strict C32 equatorial-core carveout, preserve the active C54 `26.25
   - the right next move is attribution, not another immediate support-lane variation
 - Consequence: the next active move is now `Architecture C57: 26p25 carryover containment with 18p75 transition-support preserve attribution`.
 
+## Architecture C57: 26p25 Carryover Containment With 18p75 Transition-Support Preserve Attribution
+
+### Objective
+
+Prove whether the narrow `18.75°` organized-support preserve in C56 touched the live transition-export binder at all, or whether it was fully inert relative to the active C54 receiver-containment regime.
+
+### Contract
+
+Compare C56 directly against C54 across the quick score, NH ocean moisture attribution, equatorial transport interfaces, and the `18.75°` / `26.25°` / `33.75°` shoulder rows.
+
+### Result
+
+- Status: completed
+- Verdict: `transition_support_preserve_inert_organized_support_only_not_live_binder`
+- Key evidence:
+  - C54 and C56 quick metrics match exactly to reporting precision
+  - C54 and C56 NH ocean persistence / carryover / weak-erosion survival match exactly
+  - C54 and C56 equator lower/mid/upper transport and `35°` import match exactly
+  - C54 and C56 `18.75°`, `26.25°`, and `33.75°` shoulder rows match exactly
+- Interpretation:
+  - the narrow `18.75°` organized-support-only preserve never touched the live binder
+  - C56 did not create a new middle state and did not even partially relieve the transition-export defect
+  - the next bounded move must target the broader local transition carry-input contract around `18–22.5°N`, not only the fresh organized-support cap
+- Consequence: the next active move became `Architecture C58: 26p25 carryover containment with 18p75 transition carry-input preserve experiment`.
+
+## Architecture C58: 26p25 Carryover Containment With 18p75 Transition Carry-Input Preserve Experiment
+
+### Objective
+
+Keep the active C54 `26.25°` receiver carryover-containment lane, but relax the broader local carry-input contract around `18.75°` so the transition-export lane has a real chance to recover.
+
+### Contract
+
+Preserve the active C54 receiver containment, keep the transition-band organized-support restore in place, and add a local `18.75°` transition carry-input preserve covering organized-support max, potential max, subtropical-suppression floor, dominance floor, and minimum residual-mass gate.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.634`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.231`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.497`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.194`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13447`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -351.9993`
+- Interpretation:
+  - C58 is not inert; it creates a real middle state and slightly relieves the cross-equatorial sign defect relative to C54 (`-362.46654 -> -351.9993`)
+  - but that modest export-side relief gives back part of the C54 receiver-side win: ITCZ width, NH dry-belt ratio, NH westerlies, and NH dry-belt ocean condensation all move the wrong way relative to C54
+  - the next bounded move is attribution, not another immediate preserve-geometry guess
+- Consequence: the next active move is now `Architecture C59: 26p25 carryover containment with 18p75 transition carry-input preserve attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

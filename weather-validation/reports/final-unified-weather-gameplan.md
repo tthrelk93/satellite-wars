@@ -788,6 +788,23 @@ Architecture C56 is now complete:
 So the next active move is now:
 - `Architecture C57: 26p25 carryover containment with 18p75 transition-support preserve attribution`
 
+Architecture C57 is now complete:
+- verdict: `transition_support_preserve_inert_organized_support_only_not_live_binder`
+- interpretation: C54 and C56 match exactly across the quick score, NH ocean moisture attribution, equatorial transport interfaces, and the `18.75°` / `26.25°` / `33.75°` shoulder rows, so the narrow organized-support-only preserve never touched the live binder
+
+Architecture C58 is now complete:
+- verdict: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.634`
+- `subtropicalDryNorthRatio: 1.534 -> 1.231`
+- `subtropicalDrySouthRatio: 1.199 -> 0.497`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.194`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13447`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -351.9993`
+- interpretation: the broader `18.75°` transition carry-input preserve is active and slightly relieves the sign defect relative to C54, but it gives back part of the receiver-side win and still fails the quick gate
+
+So the next active move is now:
+- `Architecture C59: 26p25 carryover containment with 18p75 transition carry-input preserve attribution`
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow
