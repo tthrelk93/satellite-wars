@@ -22,6 +22,8 @@ Updated: 2026-04-16
 - Architecture C7 Bridged Hybrid Artifact Contract Repair: FAILED (`cycle_guard_contract_block`)
 - Architecture C8 Donor-Worktree Cycle Contract Repair: COMPLETED
 - Architecture C9 Donor-Worktree Runtime Fixture Repair: COMPLETED
+- Architecture C10 Cycled Hybrid Benchmark Rerun: FAILED (`quick_reject`)
+- Architecture C11 Cycled Hybrid Flux Inversion Attribution: COMPLETED
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -300,6 +302,41 @@ Updated: 2026-04-16
   - donor hybrid runtime contracts are now restored far enough to resume actual benchmark work
   - the next bounded move is now climate benchmarking, not more integration surgery
 - Next active phase: `Architecture C10: cycled hybrid benchmark rerun`
+
+## Architecture C10 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c10-cycled-hybrid-benchmark-rerun.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c10-cycled-hybrid-benchmark-rerun.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - strong improvements:
+    - `itczWidthDeg: 25.91 -> 24.221`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.317`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.593`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.061`
+  - blocking regression:
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -371.9765`
+- Interpretation:
+  - the repaired donor/current hybrid is now a real benchmarked climate candidate
+  - the next blocker is not integration anymore; it is a single severe circulation transport failure
+- Next active phase: `Architecture C11: cycled hybrid flux inversion attribution`
+
+## Architecture C11 decision
+
+- Verdict: `equatorial_overturning_polarity_inversion`
+- Decision report: [earth-weather-architecture-c11-cycled-hybrid-flux-inversion-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c11-cycled-hybrid-flux-inversion-attribution.md)
+- Attribution result:
+  - equatorial total-water flux north: `148.97786 -> -381.81173`
+  - equatorial zonal-mean vapor flux north: `160.44983 -> -274.70821`
+  - equatorial eddy vapor flux north: `-12.37515 -> -105.45284`
+  - equatorial low-level velocity mean: `11.78514 -> -20.46744`
+  - ITCZ latitude still moves north and NH westerlies still improve
+- Interpretation:
+  - the repaired hybrid’s remaining blocker is an equatorial overturning polarity flip, not generic climate weakness
+  - the next bounded move should target equatorial overturning sign while preserving the dry-belt and NH-westerly gains
+- Next active phase: `Architecture C12: equatorial overturning sign contract design`
 
 ## Day-365 benchmark summary
 

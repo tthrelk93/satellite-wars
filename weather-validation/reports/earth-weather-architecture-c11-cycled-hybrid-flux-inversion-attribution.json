@@ -1,0 +1,84 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c11-cycled-hybrid-flux-inversion-attribution.v1",
+  "generatedAt": "2026-04-16T06:09:43.503Z",
+  "decision": {
+    "verdict": "equatorial_overturning_polarity_inversion",
+    "nextMove": "Architecture C12: equatorial overturning sign contract design"
+  },
+  "metricSummary": {
+    "offItczLatDeg": 0.919,
+    "onItczLatDeg": 5.175,
+    "offItczWidthDeg": 25.91,
+    "onItczWidthDeg": 24.221,
+    "offDryNorthRatio": 1.534,
+    "onDryNorthRatio": 1.317,
+    "offDrySouthRatio": 1.199,
+    "onDrySouthRatio": 0.593,
+    "offWesterlies": 0.531,
+    "onWesterlies": 1.061,
+    "offCrossEquatorialFlux": 143.95306,
+    "onCrossEquatorialFlux": -371.9765
+  },
+  "interfaceSummary": {
+    "offEquator": {
+      "targetLatDeg": 0,
+      "totalWaterFluxNorthKgM_1S": 148.97786,
+      "vaporFluxNorthKgM_1S": 148.07468,
+      "vaporFluxZonalMeanComponentKgM_1S": 160.44983,
+      "vaporFluxEddyComponentKgM_1S": -12.37515,
+      "lowerTroposphereVaporFluxNorthKgM_1S": 55.79432,
+      "midUpperTroposphereVaporFluxNorthKgM_1S": 92.28036,
+      "lowLevelVelocityMeanMs": 11.78514,
+      "lowerMidVelocityMeanMs": 11.88336,
+      "lowerDeepVelocityMeanMs": 11.55131
+    },
+    "onEquator": {
+      "targetLatDeg": 0,
+      "totalWaterFluxNorthKgM_1S": -381.81173,
+      "vaporFluxNorthKgM_1S": -380.16105,
+      "vaporFluxZonalMeanComponentKgM_1S": -274.70821,
+      "vaporFluxEddyComponentKgM_1S": -105.45284,
+      "lowerTroposphereVaporFluxNorthKgM_1S": -131.8214,
+      "midUpperTroposphereVaporFluxNorthKgM_1S": -248.33965,
+      "lowLevelVelocityMeanMs": -20.46744,
+      "lowerMidVelocityMeanMs": -21.19405,
+      "lowerDeepVelocityMeanMs": -21.54448
+    },
+    "offNorth35": {
+      "targetLatDeg": 35,
+      "totalWaterFluxNorthKgM_1S": -84.83678,
+      "vaporFluxNorthKgM_1S": -102.1534,
+      "vaporFluxZonalMeanComponentKgM_1S": -71.12651,
+      "vaporFluxEddyComponentKgM_1S": -31.02689,
+      "lowerTroposphereVaporFluxNorthKgM_1S": -60.24036,
+      "midUpperTroposphereVaporFluxNorthKgM_1S": -41.91303,
+      "lowLevelVelocityMeanMs": -14.83775,
+      "lowerMidVelocityMeanMs": -13.9677,
+      "lowerDeepVelocityMeanMs": -12.72429
+    },
+    "onNorth35": {
+      "targetLatDeg": 35,
+      "totalWaterFluxNorthKgM_1S": -384.99557,
+      "vaporFluxNorthKgM_1S": -386.71871,
+      "vaporFluxZonalMeanComponentKgM_1S": -270.27356,
+      "vaporFluxEddyComponentKgM_1S": -116.44514,
+      "lowerTroposphereVaporFluxNorthKgM_1S": -77.6536,
+      "midUpperTroposphereVaporFluxNorthKgM_1S": -309.06511,
+      "lowLevelVelocityMeanMs": -18.82572,
+      "lowerMidVelocityMeanMs": -18.23529,
+      "lowerDeepVelocityMeanMs": -17.46027
+    }
+  },
+  "hadleySummary": {
+    "offNorthReturnKgM_1S": 2527.7695,
+    "onNorthReturnKgM_1S": 3362.08435,
+    "offLocalImportedProxy": "0.11028 / 0.88972",
+    "onLocalImportedProxy": "null / null"
+  },
+  "moistureSummary": {
+    "offUpperCloudPathKgM2": 0.21338,
+    "onUpperCloudPathKgM2": 0.40135,
+    "offOceanCondKgM2": 0.1413,
+    "onOceanCondKgM2": 0.14095
+  }
+}

@@ -345,8 +345,23 @@ Architecture C9 is now complete in [earth-weather-architecture-c9-donor-worktree
 - the requested quick artifact is live again:
   - [earth-weather-architecture-c9-bridged-hybrid-quick.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c9-bridged-hybrid-quick.json)
 
+Architecture C10 is now complete in [earth-weather-architecture-c10-cycled-hybrid-benchmark-rerun.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c10-cycled-hybrid-benchmark-rerun.md):
+- verdict: `quick_reject`
+- the repaired donor/current hybrid is now a real climate candidate and improves `4 / 6` core quick metrics
+- the only severe quick-gate regression is:
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -371.9765`
+
+Architecture C11 is now complete in [earth-weather-architecture-c11-cycled-hybrid-flux-inversion-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c11-cycled-hybrid-flux-inversion-attribution.md):
+- verdict: `equatorial_overturning_polarity_inversion`
+- the remaining blocker is not generic climate weakness
+- it is a polarity reversal in equatorial overturning:
+  - equatorial total-water flux north: `148.97786 -> -381.81173`
+  - equatorial low-level velocity mean: `11.78514 -> -20.46744`
+  - equatorial zonal-mean vapor flux north: `160.44983 -> -274.70821`
+  - equatorial eddy vapor flux north: `-12.37515 -> -105.45284`
+
 So the next active move is now:
-- `Architecture C10: cycled hybrid benchmark rerun`
+- `Architecture C12: equatorial overturning sign contract design`
 
 ## Hard Rules Going Forward
 

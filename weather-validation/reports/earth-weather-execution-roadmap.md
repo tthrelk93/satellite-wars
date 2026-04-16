@@ -618,6 +618,53 @@ Restore the donor-worktree runtime fixture contract by forward-porting the headl
   - the bridged rerun still emits the existing `MODULE_TYPELESS_PACKAGE_JSON` warning, but it is no longer blocking execution
 - Consequence: the next active move is now `Architecture C10: cycled hybrid benchmark rerun`.
 
+## Architecture C10: Cycled Hybrid Benchmark Rerun
+
+### Objective
+
+Run the first full donor/current hybrid climate benchmark after donor-worktree cycle and runtime contracts were restored, and decide whether the repaired hybrid can now pass the quick climate gate.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- What C10 proved:
+  - the repaired donor/current hybrid is now a real climate candidate, not an integration ghost
+  - it materially improves `itczWidthDeg`, both dry-belt ratios, and `midlatitudeWesterliesNorthU10Ms`
+  - it still fails the quick gate because cross-equatorial vapor flux flips from healthy northward transport to strong southward transport
+- Supporting artifacts copied into the repo:
+  - [earth-weather-architecture-c10-bridged-hybrid-quick.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c10-bridged-hybrid-quick.json)
+  - [earth-weather-architecture-c10-bridged-hybrid-quick-transport-interface-budget.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c10-bridged-hybrid-quick-transport-interface-budget.json)
+  - [earth-weather-architecture-c10-bridged-hybrid-quick-hadley-partition-summary.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c10-bridged-hybrid-quick-hadley-partition-summary.json)
+  - [earth-weather-architecture-c10-bridged-hybrid-quick-moisture-attribution.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c10-bridged-hybrid-quick-moisture-attribution.json)
+- Consequence: the next active move is now `Architecture C11: cycled hybrid flux inversion attribution`.
+
+## Architecture C11: Cycled Hybrid Flux Inversion Attribution
+
+### Objective
+
+Prove whether the remaining quick-gate failure is a generic climate weakness or a narrower transport-polarity defect in the repaired donor/current hybrid.
+
+### Result
+
+- Status: completed
+- Verdict: `equatorial_overturning_polarity_inversion`
+- What C11 proved:
+  - the hybrid does not fail because the entire climate scaffold is weak
+  - four of the six core quick metrics improve materially
+  - the remaining blocker is a polarity reversal in equatorial overturning:
+    - cross-equatorial vapor flux north: `143.95306 -> -371.9765`
+    - equatorial low-level velocity mean: `11.78514 -> -20.46744`
+    - equatorial zonal-mean vapor flux north: `160.44983 -> -274.70821`
+    - equatorial eddy vapor flux north: `-12.37515 -> -105.45284`
+- Secondary clue:
+  - the low-level source partition proxy collapses to `null / null` in the hybrid Hadley summary, so the next contract should restore equatorial overturning sign without throwing away the dry-belt and NH-westerly gains already earned
+- Consequence: the next active move is now `Architecture C12: equatorial overturning sign contract design`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective
