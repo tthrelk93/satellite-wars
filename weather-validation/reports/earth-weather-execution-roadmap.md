@@ -261,6 +261,7 @@ Rebuild the circulation scaffold first, then only re-port partition behavior tha
 
 - `B1-circulation-scaffold-rebuild`
 - `B2-explicit-circulation-state-port`
+- `B3-direct-rollback-circulation-splice`
 
 ### Result
 
@@ -303,6 +304,78 @@ Test whether the circulation split can be improved by resetting floor/boost inhe
     - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.16433`
     - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 147.25094`
 - Consequence: broad scaffold lightening is not enough. Move to `Architecture B2: explicit circulation-state port`.
+
+## Architecture B2: Explicit Circulation-State Port
+
+### Objective
+
+Test whether explicit circulation-state carriers can recover circulation on top of the best B1 scaffold without reopening the broad current-branch dampers.
+
+### Primary files and outputs
+
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [earth-weather-architecture-b2-circulation-state-port.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/earth-weather-architecture-b2-circulation-state-port.mjs)
+- [earth-weather-architecture-b2-circulation-state-port.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b2-circulation-state-port.md)
+
+### Candidate family
+
+- `soft-containment-return-flow-port`
+- `soft-containment-omega-port`
+- `open-circulation-bundle`
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Best quick candidate: `soft-containment-omega-port`
+- Quick screen outcome:
+  - improved metrics: `1 / 6`
+  - severe regressions: `itczWidthDeg`
+  - partial movement:
+    - `subtropicalDryNorthRatio: 1.534 -> 1.504`
+  - but explicit circulation-state ports on the B1 scaffold still did not recover circulation:
+    - `itczWidthDeg: 25.91 -> 26.219`
+    - `subtropicalDrySouthRatio: 1.199 -> 1.201`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.16605`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 147.22336`
+- Consequence: explicit circulation ports alone are not enough on the weakened B1 scaffold. Move to `Architecture B3: direct rollback circulation splice`.
+
+## Architecture B3: Direct Rollback Circulation Splice
+
+### Objective
+
+Test whether a stronger A2-style rollback floor/containment base can preserve current NH partition gains while directly splicing in rollback-leaning circulation carriers.
+
+### Primary files and outputs
+
+- [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- [earth-weather-architecture-b3-rollback-circulation-splice.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/earth-weather-architecture-b3-rollback-circulation-splice.mjs)
+- [earth-weather-architecture-b3-rollback-circulation-splice.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b3-rollback-circulation-splice.md)
+
+### Candidate family
+
+- `ported-floor-soft-containment-return-flow`
+- `ported-floor-soft-containment-omega`
+- `ported-floor-open-bundle`
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Best quick candidate: `ported-floor-soft-containment-omega`
+- Quick screen outcome:
+  - improved metrics: `2 / 6`
+  - severe regressions: none
+  - preserved some current-branch NH partition behavior:
+    - `itczWidthDeg: 25.91 -> 25.837`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.512`
+  - but the circulation recovery contract still failed:
+    - `subtropicalDrySouthRatio: 1.199 -> 1.202`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.14213`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 144.56866`
+- Consequence: Architecture B is now exhausted as a parameter-only family. Move to `Architecture C: code-level rollback/current hybridization design`.
 
 ## Phase 1: Climate Base Recovery
 

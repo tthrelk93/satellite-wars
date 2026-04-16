@@ -10,7 +10,8 @@ Updated: 2026-04-16
 - Architecture A2 Circulation-Preserving Partition Port: FAILED (`quick_reject`)
 - Architecture B Circulation-First Partition Rebuild: COMPLETED
 - Architecture B1 Circulation Scaffold Rebuild: FAILED (`quick_reject`)
-- Architecture B2 Explicit Circulation-State Port: NEXT
+- Architecture B2 Explicit Circulation-State Port: FAILED (`quick_reject`)
+- Architecture B3 Direct Rollback Circulation Splice: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -91,6 +92,42 @@ Updated: 2026-04-16
     - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.16433`
     - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 147.25094`
 - Next active phase: `Architecture B2: explicit circulation-state port`
+
+## Architecture B2 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-b2-circulation-state-port.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b2-circulation-state-port.md)
+- Best quick candidate: `soft-containment-omega-port`
+- Quick result:
+  - improved metrics: `1 / 6`
+  - severe regressions: `itczWidthDeg`
+  - partial movement:
+    - `subtropicalDryNorthRatio: 1.534 -> 1.504`
+  - but explicit circulation-state ports on the weakened B1 scaffold still failed:
+    - `itczWidthDeg: 25.91 -> 26.219`
+    - `subtropicalDrySouthRatio: 1.199 -> 1.201`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.16605`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 147.22336`
+- Next active phase: `Architecture B3: direct rollback circulation splice`
+
+## Architecture B3 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-b3-rollback-circulation-splice.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b3-rollback-circulation-splice.md)
+- Best quick candidate: `ported-floor-soft-containment-omega`
+- Quick result:
+  - improved metrics: `2 / 6`
+  - severe regressions: none
+  - preserved some current-branch NH partition gains:
+    - `itczWidthDeg: 25.91 -> 25.837`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.512`
+  - but the direct rollback splice still could not recover the circulation half of the contract:
+    - `subtropicalDrySouthRatio: 1.199 -> 1.202`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.14213`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 144.56866`
+- Next active phase: `Architecture C: code-level rollback/current hybridization design`
 
 ## Day-365 benchmark summary
 

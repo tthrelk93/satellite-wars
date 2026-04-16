@@ -210,6 +210,47 @@ That means:
 - broad lightening or narrowing of the subtropical drying scaffold is not enough
 - the next bounded family needs to port or reconstruct explicit circulation-state behavior, not just rescale the current scaffold
 
+Architecture B2 is now completed in:
+- [earth-weather-architecture-b2-circulation-state-port.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b2-circulation-state-port.md)
+
+Its result is another bounded reject:
+- verdict: `quick_reject`
+- best quick candidate: `soft-containment-omega-port`
+- partial movement:
+  - `subtropicalDryNorthRatio: 1.534 -> 1.504`
+- but explicit circulation-state ports on the B1 scaffold still failed:
+  - `itczWidthDeg: 25.91 -> 26.219`
+  - `subtropicalDrySouthRatio: 1.199 -> 1.201`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.16605`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 147.22336`
+
+So the active next move became:
+- `Architecture B3: direct rollback circulation splice`
+
+Architecture B3 is now completed in:
+- [earth-weather-architecture-b3-rollback-circulation-splice.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-b3-rollback-circulation-splice.md)
+
+Its result is the strongest bounded reject in the B family:
+- verdict: `quick_reject`
+- best quick candidate: `ported-floor-soft-containment-omega`
+- it preserved some current NH partition behavior:
+  - `itczWidthDeg: 25.91 -> 25.837`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.512`
+- but it still could not recover the missing circulation half:
+  - `subtropicalDrySouthRatio: 1.199 -> 1.202`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 0.531`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.14213`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 144.56866`
+
+So the next active move is now:
+- `Architecture C: code-level rollback/current hybridization design`
+
+That means:
+- Architecture B is exhausted as a parameter-only family
+- the remaining path needs broader code-level hybridization between the rollback circulation base and the current partition-preserving branch
+- more parameter-only local patching would not be a responsible use of time here
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow

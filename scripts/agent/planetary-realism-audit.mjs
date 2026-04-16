@@ -86,6 +86,8 @@ let atlanticTransitionCarryoverContainmentPatchMode = 'default';
 let architectureA1BalanceContractMode = 'default';
 let architectureA2PartitionPortMode = 'default';
 let architectureB1CirculationScaffoldMode = 'default';
+let architectureB2CirculationStatePortMode = 'default';
+let architectureB3RollbackCirculationSpliceMode = 'default';
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -153,6 +155,10 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--architecture-a2-partition-port=')) architectureA2PartitionPortMode = arg.slice('--architecture-a2-partition-port='.length);
   else if (arg === '--architecture-b1-circulation-scaffold' && argv[i + 1]) architectureB1CirculationScaffoldMode = argv[++i];
   else if (arg.startsWith('--architecture-b1-circulation-scaffold=')) architectureB1CirculationScaffoldMode = arg.slice('--architecture-b1-circulation-scaffold='.length);
+  else if (arg === '--architecture-b2-circulation-state-port' && argv[i + 1]) architectureB2CirculationStatePortMode = argv[++i];
+  else if (arg.startsWith('--architecture-b2-circulation-state-port=')) architectureB2CirculationStatePortMode = arg.slice('--architecture-b2-circulation-state-port='.length);
+  else if (arg === '--architecture-b3-rollback-circulation-splice' && argv[i + 1]) architectureB3RollbackCirculationSpliceMode = argv[++i];
+  else if (arg.startsWith('--architecture-b3-rollback-circulation-splice=')) architectureB3RollbackCirculationSpliceMode = arg.slice('--architecture-b3-rollback-circulation-splice='.length);
   else if (arg === '--observer-effect-audit') observerEffectAudit = true;
   else if (arg === '--quiet') quiet = true;
   else if (arg === '--system-experiment' && argv[i + 1]) systemExperiment = argv[++i];
@@ -251,6 +257,24 @@ architectureB1CirculationScaffoldMode = [
   'narrow-band-soft-containment'
 ].includes(architectureB1CirculationScaffoldMode)
   ? architectureB1CirculationScaffoldMode
+  : 'default';
+architectureB2CirculationStatePortMode = [
+  'default',
+  'off',
+  'soft-containment-return-flow-port',
+  'soft-containment-omega-port',
+  'open-circulation-bundle'
+].includes(architectureB2CirculationStatePortMode)
+  ? architectureB2CirculationStatePortMode
+  : 'default';
+architectureB3RollbackCirculationSpliceMode = [
+  'default',
+  'off',
+  'ported-floor-soft-containment-return-flow',
+  'ported-floor-soft-containment-omega',
+  'ported-floor-open-bundle'
+].includes(architectureB3RollbackCirculationSpliceMode)
+  ? architectureB3RollbackCirculationSpliceMode
   : 'default';
 systemExperiment = [
   'baseline',
@@ -5224,6 +5248,70 @@ export async function main() {
     core.vertParams.circulationReboundOrganizationScale = 0.2;
     core.vertParams.circulationReboundActivityScale = 0.12;
     core.vertParams.circulationReboundSourceScale = 0.25;
+  }
+  if (architectureB2CirculationStatePortMode === 'soft-containment-return-flow-port') {
+    core.vertParams.enableCirculationReboundContainment = true;
+    core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac = 0.18;
+    core.vertParams.subtropicalSubsidenceWeakHemiBoost = 0.05;
+    core.vertParams.subtropicalSubsidenceMaxDryFrac = 0.18;
+    core.vertParams.subtropicalSubsidenceThetaStepK = 0.55;
+    core.vertParams.subtropicalSubsidenceLat0 = 18;
+    core.vertParams.subtropicalSubsidenceLat1 = 30;
+    core.vertParams.circulationReboundContainmentScale = 0.7;
+    core.vertParams.circulationReboundOrganizationScale = 0.2;
+    core.vertParams.circulationReboundActivityScale = 0.12;
+    core.vertParams.circulationReboundSourceScale = 0.25;
+    core.vertParams.enableTransitionReturnFlowCoupling = true;
+  } else if (architectureB2CirculationStatePortMode === 'soft-containment-omega-port') {
+    core.vertParams.enableCirculationReboundContainment = true;
+    core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac = 0.18;
+    core.vertParams.subtropicalSubsidenceWeakHemiBoost = 0.05;
+    core.vertParams.subtropicalSubsidenceMaxDryFrac = 0.18;
+    core.vertParams.subtropicalSubsidenceThetaStepK = 0.55;
+    core.vertParams.subtropicalSubsidenceLat0 = 18;
+    core.vertParams.subtropicalSubsidenceLat1 = 30;
+    core.vertParams.circulationReboundContainmentScale = 0.7;
+    core.vertParams.circulationReboundOrganizationScale = 0.2;
+    core.vertParams.circulationReboundActivityScale = 0.12;
+    core.vertParams.circulationReboundSourceScale = 0.25;
+    core.vertParams.enableDryingOmegaBridge = true;
+  } else if (architectureB2CirculationStatePortMode === 'open-circulation-bundle') {
+    core.vertParams.enableCirculationReboundContainment = false;
+    core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac = 0.18;
+    core.vertParams.subtropicalSubsidenceWeakHemiBoost = 0.05;
+    core.vertParams.subtropicalSubsidenceMaxDryFrac = 0.18;
+    core.vertParams.subtropicalSubsidenceThetaStepK = 0.55;
+    core.vertParams.subtropicalSubsidenceLat0 = 18;
+    core.vertParams.subtropicalSubsidenceLat1 = 30;
+    core.vertParams.enableTransitionReturnFlowCoupling = true;
+    core.vertParams.enableDryingOmegaBridge = true;
+    core.vertParams.enableWeakHemiCrossHemiFloorTaper = true;
+  }
+  if (architectureB3RollbackCirculationSpliceMode === 'ported-floor-soft-containment-return-flow') {
+    core.vertParams.enableCirculationReboundContainment = true;
+    core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac = 0.42;
+    core.vertParams.subtropicalSubsidenceWeakHemiBoost = 0.15;
+    core.vertParams.circulationReboundContainmentScale = 0.7;
+    core.vertParams.circulationReboundOrganizationScale = 0.25;
+    core.vertParams.circulationReboundActivityScale = 0.18;
+    core.vertParams.circulationReboundSourceScale = 0.4;
+    core.vertParams.enableTransitionReturnFlowCoupling = true;
+  } else if (architectureB3RollbackCirculationSpliceMode === 'ported-floor-soft-containment-omega') {
+    core.vertParams.enableCirculationReboundContainment = true;
+    core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac = 0.42;
+    core.vertParams.subtropicalSubsidenceWeakHemiBoost = 0.15;
+    core.vertParams.circulationReboundContainmentScale = 0.7;
+    core.vertParams.circulationReboundOrganizationScale = 0.25;
+    core.vertParams.circulationReboundActivityScale = 0.18;
+    core.vertParams.circulationReboundSourceScale = 0.4;
+    core.vertParams.enableDryingOmegaBridge = true;
+  } else if (architectureB3RollbackCirculationSpliceMode === 'ported-floor-open-bundle') {
+    core.vertParams.enableCirculationReboundContainment = false;
+    core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac = 0.42;
+    core.vertParams.subtropicalSubsidenceWeakHemiBoost = 0.15;
+    core.vertParams.enableTransitionReturnFlowCoupling = true;
+    core.vertParams.enableDryingOmegaBridge = true;
+    core.vertParams.enableWeakHemiCrossHemiFloorTaper = true;
   }
   if (shoulderAbsorptionGuardPatchMode === 'off') core.microParams.enableShoulderAbsorptionGuard = false;
   else if (shoulderAbsorptionGuardPatchMode === 'on') core.microParams.enableShoulderAbsorptionGuard = true;
