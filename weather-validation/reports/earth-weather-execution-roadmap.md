@@ -377,6 +377,69 @@ Test whether a stronger A2-style rollback floor/containment base can preserve cu
     - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 144.56866`
 - Consequence: Architecture B is now exhausted as a parameter-only family. Move to `Architecture C: code-level rollback/current hybridization design`.
 
+## Architecture C: Code-Level Rollback/Current Hybridization Design
+
+### Objective
+
+Define the first code-level hybrid between the rollback circulation donor and the current partition-preserving branch now that all parameter-only Architecture B families are exhausted.
+
+### Primary files and outputs
+
+- [earth-weather-architecture-c-design.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/earth-weather-architecture-c-design.mjs)
+- [earth-weather-architecture-c-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c-design.md)
+- [earth-weather-architecture-c-design.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c-design.json)
+
+### Result
+
+- Status: completed
+- Verdict: `module_level_hybrid_required`
+- Hybrid split:
+  - rollback donor files:
+    - [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+    - [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+  - current preserve file:
+    - [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+  - current adapter files:
+    - [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+    - [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+    - [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- Consequence: Architecture C is not another tuning family. It is a donor/preserve/adapter splice decision. Move to `Architecture C1: hybrid seam contract`.
+
+## Architecture C1: Hybrid Seam Contract
+
+### Objective
+
+Turn the Architecture C donor/preserve/adapter split into the explicit implementation contract for the first donor-base hybrid benchmark.
+
+### Primary files and outputs
+
+- [earth-weather-architecture-c1-hybrid-seam-contract.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/earth-weather-architecture-c1-hybrid-seam-contract.mjs)
+- [earth-weather-architecture-c1-hybrid-seam-contract.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c1-hybrid-seam-contract.md)
+- [earth-weather-architecture-c1-hybrid-seam-contract.json](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c1-hybrid-seam-contract.json)
+
+### Contract
+
+- donor base branch:
+  - `codex/world-class-weather-loop-archive-20260407-0745`
+- donor scaffold files:
+  - [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+  - [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+- preserve layer:
+  - [microphysics5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js)
+- adapter stack:
+  - [state5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/state5.js)
+  - [diagnostics.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/validation/diagnostics.js)
+  - [planetary-realism-audit.mjs](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/scripts/agent/planetary-realism-audit.mjs)
+- excluded starting point:
+  - do not start from current [core5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js)
+  - do not start from current [vertical5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js)
+
+### Result
+
+- Status: completed
+- Verdict: `rollback_vertical_core_current_partition_adapter_contract`
+- Consequence: the next active move is now `Architecture C2: donor-base hybrid worktree benchmark`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

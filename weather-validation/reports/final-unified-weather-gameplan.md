@@ -251,6 +251,50 @@ That means:
 - the remaining path needs broader code-level hybridization between the rollback circulation base and the current partition-preserving branch
 - more parameter-only local patching would not be a responsible use of time here
 
+Architecture C is now completed in:
+- [earth-weather-architecture-c-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c-design.md)
+
+Its conclusion is now explicit:
+- verdict: `module_level_hybrid_required`
+- rollback donor bundle:
+  - `src/weather/v2/core5.js`
+  - `src/weather/v2/vertical5.js`
+- current preserve bundle:
+  - `src/weather/v2/microphysics5.js`
+- current adapter bundle:
+  - `src/weather/v2/state5.js`
+  - `src/weather/validation/diagnostics.js`
+  - `scripts/agent/planetary-realism-audit.mjs`
+
+So the next active move became:
+- `Architecture C1: hybrid seam contract`
+
+Architecture C1 is now completed in:
+- [earth-weather-architecture-c1-hybrid-seam-contract.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c1-hybrid-seam-contract.md)
+
+Its result gives us the first concrete splice contract:
+- verdict: `rollback_vertical_core_current_partition_adapter_contract`
+- start from archive donor branch:
+  - `codex/world-class-weather-loop-archive-20260407-0745`
+- keep rollback donor scaffold:
+  - `src/weather/v2/core5.js`
+  - `src/weather/v2/vertical5.js`
+- forward-port current preserve layer:
+  - `src/weather/v2/microphysics5.js`
+- forward-port current adapter stack:
+  - `src/weather/v2/state5.js`
+  - `src/weather/validation/diagnostics.js`
+  - `scripts/agent/planetary-realism-audit.mjs`
+- do not start from current `core5.js` / `vertical5.js` for the first hybrid benchmark
+
+So the next active move is now:
+- `Architecture C2: donor-base hybrid worktree benchmark`
+
+That means:
+- we finally have a concrete non-parameter path forward
+- the next benchmark should be donor-base-first, not current-branch-first
+- no new tuning should happen before we measure that first hybrid worktree
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow

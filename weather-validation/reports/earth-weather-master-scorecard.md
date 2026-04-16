@@ -12,6 +12,9 @@ Updated: 2026-04-16
 - Architecture B1 Circulation Scaffold Rebuild: FAILED (`quick_reject`)
 - Architecture B2 Explicit Circulation-State Port: FAILED (`quick_reject`)
 - Architecture B3 Direct Rollback Circulation Splice: FAILED (`quick_reject`)
+- Architecture C Code-Level Hybridization Design: COMPLETED
+- Architecture C1 Hybrid Seam Contract: COMPLETED
+- Architecture C2 Donor-Base Hybrid Worktree Benchmark: NEXT
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -128,6 +131,39 @@ Updated: 2026-04-16
     - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.14213`
     - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> 144.56866`
 - Next active phase: `Architecture C: code-level rollback/current hybridization design`
+
+## Architecture C decision
+
+- Verdict: `module_level_hybrid_required`
+- Decision report: [earth-weather-architecture-c-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c-design.md)
+- Donor bundle:
+  - `src/weather/v2/core5.js`
+  - `src/weather/v2/vertical5.js`
+- Preserve bundle:
+  - `src/weather/v2/microphysics5.js`
+- Adapter bundle:
+  - `src/weather/v2/state5.js`
+  - `src/weather/validation/diagnostics.js`
+  - `scripts/agent/planetary-realism-audit.mjs`
+- Next active phase: `Architecture C1: hybrid seam contract`
+
+## Architecture C1 decision
+
+- Verdict: `rollback_vertical_core_current_partition_adapter_contract`
+- Decision report: [earth-weather-architecture-c1-hybrid-seam-contract.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c1-hybrid-seam-contract.md)
+- Contract:
+  - start from archive donor branch `codex/world-class-weather-loop-archive-20260407-0745`
+  - keep rollback donor scaffold files:
+    - `src/weather/v2/core5.js`
+    - `src/weather/v2/vertical5.js`
+  - forward-port current preserve layer:
+    - `src/weather/v2/microphysics5.js`
+  - forward-port current adapter stack:
+    - `src/weather/v2/state5.js`
+    - `src/weather/validation/diagnostics.js`
+    - `scripts/agent/planetary-realism-audit.mjs`
+  - exclude current `core5.js` and `vertical5.js` as the starting point for the first hybrid benchmark
+- Next active phase: `Architecture C2: donor-base hybrid worktree benchmark`
 
 ## Day-365 benchmark summary
 
