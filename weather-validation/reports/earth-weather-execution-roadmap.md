@@ -851,6 +851,66 @@ Determine whether C17 failed because the carryover carveout still was not bindin
   - the next bounded family must explain the unresolved equatorial eddy export / low-level velocity sign defect
 - Consequence: the next active move is now `Architecture C19: zonal-mean-preserving eddy export attribution`.
 
+## Architecture C19: Zonal-Mean-Preserving Eddy Export Attribution
+
+### Objective
+
+Determine whether the remaining post-C17 sign defect belongs to the preserved low-level momentum layer itself or to the newer vertical-overlay interaction sitting on top of that shared preserve layer.
+
+### Result
+
+- Status: completed
+- Verdict: `shared_preserve_layer_not_primary_blocker_vertical_overlay_eddy_export_coupling`
+- What C19 proved:
+  - C13 and C17 still share the same preserved low-level contract:
+    - `nudgeParams.tauQvS`
+    - `nudgeParams.tauQvColumn`
+    - `nudgeParams organized/subsidence relief quartet`
+    - `windNudgeParams.tauSurfaceSeconds`
+  - relative to C13, C17 improves the zonal-mean branch and 35° interface burden:
+    - equator zonal-mean vapor flux north: `-301.63909 -> -249.95949`
+    - 35° interface vapor flux north: `-467.08734 -> -373.49016`
+  - but C17 still worsens the remaining eddy/export side:
+    - equator eddy vapor flux north: `-34.29106 -> -109.90385`
+    - equator low-level velocity mean: `-19.4512 -> -20.79729`
+    - cross-equatorial vapor flux north: `-330.9854 -> -353.31687`
+- Interpretation:
+  - the preserved low-level contract alone is not the primary blocker
+  - the remaining defect is now best explained by the vertical-overlay family coupling into the eddy/export branch
+- Consequence: the next active move is now `Architecture C20: zonal-mean-preserving eddy nudge softening experiment`.
+
+## Architecture C20: Zonal-Mean-Preserving Eddy Nudge Softening Experiment
+
+### Objective
+
+Keep the C17 carryover carveout fixed and soften only the surface eddy-energy rescaling lane to see if the unresolved eddy/export sign defect can be relieved without losing the zonal-mean and dry-belt gains.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.26`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.152`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.504`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.209`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13877`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -361.48916`
+- Transport comparison vs C17:
+  - equator zonal-mean vapor flux north: `-249.95949 -> -254.59421`
+  - equator eddy vapor flux north: `-109.90385 -> -114.18489`
+  - equator low-level velocity mean: `-20.79729 -> -21.02244`
+  - 35° interface vapor flux north: `-373.49016 -> -350.09613`
+- Interpretation:
+  - softening eddy rescaling preserved the broad quick-shape wins
+  - but it did not relieve the equatorial sign defect and slightly worsened the core equatorial transport branches
+  - so the next step should attribute the failed eddy-softening implementation rather than tune this family blindly
+- Consequence: the next active move is now `Architecture C21: eddy-softening implementation attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

@@ -31,6 +31,8 @@ Updated: 2026-04-16
 - Architecture C16 Vertical-Contract Implementation Attribution: COMPLETED
 - Architecture C17 Zonal-Mean-Preserving Upper-Cloud Carryover Carveout Experiment: FAILED (`quick_reject`)
 - Architecture C18 Carryover Carveout Implementation Attribution: COMPLETED
+- Architecture C19 Zonal-Mean-Preserving Eddy Export Attribution: COMPLETED
+- Architecture C20 Zonal-Mean-Preserving Eddy Nudge Softening Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -473,6 +475,45 @@ Updated: 2026-04-16
   - C17 really did relieve the upper-cloud carryover lane and preserve the zonal-mean relief
   - the remaining dominant blocker is now the equatorial eddy export / low-level velocity branch, not upper-cloud carryover
 - Next active phase: `Architecture C19: zonal-mean-preserving eddy export attribution`
+
+## Architecture C19 decision
+
+- Verdict: `shared_preserve_layer_not_primary_blocker_vertical_overlay_eddy_export_coupling`
+- Decision report: [earth-weather-architecture-c19-zonal-mean-preserving-eddy-export-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c19-zonal-mean-preserving-eddy-export-attribution.md)
+- Attribution result:
+  - shared low-level preserve layer between C13 and C17:
+    - `nudgeParams.tauQvS`
+    - `nudgeParams.tauQvColumn`
+    - `nudgeParams organized/subsidence relief quartet`
+    - `windNudgeParams.tauSurfaceSeconds`
+  - equator zonal-mean vapor flux north: `-301.63909 -> -249.95949`
+  - equator eddy vapor flux north: `-34.29106 -> -109.90385`
+  - equator low-level velocity mean: `-19.4512 -> -20.79729`
+  - 35° interface vapor flux north: `-467.08734 -> -373.49016`
+- Interpretation:
+  - the preserve layer itself is not the main blocker
+  - the remaining defect sits in the vertical-overlay / eddy-export coupling on top of that shared preserve layer
+- Next active phase: `Architecture C20: zonal-mean-preserving eddy nudge softening experiment`
+
+## Architecture C20 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c20-zonal-mean-preserving-eddy-nudge-softening-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c20-zonal-mean-preserving-eddy-nudge-softening-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - bounded outcome:
+    - `itczWidthDeg: 25.91 -> 23.26`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.152`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.504`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.209`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13877`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -361.48916`
+- Interpretation:
+  - softening only the surface eddy-energy rescaling lane preserved the hybrid’s broad climate wins
+  - but it did not solve the equatorial sign defect and slightly worsened the core equatorial transport branches
+- Next active phase: `Architecture C21: eddy-softening implementation attribution`
 
 ## Day-365 benchmark summary
 

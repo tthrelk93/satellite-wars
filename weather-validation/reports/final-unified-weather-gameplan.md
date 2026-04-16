@@ -438,8 +438,34 @@ Architecture C18 is now complete in [earth-weather-architecture-c18-carryover-ca
   - equator eddy vapor flux north: `-96.97265 -> -109.90385`
   - 35° interface vapor flux north: `-360.61691 -> -373.49016`
 
+Architecture C19 is now complete in [earth-weather-architecture-c19-zonal-mean-preserving-eddy-export-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c19-zonal-mean-preserving-eddy-export-attribution.md):
+- verdict: `shared_preserve_layer_not_primary_blocker_vertical_overlay_eddy_export_coupling`
+- the important narrowing is that C13 and C17 still share the same low-level preserve layer:
+  - `nudgeParams.tauQvS`
+  - `nudgeParams.tauQvColumn`
+  - `nudgeParams organized/subsidence relief quartet`
+  - `windNudgeParams.tauSurfaceSeconds`
+- so the remaining blocker is not that preserve layer by itself
+- it is the newer vertical-overlay interaction that improves zonal mean while worsening the eddy/export branch:
+  - equator zonal-mean vapor flux north: `-301.63909 -> -249.95949`
+  - equator eddy vapor flux north: `-34.29106 -> -109.90385`
+  - equator low-level velocity mean: `-19.4512 -> -20.79729`
+
+Architecture C20 is now complete in [earth-weather-architecture-c20-zonal-mean-preserving-eddy-nudge-softening-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c20-zonal-mean-preserving-eddy-nudge-softening-experiment.md):
+- verdict: `quick_reject`
+- softening only the surface eddy-energy rescaling lane preserved the broad hybrid wins:
+  - `itczWidthDeg: 25.91 -> 23.26`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.152`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.504`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.209`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13877`
+- but it did not relieve the core sign defect:
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -361.48916`
+  - equator eddy vapor flux north: `-109.90385 -> -114.18489`
+  - equator low-level velocity mean: `-20.79729 -> -21.02244`
+
 So the next active move is now:
-- `Architecture C19: zonal-mean-preserving eddy export attribution`
+- `Architecture C21: eddy-softening implementation attribution`
 
 ## Hard Rules Going Forward
 
