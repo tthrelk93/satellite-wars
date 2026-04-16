@@ -33,6 +33,8 @@ Updated: 2026-04-16
 - Architecture C18 Carryover Carveout Implementation Attribution: COMPLETED
 - Architecture C19 Zonal-Mean-Preserving Eddy Export Attribution: COMPLETED
 - Architecture C20 Zonal-Mean-Preserving Eddy Nudge Softening Experiment: FAILED (`quick_reject`)
+- Architecture C21 Eddy-Softening Implementation Attribution: COMPLETED
+- Architecture C22 Equatorial-Band Eddy Softening Carveout Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -514,6 +516,46 @@ Updated: 2026-04-16
   - softening only the surface eddy-energy rescaling lane preserved the hybrid’s broad climate wins
   - but it did not solve the equatorial sign defect and slightly worsened the core equatorial transport branches
 - Next active phase: `Architecture C21: eddy-softening implementation attribution`
+
+## Architecture C21 decision
+
+- Verdict: `global_eddy_softening_reactivates_return_branch_carryover_without_fixing_equatorial_export`
+- Decision report: [earth-weather-architecture-c21-eddy-softening-implementation-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c21-eddy-softening-implementation-attribution.md)
+- Attribution result:
+  - relative to C17, C20 worsens the core equatorial transport branches:
+    - equator zonal-mean vapor flux north: `-249.95949 -> -254.59421`
+    - equator eddy vapor flux north: `-109.90385 -> -114.18489`
+    - equator low-level velocity mean: `-20.79729 -> -21.02244`
+  - while the NH dry-belt return/carryover family rebounds:
+    - carried-over upper cloud: `0.22666 -> 0.27973`
+    - imported anvil persistence: `0.22501 -> 0.27804`
+    - weak-erosion survival: `0.21732 -> 0.26804`
+    - cloud recirculation proxy: `0.39988 -> 1.34927`
+    - return-branch mass flux: `3368.15697 -> 3490.3125`
+- Interpretation:
+  - global eddy softening was not inert
+  - it relieved the wrong side of the hybrid and reopened the dry-belt carryover family without fixing the equatorial export defect
+- Next active phase: `Architecture C22: equatorial-band eddy softening carveout experiment`
+
+## Architecture C22 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c22-equatorial-band-eddy-softening-carveout-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c22-equatorial-band-eddy-softening-carveout-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - bounded outcome:
+    - `itczWidthDeg: 25.91 -> 23.499`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.137`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.51`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.216`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11658`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.11907`
+- Interpretation:
+  - narrowing the softening to the equatorial band preserved the broad quick-shape wins and improved NH dry-belt ocean condensation
+  - but it still failed the quick gate because the cross-equatorial transport sign stayed inverted
+- Next active phase: `Architecture C23: equatorial-band eddy softening attribution`
 
 ## Day-365 benchmark summary
 

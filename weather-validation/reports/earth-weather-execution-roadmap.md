@@ -911,6 +911,58 @@ Keep the C17 carryover carveout fixed and soften only the surface eddy-energy re
   - so the next step should attribute the failed eddy-softening implementation rather than tune this family blindly
 - Consequence: the next active move is now `Architecture C21: eddy-softening implementation attribution`.
 
+## Architecture C21: Eddy-Softening Implementation Attribution
+
+### Objective
+
+Determine whether C20 global eddy softening was inert or whether it traded the wrong transport defect for a rebound in the NH dry-belt return/carryover family.
+
+### Result
+
+- Status: completed
+- Verdict: `global_eddy_softening_reactivates_return_branch_carryover_without_fixing_equatorial_export`
+- What C21 proved:
+  - relative to C17, C20 worsens the core equatorial transport branches:
+    - equator zonal-mean vapor flux north: `-249.95949 -> -254.59421`
+    - equator eddy vapor flux north: `-109.90385 -> -114.18489`
+    - equator low-level velocity mean: `-20.79729 -> -21.02244`
+  - while the NH dry-belt return/carryover family rebounds:
+    - carried-over upper cloud: `0.22666 -> 0.27973`
+    - imported anvil persistence: `0.22501 -> 0.27804`
+    - weak-erosion survival: `0.21732 -> 0.26804`
+    - cloud recirculation proxy: `0.39988 -> 1.34927`
+    - return-branch mass flux: `3368.15697 -> 3490.3125`
+- Interpretation:
+  - global eddy softening was active, not inert
+  - but it relaxed the wrong parts of the hybrid and reopened the dry-belt carryover family without fixing the equatorial export defect
+- Consequence: the next active move is now `Architecture C22: equatorial-band eddy softening carveout experiment`.
+
+## Architecture C22: Equatorial-Band Eddy Softening Carveout Experiment
+
+### Objective
+
+Keep the C17 carryover carveout fixed and soften eddy-energy rescaling only inside a narrow equatorial band so the remaining equatorial export defect can be tested without relaxing subtropical rows enough to revive the dry-belt return/carryover family.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.499`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.137`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.51`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.216`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11658`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.11907`
+- Interpretation:
+  - equatorial-only softening preserved the broader quick wins and improved NH dry-belt ocean condensation relative to C17/C20
+  - but the cross-equatorial transport sign is still inverted, so this family is not yet a keep candidate
+- Consequence: the next active move is now `Architecture C23: equatorial-band eddy softening attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

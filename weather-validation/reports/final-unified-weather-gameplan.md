@@ -467,6 +467,34 @@ Architecture C20 is now complete in [earth-weather-architecture-c20-zonal-mean-p
 So the next active move is now:
 - `Architecture C21: eddy-softening implementation attribution`
 
+Architecture C21 is now complete in [earth-weather-architecture-c21-eddy-softening-implementation-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c21-eddy-softening-implementation-attribution.md):
+- verdict: `global_eddy_softening_reactivates_return_branch_carryover_without_fixing_equatorial_export`
+- C20 was not inert
+- relative to C17, it made the core equatorial transport branches worse:
+  - equator zonal-mean vapor flux north: `-249.95949 -> -254.59421`
+  - equator eddy vapor flux north: `-109.90385 -> -114.18489`
+  - equator low-level velocity mean: `-20.79729 -> -21.02244`
+- while the NH dry-belt return/carryover family rebounded:
+  - carried-over upper cloud: `0.22666 -> 0.27973`
+  - imported anvil persistence: `0.22501 -> 0.27804`
+  - weak-erosion survival: `0.21732 -> 0.26804`
+  - cloud recirculation proxy: `0.39988 -> 1.34927`
+  - return-branch mass flux: `3368.15697 -> 3490.3125`
+
+Architecture C22 is now complete in [earth-weather-architecture-c22-equatorial-band-eddy-softening-carveout-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c22-equatorial-band-eddy-softening-carveout-experiment.md):
+- verdict: `quick_reject`
+- limiting the softening to the equatorial band preserved the broad quick wins:
+  - `itczWidthDeg: 25.91 -> 23.499`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.137`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.51`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.216`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11658`
+- but the blocker is still the same transport-sign defect:
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.11907`
+
+So the next active move is now:
+- `Architecture C23: equatorial-band eddy softening attribution`
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow
