@@ -740,8 +740,22 @@ Architecture C50 is now complete:
 - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
 - interpretation: the modest `26.25°` receiver guard is inert and reproduces the same C40/C48 transition-band regime exactly
 
+Architecture C51 is now complete:
+- verdict: `partial_26p25_receiver_guard_inert_threshold_below_live_binder`
+- interpretation: the first `26.25°` receiver guard sits fully below the live binder; C40 and C50 are identical across quick metrics, moisture attribution, transport interfaces, and shoulder rows
+
+Architecture C52 is now complete:
+- verdict: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.386`
+- `subtropicalDryNorthRatio: 1.534 -> 1.128`
+- `subtropicalDrySouthRatio: 1.199 -> 0.49`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
+- interpretation: even the strong `26.25°` receiver guard reproduces the same C40/C50 transition-band regime, so the live binder is not simple scalar guard amplitude in that lane
+
 So the next active move is now:
-- `Architecture C51: partial 26p25 receiver-guard transition-band attribution`
+- `Architecture C53: strong 26p25 receiver-guard transition-band attribution`
 
 ## Hard Rules Going Forward
 

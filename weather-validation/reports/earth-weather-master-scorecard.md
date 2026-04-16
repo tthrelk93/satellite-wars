@@ -902,7 +902,7 @@ Updated: 2026-04-16
 - Interpretation:
   - the inner-core restore was also inert at the quick-score level relative to the strict C32 carveout
   - so the blocked subset is not being reached by the simple inner-core geometry
-- Next active phase: `Architecture C51: partial 26p25 receiver-guard transition-band attribution`
+- Next active phase: `Architecture C53: strong 26p25 receiver-guard transition-band attribution`
 - C39 result:
   - verdict: `inner_core_restore_inert_active_override_targets_outside_restore_band`
   - the live carry-input override rows stayed fixed at `18.75°`, `26.25°`, `33.75°` and mirrored southern rows, outside the C38 inner-core taper
@@ -979,6 +979,19 @@ Updated: 2026-04-16
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
   - interpretation: the modest `26.25°` receiver guard is inert; C50 reproduces the earlier C40/C48 transition-band regime exactly
+- C51 result:
+  - verdict: `partial_26p25_receiver_guard_inert_threshold_below_live_binder`
+  - C40 vs C50 are identical across the quick score, moisture attribution, transport interfaces, and the `18.75°`, `26.25°`, and `33.75°` shoulder rows
+  - interpretation: the first `26.25°` receiver guard sits below the live binder and does not create a real intermediate regime
+- C52 result:
+  - verdict: `quick_reject`
+  - `itczWidthDeg: 25.91 -> 23.386`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.128`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.49`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
+  - interpretation: even a strong `26.25°` receiver guard reproduces the same C40/C50 transition-band regime exactly, so the remaining binder is not simple scalar guard amplitude
 
 ## Day-365 benchmark summary
 

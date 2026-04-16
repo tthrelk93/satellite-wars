@@ -1749,6 +1749,62 @@ Keep the strict C32 core carveout fixed, preserve the C40 transition-band restor
   - that means the live binder is not below this simple `26.25°` guard threshold
 - Consequence: the next active move is now `Architecture C51: partial 26p25 receiver-guard transition-band attribution`.
 
+## Architecture C51: Partial 26p25 Receiver-Guard Transition-Band Attribution
+
+### Objective
+
+Prove whether the first modest `26.25°` receiver guard moved the live C40 transition-band regime at all, or whether it sat entirely below the binding threshold.
+
+### Contract
+
+Compare C50 directly against C40 across the quick score, moisture attribution, transport interfaces, and latitude-resolved shoulder rows so we can tell whether the guard created a real intermediate regime.
+
+### Result
+
+- Status: completed
+- Verdict: `partial_26p25_receiver_guard_inert_threshold_below_live_binder`
+- Key evidence:
+  - C40 vs C50 quick metrics are identical to reporting precision
+  - C40 vs C50 moisture attribution is identical for imported-anvil persistence, carried-over upper cloud, and weak-erosion survival
+  - C40 vs C50 transport interfaces are identical at the equator and `35°`
+  - C40 vs C50 shoulder rows are identical at `18.75°`, `26.25°`, and `33.75°`
+- Interpretation:
+  - the first partial `26.25°` guard never reached the active binder
+  - there is no new middle state hiding behind the C50 quick reject
+  - the next bounded move had to be a much stronger `26.25°` receiver guard on top of the same C40 geometry
+- Consequence: the next active move became `Architecture C52: strong 26p25 receiver-guard transition-band experiment`.
+
+## Architecture C52: Strong 26p25 Receiver-Guard Transition-Band Experiment
+
+### Objective
+
+Keep the live C40 transition-band geometry fixed, but strengthen the `26.25°` receiver guard enough to pull the center row back toward the strict C32 cap and test whether the transition-band sign-relief survives.
+
+### Contract
+
+Preserve the strict C32 equatorial-core carveout, preserve the C40 transition-band restore geometry, and replace the modest C50 guard with a strong `26.25°` centered receiver penalty that should be well above the previously inert threshold.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.386`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.128`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.49`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
+- Interpretation:
+  - the stronger `26.25°` guard is also inert at the climate-result level
+  - C52 reproduces the same C40/C50 transition-band regime exactly across quick metrics, moisture attribution, and the `18.75°` / `26.25°` / `33.75°` shoulder rows
+  - that means the remaining live binder is not controlled by simple scalar `26.25°` receiver-guard amplitude inside this transition-band family
+- Consequence: the next active move is now `Architecture C53: strong 26p25 receiver-guard transition-band attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective
