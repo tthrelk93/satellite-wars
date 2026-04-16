@@ -805,6 +805,23 @@ Architecture C58 is now complete:
 So the next active move is now:
 - `Architecture C59: 26p25 carryover containment with 18p75 transition carry-input preserve attribution`
 
+Architecture C59 is now complete:
+- verdict: `transition_carry_input_preserve_relieves_equatorial_export_but_reloads_18p75_26p25_and_worsens_35deg_import`
+- interpretation: C58 buys modest equatorial export relief, but it does so by reloading the `18.75°` transition row, the `26.25°` receiver row, and the `35°` import interface
+
+Architecture C60 is now complete:
+- verdict: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.287`
+- `subtropicalDryNorthRatio: 1.534 -> 1.07`
+- `subtropicalDrySouthRatio: 1.199 -> 0.48`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.194`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.15491`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -318.81218`
+- interpretation: stronger `26.25°` receiver carryover containment materially improves the sign defect and broad quick-shape metrics relative to C58, but it worsens NH dry-belt ocean condensation sharply
+
+So the next active move is now:
+- `Architecture C61: stronger 26p25 receiver carryover containment on top of 18p75 transition carry-input preserve attribution`
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow

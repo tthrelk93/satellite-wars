@@ -1974,6 +1974,62 @@ Preserve the active C54 receiver containment, keep the transition-band organized
   - the next bounded move is attribution, not another immediate preserve-geometry guess
 - Consequence: the next active move is now `Architecture C59: 26p25 carryover containment with 18p75 transition carry-input preserve attribution`.
 
+## Architecture C59: 26p25 Carryover Containment With 18p75 Transition Carry-Input Preserve Attribution
+
+### Objective
+
+Identify exactly where the modest equatorial relief from C58 came from, and determine which rows or interfaces paid for it.
+
+### Contract
+
+Compare C58 directly against the C54 receiver-containment baseline across the quick score, NH ocean moisture attribution, equatorial and `35°` transport interfaces, and the `18.75°` / `26.25°` / `33.75°` shoulder rows.
+
+### Result
+
+- Status: completed
+- Verdict: `transition_carry_input_preserve_relieves_equatorial_export_but_reloads_18p75_26p25_and_worsens_35deg_import`
+- Key evidence:
+  - equator lower/mid/upper total-water flux north all improve versus C54
+  - `18.75°` vapor flux north becomes more southward and carryover reloads
+  - `26.25°` vapor flux north becomes more southward and carryover reloads
+  - `35°` dominant NH dry-belt import worsens
+  - `33.75°` carried-over upper cloud unloads relative to C54
+- Interpretation:
+  - C58 buys modest equatorial export relief by shifting burden into the `18.75°` transition row, the `26.25°` receiver row, and the `35°` import interface
+  - the next bounded move should keep the active C58 transition preserve but strengthen the live `26.25°` receiver carryover containment
+- Consequence: the next active move became `Architecture C60: stronger 26p25 receiver carryover containment on top of 18p75 transition carry-input preserve experiment`.
+
+## Architecture C60: Stronger 26p25 Receiver Carryover Containment On Top Of 18p75 Transition Carry-Input Preserve Experiment
+
+### Objective
+
+Keep the active C58 `18.75°` transition carry-input preserve fixed, but strengthen the live `26.25°` receiver carryover containment so we can test whether the receiver-side loss can be recaptured.
+
+### Contract
+
+Preserve the active C58 transition carry-input preserve and increase only the active `26.25°` receiver carryover-containment amplitude.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.287`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.07`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.48`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.194`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.15491`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -318.81218`
+- Interpretation:
+  - C60 is a real improvement over C58 on the sign-defect side and the broad quick-shape metrics: cross-equatorial vapor flux north improves from `-351.9993` to `-318.81218`, ITCZ width narrows, and NH/SH dry-belt ratios both improve
+  - but that stronger receiver recapture worsens NH dry-belt ocean condensation sharply relative to C58 (`0.13447 -> 0.15491`)
+  - the next bounded move is attribution, not another immediate containment-strength guess
+- Consequence: the next active move is now `Architecture C61: stronger 26p25 receiver carryover containment on top of 18p75 transition carry-input preserve attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

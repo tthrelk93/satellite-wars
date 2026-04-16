@@ -1033,7 +1033,20 @@ Updated: 2026-04-16
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13447`
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -351.9993`
   - interpretation: the broader `18.75°` transition carry-input preserve is active and slightly relieves the sign defect relative to C54, but it gives back part of the receiver-side win and still fails the quick gate
-- Next active phase: `Architecture C59: 26p25 carryover containment with 18p75 transition carry-input preserve attribution`
+- C59 result:
+  - verdict: `transition_carry_input_preserve_relieves_equatorial_export_but_reloads_18p75_26p25_and_worsens_35deg_import`
+  - equator lower/mid/upper transport all improve versus C54, but `18.75°` and `26.25°` both reload carryover and become more southward while `35°` import worsens
+  - interpretation: C58 buys modest export relief by shifting burden into the transition/receiver rows and the `35°` import interface
+- C60 result:
+  - verdict: `quick_reject`
+  - `itczWidthDeg: 25.91 -> 23.287`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.07`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.48`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.194`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.15491`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -318.81218`
+  - interpretation: stronger `26.25°` receiver carryover containment materially improves the sign defect and broad quick-shape metrics relative to C58, but it worsens NH dry-belt ocean condensation sharply
+- Next active phase: `Architecture C61: stronger 26p25 receiver carryover containment on top of 18p75 transition carry-input preserve attribution`
 
 ## Day-365 benchmark summary
 
