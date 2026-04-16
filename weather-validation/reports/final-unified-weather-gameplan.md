@@ -682,8 +682,23 @@ Architecture C42 is now complete:
 - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
 - interpretation: backing away from `26.25°` removed the receiver reload, but it also collapsed the experiment back to the strict C32 quick state
 
+Architecture C43 is now complete:
+- verdict: `equatorward_narrowing_removes_26p25_restore_signal_and_exactly_reverts_to_c32`
+- C42 reproduces the strict C32 quick climate and latitude-resolved override state exactly
+- interpretation: once the `26.25°` lane is removed, the entire live C40 signal disappears
+
+Architecture C44 is now complete:
+- verdict: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.374`
+- `subtropicalDryNorthRatio: 1.534 -> 1.122`
+- `subtropicalDrySouthRatio: 1.199 -> 0.493`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+- interpretation: the isolated `26.25°` lane is not sufficient on its own, so the small C40 sign-relief signal depends on broader transition geometry coupling
+
 So the next active move is now:
-- `Architecture C43: equatorward-transition organized-support restore attribution`
+- `Architecture C45: 26p25-centered organized-support restore attribution`
 
 ## Hard Rules Going Forward
 

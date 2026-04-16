@@ -890,7 +890,7 @@ Updated: 2026-04-16
 - Interpretation:
   - the inner-core restore was also inert at the quick-score level relative to the strict C32 carveout
   - so the blocked subset is not being reached by the simple inner-core geometry
-- Next active phase: `Architecture C43: equatorward-transition organized-support restore attribution`
+- Next active phase: `Architecture C45: 26p25-centered organized-support restore attribution`
 - C39 result:
   - verdict: `inner_core_restore_inert_active_override_targets_outside_restore_band`
   - the live carry-input override rows stayed fixed at `18.75°`, `26.25°`, `33.75°` and mirrored southern rows, outside the C38 inner-core taper
@@ -916,6 +916,18 @@ Updated: 2026-04-16
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
   - interpretation: backing away from `26.25°` restored the strict C32 containment win but also erased the only live sign-relief signal from C40
+- C43 result:
+  - verdict: `equatorward_narrowing_removes_26p25_restore_signal_and_exactly_reverts_to_c32`
+  - once the `26.25°` lane is removed, the experiment fully reverts to C32
+- C44 result:
+  - verdict: `quick_reject`
+  - `itczWidthDeg: 25.91 -> 23.374`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+  - interpretation: the isolated `26.25°` lane is necessary but not sufficient; by itself it also snaps back to C32
 
 ## Day-365 benchmark summary
 

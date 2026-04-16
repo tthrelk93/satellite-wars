@@ -1525,6 +1525,61 @@ Narrow the organized-support restore equatorward so it still reaches the `18.75�
   - that means the `26.25°` lane is not just collateral damage; some part of it is carrying the only live sign-relief signal in this subfamily
 - Consequence: the next active move is now `Architecture C43: equatorward-transition organized-support restore attribution`.
 
+## Architecture C43: Equatorward-Transition Organized-Support Restore Attribution
+
+### Objective
+
+Determine whether removing the `26.25°` lane from the restore geometry merely weakens the C40 signal or eliminates it completely.
+
+### Contract
+
+Compare C42 against both the strict C32 carveout and the broader C40 transition-band restore to test whether the `26.25°` lane is the only live signal carrier in this subfamily.
+
+### Result
+
+- Status: completed
+- Verdict: `equatorward_narrowing_removes_26p25_restore_signal_and_exactly_reverts_to_c32`
+- Key evidence:
+  - C32 vs C42 quick metrics are identical to reporting precision
+  - `26.25°` override hits: C40 `18.667`, C42 `18.625`
+  - `26.25°` carried-over upper cloud: C40 `0.06`, C42 `0.05`
+  - `33.75°` override hits: C40 `5.51`, C42 `5.698`
+- Interpretation:
+  - once the `26.25°` lane is removed, the entire live C40 signal disappears
+  - C42 is a full reversion to the strict C32 state, not a weaker intermediate
+- Consequence: the next active move became `Architecture C44: 26p25-centered organized-support restore experiment`.
+
+## Architecture C44: 26p25-Centered Organized-Support Restore Experiment
+
+### Objective
+
+Test whether the `26.25°` lane alone is sufficient to reproduce the only live organized-support restore signal.
+
+### Contract
+
+Keep the strict C32 carveout fixed everywhere except a centered restore around the `26.25°` lane and its mirrored southern row.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.374`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+- Interpretation:
+  - the isolated `26.25°` lane is not sufficient on its own
+  - C44 also collapses straight back to the strict C32 state instead of reproducing the small C40 signal
+  - so the live C40 relief requires broader transition-geometry coupling, not just the `26.25°` lane in isolation
+- Consequence: the next active move is now `Architecture C45: 26p25-centered organized-support restore attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

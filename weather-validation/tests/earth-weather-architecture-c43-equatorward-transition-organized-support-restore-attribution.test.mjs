@@ -1,0 +1,75 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  classifyC43Decision,
+  renderArchitectureC43Markdown
+} from '../../scripts/agent/earth-weather-architecture-c43-equatorward-transition-organized-support-restore-attribution.mjs';
+
+test('classifyC43Decision recognizes exact reversion to C32 once the 26.25 lane is removed', () => {
+  const decision = classifyC43Decision({
+    c32CrossEq: -356.96839,
+    c42CrossEq: -356.96839,
+    c32ItczWidth: 23.374,
+    c42ItczWidth: 23.374,
+    c32DryNorth: 1.122,
+    c42DryNorth: 1.122,
+    c32DrySouth: 0.493,
+    c42DrySouth: 0.493,
+    c32Westerlies: 1.219,
+    c42Westerlies: 1.219,
+    c32OceanCond: 0.10807,
+    c42OceanCond: 0.10807,
+    c4026Hits: 18.667,
+    c4226Hits: 18.625,
+    c4026Carryover: 0.06,
+    c4226Carryover: 0.05,
+    c4033Hits: 5.51,
+    c4233Hits: 5.698
+  });
+
+  assert.equal(decision.verdict, 'equatorward_narrowing_removes_26p25_restore_signal_and_exactly_reverts_to_c32');
+  assert.equal(decision.nextMove, 'Architecture C44: 26p25-centered organized-support restore experiment');
+});
+
+test('renderArchitectureC43Markdown includes the 26.25-centered follow-up contract', () => {
+  const markdown = renderArchitectureC43Markdown({
+    decision: {
+      verdict: 'equatorward_narrowing_removes_26p25_restore_signal_and_exactly_reverts_to_c32',
+      nextMove: 'Architecture C44: 26p25-centered organized-support restore experiment'
+    },
+    quickComparison: {
+      c32CrossEq: -356.96839,
+      c42CrossEq: -356.96839,
+      c32ItczWidth: 23.374,
+      c42ItczWidth: 23.374,
+      c32DryNorth: 1.122,
+      c42DryNorth: 1.122,
+      c32DrySouth: 0.493,
+      c42DrySouth: 0.493,
+      c32Westerlies: 1.219,
+      c42Westerlies: 1.219,
+      c32OceanCond: 0.10807,
+      c42OceanCond: 0.10807
+    },
+    latitudeShiftComparison: {
+      c4026Hits: 18.667,
+      c4226Hits: 18.625,
+      c4026Carryover: 0.06,
+      c4226Carryover: 0.05,
+      c4033Hits: 5.51,
+      c4233Hits: 5.698,
+      c4033Carryover: 0.424,
+      c4233Carryover: 0.429
+    },
+    nextContract: {
+      focusTargets: [
+        'restore organized-support only around the 26.25° lane'
+      ]
+    }
+  });
+
+  assert.match(markdown, /Architecture C43 Equatorward-Transition Organized-Support Restore Attribution/);
+  assert.match(markdown, /26.25° lane/);
+  assert.match(markdown, /26p25-centered/);
+});
