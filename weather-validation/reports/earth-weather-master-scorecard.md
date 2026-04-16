@@ -890,7 +890,7 @@ Updated: 2026-04-16
 - Interpretation:
   - the inner-core restore was also inert at the quick-score level relative to the strict C32 carveout
   - so the blocked subset is not being reached by the simple inner-core geometry
-- Next active phase: `Architecture C41: transition-band organized-support restore attribution`
+- Next active phase: `Architecture C43: equatorward-transition organized-support restore attribution`
 - C39 result:
   - verdict: `inner_core_restore_inert_active_override_targets_outside_restore_band`
   - the live carry-input override rows stayed fixed at `18.75°`, `26.25°`, `33.75°` and mirrored southern rows, outside the C38 inner-core taper
@@ -903,6 +903,19 @@ Updated: 2026-04-16
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
   - interpretation: active transition-band geometry slightly relieved the sign defect versus C32 but reopened part of the strict receiver-containment win
+- C41 result:
+  - verdict: `transition_band_restore_shifts_override_equatorward_and_slightly_relieves_sign_defect_but_reloads_26p25_receiver_lane`
+  - the active geometry shifted override load from `33.75°` toward `26.25°`
+  - that gave a small sign-defect improvement while reopening the `26.25°` receiver lane
+- C42 result:
+  - verdict: `quick_reject`
+  - `itczWidthDeg: 25.91 -> 23.374`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+  - interpretation: backing away from `26.25°` restored the strict C32 containment win but also erased the only live sign-relief signal from C40
 
 ## Day-365 benchmark summary
 

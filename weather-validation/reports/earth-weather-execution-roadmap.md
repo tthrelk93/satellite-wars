@@ -1465,6 +1465,66 @@ Keep the strict C32 organized-support / potential carveout in the equatorial cor
   - but it also gives back some receiver containment (`northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.10807 -> 0.11898`, `cloudRecirculationProxyKgM_1S: 0.44108 -> 0.49162`)
 - Consequence: the next active move is now `Architecture C41: transition-band organized-support restore attribution`.
 
+## Architecture C41: Transition-Band Organized-Support Restore Attribution
+
+### Objective
+
+Pin down exactly what the active C40 transition-band geometry changed relative to the strict C32 carveout.
+
+### Contract
+
+Attribute the C40 tradeoff across equatorial transport, NH receiver metrics, and latitude-resolved override shifts to see whether the transition-band restore helped the right subset or simply moved the burden into a different receiver lane.
+
+### Result
+
+- Status: completed
+- Verdict: `transition_band_restore_shifts_override_equatorward_and_slightly_relieves_sign_defect_but_reloads_26p25_receiver_lane`
+- Key evidence:
+  - `crossEquatorialVaporFluxNorthKgM_1S: -356.96839 -> -355.94778`
+  - equator lower total-water flux north: `-18.3439 -> -18.50334`
+  - equator mid total-water flux north: `-16.74764 -> -16.63613`
+  - equator upper total-water flux north: `-12.82647 -> -12.71408`
+  - `26.25°` accumulated override hits: `18.625 -> 18.667`
+  - `33.75°` accumulated override hits: `5.698 -> 5.51`
+  - `26.25°` carried-over upper cloud: `0.05 -> 0.06`
+  - `33.75°` carried-over upper cloud: `0.429 -> 0.424`
+- Interpretation:
+  - the transition-band restore is genuinely active
+  - it slightly relieves the sign defect and helps the mid-upper / 35° zonal-mean side
+  - but it does that by shifting load equatorward into the `26.25°` receiver lane, which modestly reopens NH dry-belt containment
+- Consequence: the next active move became `Architecture C42: equatorward-transition organized-support restore experiment`.
+
+## Architecture C42: Equatorward-Transition Organized-Support Restore Experiment
+
+### Objective
+
+Keep the transition-band geometry live while backing away from the `26.25°` receiver lane.
+
+### Contract
+
+Narrow the organized-support restore equatorward so it still reaches the `18.75°`-class transition cells but fades out before the `26.25°` receiver lane can reopen.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.374`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+- Interpretation:
+  - narrowing the restore equatorward backed away from the `26.25°` receiver lane successfully
+  - but it also erased the small C40 sign-defect relief and snapped the quick climate back to the strict C32 state
+  - that means the `26.25°` lane is not just collateral damage; some part of it is carrying the only live sign-relief signal in this subfamily
+- Consequence: the next active move is now `Architecture C43: equatorward-transition organized-support restore attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

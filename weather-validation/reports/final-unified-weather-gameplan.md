@@ -664,8 +664,26 @@ Architecture C40 is now complete:
 - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
 - interpretation: the transition-band restore is active, but it only slightly relieves the sign defect versus C32 while giving back some strict dry-belt receiver containment
 
+Architecture C41 is now complete:
+- verdict: `transition_band_restore_shifts_override_equatorward_and_slightly_relieves_sign_defect_but_reloads_26p25_receiver_lane`
+- `26.25°` accumulated override hits: `18.625 -> 18.667`
+- `33.75°` accumulated override hits: `5.698 -> 5.51`
+- `26.25°` carried-over upper cloud: `0.05 -> 0.06`
+- `33.75°` carried-over upper cloud: `0.429 -> 0.424`
+- interpretation: the small C40 sign-relief signal came from shifting the active restore equatorward into the `26.25°` receiver lane
+
+Architecture C42 is now complete:
+- verdict: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.374`
+- `subtropicalDryNorthRatio: 1.534 -> 1.122`
+- `subtropicalDrySouthRatio: 1.199 -> 0.493`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+- interpretation: backing away from `26.25°` removed the receiver reload, but it also collapsed the experiment back to the strict C32 quick state
+
 So the next active move is now:
-- `Architecture C41: transition-band organized-support restore attribution`
+- `Architecture C43: equatorward-transition organized-support restore attribution`
 
 ## Hard Rules Going Forward
 
