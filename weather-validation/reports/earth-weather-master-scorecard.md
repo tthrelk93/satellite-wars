@@ -45,6 +45,8 @@ Updated: 2026-04-16
 - Architecture C30 Weak Restore Carry-Input Recapture Experiment: FAILED (`quick_reject`)
 - Architecture C31 Weak Restore Carry-Input Recapture Attribution: COMPLETED
 - Architecture C32 Organized-Support Carry-Input Carveout Experiment: FAILED (`quick_reject`)
+- Architecture C33 Organized-Support Carry-Input Carveout Attribution: COMPLETED
+- Architecture C34 Potential-Half-Relax Carry-Input Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -774,6 +776,48 @@ Updated: 2026-04-16
   - restoring stricter organized-support and potential caps preserved the broad quick-shape gains and improved NH dry-belt ocean condensation even further
   - but it still failed on the same cross-equatorial sign defect, and the defect was marginally worse than C30, so the next step is another attribution pass rather than more cap tuning
 - Next active phase: `Architecture C33: organized-support carry-input carveout attribution`
+
+## Architecture C33 decision
+
+- Verdict: `organized_support_carveout_restores_receiver_containment_and_upper_branch_but_deepens_lower_mid_core_import`
+- Decision report: [earth-weather-architecture-c33-organized-support-carry-input-carveout-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c33-organized-support-carry-input-carveout-attribution.md)
+- What changed relative to C30:
+  - improved:
+    - NH dry-belt ocean condensation: `0.12693 -> 0.10807`
+    - carryover upper cloud: `0.2187 -> 0.17351`
+    - imported anvil persistence: `0.21701 -> 0.17183`
+    - cloud recirculation proxy: `1.18525 -> 0.44108`
+    - equator upper total-water flux north: `-12.94654 -> -12.82647`
+  - worsened:
+    - cross-equatorial vapor flux north: `-353.96486 -> -356.96839`
+    - equator lower total-water flux north: `-17.99024 -> -18.3439`
+    - equator mid total-water flux north: `-16.67245 -> -16.74764`
+    - 35° lower vapor import: `-22.46949 -> -23.19317`
+    - 35° mid vapor import: `-16.40141 -> -17.28133`
+- Interpretation:
+  - the organized-support carveout direction was genuinely useful for receiver containment and the upper branch
+  - but it over-tightened the lower-mid core, so the next move should keep the strict organized-support cap and only partially relax the potential cap
+- Next active phase: `Architecture C34: potential-half-relax carry-input experiment`
+
+## Architecture C34 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c34-potential-half-relax-carry-input-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c34-potential-half-relax-carry-input-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - bounded outcome:
+    - `itczWidthDeg: 25.91 -> 23.374`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+    - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+- Interpretation:
+  - the potential half-relax was effectively inert at the quick-score level relative to C32
+  - that means the strict organized-support cap or some other upstream admission condition is likely still the active binder, so the next step is attribution rather than more potential-cap nudging
+- Next active phase: `Architecture C35: potential-half-relax carry-input attribution`
 
 ## Day-365 benchmark summary
 

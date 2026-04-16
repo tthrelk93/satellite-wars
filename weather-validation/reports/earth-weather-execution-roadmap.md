@@ -1240,6 +1240,62 @@ Keep the C30 recapture base fixed and restore stricter organized-support / poten
   - but it still did not fix the transport-sign inversion and slightly worsened the cross-equatorial defect relative to C30, so more cap retuning is not justified without another attribution pass
 - Consequence: the next active move is now `Architecture C33: organized-support carry-input carveout attribution`.
 
+## Architecture C33: Organized-Support Carry-Input Carveout Attribution
+
+### Objective
+
+Explain exactly what the stricter C32 organized-support / potential carveout fixed and what it re-broke, so the next experiment can keep the useful receiver relief without over-tightening the lower-mid equatorial core.
+
+### Result
+
+- Status: completed
+- Verdict: `organized_support_carveout_restores_receiver_containment_and_upper_branch_but_deepens_lower_mid_core_import`
+- What C33 proved:
+  - C32 tightened the receiver side relative to C30:
+    - NH dry-belt ocean condensation: `0.12693 -> 0.10807`
+    - carryover upper cloud: `0.2187 -> 0.17351`
+    - imported anvil persistence: `0.21701 -> 0.17183`
+    - cloud recirculation proxy: `1.18525 -> 0.44108`
+  - C32 also improved the upper equatorial branch:
+    - upper total-water flux north: `-12.94654 -> -12.82647`
+    - upper zonal-mean transport: `-7.84381 -> -7.78225`
+    - upper eddy transport: `-5.10272 -> -5.04422`
+  - but it deepened the lower-mid core and the dry-belt import burden:
+    - lower total-water flux north: `-17.99024 -> -18.3439`
+    - mid total-water flux north: `-16.67245 -> -16.74764`
+    - 35° lower vapor import: `-22.46949 -> -23.19317`
+    - 35° mid vapor import: `-16.40141 -> -17.28133`
+- Interpretation:
+  - the organized-support carveout itself was directionally right
+  - but restoring both stricter caps over-tightened the lower-mid core, so the next bounded move should keep the strict organized-support cap and only partially relax the potential cap
+- Consequence: the next active move is now `Architecture C34: potential-half-relax carry-input experiment`.
+
+## Architecture C34: Potential-Half-Relax Carry-Input Experiment
+
+### Objective
+
+Keep the C32 strict organized-support cap fixed and only half-relax the convective-potential cap so the lower-mid equatorial core can recover without reopening the receiver side.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.374`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+- Interpretation:
+  - the potential half-relax was effectively inert at the quick-score level relative to C32
+  - that means the potential cap was not the main active binder in the admitted subset, so more potential-cap tuning is not justified without another attribution pass
+- Consequence: the next active move is now `Architecture C35: potential-half-relax carry-input attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

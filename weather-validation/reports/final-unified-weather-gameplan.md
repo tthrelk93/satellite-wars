@@ -597,8 +597,26 @@ Architecture C32 is now complete in [earth-weather-architecture-c32-organized-su
 - but it still failed on the same live blocker:
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
 
+Architecture C33 is now complete in [earth-weather-architecture-c33-organized-support-carry-input-carveout-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c33-organized-support-carry-input-carveout-attribution.md):
+- verdict: `organized_support_carveout_restores_receiver_containment_and_upper_branch_but_deepens_lower_mid_core_import`
+- C33 showed the split clearly:
+  - receiver/containment side improved again
+  - upper equatorial branch improved
+  - but lower/mid core transport and 35° import got worse
+
+Architecture C34 is now complete in [earth-weather-architecture-c34-potential-half-relax-carry-input-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c34-potential-half-relax-carry-input-experiment.md):
+- verdict: `quick_reject`
+- the potential half-relax was effectively inert at the quick-score level:
+  - `itczWidthDeg: 25.91 -> 23.374`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.122`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.493`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.219`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.10807`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.96839`
+- so the live binder is probably not the potential cap by itself
+
 So the next active move is now:
-- `Architecture C33: organized-support carry-input carveout attribution`
+- `Architecture C35: potential-half-relax carry-input attribution`
 
 ## Hard Rules Going Forward
 
