@@ -874,6 +874,24 @@ Architecture C66 is now complete in [earth-weather-architecture-c66-stronger-26p
 So the next active move is now:
 - `Architecture C67: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, and equatorial eddy guard attribution`
 
+Architecture C67 is now complete in [earth-weather-architecture-c67-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-and-equatorial-eddy-guard-attribution.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c67-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-and-equatorial-eddy-guard-attribution.md):
+- verdict: `equatorial_guard_relieves_lower_mid_core_and_nh_maintenance_but_upper_eddy_and_transition_receiver_flux_remain_primary_blockers`
+- C66 really does improve the lower and mid equatorial core, preserve the `35°` eddy-import relief, and unload the NH ocean maintenance family
+- but the upper equatorial eddy branch remains unrepaired, and the transition / receiver vapor-flux rows at `11.25°`, `18.75°`, `26.25°`, and `33.75°` still reload more negative
+
+Architecture C68 is now complete in [earth-weather-architecture-c68-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-and-narrower-equatorial-core-guard-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c68-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-and-narrower-equatorial-core-guard-experiment.md):
+- decision: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.431`
+- `subtropicalDryNorthRatio: 1.534 -> 1.141`
+- `subtropicalDrySouthRatio: 1.199 -> 0.507`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.235`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12134`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -357.91328`
+- interpretation: narrowing the equatorial guard inward is active and improves the broad quick-shape metrics plus NH ocean condensation, but it pushes the cross-equatorial vapor-flux sign defect slightly the wrong way again
+
+So the next active move is now:
+- `Architecture C69: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, and narrower equatorial-core guard attribution`
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow

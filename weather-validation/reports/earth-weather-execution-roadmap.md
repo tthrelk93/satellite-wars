@@ -2342,5 +2342,22 @@ That architecture lane should be framed as:
   - tightening the base equatorial eddy-softening lane is active and preserves the broad quick-shape gains
   - it modestly relieves the C64 cross-equatorial sign defect, but nowhere near enough to clear the quick gate
   - the `35°` import relief still repays through a severe equatorial export failure, so the next step is attribution, not promotion
+- C67 completed with verdict `equatorial_guard_relieves_lower_mid_core_and_nh_maintenance_but_upper_eddy_and_transition_receiver_flux_remain_primary_blockers`
+- C67 conclusion:
+  - C66 is a real improvement over C64: it relieves the lower and mid equatorial core, preserves the `35°` eddy-import relief, and improves NH dry-belt ocean maintenance
+  - but the upper equatorial eddy branch does not improve, and the transition / receiver vapor-flux rows at `11.25°`, `18.75°`, `26.25°`, and `33.75°` all reload more negative
+  - the next bounded move is to narrow the guard toward the equatorial core rather than abandoning the C66 family
+- C68 completed with verdict `quick_reject`
+- C68 quick metrics:
+  - `itczWidthDeg: 25.91 -> 23.431`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.141`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.507`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.235`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12134`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -357.91328`
+- C68 conclusion:
+  - narrowing the equatorial guard inward is active and further improves the broad shape metrics plus NH dry-belt ocean condensation
+  - but the cross-equatorial sign defect gets slightly worse again relative to C66, so the remaining blocker is not simply the outer shoulder width of the guard
+  - the next step is attribution on that tradeoff, not immediate promotion
 - Active next move:
-  - `Architecture C67: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, and equatorial eddy guard attribution`
+  - `Architecture C69: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, and narrower equatorial-core guard attribution`
