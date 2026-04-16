@@ -1409,6 +1409,62 @@ Keep the strict C32 organized-support / potential carveout outside the equatoria
   - that means the blocked subset is not being reached by this basic inner-core latitude taper
 - Consequence: the next active move is now `Architecture C39: inner-core organized-support restore attribution`.
 
+## Architecture C39: Inner-Core Organized-Support Restore Attribution
+
+### Objective
+
+Prove why the C38 inner-core organized-support restore was inert.
+
+### Contract
+
+Compare the strict C32 carveout against C38 at the latitude-resolved carry-input override layer and confirm whether the restore geometry ever touched the live override targets.
+
+### Result
+
+- Status: completed
+- Verdict: `inner_core_restore_inert_active_override_targets_outside_restore_band`
+- Quick comparison:
+  - `crossEquatorialVaporFluxNorthKgM_1S: -356.96839 -> -356.96839`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.10807 -> 0.10807`
+- Active override rows:
+  - accumulated hits stayed fixed at `33.75°`, `26.25°`, `18.75°`, `-18.75°`, `-26.25°`, `-33.75°`
+  - accumulated removed mass stayed fixed at `33.75°`, `26.25°`, `18.75°`, `-18.75°`, `-26.25°`, `-33.75°`
+- Interpretation:
+  - the C38 inner-core restore never touched the live carry-input override rows
+  - the blocked subset lives in the transition / receiver band, not the equatorial core
+- Consequence: the next active move became `Architecture C40: transition-band organized-support restore experiment`.
+
+## Architecture C40: Transition-Band Organized-Support Restore Experiment
+
+### Objective
+
+Restore organized-support admission only across the active transition-band rows where the carry-input override is actually accumulating.
+
+### Contract
+
+Keep the strict C32 organized-support / potential carveout in the equatorial core, but restore organized-support admission with a bounded latitude taper across the live transition-band override rows.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.386`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.128`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.49`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
+- Interpretation:
+  - the transition-band geometry is active, not inert
+  - relative to strict C32 it only slightly relieves the sign defect (`-356.96839 -> -355.94778`)
+  - but it also gives back some receiver containment (`northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.10807 -> 0.11898`, `cloudRecirculationProxyKgM_1S: 0.44108 -> 0.49162`)
+- Consequence: the next active move is now `Architecture C41: transition-band organized-support restore attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

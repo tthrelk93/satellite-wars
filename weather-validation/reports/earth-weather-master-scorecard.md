@@ -890,7 +890,19 @@ Updated: 2026-04-16
 - Interpretation:
   - the inner-core restore was also inert at the quick-score level relative to the strict C32 carveout
   - so the blocked subset is not being reached by the simple inner-core geometry
-- Next active phase: `Architecture C39: inner-core organized-support restore attribution`
+- Next active phase: `Architecture C41: transition-band organized-support restore attribution`
+- C39 result:
+  - verdict: `inner_core_restore_inert_active_override_targets_outside_restore_band`
+  - the live carry-input override rows stayed fixed at `18.75°`, `26.25°`, `33.75°` and mirrored southern rows, outside the C38 inner-core taper
+- C40 result:
+  - verdict: `quick_reject`
+  - `itczWidthDeg: 25.91 -> 23.386`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.128`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.49`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
+  - interpretation: active transition-band geometry slightly relieved the sign defect versus C32 but reopened part of the strict receiver-containment win
 
 ## Day-365 benchmark summary
 
