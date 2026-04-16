@@ -665,6 +665,57 @@ Prove whether the remaining quick-gate failure is a generic climate weakness or 
   - the low-level source partition proxy collapses to `null / null` in the hybrid Hadley summary, so the next contract should restore equatorial overturning sign without throwing away the dry-belt and NH-westerly gains already earned
 - Consequence: the next active move is now `Architecture C12: equatorial overturning sign contract design`.
 
+## Architecture C12: Equatorial Overturning Sign Contract Design
+
+### Objective
+
+Convert the C11 polarity inversion into one explicit donor/current hybrid contract instead of continuing local climate patching.
+
+### Result
+
+- Status: completed
+- Verdict: `current_low_level_momentum_preserve_layer_required`
+- What C12 proved:
+  - the hybrid keeps the stronger donor/current circulation scaffold outside the equator
+  - the cleanest remaining mismatch is the low-level momentum/nudging sign-control lane
+  - the first preserve layer should be forward-ported from current:
+    - [windNudge5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/windNudge5.js)
+    - [windEddyNudge5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/windEddyNudge5.js)
+    - [nudging5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/nudging5.js)
+  - the donor-core patch lane should stay narrowly scoped to:
+    - `windNudgeParams.tauSurfaceSeconds: 7 * 86400 -> 8 * 3600`
+    - `nudgeParams.tauQvS: 30 * 86400 -> 45 * 86400`
+    - `nudgeParams.tauQvColumn: 12 * 86400 -> 18 * 86400`
+    - the organized/subsidence relief quartet now consumed by current nudging modules
+- Consequence: the next active move is now `Architecture C13: equatorial overturning sign contract experiment`.
+
+## Architecture C13: Equatorial Overturning Sign Contract Experiment
+
+### Objective
+
+Test whether preserving the current low-level momentum/nudging layer on top of the donor scaffold restores northward equatorial overturning without giving back the repaired dry-belt and NH-westerly gains.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Strong retained wins:
+  - `itczWidthDeg: 25.91 -> 23.884`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.152`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.585`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.232`
+- Remaining blocker:
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -330.9854`
+- Interpretation:
+  - the donor/current hybrid remains a genuinely strong climate candidate on five of the six core quick metrics
+  - the preserve-layer contract did not fix the equatorial overturning sign defect
+  - the next work should attribute the implementation lane that still flips transport polarity instead of broadening the hybrid family again
+- Consequence: the next active move is now `Architecture C14: sign-contract implementation attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

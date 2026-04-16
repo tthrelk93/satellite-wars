@@ -360,8 +360,30 @@ Architecture C11 is now complete in [earth-weather-architecture-c11-cycled-hybri
   - equatorial zonal-mean vapor flux north: `160.44983 -> -274.70821`
   - equatorial eddy vapor flux north: `-12.37515 -> -105.45284`
 
+Architecture C12 is now complete in [earth-weather-architecture-c12-equatorial-overturning-sign-contract-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c12-equatorial-overturning-sign-contract-design.md):
+- verdict: `current_low_level_momentum_preserve_layer_required`
+- the contract now explicitly keeps the donor scaffold but forward-ports the current low-level preserve layer:
+  - [windNudge5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/windNudge5.js)
+  - [windEddyNudge5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/windEddyNudge5.js)
+  - [nudging5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/nudging5.js)
+- donor-core sign-control ports are now explicitly bounded to:
+  - `tauSurfaceSeconds`
+  - `tauQvS`
+  - `tauQvColumn`
+  - organized/subsidence relief terms
+
+Architecture C13 is now complete in [earth-weather-architecture-c13-equatorial-overturning-sign-contract-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c13-equatorial-overturning-sign-contract-experiment.md):
+- verdict: `quick_reject`
+- the sign-contract hybrid is still a strong climate candidate on `4 / 6` quick metrics:
+  - `itczWidthDeg: 25.91 -> 23.884`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.152`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.585`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.232`
+- but the remaining blocker is still transport polarity:
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -330.9854`
+
 So the next active move is now:
-- `Architecture C12: equatorial overturning sign contract design`
+- `Architecture C14: sign-contract implementation attribution`
 
 ## Hard Rules Going Forward
 

@@ -338,6 +338,45 @@ Updated: 2026-04-16
   - the next bounded move should target equatorial overturning sign while preserving the dry-belt and NH-westerly gains
 - Next active phase: `Architecture C12: equatorial overturning sign contract design`
 
+## Architecture C12 decision
+
+- Verdict: `current_low_level_momentum_preserve_layer_required`
+- Decision report: [earth-weather-architecture-c12-equatorial-overturning-sign-contract-design.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c12-equatorial-overturning-sign-contract-design.md)
+- Contract result:
+  - preserve layer:
+    - [windNudge5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/windNudge5.js)
+    - [windEddyNudge5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/windEddyNudge5.js)
+    - [nudging5.js](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/nudging5.js)
+  - donor-core param ports:
+    - `windNudgeParams.tauSurfaceSeconds: 7 * 86400 -> 8 * 3600`
+    - `nudgeParams.tauQvS: 30 * 86400 -> 45 * 86400`
+    - `nudgeParams.tauQvColumn: 12 * 86400 -> 18 * 86400`
+    - `nudgeParams organized/subsidence relief quartet from current core`
+- Interpretation:
+  - C11 narrowed the defect to a low-level sign-control mismatch rather than a broad scaffold failure
+  - the next bounded move is the actual sign-contract experiment on the donor scaffold
+- Next active phase: `Architecture C13: equatorial overturning sign contract experiment`
+
+## Architecture C13 decision
+
+- Verdict: `quick_reject`
+- Decision report: [earth-weather-architecture-c13-equatorial-overturning-sign-contract-experiment.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c13-equatorial-overturning-sign-contract-experiment.md)
+- Quick result:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+  - retained hybrid wins:
+    - `itczWidthDeg: 25.91 -> 23.884`
+    - `subtropicalDryNorthRatio: 1.534 -> 1.152`
+    - `subtropicalDrySouthRatio: 1.199 -> 0.585`
+    - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.232`
+  - blocking regression:
+    - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -330.9854`
+- Interpretation:
+  - the donor/current hybrid is still strong almost everywhere we care about
+  - the remaining blocker is now specific to sign-contract implementation rather than generic hybrid viability
+- Next active phase: `Architecture C14: sign-contract implementation attribution`
+
 ## Day-365 benchmark summary
 
 - ITCZ width: current 24.875, rollback 25.613, winner current

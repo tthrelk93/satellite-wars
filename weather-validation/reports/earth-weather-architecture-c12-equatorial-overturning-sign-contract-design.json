@@ -1,0 +1,42 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c12-equatorial-overturning-sign-contract-design.v1",
+  "generatedAt": "2026-04-16T06:19:39.095Z",
+  "decision": {
+    "verdict": "current_low_level_momentum_preserve_layer_required",
+    "nextMove": "Architecture C13: equatorial overturning sign contract experiment"
+  },
+  "attribution": {
+    "offFlux": 143.95306,
+    "onFlux": -371.9765,
+    "offEquatorVelocity": 11.78514,
+    "onEquatorVelocity": -20.46744,
+    "offWesterlies": 0.531,
+    "onWesterlies": 1.061
+  },
+  "contract": {
+    "preserveLayer": [
+      "src/weather/v2/windNudge5.js",
+      "src/weather/v2/windEddyNudge5.js",
+      "src/weather/v2/nudging5.js"
+    ],
+    "coreParamPorts": [
+      "windNudgeParams.tauSurfaceSeconds: 7 * 86400 -> 8 * 3600",
+      "nudgeParams.tauQvS: 30 * 86400 -> 45 * 86400",
+      "nudgeParams.tauQvColumn: 12 * 86400 -> 18 * 86400",
+      "nudgeParams organized/subsidence relief quartet from current core"
+    ],
+    "evidenceLines": [
+      "The hybrid flips equatorial low-level velocity from northward to strongly southward while improving NH westerlies, which points to a low-level sign-control mismatch rather than a generic circulation collapse.",
+      "Current-vs-donor core diff exposes the strongest sign-control change in low-level wind nudging: -      tauSurfaceSeconds: 7 * 86400, | +      tauSurfaceSeconds: 8 * 3600,",
+      "Current-vs-donor core diff also changes surface/column moisture nudging timescales: -      tauQvS: 30 * 86400, | +      tauQvS: 45 * 86400, | -      tauQvColumn: 12 * 86400, | +      tauQvColumn: 18 * 86400,",
+      "Current core adds organized/subsidence relief terms consumed by current nudging modules: +      organizedConvectionQvSurfaceRelief: 0.85,"
+    ]
+  },
+  "diffTargets": [
+    "src/weather/v2/core5.js",
+    "src/weather/v2/windNudge5.js",
+    "src/weather/v2/windEddyNudge5.js",
+    "src/weather/v2/nudging5.js",
+    "src/weather/v2/dynamics5.js"
+  ]
+}
