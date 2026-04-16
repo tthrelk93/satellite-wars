@@ -771,6 +771,23 @@ Architecture C54 is now complete:
 So the next active move is now:
 - `Architecture C55: 26p25 receiver carryover containment transition-band attribution`
 
+Architecture C55 is now complete:
+- verdict: `receiver_carryover_containment_relieves_26p25_but_forces_18p75_transition_export_and_33p75_reload`
+- interpretation: the C54 receiver relief is real, but it is paid for by a worse `18.75°` transition-export lane and a reloaded `33.75°` shoulder
+
+Architecture C56 is now complete:
+- verdict: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.333`
+- `subtropicalDryNorthRatio: 1.534 -> 1.124`
+- `subtropicalDrySouthRatio: 1.199 -> 0.496`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.201`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12942`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -362.46654`
+- interpretation: the narrow `18.75°` transition-support preserve is effectively inert at the climate-result level and reproduces the same C54 state to reporting precision
+
+So the next active move is now:
+- `Architecture C57: 26p25 carryover containment with 18p75 transition-support preserve attribution`
+
 ## Hard Rules Going Forward
 
 - no more alphabetized residual micro-phases as the default workflow

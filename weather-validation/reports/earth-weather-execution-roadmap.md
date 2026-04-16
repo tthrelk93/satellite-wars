@@ -1861,6 +1861,63 @@ Preserve the strict C32 equatorial-core carveout, preserve the C40 transition-ba
   - the next bounded move is attribution, not another immediate geometry guess
 - Consequence: the next active move is now `Architecture C55: 26p25 receiver carryover containment transition-band attribution`.
 
+## Architecture C55: 26p25 Receiver Carryover Containment Transition-Band Attribution
+
+### Objective
+
+Prove exactly what C54 bought at the `26.25°` receiver row, and identify which neighboring latitude lanes paid for that relief.
+
+### Contract
+
+Compare C54 directly against the live C40 transition-band regime, with strict C32 kept as the receiver-row baseline, across quick metrics, moisture attribution, transport interfaces, and the `18.75°` / `26.25°` / `33.75°` transition shoulder rows.
+
+### Result
+
+- Status: completed
+- Verdict: `receiver_carryover_containment_relieves_26p25_but_forces_18p75_transition_export_and_33p75_reload`
+- Key evidence:
+  - `26.25°` northward vapor flux becomes less negative: C40 `-579.114`, C54 `-565.124`
+  - `26.25°` carried-over upper cloud drops slightly: C40 `0.06`, C54 `0.058`
+  - `18.75°` northward vapor flux becomes more southward: C40 `-229.214`, C54 `-237.978`
+  - `33.75°` carried-over upper cloud rises: C40 `0.424`, C54 `0.437`
+  - equator lower/mid/upper total-water flux north all worsen versus C40
+- Interpretation:
+  - the C54 receiver-lane containment is genuinely active and does relieve the `26.25°` row
+  - that relief is paid for by starving the `18.75°` transition-export lane and reloading the `33.75°` shoulder carryover family
+  - the next bounded move should preserve the C54 receiver relief while explicitly protecting the narrow `18.75°` transition-support lane
+- Consequence: the next active move became `Architecture C56: 26p25 carryover containment with 18p75 transition-support preserve experiment`.
+
+## Architecture C56: 26p25 Carryover Containment With 18p75 Transition-Support Preserve Experiment
+
+### Objective
+
+Keep the active C54 `26.25°` carryover-containment lane, but add narrow `18.75°` transition-support preserve so the equatorward transition lane does not pay for that receiver relief.
+
+### Contract
+
+Preserve the strict C32 equatorial-core carveout, preserve the active C54 `26.25°` carryover containment, and add a narrow `18.75°` organized-support preserve inside the transition-support contract.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.333`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.124`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.496`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.201`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12942`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -362.46654`
+- Interpretation:
+  - the narrow `18.75°` transition-support preserve does not create a useful new middle state
+  - to reporting precision, C56 reproduces the same climate result as C54, so this preserve lane is effectively below the live binder in the current geometry
+  - the right next move is attribution, not another immediate support-lane variation
+- Consequence: the next active move is now `Architecture C57: 26p25 carryover containment with 18p75 transition-support preserve attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

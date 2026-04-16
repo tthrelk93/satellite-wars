@@ -902,7 +902,7 @@ Updated: 2026-04-16
 - Interpretation:
   - the inner-core restore was also inert at the quick-score level relative to the strict C32 carveout
   - so the blocked subset is not being reached by the simple inner-core geometry
-- Next active phase: `Architecture C55: 26p25 receiver carryover containment transition-band attribution`
+- Next active phase: `Architecture C39: inner-core organized-support restore attribution`
 - C39 result:
   - verdict: `inner_core_restore_inert_active_override_targets_outside_restore_band`
   - the live carry-input override rows stayed fixed at `18.75°`, `26.25°`, `33.75°` and mirrored southern rows, outside the C38 inner-core taper
@@ -1005,6 +1005,22 @@ Updated: 2026-04-16
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12942`
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -362.46654`
   - interpretation: the 26.25° carryover-containment lane is active but still worsens the core sign defect and gives back part of the receiver-side relief
+- C55 result:
+  - verdict: `receiver_carryover_containment_relieves_26p25_but_forces_18p75_transition_export_and_33p75_reload`
+  - `26.25°` vapor flux north becomes less negative: `-579.114 -> -565.124`
+  - `18.75°` vapor flux north becomes more southward: `-229.214 -> -237.978`
+  - `33.75°` carried-over upper cloud rises: `0.424 -> 0.437`
+  - interpretation: the C54 receiver relief is real, but it is paid for by a worse `18.75°` transition-export lane and a reloaded `33.75°` shoulder
+- C56 result:
+  - verdict: `quick_reject`
+  - `itczWidthDeg: 25.91 -> 23.333`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.124`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.496`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.201`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12942`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -362.46654`
+  - interpretation: the narrow `18.75°` transition-support preserve is effectively inert at the climate-result level and reproduces the same C54 state to reporting precision
+- Next active phase: `Architecture C57: 26p25 carryover containment with 18p75 transition-support preserve attribution`
 
 ## Day-365 benchmark summary
 
