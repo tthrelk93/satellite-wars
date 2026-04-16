@@ -1636,6 +1636,63 @@ Keep the strict C32 organized-support / potential carveout fixed in the equatori
   - instead it reproduces the broader C30 weak-restore carry-input recapture regime to reporting precision
 - Consequence: the next active move is now `Architecture C47: 26p25-33p75 coupled organized-support restore attribution`.
 
+## Architecture C47: 26p25-33p75 Coupled Organized-Support Restore Attribution
+
+### Objective
+
+Determine whether C46 created a genuinely new intermediate state or whether it simply reopened the older C30 weak-restore carry-input recapture regime.
+
+### Contract
+
+Compare C46 against both C30 and C40 across the quick score, moisture attribution, transport interfaces, and latitude-resolved override rows. If C46 matches C30 exactly while differing from C40 mainly through a stronger `33.75°` shoulder, then the honest next move is to taper the poleward shoulder instead of restoring it at full strength.
+
+### Result
+
+- Status: completed
+- Verdict: `coupled_shoulder_reopens_c30_recapture_regime_full_33p75_restore_too_strong`
+- Key evidence:
+  - C30 vs C46 quick metrics are identical to reporting precision
+  - C30 vs C46 moisture attribution is identical for persistence, carryover, weak-erosion survival, and cross-equatorial flux
+  - C30 vs C46 transport interfaces are identical at the equator and `35°`
+  - the live difference from C40 is concentrated in the poleward shoulder:
+    - `33.75°` override hits: C40 `5.51`, C46 `6.479`
+    - `33.75°` carried-over upper cloud: C40 `0.424`, C46 `0.485`
+- Interpretation:
+  - the coupled shoulder is necessary, but restoring the full `33.75°` shoulder is too strong
+  - C46 is another route back into the broader C30 tradeoff, not a distinct improvement family
+- Consequence: the next active move became `Architecture C48: tapered poleward-shoulder organized-support restore experiment`.
+
+## Architecture C48: Tapered Poleward-Shoulder Organized-Support Restore Experiment
+
+### Objective
+
+Keep the live `26.25°` shoulder signal active while tapering the `33.75°` poleward shoulder down toward the smaller C40-level restore so the hybrid does not snap back to the full C30 regime.
+
+### Contract
+
+Keep the strict C32 core carveout fixed, keep `26.25°` fully restored, taper the `33.75°` poleward shoulder with a C40-style upper-latitude fade, and leave `18.75°` outside the active restore geometry.
+
+### Result
+
+- Status: completed
+- Verdict: `quick_reject`
+- Quick gate:
+  - improved metrics: `4 / 6`
+  - severe regressions:
+    - `crossEquatorialVaporFluxNorthKgM_1S`
+- Quick outcome:
+  - `itczWidthDeg: 25.91 -> 23.386`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.128`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.49`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
+- Interpretation:
+  - the tapered `33.75°` shoulder does not create a new intermediate state
+  - it reproduces the earlier C40 transition-band restore state to reporting precision across the quick score, moisture attribution, and latitude-resolved shoulder rows
+  - that means the remaining live question is no longer whether tapering works, but why the C40/C48 regime still cannot clear the equatorial sign defect
+- Consequence: the next active move is now `Architecture C49: tapered poleward-shoulder organized-support restore attribution`.
+
 ## Phase 1: Climate Base Recovery
 
 ### Objective

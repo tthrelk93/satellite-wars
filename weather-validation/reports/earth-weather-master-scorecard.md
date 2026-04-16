@@ -59,6 +59,8 @@ Updated: 2026-04-16
 - Architecture C44 26p25-Centered Organized-Support Restore Experiment: FAILED (`quick_reject`)
 - Architecture C45 26p25-Centered Organized-Support Restore Attribution: COMPLETED
 - Architecture C46 26p25-33p75 Coupled Organized-Support Restore Experiment: FAILED (`quick_reject`)
+- Architecture C47 26p25-33p75 Coupled Organized-Support Restore Attribution: COMPLETED
+- Architecture C48 Tapered Poleward-Shoulder Organized-Support Restore Experiment: FAILED (`quick_reject`)
 - Phase 1 Climate Base Recovery: BLOCKED
 - Phase 2 Seasonal Earth Realism: BLOCKED
 - Phase 3 Regional Weather-Regime Realism: BLOCKED
@@ -898,7 +900,7 @@ Updated: 2026-04-16
 - Interpretation:
   - the inner-core restore was also inert at the quick-score level relative to the strict C32 carveout
   - so the blocked subset is not being reached by the simple inner-core geometry
-- Next active phase: `Architecture C47: 26p25-33p75 coupled organized-support restore attribution`
+- Next active phase: `Architecture C49: tapered poleward-shoulder organized-support restore attribution`
 - C39 result:
   - verdict: `inner_core_restore_inert_active_override_targets_outside_restore_band`
   - the live carry-input override rows stayed fixed at `18.75°`, `26.25°`, `33.75°` and mirrored southern rows, outside the C38 inner-core taper
@@ -949,6 +951,19 @@ Updated: 2026-04-16
   - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12693`
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
   - interpretation: the coupled `26.25°–33.75°` shoulder is active, but it reproduces the older C30 weak-restore recapture regime rather than the smaller C40 sign-relief signal
+- C47 result:
+  - verdict: `coupled_shoulder_reopens_c30_recapture_regime_full_33p75_restore_too_strong`
+  - C46 matches the earlier C30 weak-restore carry-input recapture regime across quick metrics, moisture attribution, transport interfaces, and shoulder-row diagnostics
+  - interpretation: the full `33.75°` poleward shoulder restore is too strong
+- C48 result:
+  - verdict: `quick_reject`
+  - `itczWidthDeg: 25.91 -> 23.386`
+  - `subtropicalDryNorthRatio: 1.534 -> 1.128`
+  - `subtropicalDrySouthRatio: 1.199 -> 0.49`
+  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
+  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
+  - interpretation: tapering the `33.75°` shoulder reproduces the earlier C40 transition-band regime exactly rather than creating a new intermediate state
 
 ## Day-365 benchmark summary
 

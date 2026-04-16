@@ -712,8 +712,22 @@ Architecture C46 is now complete:
 - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -353.96486`
 - interpretation: the coupled `26.25°–33.75°` shoulder is active, but it reproduces the broader C30 weak-restore carry-input recapture state instead of the smaller C40 sign-relief state
 
+Architecture C47 is now complete:
+- verdict: `coupled_shoulder_reopens_c30_recapture_regime_full_33p75_restore_too_strong`
+- interpretation: C46 is not a new intermediate state; it reopens the older C30 weak-restore carry-input recapture regime, so the full `33.75°` shoulder restore is too strong
+
+Architecture C48 is now complete:
+- verdict: `quick_reject`
+- `itczWidthDeg: 25.91 -> 23.386`
+- `subtropicalDryNorthRatio: 1.534 -> 1.128`
+- `subtropicalDrySouthRatio: 1.199 -> 0.49`
+- `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.225`
+- `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.11898`
+- `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -355.94778`
+- interpretation: tapering the `33.75°` shoulder does not create a new middle state; it reproduces the earlier C40 transition-band restore regime to reporting precision
+
 So the next active move is now:
-- `Architecture C47: 26p25-33p75 coupled organized-support restore attribution`
+- `Architecture C49: tapered poleward-shoulder organized-support restore attribution`
 
 ## Hard Rules Going Forward
 
