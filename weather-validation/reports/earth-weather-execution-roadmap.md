@@ -11,6 +11,34 @@ Build a free-running Earth-like weather system where:
 
 This roadmap is for **emergent Earth realism**, not historical replay.
 
+## Hybrid Harness Quarantine (Rescue Plan Phase 1)
+
+- status: `active`
+- Architecture B, Architecture C (all 76 scripts, C1–C70), and the planned Architecture D are **retired**.
+- Scripts and tests live under `scripts/agent/archived/` and `weather-validation/tests/archived/`. Do not reintroduce them into the active agent script directory.
+- The `crossEquatorialVaporFluxNorthKgM_1S` "sign defect" that drove Architecture C/D was a runtime artifact of splicing donor-rollback core code with current-branch overlays. The **actual master branch is sign-positive** (day-365 = +326), so the sign defect does not exist in the deployed model.
+- Architecture A scripts (`a-design`, `a1-balance-contract`, `a2-partition-port`) remain in place because they are in-branch experiments, not hybrids.
+- Going forward, **all experiments run in-branch on master**. No donor-core bridges, no overlay copies, no patch-string splicing.
+
+## Master Rescue Plan
+
+Replaces the hybrid-driven architecture ladder. Six bounded phases, each with hard exit gates, two-attempt rule, and annual validation.
+
+| Phase | Objective | Metric | Master day-365 | Target | Status |
+| --- | --- | --- | ---: | ---: | --- |
+| R1 | Quarantine hybrid harness | — | — | — | **completed** |
+| R2 | SH dry-belt drying | `subtropicalDrySouthRatio` | 1.145 | ≤ 0.70 | pending |
+| R3 | NH midlatitude westerlies | `midlatitudeWesterliesNorthU10Ms` | 0.524 | ≥ 1.00 | pending |
+| R4 | ITCZ width | `itczWidthDeg` | 24.875 | ≤ 24.00 | pending |
+| R5 | Emergent NH tropical cyclone environment | `tropicalCycloneEnvironmentCountNh` | 0 | ≥ 1 | pending |
+| R6 | Multi-year drift | 3-year audit | — | no secular drift | pending |
+
+### R1 closeout note
+
+- `earth-weather-architecture-b*` and `earth-weather-architecture-c*` scripts moved from `scripts/agent/` to `scripts/agent/archived/`. Test imports were rewritten to `../../../scripts/agent/archived/...`.
+- 201 archived tests still pass post-move (classifier/renderer unit tests). No npm scripts, source files, or active experiment scripts referenced B/C scripts, so no external callers were broken.
+- Architecture D was never coded; it existed only as a roadmap plan. Its report files remain as historical record but are **no longer active**.
+
 ## Program Rules
 
 - No more alphabetized residual micro-phases as the default workflow.
@@ -19,6 +47,7 @@ This roadmap is for **emergent Earth realism**, not historical replay.
 - Any candidate that might be kept must clear a `365`-day gate.
 - Storm-focused work does not start until the climate base passes Phase 1.
 - After two annual failures inside a top-level family, we stop and choose rollback or architecture change instead of inventing narrower patches.
+- **Rescue-plan rule:** no hybrid splices; work in-branch on master only.
 
 ## Canonical Anchors
 
