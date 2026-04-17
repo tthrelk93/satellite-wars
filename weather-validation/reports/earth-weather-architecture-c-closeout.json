@@ -1,0 +1,91 @@
+{
+  "decision": {
+    "verdict": "architecture_c_exhausted_best_reference_c62",
+    "architectureExhausted": true,
+    "bestReferenceCandidate": "C62",
+    "doNotContinue": "C71+",
+    "nextArchitecture": "Architecture D: core transport-sign rebuild",
+    "nextMove": "Architecture D1: signed transport-budget decomposition design",
+    "reasons": [
+      "All four meaningful late Architecture C candidates remain quick rejects.",
+      "C62 still has the least-bad cross-equatorial transport-sign defect in the final comparison set.",
+      "C66, C68, and C70 map tradeoffs inside the same family instead of producing a better keep candidate.",
+      "Architecture C generated real discovery value, but it no longer justifies continued latitude-lane micro-tuning."
+    ]
+  },
+  "baselineMetrics": {
+    "itczWidthDeg": 25.91,
+    "subtropicalDryNorthRatio": 1.534,
+    "subtropicalDrySouthRatio": 1.199,
+    "midlatitudeWesterliesNorthU10Ms": 0.531,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.1413,
+    "crossEquatorialVaporFluxNorthKgM_1S": 143.95306
+  },
+  "candidates": [
+    {
+      "id": "C62",
+      "label": "Architecture C62",
+      "quickVerdict": "quick_reject",
+      "quickPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c62-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-quick.json",
+      "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c62-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-experiment.md",
+      "signal": "Best retained late-C reference candidate. It keeps the least-bad cross-equatorial transport-sign defect while still preserving the strongest dry-belt ratios in this final comparison set.",
+      "metrics": {
+        "itczWidthDeg": 23.386,
+        "subtropicalDryNorthRatio": 1.057,
+        "subtropicalDrySouthRatio": 0.487,
+        "midlatitudeWesterliesNorthU10Ms": 1.214,
+        "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.13629,
+        "crossEquatorialVaporFluxNorthKgM_1S": -318.32449
+      }
+    },
+    {
+      "id": "C66",
+      "label": "Architecture C66",
+      "quickVerdict": "quick_reject",
+      "quickPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c66-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-and-equatorial-eddy-guard-quick.json",
+      "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c66-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-and-equatorial-eddy-guard-experiment.md",
+      "signal": "Real equatorial-guard activity, but it does not beat C62 on the primary blocker. The sign defect stays materially worse even though the shape metrics remain strong.",
+      "metrics": {
+        "itczWidthDeg": 23.232,
+        "subtropicalDryNorthRatio": 1.112,
+        "subtropicalDrySouthRatio": 0.492,
+        "midlatitudeWesterliesNorthU10Ms": 1.218,
+        "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.12975,
+        "crossEquatorialVaporFluxNorthKgM_1S": -356.31833
+      }
+    },
+    {
+      "id": "C68",
+      "label": "Architecture C68",
+      "quickVerdict": "quick_reject",
+      "quickPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c68-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-and-narrower-equatorial-core-guard-quick.json",
+      "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c68-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-and-narrower-equatorial-core-guard-experiment.md",
+      "signal": "Best NH dry-belt ocean-condensation containment and strongest NH westerlies of the four, but it pushes the transport-sign defect farther from recovery again.",
+      "metrics": {
+        "itczWidthDeg": 23.431,
+        "subtropicalDryNorthRatio": 1.141,
+        "subtropicalDrySouthRatio": 0.507,
+        "midlatitudeWesterliesNorthU10Ms": 1.235,
+        "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.12134,
+        "crossEquatorialVaporFluxNorthKgM_1S": -357.91328
+      }
+    },
+    {
+      "id": "C70",
+      "label": "Architecture C70",
+      "quickVerdict": "quick_reject",
+      "quickPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c70-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-narrower-equatorial-core-guard-and-stronger-inner-core-blend-quick.json",
+      "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c70-stronger-26p25-receiver-carryover-containment-with-33p75-poleward-shoulder-carryover-containment-35deg-interface-eddy-softening-narrower-equatorial-core-guard-and-stronger-inner-core-blend-experiment.md",
+      "signal": "Best post-C68 recovery on the transport-sign defect, but it still fails badly versus C62 and gives back part of the NH ocean-condensation relief.",
+      "metrics": {
+        "itczWidthDeg": 23.438,
+        "subtropicalDryNorthRatio": 1.13,
+        "subtropicalDrySouthRatio": 0.514,
+        "midlatitudeWesterliesNorthU10Ms": 1.226,
+        "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.13037,
+        "crossEquatorialVaporFluxNorthKgM_1S": -348.97338
+      }
+    }
+  ],
+  "generatedAt": "2026-04-17T02:09:37.652Z"
+}

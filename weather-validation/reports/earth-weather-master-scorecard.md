@@ -1097,7 +1097,42 @@ Updated: 2026-04-16
   - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -361.01`
   - relative to C62, `35°` interface softening slightly improves NH ocean condensation `0.13629 -> 0.13472`, but cross-equatorial vapor flux worsens sharply `-318.32449 -> -361.01`
   - interpretation: the targeted `35°` interface eddy softening is active, but it repays the local import relief by collapsing the equatorial / transition export side more severely
-- Next active phase: `Architecture C65: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment and 35deg interface eddy softening attribution`
+- Next active phase: superseded by Architecture C closeout
+
+## Architecture C closeout
+
+- Verdict: `architecture_c_exhausted_best_reference_c62`
+- Decision report: [earth-weather-architecture-c-closeout.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c-closeout.md)
+- Best retained candidate: `C62`
+- Comparison:
+  - `C62`
+    - best primary-blocker result: `crossEquatorialVaporFluxNorthKgM_1S = -318.32449`
+    - best late-C NH / SH dry-belt ratios: `1.057`, `0.487`
+  - `C66`
+    - preserves broad quick-shape gains, but sign defect remains much worse than `C62`: `-356.31833`
+  - `C68`
+    - best NH ocean condensation and NH westerlies of the four: `0.12134`, `1.235`
+    - but the sign defect worsens again: `-357.91328`
+  - `C70`
+    - partial recovery from `C68` on the sign defect: `-348.97338`
+    - still does not beat `C62`, and gives back part of the NH ocean-condensation win
+- Explicit decision:
+  - Architecture C is exhausted as a micro-phase family
+  - do not continue `C71+`
+  - use `C62` as the retained late-C reference candidate
+
+## Architecture D decision
+
+- Verdict: `core_transport_sign_rebuild_required`
+- Decision report: [earth-weather-architecture-d-core-transport-sign-rebuild.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-d-core-transport-sign-rebuild.md)
+- Focus:
+  - circulation-core transport-sign repair
+  - zonal-mean overturning polarity
+  - equatorial eddy export closure
+  - NH dry-belt import / closure balance
+- Hard bound:
+  - Architecture D is bounded to `D1-D3` before another mandatory closeout gate
+- Next active phase: `Architecture D1: signed transport-budget decomposition design`
 
 ## Day-365 benchmark summary
 

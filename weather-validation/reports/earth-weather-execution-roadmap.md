@@ -2289,92 +2289,45 @@ That architecture lane should be framed as:
 - recover the rollback branch’s stronger NH jet / cross-equatorial circulation behavior
 - test only broad integrated families, not local residual patches
 
-## Current Architecture C Status
+## Architecture C Closeout
 
-- C61 completed with verdict `stronger_receiver_containment_relieves_equatorial_export_and_recaptures_26p25_carryover_but_reloads_33p75_poleward_shoulder_and_nh_ocean_maintenance`
-- C61 conclusion:
-  - the stronger `26.25°` receiver containment is a real middle state
-  - it improves the sign defect and unloads `26.25°` carryover
-  - but it repays that win by reloading the `33.75°` poleward shoulder and NH dry-belt ocean upper-cloud maintenance
-- C62 completed with verdict `quick_reject`
-- C62 quick metrics:
-  - `itczWidthDeg: 25.91 -> 23.386`
-  - `subtropicalDryNorthRatio: 1.534 -> 1.057`
-  - `subtropicalDrySouthRatio: 1.199 -> 0.487`
-  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.214`
-  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13629`
-  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -318.32449`
-- C62 conclusion:
-  - the narrow `33.75°` poleward-shoulder carryover containment is active
-  - it meaningfully recaptures the NH ocean rebound from C60
-  - but the cross-equatorial sign defect is still severe, so the quick gate remains red
-- C63 completed with verdict `poleward_shoulder_containment_recaptures_receiver_and_nh_ocean_rebound_but_35deg_eddy_import_remains_primary_blocker`
-- C63 conclusion:
-  - C62 genuinely recaptures the `26.25°` receiver lane and the `33.75°` poleward shoulder
-  - NH dry-belt ocean maintenance rebounds are materially recovered relative to C60
-  - the remaining live blocker is now the `35°` eddy-import branch, not the `35°` zonal-mean branch
-- C64 completed with verdict `quick_reject`
-- C64 quick metrics:
-  - `itczWidthDeg: 25.91 -> 23.237`
-  - `subtropicalDryNorthRatio: 1.534 -> 1.14`
-  - `subtropicalDrySouthRatio: 1.199 -> 0.518`
-  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.216`
-  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13472`
-  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -361.01`
-- C64 conclusion:
-  - the narrow `35°` interface eddy softening is active
-  - it improves the targeted `35°` import branch and slightly improves NH dry-belt ocean condensation relative to C62
-  - but it reloads the equatorial / transition export defect strongly enough that the cross-equatorial sign error worsens sharply
-- C65 completed with verdict `35deg_interface_eddy_softening_relieves_targeted_import_but_overcorrects_equatorial_eddy_export_and_reloads_transition_shoulder_maintenance`
-- C65 conclusion:
-  - C64 is not inert and does relieve the targeted `35°` import branch, including the lower, mid, and upper eddy components
-  - but that relief is repaid mainly through a harder collapse in the equatorial eddy branch, not the zonal-mean branch
-  - the repayment also reloads the `11.25°`, `18.75°`, `26.25°`, and `33.75°` transition / shoulder maintenance family
-- C66 completed with verdict `quick_reject`
-- C66 quick metrics:
-  - `itczWidthDeg: 25.91 -> 23.232`
-  - `subtropicalDryNorthRatio: 1.534 -> 1.112`
-  - `subtropicalDrySouthRatio: 1.199 -> 0.492`
-  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.218`
-  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12975`
-  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -356.31833`
-- C66 conclusion:
-  - tightening the base equatorial eddy-softening lane is active and preserves the broad quick-shape gains
-  - it modestly relieves the C64 cross-equatorial sign defect, but nowhere near enough to clear the quick gate
-  - the `35°` import relief still repays through a severe equatorial export failure, so the next step is attribution, not promotion
-- C67 completed with verdict `equatorial_guard_relieves_lower_mid_core_and_nh_maintenance_but_upper_eddy_and_transition_receiver_flux_remain_primary_blockers`
-- C67 conclusion:
-  - C66 is a real improvement over C64: it relieves the lower and mid equatorial core, preserves the `35°` eddy-import relief, and improves NH dry-belt ocean maintenance
-  - but the upper equatorial eddy branch does not improve, and the transition / receiver vapor-flux rows at `11.25°`, `18.75°`, `26.25°`, and `33.75°` all reload more negative
-  - the next bounded move is to narrow the guard toward the equatorial core rather than abandoning the C66 family
-- C68 completed with verdict `quick_reject`
-- C68 quick metrics:
-  - `itczWidthDeg: 25.91 -> 23.431`
-  - `subtropicalDryNorthRatio: 1.534 -> 1.141`
-  - `subtropicalDrySouthRatio: 1.199 -> 0.507`
-  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.235`
-  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.12134`
-  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -357.91328`
-- C68 conclusion:
-  - narrowing the equatorial guard inward is active and further improves the broad shape metrics plus NH dry-belt ocean condensation
-  - but the cross-equatorial sign defect gets slightly worse again relative to C66, so the remaining blocker is not simply the outer shoulder width of the guard
-  - the next step is attribution on that tradeoff, not immediate promotion
-- C69 completed with verdict `narrower_core_guard_relieves_transition_rows_and_nh_maintenance_but_overwithdraws_equatorial_upper_support_and_dominant_import`
-- C69 conclusion:
-  - C68 clearly relieves the outer transition / shoulder repayment family and further improves the NH maintenance family
-  - but it pays for that by over-withdrawing equatorial upper support and weakening dominant NH dry-belt import strength
-  - the next bounded move is to strengthen support inside the preserved core, not widen the guard back out
-- C70 completed with verdict `quick_reject`
-- C70 quick metrics:
-  - `itczWidthDeg: 25.91 -> 23.438`
-  - `subtropicalDryNorthRatio: 1.534 -> 1.13`
-  - `subtropicalDrySouthRatio: 1.199 -> 0.514`
-  - `midlatitudeWesterliesNorthU10Ms: 0.531 -> 1.226`
-  - `northDryBeltOceanLargeScaleCondensationMeanKgM2: 0.1413 -> 0.13037`
-  - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -348.97338`
-- C70 conclusion:
-  - strengthening the inner-core blend on top of C68 is active and improves the cross-equatorial sign defect relative to C68 while keeping the broad quick-shape gains alive
-  - but the sign defect is still severe enough that the quick gate stays red, and some of the stronger NH ocean-condensation relief from C68 is given back
-  - the next step is attribution on that tradeoff, not promotion
+- Decision report: [earth-weather-architecture-c-closeout.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c-closeout.md)
+- Verdict: `architecture_c_exhausted_best_reference_c62`
+- Explicit decision:
+  - Architecture C is exhausted as a micro-phase family
+  - do not continue `C71+`
+  - retain `C62` as the late-C reference candidate
+- Best meaningful late-C candidate comparison:
+  - `C62`
+    - least-bad cross-equatorial transport-sign defect: `-318.32449`
+    - strongest NH / SH dry-belt ratios in the comparison set: `1.057`, `0.487`
+    - still a `quick_reject`, so not promotable
+  - `C66`
+    - active equatorial-guard family with broad quick-shape wins
+    - but the main blocker remains materially worse than `C62`: `-356.31833`
+  - `C68`
+    - best NH dry-belt ocean-condensation containment of the set: `0.12134`
+    - best NH westerlies of the set: `1.235`
+    - but the sign defect worsens again: `-357.91328`
+  - `C70`
+    - best post-`C68` sign recovery: `-348.97338`
+    - but it still does not beat `C62` on the primary blocker and gives back part of the NH ocean-condensation relief
+- Closeout rationale:
+  - all four meaningful late Architecture C candidates remain `quick_reject`
+  - `C62` still leads on the primary blocker, so later C phases map tradeoffs rather than producing a better keep candidate
+  - the Architecture C family generated real discoveries, but it no longer justifies continued latitude-lane micro-tuning
+
+## Architecture D Status
+
+- Decision report: [earth-weather-architecture-d-core-transport-sign-rebuild.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-d-core-transport-sign-rebuild.md)
+- Verdict: `core_transport_sign_rebuild_required`
+- Focus:
+  - circulation-core transport-sign repair
+  - zonal-mean overturning polarity
+  - equatorial eddy export closure
+  - NH dry-belt import / closure balance
+- Hard bounds:
+  - no new latitude-lane micro-tuning as the primary experiment family
+  - Architecture D is bounded to `D1-D3` before another mandatory closeout gate
 - Active next move:
-  - `Architecture C71: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, narrower equatorial-core guard, and stronger inner-core blend attribution`
+  - `Architecture D1: signed transport-budget decomposition design`

@@ -907,8 +907,31 @@ Architecture C70 is now complete in [earth-weather-architecture-c70-stronger-26p
 - `crossEquatorialVaporFluxNorthKgM_1S: 143.95306 -> -348.97338`
 - interpretation: strengthening the inner-core blend is active and does improve the sign defect relative to C68, but the severe cross-equatorial inversion is still live and the quick gate remains red
 
+Architecture C closeout is now complete in [earth-weather-architecture-c-closeout.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c-closeout.md):
+- verdict: `architecture_c_exhausted_best_reference_c62`
+- explicit decision:
+  - Architecture C is exhausted as a micro-phase family
+  - do not continue `C71+`
+  - retain `C62` as the best late-C reference candidate
+- candidate comparison:
+  - `C62` remains the best meaningful late-C candidate because it has the least-bad transport-sign defect: `-318.32449`
+  - `C66` preserves broad shape gains but remains materially worse on the primary blocker: `-356.31833`
+  - `C68` has the best NH ocean-condensation containment and NH westerlies, but makes the sign defect worse again: `-357.91328`
+  - `C70` partially recovers from `C68`, but still does not beat `C62` and gives back part of the NH ocean-condensation win
+
+Architecture D is now started in [earth-weather-architecture-d-core-transport-sign-rebuild.md](/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-d-core-transport-sign-rebuild.md):
+- decision: `core_transport_sign_rebuild_required`
+- focus:
+  - circulation-core transport-sign repair
+  - zonal-mean overturning polarity
+  - equatorial eddy export closure
+  - NH dry-belt import / closure balance
+- hard bound:
+  - no more latitude-lane micro-tuning as the primary experiment family
+  - Architecture D is bounded to `D1-D3` before another closeout gate
+
 So the next active move is now:
-- `Architecture C71: stronger 26p25 receiver carryover containment with 33p75 poleward shoulder carryover containment, 35deg interface eddy softening, narrower equatorial-core guard, and stronger inner-core blend attribution`
+- `Architecture D1: signed transport-budget decomposition design`
 
 ## Hard Rules Going Forward
 
