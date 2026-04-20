@@ -2304,7 +2304,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           subtropicalCrossHemiFloorShareDiag[k] = sourceDriverFloor > eps
             ? clamp01(Math.max(0, sourceDriverFloor - hemiSource) / sourceDriverFloor)
             : 0;
-          const descentSupport = smoothstep(-0.01, 0.24, lowLevelOmegaEffective[k]);
+          const descentSupport = smoothstep(-0.005, 0.08, lowLevelOmegaEffective[k]);
           const localOrganizationRelief = 1 - 0.45 * convectiveOrganization[k];
           const localMoistureExportSupport = 0.62 + 0.38 * (1 - clamp01(lowLevelMoistureConvergence[k] * 21600));
           const dryDriver = clamp01(
