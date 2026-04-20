@@ -9,6 +9,9 @@ import { CLOUD_BIRTH_LEVEL_BANDS, cloudBirthBandOffset } from '../../src/weather
 import { NH_DRY_BELT_SOURCE_SECTOR_KEYS, SURFACE_MOISTURE_SOURCE_TRACERS, classifyNhDryBeltSector } from '../../src/weather/v2/sourceTracing5.js';
 import { applyHeadlessTerrainFixture } from './headless-terrain-fixture.mjs';
 import { ensureCyclePlanReady } from './plan-guard.mjs';
+import { installNodeClimoLoader } from './climatology-node-loader.mjs';
+
+installNodeClimoLoader();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

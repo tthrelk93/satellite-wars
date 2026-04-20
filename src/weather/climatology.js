@@ -72,7 +72,7 @@ export function sampleImageToGrid({ imageData, imgW, imgH, nx, ny, decodeFn }) {
 const canUseDomImageDecode = () => typeof Image !== 'undefined' && typeof document !== 'undefined';
 const canUseBitmapImageDecode = () => typeof createImageBitmap === 'function' && typeof OffscreenCanvas !== 'undefined';
 
-export const loadImageData = async (url) => {
+const browserLoadImageData = async (url) => {
   if (canUseDomImageDecode()) {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -101,6 +101,33 @@ export const loadImageData = async (url) => {
   const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
   bitmap.close?.();
   return { data, width: canvas.width, height: canvas.height };
+};
+
+const browserLoadManifest = async (baseUrl) => {
+  const res = await fetch(`${baseUrl}/manifest.json`);
+  if (!res.ok) throw new Error(`Manifest fetch failed: ${res.status}`);
+  return res.json();
+};
+
+let _imageLoader = browserLoadImageData;
+let _manifestLoader = browserLoadManifest;
+let _customLoaderInstalled = false;
+
+export const loadImageData = (url) => _imageLoader(url);
+
+export const setImageLoader = (fn) => {
+  _imageLoader = typeof fn === 'function' ? fn : browserLoadImageData;
+  _customLoaderInstalled = typeof fn === 'function';
+};
+
+export const setManifestLoader = (fn) => {
+  _manifestLoader = typeof fn === 'function' ? fn : browserLoadManifest;
+};
+
+export const resetClimatologyLoaders = () => {
+  _imageLoader = browserLoadImageData;
+  _manifestLoader = browserLoadManifest;
+  _customLoaderInstalled = false;
 };
 
 const createFallbackClimo = ({ nx, ny, latDeg }) => {
@@ -151,16 +178,14 @@ const createFallbackClimo = ({ nx, ny, latDeg }) => {
 };
 
 export async function loadClimatology({ nx, ny, latDeg }) {
-  if (typeof fetch === 'undefined' || (!canUseDomImageDecode() && !canUseBitmapImageDecode())) {
+  if (!_customLoaderInstalled && (typeof fetch === 'undefined' || (!canUseDomImageDecode() && !canUseBitmapImageDecode()))) {
     return createFallbackClimo({ nx, ny, latDeg });
   }
 
   const baseUrl = `${process.env.PUBLIC_URL || ''}/climo`;
   let manifest;
   try {
-    const res = await fetch(`${baseUrl}/manifest.json`);
-    if (!res.ok) throw new Error(`Manifest fetch failed: ${res.status}`);
-    manifest = await res.json();
+    manifest = await _manifestLoader(baseUrl);
   } catch (err) {
     return createFallbackClimo({ nx, ny, latDeg });
   }
