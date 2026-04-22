@@ -57,6 +57,15 @@ if (flagOn) {
   console.log('[R9-β1 FLAG OFF — baseline]');
 }
 
+// R9-β2: shorten ocean restore tau to snap SST back to Earth climatology
+// faster than the atmospheric flux bias can drift it.  Default: 120 days
+// (matches atmospheric deep-ocean timescale).  R9_SST_TAU_DAYS env overrides.
+const sstTauDays = Number(process.env.R9_SST_TAU_DAYS || 0);
+if (sstTauDays > 0) {
+  core.surfaceParams.oceanRestoreTau = sstTauDays * 86400;
+  console.log(`[R9-β2 SST TAU] ${sstTauDays}d (was 120d)`);
+}
+
 core.advanceModelSeconds(spinupDays * 86400);
 
 const state = core.state;
@@ -70,6 +79,8 @@ const evap = state.surfaceEvapRate;             // mm/hr
 const evapPot = state.surfaceEvapPotentialRate; // mm/hr
 const t2mClimo = core.climo?.t2mNow;            // Float32Array(N), K
 const hasT2m = Boolean(core.climo?.hasT2m);
+const sstClimo = core.climo?.sstNow;             // Float32Array(N), K
+const hasSst = Boolean(core.climo?.hasSst ?? (sstClimo && sstClimo.length === state.N));
 const latArr = core.grid.latDeg;
 
 const fmt = (n, w = 7, d = 2) => {
@@ -83,24 +94,21 @@ const pct = (n) => {
 
 console.log('=== R9-β surface temperature probe ===');
 console.log(`Spin-up: ${spinupDays} days, ${nx2}×${ny2} grid`);
-console.log(`Climo hasT2m: ${hasT2m}`);
+console.log(`Climo hasT2m: ${hasT2m}  hasSst: ${hasSst}`);
 console.log();
 
 // Per-row zonal means
 console.log('Row-by-row (row 0 = N pole, row ' + (ny2 - 1) + ' = S pole):');
-console.log('  lat   landfrac  Ts_land  Ts_ocn  t2m_land  Tair    Qs-Qa     E      Epot    E/Epot');
+console.log('  lat   landfrac  Ts_land  Ts_ocn  sstClimo  Δ(ocn-climo)  t2m_land  Tair    E/Epot');
 for (let j = 0; j < ny2; j += 1) {
   const lat = latArr[j];
   let nLand = 0, nOcn = 0;
-  let TsLand = 0, TsOcn = 0, t2mLand = 0, Tairj = 0, QsQa = 0, Ej = 0, Epj = 0;
+  let TsLand = 0, TsOcn = 0, t2mLand = 0, sstClimoOcn = 0, Tairj = 0, Ej = 0, Epj = 0;
   for (let i = 0; i < nx2; i += 1) {
     const k = j * nx2 + i;
     const isLand = landMask[k] === 1;
     const tair = Tair?.[k] ?? 0;
     Tairj += tair;
-    const qs = Qs?.[k] ?? 0;
-    const qa = Qa?.[k] ?? 0;
-    QsQa += (qs - qa);
     Ej += evap?.[k] ?? 0;
     Epj += evapPot?.[k] ?? 0;
     if (isLand) {
@@ -110,19 +118,21 @@ for (let j = 0; j < ny2; j += 1) {
     } else {
       nOcn += 1;
       TsOcn += Ts[k];
+      if (hasSst) sstClimoOcn += sstClimo[k];
     }
   }
   const landFrac = nLand / nx2;
   const TsL = nLand > 0 ? TsLand / nLand : NaN;
   const TsO = nOcn > 0 ? TsOcn / nOcn : NaN;
+  const sstC = nOcn > 0 ? sstClimoOcn / nOcn : NaN;
+  const delta = Number.isFinite(TsO) && Number.isFinite(sstC) ? TsO - sstC : NaN;
   const t2mL = nLand > 0 ? t2mLand / nLand : NaN;
   const TairJ = Tairj / nx2;
-  const QsQaJ = QsQa / nx2;
   const EJ = Ej / nx2;
   const EpJ = Epj / nx2;
   const ratio = EpJ > 0 ? EJ / EpJ : NaN;
   console.log(
-    `  ${lat.toFixed(1).padStart(6)}  ${pct(landFrac)}    ${fmt(TsL)}  ${fmt(TsO)}  ${fmt(t2mL)}   ${fmt(TairJ)}  ${fmt(QsQaJ, 7, 4)}  ${fmt(EJ, 7, 3)}  ${fmt(EpJ, 7, 3)}  ${pct(ratio)}`
+    `  ${lat.toFixed(1).padStart(6)}  ${pct(landFrac)}    ${fmt(TsL)}  ${fmt(TsO)}  ${fmt(sstC)}   ${fmt(delta, 7, 3)}     ${fmt(t2mL)}   ${fmt(TairJ)}  ${pct(ratio)}`
   );
 }
 
@@ -131,7 +141,7 @@ console.log();
 console.log('Latitude-band summaries:');
 const bandStats = (minLat, maxLat, label) => {
   let nLand = 0, nOcn = 0;
-  let TsLand = 0, TsOcn = 0, t2mLand = 0, Tair_sum = 0, E = 0, Ep = 0;
+  let TsLand = 0, TsOcn = 0, t2mLand = 0, sstClimoOcn = 0, Tair_sum = 0, E = 0, Ep = 0;
   let nAll = 0;
   for (let j = 0; j < ny2; j += 1) {
     const lat = latArr[j];
@@ -149,15 +159,18 @@ const bandStats = (minLat, maxLat, label) => {
       } else {
         nOcn += 1;
         TsOcn += Ts[k];
+        if (hasSst) sstClimoOcn += sstClimo[k];
       }
     }
   }
   const TsL = nLand > 0 ? TsLand / nLand : NaN;
   const TsO = nOcn > 0 ? TsOcn / nOcn : NaN;
+  const sstC = nOcn > 0 ? sstClimoOcn / nOcn : NaN;
+  const delta = Number.isFinite(TsO) && Number.isFinite(sstC) ? TsO - sstC : NaN;
   const t2mL = nLand > 0 ? t2mLand / nLand : NaN;
   const TairM = nAll > 0 ? Tair_sum / nAll : NaN;
   const TsAll = (TsLand + TsOcn) / Math.max(1, nLand + nOcn);
-  console.log(`  ${label.padEnd(24)}  Ts_land=${fmt(TsL)}  Ts_ocn=${fmt(TsO)}  Ts_all=${fmt(TsAll)}  t2m_land=${fmt(t2mL)}  Tair=${fmt(TairM)}  E/Epot=${pct(Ep > 0 ? E / Ep : NaN)}`);
+  console.log(`  ${label.padEnd(24)}  Ts_land=${fmt(TsL)}  Ts_ocn=${fmt(TsO)}  sstClimo=${fmt(sstC)}  Δ=${fmt(delta, 6, 2)}  t2m_land=${fmt(t2mL)}  Tair=${fmt(TairM)}  E/Epot=${pct(Ep > 0 ? E / Ep : NaN)}`);
 };
 bandStats(-6, 6, 'Deep tropics (±6°)');
 bandStats(-12, 12, 'Tropics (±12°)');
