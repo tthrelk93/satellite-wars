@@ -144,7 +144,71 @@ just 0.013 to the 0.8 gate). Increased tropical convective activity will
 strengthen Hadley descent, which could dry subtropics further and push
 the gate. R8 verification must check that.
 
+## Convection-trigger follow-up probe (`scripts/agent/r8-convection-trigger-probe.mjs`)
+
+Per-row zonal means at 180-day spinup:
+
+| Band              | convMask %  | convPot | convOrg | omega_low | RH_BL | subtropSup |
+|-------------------|-------------|---------|---------|-----------|-------|------------|
+| Deep tropics ±6°  | **10.4**    | 0.456   | 0.445   | +0.009    | 0.544 | 0.000      |
+| Tropics ±12°      | 10.4        | 0.428   | 0.355   | +0.011    | 0.558 | 0.043      |
+| ITCZ shoulder N   | 4.2         | 0.352   | 0.235   | +0.085    | 0.455 | 0.092      |
+| ITCZ shoulder S   | 14.6        | 0.450   | 0.294   | -0.060    | 0.690 | 0.080      |
+| NH subtrop        | 0.0         | 0.139   | 0.023   | +0.096    | 0.460 | 0.824      |
+| SH subtrop        | 0.0         | 0.174   | 0.023   | +0.052    | 0.549 | 0.805      |
+| NH midlat         | 3.1         | 0.299   | 0.199   | -0.098    | 0.831 | 0.000      |
+| SH midlat         | 0.5         | 0.339   | 0.184   | +0.003    | 0.711 | 0.000      |
+
+Earth ITCZ target: convMask ≈ 35–55% with convPot+convOrg ≈ 0.4–0.6.
+
+### Updated root cause
+
+Two independent findings now:
+
+**R8-A.  Deep tropical omega_low is +0.009 Pa/s (net subsidence).**  Earth
+ITCZ has omega_low ≈ -0.03 to -0.06 Pa/s (organized ascent).  Our model's
+Hadley ascending branch is missing or very weak — the tropics *on average*
+subside, not ascend.  That is the primary reason convective precipitation
+is 12% of Earth's even though the scheme can fire: there's no coherent
+ascent to drive mass flux.
+
+**R8-B.  ITCZ is southward-biased.**  -15..-6° band has convMask=14.6%,
+omega=-0.06; 0..+15° band has convMask=4%, omega=+0.08.  The NH shoulder
+is subsiding (Hadley descending branch extending to 6°N), suppressing
+convection in what should be the NH ITCZ.  This is consistent with
+observed ITCZ-lat ≈ -0.07° and -1.85 m/s NH trade (stronger than the
+-0.93 m/s SH trade — more momentum implies stronger Hadley descent on
+the NH side).
+
+**R8-C.  Activity threshold may be partly responsible (secondary).**  Even
+where convPot=0.46 and convOrg=0.45 (both well above the 0.15/0.18 minima),
+convMask fires only ~10% of the time.  The `activity > 0.22` cutoff
+combined with the S-curve smoothsteps is letting only ~1 in 10 grid
+cell-timesteps fire.
+
+### R8 fix-design candidates (ordered by leverage × safety)
+
+1. **R8-α: Tune `activity > 0.22` threshold and smoothstep shape** —
+   purely local change to vertical5.js, no coupling to subtropics.  Expected:
+   tropical convMask 10% → 20-25%, tropical P 0.021 → 0.04-0.05 mm/hr.  Low
+   regression risk: changes to `activity` formula only fire where supports
+   are already non-zero.
+2. **R8-β: Raise `convRainoutBase` (0.28 → 0.4)** — each convective event
+   rains out more of its cloud water.  Local, fast.  May dry convective
+   anvils.
+3. **R8-γ: Strengthen tropical ascent via direct Hadley tuning** —
+   biggest leverage (tackles R8-A root cause) but touches many downstream
+   gates.  Risk of re-breaking R4 (tropical org) and R1-R2 (subtropical dry
+   belts).  Defer to R9 if α/β don't close enough gap.
+4. **R8-δ: Advection conservation fix** — real numerical bug, but only
+   ~20% of gap.  Separate phase.
+
+Start with R8-α.  If tropical P lifts without subtropical dry-belt
+regression, proceed to R8-β.  Only if that doesn't reach P_global ≥ 0.07
+do we touch Hadley (R8-γ).
+
 ## Artifacts
 
-- `scripts/agent/r8-global-precip-budget-probe.mjs` — this probe
-- `/tmp/r8-probe.log` — full probe output (not committed)
+- `scripts/agent/r8-global-precip-budget-probe.mjs` — budget probe
+- `scripts/agent/r8-convection-trigger-probe.mjs` — trigger probe
+- `/tmp/r8-probe.log`, `/tmp/r8-conv-probe.log` — full probe output (not committed)
