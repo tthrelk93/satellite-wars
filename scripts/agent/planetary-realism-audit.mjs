@@ -10,6 +10,16 @@ import { NH_DRY_BELT_SOURCE_SECTOR_KEYS, SURFACE_MOISTURE_SOURCE_TRACERS, classi
 import { applyHeadlessTerrainFixture } from './headless-terrain-fixture.mjs';
 import { ensureCyclePlanReady } from './plan-guard.mjs';
 import { installNodeClimoLoader } from './climatology-node-loader.mjs';
+import {
+  PLANETARY_AUDIT_CLI_FLAGS,
+  buildAuditCliFlagSnapshot,
+  buildAuditRunMetadata,
+  collectUnknownAuditCliFlags,
+  getRepoChangedFiles,
+  resolveAuditLabelReportBase,
+  stampAuditArtifact,
+  stripKnownArtifactExtension
+} from './audit-artifact-metadata.mjs';
 
 installNodeClimoLoader();
 
@@ -56,6 +66,15 @@ export const PLANETARY_PRESETS = {
 };
 
 const argv = process.argv.slice(2);
+const isMainInvocation = Boolean(process.argv[1]) && path.resolve(process.argv[1]) === __filename;
+const unknownCliFlags = isMainInvocation ? collectUnknownAuditCliFlags(argv) : [];
+if (unknownCliFlags.length) {
+  throw new Error(
+    `Unknown agent:planetary-realism-audit flag(s): ${unknownCliFlags.join(', ')}. `
+    + `Known flags: ${PLANETARY_AUDIT_CLI_FLAGS.join(', ')}. `
+    + 'Use --report-base or --label for named audit artifact bases.'
+  );
+}
 let preset = 'quick';
 let nx = null;
 let ny = null;
@@ -120,6 +139,8 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--md-out=')) mdOutPath = path.resolve(arg.slice('--md-out='.length));
   else if (arg === '--report-base' && argv[i + 1]) reportBase = path.resolve(argv[++i]);
   else if (arg.startsWith('--report-base=')) reportBase = path.resolve(arg.slice('--report-base='.length));
+  else if (arg === '--label' && argv[i + 1]) reportBase = resolveAuditLabelReportBase(argv[++i], { repoRoot });
+  else if (arg.startsWith('--label=')) reportBase = resolveAuditLabelReportBase(arg.slice('--label='.length), { repoRoot });
   else if (arg === '--repro-check') reproCheck = true;
   else if (arg === '--no-repro-check') reproCheck = false;
   else if (arg === '--counterfactuals') counterfactuals = true;
@@ -423,7 +444,7 @@ const safeRatio = (numerator, denominator, clampToUnit = false) => {
   return clampToUnit ? clamp01(value) : value;
 };
 
-const stripKnownExtension = (filePath) => filePath.replace(/\.(json|md)$/i, '');
+const stripKnownExtension = stripKnownArtifactExtension;
 
 const dayToMonthIndex = (day) => {
   const normalized = ((day % 365) + 365) % 365;
@@ -767,6 +788,8 @@ const buildRunManifest = ({ core, terrainFallback, sampleTargetsDays, targetsSec
   schema: 'satellite-wars.run-manifest.v1',
   generatedAt: new Date().toISOString(),
   gitCommit: getRepoCommitSha(),
+  gitChangedFiles: getRepoChangedFiles({ repoRoot }),
+  cli: buildAuditCliFlagSnapshot(argv),
   config: {
     preset,
     nx,
@@ -5834,10 +5857,30 @@ export async function main() {
     ...horizon,
     latest: compactSampleForSummary(horizon.latest)
   }));
+  const generatedAt = new Date().toISOString();
+  const auditRun = buildAuditRunMetadata({
+    repoRoot,
+    generatedAt,
+    argv,
+    config: {
+      preset,
+      nx,
+      ny,
+      dtSeconds: dt,
+      seed,
+      systemExperiment,
+      sampleEveryDays,
+      horizonsDays,
+      reportBase: effectiveReportBase,
+      outPath,
+      mdOutPath
+    }
+  });
 
   const summary = {
     schema: 'satellite-wars.planetary-realism-audit.v4',
-    generatedAt: new Date().toISOString(),
+    generatedAt,
+    auditRun,
     overallPass,
     config: {
       preset,
@@ -5919,66 +5962,70 @@ export async function main() {
     fs.writeFileSync(`${effectiveReportBase}.json`, toJson(summary));
     fs.writeFileSync(`${effectiveReportBase}.md`, markdown);
   }
+  const writeAuditJsonArtifact = (filePath, payload, artifactKind) => {
+    fs.writeFileSync(filePath, toJson(stampAuditArtifact(payload, auditRun, artifactKind)));
+  };
   if (artifacts) {
     fs.mkdirSync(path.dirname(artifacts.monthlyClimatologyJsonPath), { recursive: true });
-    fs.writeFileSync(artifacts.monthlyClimatologyJsonPath, toJson(monthlyClimatology));
-    fs.writeFileSync(
+    writeAuditJsonArtifact(artifacts.monthlyClimatologyJsonPath, monthlyClimatology, 'monthlyClimatology');
+    writeAuditJsonArtifact(
       artifacts.sampleProfilesJsonPath,
-      toJson(samples.map((sample) => ({
+      samples.map((sample) => ({
         targetDay: sample.targetDay,
         monthIndex: sample.monthIndex,
         profiles: sample.profiles
-      })))
+      })),
+      'sampleProfiles'
     );
-    fs.writeFileSync(artifacts.realismGapsJsonPath, toJson(realismGaps));
-    fs.writeFileSync(artifacts.moistureAttributionJsonPath, toJson(moistureAttribution));
-    fs.writeFileSync(artifacts.runManifestJsonPath, toJson(runManifest));
-    fs.writeFileSync(artifacts.conservationSummaryJsonPath, toJson(conservationSummary));
-    fs.writeFileSync(artifacts.restartParityJsonPath, toJson(restartParity));
-    fs.writeFileSync(artifacts.surfaceSourceAttributionJsonPath, toJson(surfaceSourceAttribution));
-    fs.writeFileSync(artifacts.surfaceFluxDecompositionJsonPath, toJson(surfaceFluxDecomposition));
-    fs.writeFileSync(artifacts.nhDryBeltSourceSectorSummaryJsonPath, toJson(nhDryBeltSourceSectorSummary));
-    fs.writeFileSync(artifacts.transportInterfaceBudgetJsonPath, toJson(transportInterfaceBudget));
-    fs.writeFileSync(artifacts.hadleyPartitionSummaryJsonPath, toJson(hadleyPartitionSummary));
-    fs.writeFileSync(artifacts.bandLevelFluxMatrixJsonPath, toJson(bandLevelFluxMatrix));
-    fs.writeFileSync(artifacts.verticalCloudBirthAttributionJsonPath, toJson(verticalCloudBirthAttribution));
-    fs.writeFileSync(artifacts.verticalCloudBirthHistogramsJsonPath, toJson(verticalCloudBirthHistograms));
-    fs.writeFileSync(artifacts.dryBeltCloudOriginMatrixJsonPath, toJson(dryBeltCloudOriginMatrix));
-    fs.writeFileSync(artifacts.cloudTransitionLedgerJsonPath, toJson(cloudTransitionLedger));
-    fs.writeFileSync(artifacts.cloudTransitionLedgerSummaryJsonPath, toJson(cloudTransitionLedgerSummary));
-    fs.writeFileSync(artifacts.cloudTransitionLedgerSectorSplitJsonPath, toJson(cloudTransitionLedgerSectorSplit));
-    fs.writeFileSync(artifacts.corridorReplayCatalogJsonPath, toJson(corridorReplayCatalog));
-    fs.writeFileSync(artifacts.corridorStepSliceAttributionJsonPath, toJson(corridorStepSliceAttribution));
-    fs.writeFileSync(artifacts.corridorModuleToggleDeltasJsonPath, toJson(corridorModuleToggleDeltas));
-    fs.writeFileSync(artifacts.upperCloudResidenceJsonPath, toJson(upperCloudResidence));
-    fs.writeFileSync(artifacts.upperCloudErosionBudgetJsonPath, toJson(upperCloudErosionBudget));
-    fs.writeFileSync(artifacts.upperCloudVentilationSummaryJsonPath, toJson(upperCloudVentilationSummary));
-    fs.writeFileSync(artifacts.thermodynamicSupportSummaryJsonPath, toJson(thermodynamicSupportSummary));
-    fs.writeFileSync(artifacts.radiativeCloudMaintenanceJsonPath, toJson(radiativeCloudMaintenance));
-    fs.writeFileSync(artifacts.boundaryLayerStabilityProfilesJsonPath, toJson(boundaryLayerStabilityProfiles));
-    fs.writeFileSync(artifacts.forcingOppositionBudgetJsonPath, toJson(forcingOppositionBudget));
-    fs.writeFileSync(artifacts.nudgingTargetMismatchJsonPath, toJson(nudgingTargetMismatch));
-    fs.writeFileSync(artifacts.initializationMemoryJsonPath, toJson(initializationMemory));
-    fs.writeFileSync(artifacts.numericalIntegritySummaryJsonPath, toJson(numericalIntegritySummary));
-    fs.writeFileSync(artifacts.stormSpilloverCatalogJsonPath, toJson(stormSpilloverCatalog));
-    fs.writeFileSync(artifacts.sectoralDryBeltRegimesJsonPath, toJson(sectoralDryBeltRegimes));
-    fs.writeFileSync(artifacts.transientEddyLeakageSummaryJsonPath, toJson(transientEddyLeakageSummary));
-    fs.writeFileSync(artifacts.dtSensitivityJsonPath, toJson(dtSensitivity));
-    fs.writeFileSync(artifacts.gridSensitivityJsonPath, toJson(gridSensitivity));
-    fs.writeFileSync(artifacts.monthlyAttributionClimatologyJsonPath, toJson(monthlyAttributionClimatology));
-    fs.writeFileSync(artifacts.seasonalRootCauseRankingJsonPath, toJson(seasonalRootCauseRanking));
-    fs.writeFileSync(artifacts.attributionLagAnalysisJsonPath, toJson(attributionLagAnalysis));
-    fs.writeFileSync(artifacts.counterfactualPathwaySensitivityJsonPath, toJson(counterfactualPathwaySensitivity));
-    fs.writeFileSync(artifacts.rootCauseCandidateRankingJsonPath, toJson(rootCauseCandidateRanking));
-    fs.writeFileSync(artifacts.coupledCounterfactualMatrixJsonPath, toJson(coupledCounterfactualMatrix));
-    fs.writeFileSync(artifacts.coupledCounterfactualRankingJsonPath, toJson(coupledCounterfactualRanking));
-    fs.writeFileSync(artifacts.coupledCounterfactualGuardrailsJsonPath, toJson(coupledCounterfactualGuardrails));
+    writeAuditJsonArtifact(artifacts.realismGapsJsonPath, realismGaps, 'realismGaps');
+    writeAuditJsonArtifact(artifacts.moistureAttributionJsonPath, moistureAttribution, 'moistureAttribution');
+    writeAuditJsonArtifact(artifacts.runManifestJsonPath, runManifest, 'runManifest');
+    writeAuditJsonArtifact(artifacts.conservationSummaryJsonPath, conservationSummary, 'conservationSummary');
+    writeAuditJsonArtifact(artifacts.restartParityJsonPath, restartParity, 'restartParity');
+    writeAuditJsonArtifact(artifacts.surfaceSourceAttributionJsonPath, surfaceSourceAttribution, 'surfaceSourceAttribution');
+    writeAuditJsonArtifact(artifacts.surfaceFluxDecompositionJsonPath, surfaceFluxDecomposition, 'surfaceFluxDecomposition');
+    writeAuditJsonArtifact(artifacts.nhDryBeltSourceSectorSummaryJsonPath, nhDryBeltSourceSectorSummary, 'nhDryBeltSourceSectorSummary');
+    writeAuditJsonArtifact(artifacts.transportInterfaceBudgetJsonPath, transportInterfaceBudget, 'transportInterfaceBudget');
+    writeAuditJsonArtifact(artifacts.hadleyPartitionSummaryJsonPath, hadleyPartitionSummary, 'hadleyPartitionSummary');
+    writeAuditJsonArtifact(artifacts.bandLevelFluxMatrixJsonPath, bandLevelFluxMatrix, 'bandLevelFluxMatrix');
+    writeAuditJsonArtifact(artifacts.verticalCloudBirthAttributionJsonPath, verticalCloudBirthAttribution, 'verticalCloudBirthAttribution');
+    writeAuditJsonArtifact(artifacts.verticalCloudBirthHistogramsJsonPath, verticalCloudBirthHistograms, 'verticalCloudBirthHistograms');
+    writeAuditJsonArtifact(artifacts.dryBeltCloudOriginMatrixJsonPath, dryBeltCloudOriginMatrix, 'dryBeltCloudOriginMatrix');
+    writeAuditJsonArtifact(artifacts.cloudTransitionLedgerJsonPath, cloudTransitionLedger, 'cloudTransitionLedger');
+    writeAuditJsonArtifact(artifacts.cloudTransitionLedgerSummaryJsonPath, cloudTransitionLedgerSummary, 'cloudTransitionLedgerSummary');
+    writeAuditJsonArtifact(artifacts.cloudTransitionLedgerSectorSplitJsonPath, cloudTransitionLedgerSectorSplit, 'cloudTransitionLedgerSectorSplit');
+    writeAuditJsonArtifact(artifacts.corridorReplayCatalogJsonPath, corridorReplayCatalog, 'corridorReplayCatalog');
+    writeAuditJsonArtifact(artifacts.corridorStepSliceAttributionJsonPath, corridorStepSliceAttribution, 'corridorStepSliceAttribution');
+    writeAuditJsonArtifact(artifacts.corridorModuleToggleDeltasJsonPath, corridorModuleToggleDeltas, 'corridorModuleToggleDeltas');
+    writeAuditJsonArtifact(artifacts.upperCloudResidenceJsonPath, upperCloudResidence, 'upperCloudResidence');
+    writeAuditJsonArtifact(artifacts.upperCloudErosionBudgetJsonPath, upperCloudErosionBudget, 'upperCloudErosionBudget');
+    writeAuditJsonArtifact(artifacts.upperCloudVentilationSummaryJsonPath, upperCloudVentilationSummary, 'upperCloudVentilationSummary');
+    writeAuditJsonArtifact(artifacts.thermodynamicSupportSummaryJsonPath, thermodynamicSupportSummary, 'thermodynamicSupportSummary');
+    writeAuditJsonArtifact(artifacts.radiativeCloudMaintenanceJsonPath, radiativeCloudMaintenance, 'radiativeCloudMaintenance');
+    writeAuditJsonArtifact(artifacts.boundaryLayerStabilityProfilesJsonPath, boundaryLayerStabilityProfiles, 'boundaryLayerStabilityProfiles');
+    writeAuditJsonArtifact(artifacts.forcingOppositionBudgetJsonPath, forcingOppositionBudget, 'forcingOppositionBudget');
+    writeAuditJsonArtifact(artifacts.nudgingTargetMismatchJsonPath, nudgingTargetMismatch, 'nudgingTargetMismatch');
+    writeAuditJsonArtifact(artifacts.initializationMemoryJsonPath, initializationMemory, 'initializationMemory');
+    writeAuditJsonArtifact(artifacts.numericalIntegritySummaryJsonPath, numericalIntegritySummary, 'numericalIntegritySummary');
+    writeAuditJsonArtifact(artifacts.stormSpilloverCatalogJsonPath, stormSpilloverCatalog, 'stormSpilloverCatalog');
+    writeAuditJsonArtifact(artifacts.sectoralDryBeltRegimesJsonPath, sectoralDryBeltRegimes, 'sectoralDryBeltRegimes');
+    writeAuditJsonArtifact(artifacts.transientEddyLeakageSummaryJsonPath, transientEddyLeakageSummary, 'transientEddyLeakageSummary');
+    writeAuditJsonArtifact(artifacts.dtSensitivityJsonPath, dtSensitivity, 'dtSensitivity');
+    writeAuditJsonArtifact(artifacts.gridSensitivityJsonPath, gridSensitivity, 'gridSensitivity');
+    writeAuditJsonArtifact(artifacts.monthlyAttributionClimatologyJsonPath, monthlyAttributionClimatology, 'monthlyAttributionClimatology');
+    writeAuditJsonArtifact(artifacts.seasonalRootCauseRankingJsonPath, seasonalRootCauseRanking, 'seasonalRootCauseRanking');
+    writeAuditJsonArtifact(artifacts.attributionLagAnalysisJsonPath, attributionLagAnalysis, 'attributionLagAnalysis');
+    writeAuditJsonArtifact(artifacts.counterfactualPathwaySensitivityJsonPath, counterfactualPathwaySensitivity, 'counterfactualPathwaySensitivity');
+    writeAuditJsonArtifact(artifacts.rootCauseCandidateRankingJsonPath, rootCauseCandidateRanking, 'rootCauseCandidateRanking');
+    writeAuditJsonArtifact(artifacts.coupledCounterfactualMatrixJsonPath, coupledCounterfactualMatrix, 'coupledCounterfactualMatrix');
+    writeAuditJsonArtifact(artifacts.coupledCounterfactualRankingJsonPath, coupledCounterfactualRanking, 'coupledCounterfactualRanking');
+    writeAuditJsonArtifact(artifacts.coupledCounterfactualGuardrailsJsonPath, coupledCounterfactualGuardrails, 'coupledCounterfactualGuardrails');
     if (observerEffectBaselineDiff) {
-      fs.writeFileSync(artifacts.observerEffectBaselineDiffJsonPath, toJson(observerEffectBaselineDiff));
+      writeAuditJsonArtifact(artifacts.observerEffectBaselineDiffJsonPath, observerEffectBaselineDiff, 'observerEffectBaselineDiff');
       fs.writeFileSync(artifacts.observerEffectBaselineDiffMdPath, renderObserverEffectBaselineDiffMarkdown(observerEffectBaselineDiff));
     }
     if (observerEffectModuleOrderParity) {
-      fs.writeFileSync(artifacts.observerEffectModuleOrderParityJsonPath, toJson(observerEffectModuleOrderParity));
+      writeAuditJsonArtifact(artifacts.observerEffectModuleOrderParityJsonPath, observerEffectModuleOrderParity, 'observerEffectModuleOrderParity');
     }
   }
   if (!quiet) process.stdout.write(toJson(summary));
@@ -5994,6 +6041,11 @@ export const _test = {
   buildConservationSummary,
   applySystemExperiment,
   PLANETARY_PRESETS,
+  buildAuditCliFlagSnapshot,
+  buildAuditRunMetadata,
+  collectUnknownAuditCliFlags,
+  resolveAuditLabelReportBase,
+  stampAuditArtifact,
   buildMoistureAttributionReport,
   buildNhDryBeltSourceSectorReport,
   buildRestartParityReport,

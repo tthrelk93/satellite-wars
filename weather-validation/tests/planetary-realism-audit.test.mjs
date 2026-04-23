@@ -1,8 +1,61 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import {
   _test as planetaryAuditTest
 } from '../../scripts/agent/planetary-realism-audit.mjs';
+
+const repoRoot = path.resolve(new URL('../..', import.meta.url).pathname);
+
+test('planetary audit CLI rejects unknown flags and supports label artifact bases', () => {
+  assert.deepEqual(
+    planetaryAuditTest.collectUnknownAuditCliFlags(['--preset', 'quick', '--label=phase0-smoke', '--bogus']),
+    ['--bogus']
+  );
+  assert.equal(
+    planetaryAuditTest.resolveAuditLabelReportBase('phase0-smoke', { repoRoot }),
+    path.join(repoRoot, 'weather-validation', 'output', 'phase0-smoke')
+  );
+  assert.equal(
+    planetaryAuditTest.resolveAuditLabelReportBase('weather-validation/output/custom-audit.json', { repoRoot }),
+    path.join(repoRoot, 'weather-validation', 'output', 'custom-audit')
+  );
+});
+
+test('audit artifact metadata preserves object schemas and wraps array payloads', () => {
+  const auditRun = planetaryAuditTest.buildAuditRunMetadata({
+    repoRoot,
+    generatedAt: '2026-04-23T00:00:00.000Z',
+    argv: ['--preset', 'quick', '--grid=48x24'],
+    config: {
+      preset: 'quick',
+      nx: 48,
+      ny: 24,
+      dtSeconds: 1800,
+      seed: 12345
+    }
+  });
+  assert.equal(auditRun.preset, 'quick');
+  assert.equal(auditRun.grid, '48x24');
+  assert.equal(auditRun.dtSeconds, 1800);
+  assert.equal(auditRun.seed, 12345);
+  assert.equal(auditRun.flags.flags['--grid'], '48x24');
+  assert.ok(Array.isArray(auditRun.changedFiles));
+
+  const stampedObject = planetaryAuditTest.stampAuditArtifact(
+    { schema: 'example.v1', value: 1 },
+    auditRun,
+    'objectArtifact'
+  );
+  assert.equal(stampedObject.schema, 'example.v1');
+  assert.equal(stampedObject.auditRun.artifactKind, 'objectArtifact');
+  assert.equal(stampedObject.auditRun.gitHash?.length > 0, true);
+
+  const stampedArray = planetaryAuditTest.stampAuditArtifact([{ value: 1 }], auditRun, 'arrayArtifact');
+  assert.equal(stampedArray.schema, 'satellite-wars.audit-artifact-wrapper.v1');
+  assert.equal(stampedArray.auditRun.artifactKind, 'arrayArtifact');
+  assert.deepEqual(stampedArray.data, [{ value: 1 }]);
+});
 
 test('buildSampleTargetsDays merges horizons with cadence without duplicates', () => {
   assert.deepEqual(

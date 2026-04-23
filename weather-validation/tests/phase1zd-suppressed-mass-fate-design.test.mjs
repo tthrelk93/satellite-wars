@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildPhase1ZDSuppressedMassFateDesign } from '../../scripts/agent/phase1zd-suppressed-mass-fate-design.mjs';
 
-test('phase 1ZD ranks in-place vapor retention ahead of another selector retune', () => {
+test('phase 1ZD ranks fate-aware fixes ahead of another selector retune', () => {
   const reintegrationSummary = {
     verdict: 'same_lane_vapor_recharge',
     nextPhase: 'Phase 1ZD: Suppressed-Mass Fate Design',
@@ -39,7 +39,13 @@ test('phase 1ZD ranks in-place vapor retention ahead of another selector retune'
   assert.equal(summary.verdict, 'in_place_vapor_retention');
   assert.equal(summary.nextPhase, 'Phase 1ZE: Suppressed-Mass Fate Counterfactuals');
   assert.equal(summary.ranking[0].key, 'in_place_vapor_retention');
-  assert.equal(summary.designOptions[0].key, 'local_sink_or_export_path');
-  assert.ok((summary.witness.qvSumDelta || 0) > 0);
-  assert.ok((summary.witness.qcSumDelta || 0) < 0);
+  assert.deepEqual(summary.designOptions.map((option) => option.key), [
+    'delayed_rainout_or_buffered_removal',
+    'local_sink_or_export_path',
+    'selector_only_retune'
+  ]);
+  assert.equal(summary.witness.shoulderSuppressedMassKgM2, 0);
+  assert.equal(summary.witness.qvSumDelta, 0);
+  assert.equal(summary.witness.qcSumDelta, 0);
+  assert.ok(summary.rootCauseAssessment.ruledIn.some((line) => line.includes('neutral evidence')));
 });

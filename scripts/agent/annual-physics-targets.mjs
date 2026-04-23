@@ -2,6 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { readAuditJsonArtifact } from './audit-artifact-metadata.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,7 +31,7 @@ const clamp01 = (value) => Math.max(0, Math.min(1, value));
 const round = (value, digits = 3) => Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
 const toJson = (value) => `${JSON.stringify(value, null, 2)}\n`;
 
-const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
+const readJson = readAuditJsonArtifact;
 
 const monthLabel = (monthIndex) => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][monthIndex] || `M${monthIndex + 1}`;
 

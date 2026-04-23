@@ -4,6 +4,7 @@ import path from 'path';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { findNewestActiveCycleDir, readCycleState } from './plan-guard.mjs';
+import { assertWorldClassStatusClaims } from './status-claim-guard.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +12,8 @@ const repoRoot = path.resolve(__dirname, '..', '..');
 const reportsDir = path.join(repoRoot, 'weather-validation', 'reports');
 const outputDir = path.join(repoRoot, 'weather-validation', 'output');
 const workerBriefBase = path.join(reportsDir, 'worker-brief');
+
+assertWorldClassStatusClaims({ repoRoot, reportsDir });
 
 const readJsonIfExists = (filePath) => {
   try {

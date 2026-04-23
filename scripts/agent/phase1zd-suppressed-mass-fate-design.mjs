@@ -140,13 +140,28 @@ export function buildPhase1ZDSuppressedMassFateDesign({ reintegrationSummary, pa
     1 - clamp01(((reintegrationSummary.referenceSlices?.targetEntry33p75?.on?.shoulderAbsorptionGuardAppliedSuppressionKgM2) || 0) / 0.001),
     clamp01(((reintegrationSummary.referenceSlices?.targetEntry33p75?.on?.freshShoulderTargetEntryExclusionDiagFrac) || 0) / 0.9)
   );
+  const witnessSupportsInPlaceRetention = (witness.qvSumDelta || 0) > 0
+    && (witness.qcSumDelta || 0) < 0
+    && (witness.shoulderSuppressedMassKgM2 || 0) > 0;
+  const liveBandRetentionRationale = witnessSupportsInPlaceRetention
+    ? 'Best fit to the live 3-12 N recharge and the one-column witness that shows more qv and less qc after suppression.'
+    : 'Best fit to the live 3-12 N recharge; the synthetic one-column witness is neutral under current defaults, so this must be proven by counterfactual audit instead of treated as a column proof.';
+  const ruledInEvidence = witnessSupportsInPlaceRetention
+    ? [
+      'The current shoulder guard leaves more qv and less qc behind in the same column when it suppresses condensation.',
+      'That in-place vapor retention matches the 30-day increase in tropical-shoulder TCW and RH.'
+    ]
+    : [
+      'The live reintegration evidence still shows tropical-shoulder TCW/RH recharge after suppression.',
+      'The current synthetic one-column witness no longer triggers shoulder suppression, so it is neutral evidence and must not be used as proof.'
+    ];
 
   const designOptions = [
     {
       key: 'local_sink_or_export_path',
       label: 'Route suppressed shoulder mass into a capped local sink/export path instead of leaving it in-place as vapor.',
       score: round(inPlaceVaporRetentionScore, 5),
-      rationale: 'Best fit to the live 3–12°N recharge and the one-column witness that shows more qv and less qc after suppression.'
+      rationale: liveBandRetentionRationale
     },
     {
       key: 'delayed_rainout_or_buffered_removal',
@@ -212,10 +227,7 @@ export function buildPhase1ZDSuppressedMassFateDesign({ reintegrationSummary, pa
     ],
     designOptions,
     rootCauseAssessment: {
-      ruledIn: [
-        'The current shoulder guard leaves more qv and less qc behind in the same column when it suppresses condensation.',
-        'That in-place vapor retention matches the 30-day increase in tropical-shoulder TCW and RH.'
-      ],
+      ruledIn: ruledInEvidence,
       ruledOut: [
         'Another selector-geometry retune is not the primary next move.'
       ],

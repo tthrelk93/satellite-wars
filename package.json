@@ -26,6 +26,7 @@
     "agent:recover-interrupted-cycle": "node scripts/agent/recover-interrupted-cycle.mjs",
     "agent:wake-bootstrap": "node scripts/agent/wake-bootstrap.mjs",
     "agent:start-cycle": "node scripts/agent/start-cycle.mjs",
+    "agent:claim-guard": "node scripts/agent/status-claim-guard.mjs",
     "agent:refresh-worker-brief": "node scripts/agent/build-worker-brief.mjs",
     "agent:dev-server": "node scripts/agent/dev-server.mjs",
     "agent:orographic-audit": "node --experimental-default-type=module --loader ./scripts/agent/resolve-js-loader.mjs scripts/agent/orographic-audit.mjs",

@@ -4,6 +4,7 @@ import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { readAuditJsonArtifact } from './audit-artifact-metadata.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -129,7 +130,7 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg === '--no-rerun-current') rerunCurrent = false;
 }
 
-const readJson = (filePath) => JSON.parse(fs.readFileSync(filePath, 'utf8'));
+const readJson = readAuditJsonArtifact;
 
 const runCurrentAudit = ({ variantReportBase }) => {
   const args = [
