@@ -1,0 +1,14 @@
+[
+  {
+    "code": "south_subtropical_dry_belt_too_wet",
+    "label": "South subtropical dry belt too wet",
+    "category": "moistureBelts",
+    "metricKey": "subtropicalDrySouthRatio",
+    "actual": 0.829,
+    "target": "< 0.8",
+    "severity": 0.058,
+    "horizonsDays": [
+      365
+    ]
+  }
+]

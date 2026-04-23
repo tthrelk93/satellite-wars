@@ -158,9 +158,17 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
       TsVal += (skinTarget - TsVal) * (dt / oceanTauTs);
     } else {
       let TsTargetLand = 288;
+      // R9-γ-2 fix: track whether the target is already surface-standardized
+      // (ERA5 t2m is measured at actual terrain elevation) or a sea-level
+      // baseline that still needs lapse correction. Applying the lapse
+      // correction to an already-surface-standardized t2m was a double
+      // correction, leaving elevated land 1–7 K too cold (most visible in
+      // the NH subtropical dry-belt bias).
+      let targetIsSurfaceStandardized = false;
       if (enableLandClimoTs) {
         if (t2mNow && t2mNow.length === N) {
           TsTargetLand = t2mNow[k];
+          targetIsSurfaceStandardized = true;
         } else if (landTsUseLatBaseline && latDeg) {
           const latAbs = Math.abs(latDeg[row]);
           const humidLat = smoothstep(60, 0, latAbs);
@@ -168,7 +176,7 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
           TsTargetLand = thetaLat - 2;
         }
       }
-      if (elevField) {
+      if (elevField && !targetIsSurfaceStandardized) {
         TsTargetLand -= lapseRateKPerM * elevField[k];
       }
       const cap = Math.max(1e-6, soilCap[k]);
