@@ -83,6 +83,25 @@ const sstClimo = core.climo?.sstNow;             // Float32Array(N), K
 const hasSst = Boolean(core.climo?.hasSst ?? (sstClimo && sstClimo.length === state.N));
 const latArr = core.grid.latDeg;
 
+// R9-β3 instrumentation: ω@700hPa and surface radiative flux for
+// subsidence and radiation-budget diagnosis.
+const omega = state.omega;                        // (nz+1)*N, Pa/s
+const sigmaHalf = state.sigmaHalf;                // length nz+1
+const surfRad = state.surfaceRadiativeFlux;       // Float32Array(N), W/m²
+const nzState = state.nz;
+// Find half-level closest to sigma=0.7 (≈ 700 hPa)
+let lev700 = 0;
+let lev500 = 0;
+{
+  let best700 = Infinity, best500 = Infinity;
+  for (let lv = 0; lv <= nzState; lv += 1) {
+    const s = sigmaHalf?.[lv] ?? 0;
+    if (Math.abs(s - 0.7) < best700) { best700 = Math.abs(s - 0.7); lev700 = lv; }
+    if (Math.abs(s - 0.5) < best500) { best500 = Math.abs(s - 0.5); lev500 = lv; }
+  }
+}
+console.log(`[R9-β3] Using half-level lev700=${lev700} (σ=${sigmaHalf?.[lev700]?.toFixed(3)}), lev500=${lev500} (σ=${sigmaHalf?.[lev500]?.toFixed(3)})`);
+
 const fmt = (n, w = 7, d = 2) => {
   if (!Number.isFinite(n)) return '   n/a '.padStart(w);
   return n.toFixed(d).padStart(w);
@@ -180,6 +199,45 @@ bandStats(35, 65, 'NH midlat 35–65°');
 bandStats(-65, -35, 'SH midlat -65–-35°');
 bandStats(65, 90, 'NH polar 65–90°');
 bandStats(-90, -65, 'SH polar -90–-65°');
+
+// R9-β3: subsidence (ω@500/700) and surface radiation per band
+console.log();
+console.log('R9-β3 subsidence & surface radiation:');
+console.log('  (ω positive = descending; Earth subtrop ω@700 ≈ +0.02 to +0.05 Pa/s)');
+const bandOmega = (minLat, maxLat, label) => {
+  let nAll = 0, nLand = 0, nOcn = 0;
+  let w700 = 0, w500 = 0, srLand = 0, srOcn = 0;
+  for (let j = 0; j < ny2; j += 1) {
+    const lat = latArr[j];
+    if (lat < minLat || lat > maxLat) continue;
+    for (let i = 0; i < nx2; i += 1) {
+      const k = j * nx2 + i;
+      nAll += 1;
+      w700 += omega?.[lev700 * state.N + k] ?? 0;
+      w500 += omega?.[lev500 * state.N + k] ?? 0;
+      if (landMask[k] === 1) {
+        nLand += 1;
+        srLand += surfRad?.[k] ?? 0;
+      } else {
+        nOcn += 1;
+        srOcn += surfRad?.[k] ?? 0;
+      }
+    }
+  }
+  const w7 = nAll > 0 ? w700 / nAll : NaN;
+  const w5 = nAll > 0 ? w500 / nAll : NaN;
+  const srL = nLand > 0 ? srLand / nLand : NaN;
+  const srO = nOcn > 0 ? srOcn / nOcn : NaN;
+  console.log(`  ${label.padEnd(24)}  ω700=${fmt(w7 * 1000, 7, 2)} mPa/s  ω500=${fmt(w5 * 1000, 7, 2)} mPa/s  srLand=${fmt(srL, 7, 1)} W/m²  srOcn=${fmt(srO, 7, 1)} W/m²`);
+};
+bandOmega(-6, 6, 'Deep tropics (±6°)');
+bandOmega(-12, 12, 'Tropics (±12°)');
+bandOmega(15, 35, 'NH subtrop 15–35°');
+bandOmega(-35, -15, 'SH subtrop -35–-15°');
+bandOmega(35, 65, 'NH midlat 35–65°');
+bandOmega(-65, -35, 'SH midlat -65–-35°');
+bandOmega(65, 90, 'NH polar 65–90°');
+bandOmega(-90, -65, 'SH polar -90–-65°');
 
 // Check at specific sample cells
 console.log();
