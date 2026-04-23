@@ -571,6 +571,17 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'equatorialEdgeSubsidenceGuardTargetLat0',
   'equatorialEdgeSubsidenceGuardTargetLat1',
   'equatorialEdgeSubsidenceGuardProjectedMaxPaS',
+  // R9-β4: Tropical ascent seed — Gaussian ω injection in the deep tropics
+  // to bootstrap the Hadley ascending branch out of a no-ITCZ feedback state.
+  // Default OFF.  See weather-validation/reports/r9-beta3-subsidence-is-hyperactive.md.
+  'enableTropicalAscentSeed',
+  'tropicalAscentSeedPeakPaS',
+  'tropicalAscentSeedCenterLatDeg',
+  'tropicalAscentSeedWidthDeg',
+  'tropicalAscentSeedSigmaHi',
+  'tropicalAscentSeedSigmaLo',
+  'tropicalAscentSeedFadeStartDay',
+  'tropicalAscentSeedFadeDurationDays',
   'enableNorthsideFanoutLeakPenalty',
   'northsideFanoutLeakPenaltyMaxFrac',
   'northsideFanoutLeakPenaltyLat0',
@@ -749,6 +760,15 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     equatorialEdgeSubsidenceGuardTargetLat0 = 2,
     equatorialEdgeSubsidenceGuardTargetLat1 = 6,
     equatorialEdgeSubsidenceGuardProjectedMaxPaS = 0.0035,
+    // R9-β4: tropical ascent seed (negative ω injection)
+    enableTropicalAscentSeed = false,
+    tropicalAscentSeedPeakPaS = 0.05,          // magnitude; applied as negative (ascent)
+    tropicalAscentSeedCenterLatDeg = 0,
+    tropicalAscentSeedWidthDeg = 10,
+    tropicalAscentSeedSigmaHi = 0.7,            // envelope top (sigma; ≈ 700 hPa)
+    tropicalAscentSeedSigmaLo = 0.3,            // envelope bottom (sigma; ≈ 300 hPa)
+    tropicalAscentSeedFadeStartDay = 20,
+    tropicalAscentSeedFadeDurationDays = 20,
     enableNorthsideFanoutLeakPenalty = false,
     northsideFanoutLeakPenaltyMaxFrac = 0.28,
     northsideFanoutLeakPenaltyLat0 = 9,
@@ -2612,6 +2632,54 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       lowLevelMoistureConvergenceMeanS_1: totalWeightAll > 0 ? lowLevelConvergenceWeightedSum / totalWeightAll : 0,
       subtropicalSubsidenceDryingMean: totalWeightAll > 0 ? subsidenceDryingWeightedSum / totalWeightAll : 0
     };
+  }
+
+  // R9-β4: Tropical ascent seed.  Gaussian ω injection in the deep tropics
+  // to bootstrap the Hadley ascending branch out of a no-ITCZ feedback state.
+  // Diagnosis memo: weather-validation/reports/r9-beta3-subsidence-is-hyperactive.md
+  //
+  // Guarded by enableTropicalAscentSeed (default false).  Fades linearly
+  // between fadeStartDay and fadeStartDay + fadeDurationDays so the
+  // self-sustaining circulation (if any) becomes visible after the seed
+  // is removed.  Applied as an additive omega perturbation after dynamical
+  // omega is computed, matching the pattern of the equatorial-edge
+  // subsidence guardrail above.
+  if (enableTropicalAscentSeed && tropicalAscentSeedPeakPaS > 0) {
+    const elapsedDays = (state.timeUTC || 0) / 86400;
+    const fadeStart = Number(tropicalAscentSeedFadeStartDay) || 0;
+    const fadeDur = Math.max(1, Number(tropicalAscentSeedFadeDurationDays) || 1);
+    let fade = 1;
+    if (elapsedDays > fadeStart) {
+      fade = Math.max(0, 1 - (elapsedDays - fadeStart) / fadeDur);
+    }
+    if (fade > 0) {
+      const latDegSeed = grid.latDeg;
+      const centerLat = Number(tropicalAscentSeedCenterLatDeg) || 0;
+      const widthLat = Math.max(1, Number(tropicalAscentSeedWidthDeg) || 10);
+      const sigHi = Math.max(0.05, Math.min(0.95, Number(tropicalAscentSeedSigmaHi) || 0.7));
+      const sigLo = Math.max(0.05, Math.min(0.95, Number(tropicalAscentSeedSigmaLo) || 0.3));
+      const sigMid = 0.5 * (sigHi + sigLo);
+      const sigSpanHalf = Math.max(1e-3, 0.5 * (sigHi - sigLo));
+      const peak = Number(tropicalAscentSeedPeakPaS) || 0;
+      for (let lv = 0; lv <= nz; lv += 1) {
+        const s = sigmaHalf?.[lv] ?? 0;
+        if (s < sigLo || s > sigHi) continue;
+        const sD = (s - sigMid) / sigSpanHalf;
+        const sEnv = Math.exp(-0.5 * sD * sD);
+        if (sEnv < 0.01) continue;
+        for (let j = 0; j < ny; j += 1) {
+          const latVal = latDegSeed?.[j] ?? 0;
+          const latD = (latVal - centerLat) / widthLat;
+          const latEnv = Math.exp(-0.5 * latD * latD);
+          if (latEnv < 0.01) continue;
+          const seedPaS = -peak * fade * sEnv * latEnv;
+          const rowBase = lv * N + j * nx;
+          for (let i = 0; i < nx; i += 1) {
+            omega[rowBase + i] += seedPaS;
+          }
+        }
+      }
+    }
   }
 
   if (enableCarryInputDominanceOverride) {

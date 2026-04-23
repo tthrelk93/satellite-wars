@@ -66,6 +66,26 @@ if (sstTauDays > 0) {
   console.log(`[R9-β2 SST TAU] ${sstTauDays}d (was 120d)`);
 }
 
+// R9-β4: enable tropical ascent seed to bootstrap Hadley ascending branch.
+// R9_ASCENT_SEED=1 turns it on with defaults.
+const ascentSeedOn = process.env.R9_ASCENT_SEED === '1';
+if (ascentSeedOn) {
+  Object.assign(core.vertParams, {
+    enableTropicalAscentSeed: true,
+    tropicalAscentSeedPeakPaS: Number(process.env.R9_ASCENT_PEAK || 0.05),
+    tropicalAscentSeedCenterLatDeg: Number(process.env.R9_ASCENT_CENTER || 0),
+    tropicalAscentSeedWidthDeg: Number(process.env.R9_ASCENT_WIDTH || 10),
+    tropicalAscentSeedSigmaHi: Number(process.env.R9_ASCENT_SIGMA_HI || 0.7),
+    tropicalAscentSeedSigmaLo: Number(process.env.R9_ASCENT_SIGMA_LO || 0.3),
+    tropicalAscentSeedFadeStartDay: Number(process.env.R9_ASCENT_FADE_START || 30),
+    tropicalAscentSeedFadeDurationDays: Number(process.env.R9_ASCENT_FADE_DURATION || 20)
+  });
+  const p = core.vertParams;
+  console.log(`[R9-β4 ASCENT SEED ON] peak=${p.tropicalAscentSeedPeakPaS}Pa/s center=${p.tropicalAscentSeedCenterLatDeg}° width=${p.tropicalAscentSeedWidthDeg}° σ=[${p.tropicalAscentSeedSigmaLo}, ${p.tropicalAscentSeedSigmaHi}] fade=${p.tropicalAscentSeedFadeStartDay}d+${p.tropicalAscentSeedFadeDurationDays}d`);
+} else {
+  console.log('[R9-β4 ASCENT SEED OFF — baseline]');
+}
+
 core.advanceModelSeconds(spinupDays * 86400);
 
 const state = core.state;
