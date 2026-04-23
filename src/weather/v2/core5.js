@@ -347,7 +347,7 @@ export class WeatherCore5 {
       tropicsDragLat0Deg: 10,
       tropicsDragLat1Deg: 30,
       polarFilterLatStartDeg: 60,
-      polarFilterEverySteps: 0,
+      polarFilterEverySteps: 1,
       extraFilterEverySteps: 0,
       extraFilterPasses: 2,
       enableMetricTerms: true
