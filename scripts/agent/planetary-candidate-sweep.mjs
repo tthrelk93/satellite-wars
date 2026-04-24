@@ -139,7 +139,9 @@ const keyMetrics = [
   'itczLatDeg',
   'globalPrecipMeanMmHr',
   'globalTcwMeanKgM2',
-  'tropicalConvectiveFraction'
+  'tropicalConvectiveFraction',
+  'southDryBeltHadleyReturnFlowWindAppliedMeanMs',
+  'southDryBeltWalkerLongitudinalSubsidenceSupportMeanFrac'
 ];
 
 const deltaResults = candidateResults.map((candidate) => ({

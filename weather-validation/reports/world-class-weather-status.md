@@ -6,7 +6,7 @@ Verdict: NOT WORLD CLASS YET
 ## Current baseline
 
 - Clean worker worktree: `codex/world-class-weather-loop`
-- Latest verified cycle: `cycle-2026-04-24T09-38-30Z-phase2-conservative-moisture-long-horizon`
+- Latest verified cycle: `cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure`
 - Earth accuracy suite: PASS (`weather-validation/reports/earth-accuracy-status.md`)
 - Phase 2 conservative moisture transport now has fresh annual evidence:
   - annual E/P relative imbalance: `0.00967`
@@ -16,6 +16,15 @@ Verdict: NOT WORLD CLASS YET
   - advection repair: `0.0002 kg/m²`
   - tropical-source numerical residual: `-0.0000003 kg/m²`
   - numerical integrity: PASS
+- Phase 3 Hadley/Walker closure now has fresh quick evidence:
+  - southern dry-belt return branch: `0 -> 41.57037 kg/m/s`
+  - northern dry-belt return branch: `2026.61061 kg/m/s`
+  - branch continuity diagnostics: north and south `equatorwardReturnClosed = true`
+  - return-flow wind diagnostics: north `0.20897 m/s`, south `0.28446 m/s`
+  - Walker longitudinal support diagnostics: north/south `0.5196`
+  - water-cycle budget: PASS
+  - numerical integrity score/pass: `0.8689 / true`
+  - Phase 3 is not fully passed because the south subtropical dry-belt ratio remains `1.134` vs target `< 0.8`
 - Latest verified physics baseline in `src/weather/v2/core5.js` still holds:
   - `vertParams.thetaeCoeff: 11 -> 10.5`
   - current dry-belt metrics remain:
@@ -37,28 +46,30 @@ Verdict: NOT WORLD CLASS YET
 
 ## Fresh evidence from the latest cycle
 
-- The Phase 2 cycle changed real weather-core code:
-  - conservative source-demand remap for `qv`, `qc`, `qi`, `qr`, `qs`, and vapor-source tracers
-  - default-off QV nudging so water closure is no longer hidden by climatology relaxation
-  - stronger physical rainout/autoconversion defaults and organized supersaturation rainout tracing
-  - water-cycle reporting now separates physical tropical-source redistribution from true global source-tracer residual
-  - numerical limiter scoring now compares accumulated limiter mass on a 90-day-equivalent basis while preserving raw diagnostics
-- Fresh annual artifact:
+- The Phase 3 cycle changed real weather-core code:
+  - added bounded low-level Hadley return-flow wind coupling in `src/weather/v2/vertical5.js`
+  - added Walker-style longitudinal tropical source support diagnostics
+  - added explicit Hadley branch mass-continuity diagnostics in the planetary audit
+  - removed the tested direct return-flow subsidence experiment after it worsened the dry-belt gate
+- Fresh quick artifact:
+  - `overallPass = false`
+  - `subtropicalDryNorthRatio = 0.795`
+  - `subtropicalDrySouthRatio = 1.134`
+  - `itczLatDeg = -3.639`
+  - `itczWidthDeg = 23.641`
+  - `southDryBeltEquatorwardMassFluxKgM_1S = 41.57037`
   - `waterCycleBudget.pass = true`
-  - `sampledDays = 365`
-  - `evaporationMeanMm = 533.48408`
-  - `precipitationMeanMm = 528.32495`
-  - `advectionRepairMeanKgM2 = 0.0002`
   - `numericalIntegrityPass = true`
 - Fresh cycle artifacts:
-  - `weather-validation/output/cycle-2026-04-24T09-38-30Z-phase2-conservative-moisture-long-horizon/conservative-remap-final-annual-baseline.json`
-  - `weather-validation/output/cycle-2026-04-24T09-38-30Z-phase2-conservative-moisture-long-horizon/checkpoint.md`
-  - `weather-validation/output/cycle-2026-04-24T09-38-30Z-phase2-conservative-moisture-long-horizon/evidence-summary.json`
+  - `weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/final-quick.json`
+  - `weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/final-quick-hadley-partition-summary.json`
+  - `weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/checkpoint.md`
+  - `weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/evidence-summary.json`
 
 ## What still blocks "world class"
 
-- ITCZ width and south subtropical dry-belt wetness are the next broad climate blockers after Phase 2 transport closure.
-- Northern subtropical dry-belt moisture partitioning still needs a fresh broad-realism follow-through under the new conservative transport baseline.
+- South subtropical dry-belt wetness remains the active Phase 3 blocker after return-flow closure.
+- The next physics target is south subtropical cloud/condensation persistence and moisture-belt rainout; circulation closure alone did not clear the dry-belt gate.
 - Browser/runtime signoff is no longer blocked by the old white panel or the full-grid model-diagnostics payload, but it still fails on larger remaining `Earth.update` spikes and weak wind-target diagnostics in the latest live run.
 - A full annual planetary-realism pass is still required before any world-class claim; the new annual evidence only clears the conservative moisture-transport contract.
 - World-class status still requires realism and smoothness to pass in the same browser-backed run.
@@ -76,7 +87,7 @@ Verdict: NOT WORLD CLASS YET
 
 ## Default next priority
 
-1. Start Phase 3 with ITCZ width and south subtropical dry-belt moisture partitioning under the new conservative transport baseline.
+1. Continue Phase 3 with south subtropical cloud/condensation persistence and moisture-belt rainout under the new closed-return-branch baseline.
 2. Keep the annual water-cycle contract as a guardrail for every broad hydrology/circulation change.
 3. Run bounded live/browser verification after the next verified climate fix or when runtime debt becomes blocking again.
 4. Keep validation on the clean world-class checkout only.

@@ -18,6 +18,7 @@ import {
   computeEquatorialEdgeSubsidenceGuardTargetWeight,
   computeWeakHemiCrossHemiFloorTaperFrac,
   computeTransitionReturnFlowCouplingFrac,
+  computeHadleyReturnFlowWindTendencyMs,
   stepVertical5
 } from './vertical5.js';
 
@@ -792,6 +793,51 @@ test('computeTransitionReturnFlowCouplingFrac is capped and only active when ena
   });
   assert.ok(active > 0);
   assert.ok(active <= 0.14);
+});
+
+test('computeHadleyReturnFlowWindTendencyMs only accelerates low-level flow equatorward', () => {
+  const common = {
+    enabled: true,
+    dryDriver: 0.2,
+    sourceDriver: 0.2,
+    latShape: 0.9,
+    descentSupport: 0.8,
+    circulationSupport: 0.7,
+    returnFlowCouplingFrac: 0.05,
+    walkerSubsidenceSupport: 0.6,
+    dt: 1800,
+    tauSeconds: 6 * 3600,
+    maxMs: 3.2,
+    maxStepMs: 0.65,
+    source0: 0.07,
+    source1: 0.22,
+    dry0: 0.08,
+    dry1: 0.22
+  };
+
+  const nh = computeHadleyReturnFlowWindTendencyMs({
+    ...common,
+    latDeg: 25,
+    currentV: 0.8
+  });
+  const sh = computeHadleyReturnFlowWindTendencyMs({
+    ...common,
+    latDeg: -25,
+    currentV: -0.8
+  });
+
+  assert.ok(nh < 0);
+  assert.ok(sh > 0);
+  assert.ok(Math.abs(nh) <= common.maxStepMs);
+  assert.ok(Math.abs(sh) <= common.maxStepMs);
+  assert.equal(
+    computeHadleyReturnFlowWindTendencyMs({
+      ...common,
+      latDeg: -25,
+      currentV: 4
+    }),
+    0
+  );
 });
 
 test('computeDryingOmegaBridgePaS is capped and only active for weak-engine dry-driver cases', () => {

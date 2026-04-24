@@ -19,6 +19,11 @@ test('WeatherCore5 defaults keep the stronger broad-circulation surface wind res
   assert.equal(core.vertParams.subtropicalSubsidenceTau, 8 * 3600);
   assert.equal(core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac, 0.58);
   assert.equal(core.vertParams.subtropicalSubsidenceWeakHemiBoost, 0.35);
+  assert.equal(core.vertParams.enableTransitionReturnFlowCoupling, true);
+  assert.equal(core.vertParams.circulationReturnFlowCouplingMaxFrac, 0.32);
+  assert.equal(core.vertParams.enableHadleyReturnFlowWindCoupling, true);
+  assert.equal(core.vertParams.hadleyReturnFlowWindTau, 3 * 3600);
+  assert.equal(core.vertParams.enableWalkerLongitudinalCoupling, true);
   assert.equal(core.microParams.qc0, 2e-4);
   assert.equal(core.microParams.qi0, 1.5e-4);
   assert.equal(core.microParams.kAutoRain, 2.4e-3);

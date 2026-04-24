@@ -144,6 +144,47 @@ export const computeTransitionReturnFlowCouplingFrac = ({
     maxFrac
   );
 };
+export const computeHadleyReturnFlowWindTendencyMs = ({
+  enabled,
+  latDeg,
+  currentV,
+  dryDriver,
+  sourceDriver,
+  latShape,
+  descentSupport,
+  circulationSupport,
+  returnFlowCouplingFrac,
+  walkerSubsidenceSupport,
+  dt,
+  tauSeconds,
+  maxMs,
+  maxStepMs,
+  source0,
+  source1,
+  dry0,
+  dry1
+}) => {
+  if (!enabled || !Number.isFinite(latDeg) || Math.abs(latDeg) < 1e-6) return 0;
+  const sourceSupport = smoothstep(source0, source1, sourceDriver);
+  const drySupport = smoothstep(dry0, dry1, dryDriver);
+  const couplingSupport = smoothstep(0.005, 0.08, returnFlowCouplingFrac);
+  const support = clamp01(
+    clamp01(latShape)
+      * sourceSupport
+      * drySupport
+      * (0.45 + 0.35 * clamp01(descentSupport) + 0.2 * clamp01(circulationSupport))
+      * (0.75 + 0.25 * couplingSupport)
+      * (0.82 + 0.36 * clamp01(walkerSubsidenceSupport))
+  );
+  if (!(support > 0)) return 0;
+  const equatorwardSign = latDeg >= 0 ? -1 : 1;
+  const targetV = equatorwardSign * Math.max(0, maxMs) * support;
+  const relax = clamp(dt / Math.max(1, tauSeconds), 0, 1);
+  const delta = (targetV - currentV) * relax;
+  if (!(delta * equatorwardSign > 0)) return 0;
+  return equatorwardSign * Math.min(Math.abs(delta), Math.max(0, maxStepMs));
+};
+
 export const computeSubtropicalBalanceContract = ({
   dryDriver,
   sourceDriver,
@@ -565,6 +606,18 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'circulationReturnFlowCouplingOpportunity0',
   'circulationReturnFlowCouplingOpportunity1',
   'circulationReturnFlowCouplingMaxFrac',
+  'enableHadleyReturnFlowWindCoupling',
+  'hadleyReturnFlowWindTau',
+  'hadleyReturnFlowWindMaxMs',
+  'hadleyReturnFlowWindMaxStepMs',
+  'hadleyReturnFlowWindSigmaTop',
+  'hadleyReturnFlowWindSigmaBottom',
+  'hadleyReturnFlowWindSource0',
+  'hadleyReturnFlowWindSource1',
+  'hadleyReturnFlowWindDry0',
+  'hadleyReturnFlowWindDry1',
+  'enableWalkerLongitudinalCoupling',
+  'walkerLongitudinalCouplingScale',
   'enableDryingOmegaBridge',
   'dryingOmegaBridgeDry0',
   'dryingOmegaBridgeDry1',
@@ -751,10 +804,22 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     circulationReboundOrganizationScale = 0.6,
     circulationReboundActivityScale = 0.35,
     circulationReboundSourceScale = 0.75,
-    enableTransitionReturnFlowCoupling = false,
-    circulationReturnFlowCouplingOpportunity0 = 0.0002,
-    circulationReturnFlowCouplingOpportunity1 = 0.0012,
-    circulationReturnFlowCouplingMaxFrac = 0.14,
+    enableTransitionReturnFlowCoupling = true,
+    circulationReturnFlowCouplingOpportunity0 = 0.00004,
+    circulationReturnFlowCouplingOpportunity1 = 0.00032,
+    circulationReturnFlowCouplingMaxFrac = 0.32,
+    enableHadleyReturnFlowWindCoupling = true,
+    hadleyReturnFlowWindTau = 3 * 3600,
+    hadleyReturnFlowWindMaxMs = 5.8,
+    hadleyReturnFlowWindMaxStepMs = 1.2,
+    hadleyReturnFlowWindSigmaTop = 0.62,
+    hadleyReturnFlowWindSigmaBottom = 0.98,
+    hadleyReturnFlowWindSource0 = 0.05,
+    hadleyReturnFlowWindSource1 = 0.2,
+    hadleyReturnFlowWindDry0 = 0.05,
+    hadleyReturnFlowWindDry1 = 0.2,
+    enableWalkerLongitudinalCoupling = true,
+    walkerLongitudinalCouplingScale = 0.25,
     enableDryingOmegaBridge = false,
     dryingOmegaBridgeDry0 = 0.08,
     dryingOmegaBridgeDry1 = 0.16,
@@ -873,6 +938,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.circulationReboundSuppressedSourceDiag || state.circulationReboundSuppressedSourceDiag.length !== N) state.circulationReboundSuppressedSourceDiag = new Float32Array(N);
   if (!state.circulationReturnFlowOpportunityDiag || state.circulationReturnFlowOpportunityDiag.length !== N) state.circulationReturnFlowOpportunityDiag = new Float32Array(N);
   if (!state.circulationReturnFlowCouplingAppliedDiag || state.circulationReturnFlowCouplingAppliedDiag.length !== N) state.circulationReturnFlowCouplingAppliedDiag = new Float32Array(N);
+  if (!state.hadleyReturnFlowWindSupportDiag || state.hadleyReturnFlowWindSupportDiag.length !== N) state.hadleyReturnFlowWindSupportDiag = new Float32Array(N);
+  if (!state.hadleyReturnFlowWindAppliedDiag || state.hadleyReturnFlowWindAppliedDiag.length !== N) state.hadleyReturnFlowWindAppliedDiag = new Float32Array(N);
+  if (!state.walkerLongitudinalSubsidenceSupportDiag || state.walkerLongitudinalSubsidenceSupportDiag.length !== N) state.walkerLongitudinalSubsidenceSupportDiag = new Float32Array(N);
   if (!state.dryingOmegaBridgeAppliedDiag || state.dryingOmegaBridgeAppliedDiag.length !== N) state.dryingOmegaBridgeAppliedDiag = new Float32Array(N);
   if (!state.dryingOmegaBridgeLocalAppliedDiag || state.dryingOmegaBridgeLocalAppliedDiag.length !== N) state.dryingOmegaBridgeLocalAppliedDiag = new Float32Array(N);
   if (!state.dryingOmegaBridgeProjectedAppliedDiag || state.dryingOmegaBridgeProjectedAppliedDiag.length !== N) state.dryingOmegaBridgeProjectedAppliedDiag = new Float32Array(N);
@@ -1015,6 +1083,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const circulationReboundSuppressedSourceDiag = state.circulationReboundSuppressedSourceDiag;
   const circulationReturnFlowOpportunityDiag = state.circulationReturnFlowOpportunityDiag;
   const circulationReturnFlowCouplingAppliedDiag = state.circulationReturnFlowCouplingAppliedDiag;
+  const hadleyReturnFlowWindSupportDiag = state.hadleyReturnFlowWindSupportDiag;
+  const hadleyReturnFlowWindAppliedDiag = state.hadleyReturnFlowWindAppliedDiag;
+  const walkerLongitudinalSubsidenceSupportDiag = state.walkerLongitudinalSubsidenceSupportDiag;
   const dryingOmegaBridgeAppliedDiag = state.dryingOmegaBridgeAppliedDiag;
   const dryingOmegaBridgeLocalAppliedDiag = state.dryingOmegaBridgeLocalAppliedDiag;
   const dryingOmegaBridgeProjectedAppliedDiag = state.dryingOmegaBridgeProjectedAppliedDiag;
@@ -1130,6 +1201,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   circulationReboundSuppressedSourceDiag.fill(0);
   circulationReturnFlowOpportunityDiag.fill(0);
   circulationReturnFlowCouplingAppliedDiag.fill(0);
+  hadleyReturnFlowWindSupportDiag.fill(0);
+  hadleyReturnFlowWindAppliedDiag.fill(0);
+  walkerLongitudinalSubsidenceSupportDiag.fill(0);
   dryingOmegaBridgeAppliedDiag.fill(0);
   dryingOmegaBridgeLocalAppliedDiag.fill(0);
   dryingOmegaBridgeProjectedAppliedDiag.fill(0);
@@ -1713,14 +1787,29 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     if (!state._rowTransitionSuppressedSource || state._rowTransitionSuppressedSource.length !== ny) {
       state._rowTransitionSuppressedSource = new Float32Array(ny);
     }
+    if (!state._walkerColumnTropicalSource || state._walkerColumnTropicalSource.length !== nx) {
+      state._walkerColumnTropicalSource = new Float32Array(nx);
+    }
+    if (!state._walkerColumnTropicalWeight || state._walkerColumnTropicalWeight.length !== nx) {
+      state._walkerColumnTropicalWeight = new Float32Array(nx);
+    }
+    if (!state._walkerColumnSource || state._walkerColumnSource.length !== nx) {
+      state._walkerColumnSource = new Float32Array(nx);
+    }
     const omegaPos = state._omegaPosScratch;
     const instabArr = state._instabScratch;
     const rowConvectiveSource = state._rowConvectiveSource;
     const rowConvectiveSourceRaw = state._rowConvectiveSourceRaw;
     const rowTransitionSuppressedSource = state._rowTransitionSuppressedSource;
+    const walkerColumnTropicalSource = state._walkerColumnTropicalSource;
+    const walkerColumnTropicalWeight = state._walkerColumnTropicalWeight;
+    const walkerColumnSource = state._walkerColumnSource;
     rowConvectiveSource.fill(0);
     rowConvectiveSourceRaw.fill(0);
     rowTransitionSuppressedSource.fill(0);
+    walkerColumnTropicalSource.fill(0);
+    walkerColumnTropicalWeight.fill(0);
+    walkerColumnSource.fill(0);
     nOmegaPos = 0;
     const omegaThreshDynamic = Math.max(omegaTrig, state.vertMetrics?.omegaPosP90 || 0);
     const muMax = clamp01(mu0);
@@ -1767,6 +1856,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const idxS = levS * N + k;
       const idxM = levM * N + k;
       const rowIndex = Math.floor(k / nx);
+      const colIndex = k - rowIndex * nx;
       const columnWeight = cosLat[rowIndex];
 
       const p1 = Math.max(100, pHalf[levS * N + k]);
@@ -2023,9 +2113,14 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       });
       const retainedSourceContribution = rawSourceContribution - suppressedSourceContribution;
       const concentrationPenaltyContribution = Math.max(0, retainedSourceContribution) * northSourceConcentrationPenaltyFrac;
+      const retainedColumnSourceContribution = retainedSourceContribution - concentrationPenaltyContribution;
       rowConvectiveSourceRaw[rowIndex] += rawSourceContribution;
       rowTransitionSuppressedSource[rowIndex] += suppressedSourceContribution;
-      rowConvectiveSource[rowIndex] += retainedSourceContribution - concentrationPenaltyContribution;
+      rowConvectiveSource[rowIndex] += retainedColumnSourceContribution;
+      if (latAbs <= tropicalOrganizationBandDeg) {
+        walkerColumnTropicalSource[colIndex] += retainedColumnSourceContribution * columnWeight;
+        walkerColumnTropicalWeight[colIndex] += columnWeight;
+      }
       circulationReboundRawSourceDiag[k] = rawSourceContribution;
       circulationReboundSuppressedSourceDiag[k] = suppressedSourceContribution;
       northSourceConcentrationPenaltyDiag[k] = northSourceConcentrationPenaltyFrac;
@@ -2193,6 +2288,16 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         rowConvectiveSourceRaw[j] /= Math.max(1, nx);
         rowTransitionSuppressedSource[j] /= Math.max(1, nx);
       }
+      let walkerSourceSum = 0;
+      let walkerSourceCount = 0;
+      for (let i = 0; i < nx; i += 1) {
+        const columnWeight = walkerColumnTropicalWeight[i] || 0;
+        const columnSource = columnWeight > eps ? walkerColumnTropicalSource[i] / columnWeight : 0;
+        walkerColumnSource[i] = columnSource;
+        walkerSourceSum += columnSource;
+        walkerSourceCount += 1;
+      }
+      const walkerMeanSource = walkerSourceCount > 0 ? walkerSourceSum / walkerSourceCount : 0;
       let nhSource = 0;
       let nhWeight = 0;
       let shSource = 0;
@@ -2337,6 +2442,14 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         for (let i = 0; i < nx; i++) {
           const k = row + i;
           const hemiTransitionSuppressedSource = lat >= 0 ? nhTransitionSuppressedSource : shTransitionSuppressedSource;
+          const walkerColumnSourceValue = walkerColumnSource[i] || 0;
+          const walkerSourceAnomaly = walkerMeanSource > eps
+            ? (walkerMeanSource - walkerColumnSourceValue) / Math.max(walkerMeanSource, eps)
+            : 0;
+          const walkerSubsidenceSupport = enableWalkerLongitudinalCoupling
+            ? clamp01(0.5 + clamp(walkerSourceAnomaly, -1, 1) * clamp(walkerLongitudinalCouplingScale, 0, 1))
+            : 0.5;
+          walkerLongitudinalSubsidenceSupportDiag[k] = walkerSubsidenceSupport;
           const returnFlowOpportunity = clamp01(
             2.2 * hemiTransitionSuppressedSource
             * latShape
@@ -2372,6 +2485,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
               * descentSupport
               * localOrganizationRelief
               * localMoistureExportSupport
+              * (0.92 + 0.18 * walkerSubsidenceSupport)
               * (1 - 0.24 * convectivePotential[k])
           );
           const atlanticDryCoreReceiverTaperFrac = computeAtlanticDryCoreReceiverTaperFrac({
@@ -2397,7 +2511,6 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           const taperedDryDriver = dryDriver * (1 - atlanticDryCoreReceiverTaperFrac);
           atlanticDryCoreReceiverTaperDiag[k] = atlanticDryCoreReceiverTaperFrac;
           atlanticDryCoreReceiverTaperAppliedDiag[k] = dryDriver - taperedDryDriver;
-          subtropicalSubsidenceDrying[k] = taperedDryDriver;
           const balanceContract = computeSubtropicalBalanceContract({
             dryDriver: taperedDryDriver,
             sourceDriver: coupledSourceDriver,
@@ -2412,6 +2525,67 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           subtropicalBalancePartitionSupportDiag[k] = balanceContract.partitionSupport;
           subtropicalBalanceCirculationSupportDiag[k] = balanceContract.circulationSupport;
           subtropicalBalanceContractSupportDiag[k] = balanceContract.contractSupport;
+          const returnFlowWindSupportProbe = Math.abs(computeHadleyReturnFlowWindTendencyMs({
+            enabled: enableHadleyReturnFlowWindCoupling,
+            latDeg: lat,
+            currentV: 0,
+            dryDriver: taperedDryDriver,
+            sourceDriver: coupledSourceDriver,
+            latShape,
+            descentSupport,
+            circulationSupport: balanceContract.circulationSupport,
+            returnFlowCouplingFrac,
+            walkerSubsidenceSupport,
+            dt: 1,
+            tauSeconds: 1,
+            maxMs: 1,
+            maxStepMs: 1,
+            source0: hadleyReturnFlowWindSource0,
+            source1: hadleyReturnFlowWindSource1,
+            dry0: hadleyReturnFlowWindDry0,
+            dry1: hadleyReturnFlowWindDry1
+          }));
+          hadleyReturnFlowWindSupportDiag[k] = returnFlowWindSupportProbe;
+          if (enableHadleyReturnFlowWindCoupling && returnFlowWindSupportProbe > 0) {
+            let maxAppliedWindDelta = 0;
+            const windMidSigma = 0.5 * (hadleyReturnFlowWindSigmaTop + hadleyReturnFlowWindSigmaBottom);
+            for (let lev = 0; lev < nz; lev += 1) {
+              const sigmaMid = sigmaHalf
+                ? clamp01(0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1]))
+                : clamp01((lev + 0.5) / Math.max(1, nz));
+              if (sigmaMid < hadleyReturnFlowWindSigmaTop || sigmaMid > hadleyReturnFlowWindSigmaBottom) continue;
+              const lowerRamp = smoothstep(hadleyReturnFlowWindSigmaTop, windMidSigma, sigmaMid);
+              const upperRamp = 1 - smoothstep(windMidSigma, hadleyReturnFlowWindSigmaBottom, sigmaMid);
+              const layerWeight = clamp01(Math.min(lowerRamp, upperRamp) * 1.8);
+              if (!(layerWeight > 0)) continue;
+              const idx = lev * N + k;
+              const deltaV = computeHadleyReturnFlowWindTendencyMs({
+                enabled: true,
+                latDeg: lat,
+                currentV: v[idx],
+                dryDriver: taperedDryDriver,
+                sourceDriver: coupledSourceDriver,
+                latShape,
+                descentSupport,
+                circulationSupport: balanceContract.circulationSupport,
+                returnFlowCouplingFrac,
+                walkerSubsidenceSupport,
+                dt,
+                tauSeconds: hadleyReturnFlowWindTau,
+                maxMs: hadleyReturnFlowWindMaxMs * layerWeight,
+                maxStepMs: hadleyReturnFlowWindMaxStepMs * layerWeight,
+                source0: hadleyReturnFlowWindSource0,
+                source1: hadleyReturnFlowWindSource1,
+                dry0: hadleyReturnFlowWindDry0,
+                dry1: hadleyReturnFlowWindDry1
+              });
+              if (deltaV === 0) continue;
+              v[idx] += deltaV;
+              maxAppliedWindDelta = Math.max(maxAppliedWindDelta, Math.abs(deltaV));
+            }
+            hadleyReturnFlowWindAppliedDiag[k] = maxAppliedWindDelta;
+          }
+          subtropicalSubsidenceDrying[k] = taperedDryDriver;
           const omegaBridgePaS = computeDryingOmegaBridgePaS({
             enabled: enableDryingOmegaBridge,
             dryDriver: taperedDryDriver,

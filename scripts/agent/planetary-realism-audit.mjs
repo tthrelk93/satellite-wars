@@ -1765,6 +1765,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     circulationReboundSuppressedSourceDiagFrac,
     circulationReturnFlowOpportunityDiagFrac,
     circulationReturnFlowCouplingAppliedDiagFrac,
+    hadleyReturnFlowWindSupportDiagFrac,
+    hadleyReturnFlowWindAppliedDiagMs,
+    walkerLongitudinalSubsidenceSupportDiagFrac,
     dryingOmegaBridgeAppliedDiagPaS,
     dryingOmegaBridgeLocalAppliedDiagPaS,
     dryingOmegaBridgeProjectedAppliedDiagPaS,
@@ -2279,6 +2282,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalCirculationReboundSuppressedSource = zonalMean(circulationReboundSuppressedSourceDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalCirculationReturnFlowOpportunity = zonalMean(circulationReturnFlowOpportunityDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalCirculationReturnFlowCouplingApplied = zonalMean(circulationReturnFlowCouplingAppliedDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalHadleyReturnFlowWindSupport = zonalMean(hadleyReturnFlowWindSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalHadleyReturnFlowWindApplied = zonalMean(hadleyReturnFlowWindAppliedDiagMs || new Array(nx * ny).fill(0), nx, ny);
+  const zonalWalkerLongitudinalSubsidenceSupport = zonalMean(walkerLongitudinalSubsidenceSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalDryingOmegaBridgeApplied = zonalMean(dryingOmegaBridgeAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
   const northTransitionCirculationReboundContainmentMean = weightedBandMean(zonalCirculationReboundContainment, latitudesDeg, rowWeights, 12, 22);
   const southTransitionCirculationReboundContainmentMean = weightedBandMean(zonalCirculationReboundContainment, latitudesDeg, rowWeights, -22, -12);
@@ -2296,6 +2302,12 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const southDryBeltCirculationReturnFlowOpportunityMean = weightedBandMean(zonalCirculationReturnFlowOpportunity, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
   const northDryBeltCirculationReturnFlowCouplingAppliedMean = weightedBandMean(zonalCirculationReturnFlowCouplingApplied, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const southDryBeltCirculationReturnFlowCouplingAppliedMean = weightedBandMean(zonalCirculationReturnFlowCouplingApplied, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northDryBeltHadleyReturnFlowWindSupportMean = weightedBandMean(zonalHadleyReturnFlowWindSupport, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltHadleyReturnFlowWindSupportMean = weightedBandMean(zonalHadleyReturnFlowWindSupport, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northDryBeltHadleyReturnFlowWindAppliedMean = weightedBandMean(zonalHadleyReturnFlowWindApplied, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltHadleyReturnFlowWindAppliedMean = weightedBandMean(zonalHadleyReturnFlowWindApplied, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
+  const northDryBeltWalkerLongitudinalSubsidenceSupportMean = weightedBandMean(zonalWalkerLongitudinalSubsidenceSupport, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
+  const southDryBeltWalkerLongitudinalSubsidenceSupportMean = weightedBandMean(zonalWalkerLongitudinalSubsidenceSupport, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
   const northTransitionDryingOmegaBridgeAppliedMean = weightedBandMean(zonalDryingOmegaBridgeApplied, latitudesDeg, rowWeights, 12, 22);
   const southTransitionDryingOmegaBridgeAppliedMean = weightedBandMean(zonalDryingOmegaBridgeApplied, latitudesDeg, rowWeights, -22, -12);
   const northDryBeltDryingOmegaBridgeAppliedMean = weightedBandMean(zonalDryingOmegaBridgeApplied, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
@@ -2549,6 +2561,12 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       southDryBeltCirculationReturnFlowOpportunityMeanFrac: round(southDryBeltCirculationReturnFlowOpportunityMean, 5),
       northDryBeltCirculationReturnFlowCouplingAppliedMeanFrac: round(northDryBeltCirculationReturnFlowCouplingAppliedMean, 5),
       southDryBeltCirculationReturnFlowCouplingAppliedMeanFrac: round(southDryBeltCirculationReturnFlowCouplingAppliedMean, 5),
+      northDryBeltHadleyReturnFlowWindSupportMeanFrac: round(northDryBeltHadleyReturnFlowWindSupportMean, 5),
+      southDryBeltHadleyReturnFlowWindSupportMeanFrac: round(southDryBeltHadleyReturnFlowWindSupportMean, 5),
+      northDryBeltHadleyReturnFlowWindAppliedMeanMs: round(northDryBeltHadleyReturnFlowWindAppliedMean, 5),
+      southDryBeltHadleyReturnFlowWindAppliedMeanMs: round(southDryBeltHadleyReturnFlowWindAppliedMean, 5),
+      northDryBeltWalkerLongitudinalSubsidenceSupportMeanFrac: round(northDryBeltWalkerLongitudinalSubsidenceSupportMean, 5),
+      southDryBeltWalkerLongitudinalSubsidenceSupportMeanFrac: round(southDryBeltWalkerLongitudinalSubsidenceSupportMean, 5),
       northTransitionDryingOmegaBridgeAppliedMeanPaS: round(northTransitionDryingOmegaBridgeAppliedMean, 5),
       southTransitionDryingOmegaBridgeAppliedMeanPaS: round(southTransitionDryingOmegaBridgeAppliedMean, 5),
       northDryBeltDryingOmegaBridgeAppliedMeanPaS: round(northDryBeltDryingOmegaBridgeAppliedMean, 5),
@@ -2708,6 +2726,9 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         lowerTroposphericInversionStrengthK: roundSeries(zonalInversionStrength, 5),
         lowerLevelMoistureConvergenceS_1: roundSeries(zonalMoistureConvergence, 6),
         subtropicalSubsidenceDryingFrac: roundSeries(zonalSubsidenceDrying, 5),
+        hadleyReturnFlowWindSupportFrac: roundSeries(zonalHadleyReturnFlowWindSupport, 5),
+        hadleyReturnFlowWindAppliedMs: roundSeries(zonalHadleyReturnFlowWindApplied, 5),
+        walkerLongitudinalSubsidenceSupportFrac: roundSeries(zonalWalkerLongitudinalSubsidenceSupport, 5),
         dryingOmegaBridgeAppliedPaS: roundSeries(zonalDryingOmegaBridgeApplied, 5),
         dryingOmegaBridgeLocalAppliedPaS: roundSeries(zonalDryingOmegaBridgeLocalApplied, 5),
         dryingOmegaBridgeProjectedAppliedPaS: roundSeries(zonalDryingOmegaBridgeProjectedApplied, 5),
@@ -2959,6 +2980,17 @@ const computeReturnBranchIntensity = (transportTracing, bandKey, direction = 'eq
   return Math.max(...signedFluxes.map((value) => Math.abs(value)), 0);
 };
 
+const lowLevelBranchMassFluxes = (transportTracing, bandKey) => {
+  const band = (transportTracing?.bandLevelMatrix || []).find((entry) => entry?.key === bandKey);
+  if (!band) return null;
+  return {
+    boundaryLayerMassFluxNorthKgM_1S: round(Number(band?.levelBands?.boundaryLayer?.massFluxNorthKgM_1S) || 0, 5),
+    lowerTroposphereMassFluxNorthKgM_1S: round(Number(band?.levelBands?.lowerTroposphere?.massFluxNorthKgM_1S) || 0, 5),
+    midTroposphereMassFluxNorthKgM_1S: round(Number(band?.levelBands?.midTroposphere?.massFluxNorthKgM_1S) || 0, 5),
+    upperTroposphereMassFluxNorthKgM_1S: round(Number(band?.levelBands?.upperTroposphere?.massFluxNorthKgM_1S) || 0, 5)
+  };
+};
+
 const buildTransportRootCauseAssessment = (latestSample = null) => {
   const transportTracing = latestSample?.transportTracing;
   const metrics = latestSample?.metrics || {};
@@ -3045,6 +3077,8 @@ export const buildHadleyPartitionSummaryReport = (latestSample = null) => {
     + (Number(metrics.northDryBeltSourceNudgingInjectionMeanKgM2) || 0)
     + (Number(metrics.northDryBeltSourceAnalysisInjectionMeanKgM2) || 0);
   const importedSourceProxyKgM2 = Math.max(0, attributedTotalKgM2 - localSourceProxyKgM2);
+  const northReturnBranch = computeReturnBranchIntensity(transportTracing, 'northDryBelt', 'equatorward_nh');
+  const southReturnBranch = computeReturnBranchIntensity(transportTracing, 'southDryBelt', 'equatorward_sh');
   return {
     schema: 'satellite-wars.hadley-partition-summary.v1',
     generatedAt: new Date().toISOString(),
@@ -3062,8 +3096,18 @@ export const buildHadleyPartitionSummaryReport = (latestSample = null) => {
       southCloudExportSigma: round(computeDirectionalExportSigma(south12, 'cloudFluxNorthKgM_1S', 'southward'), 5)
     },
     returnBranchIntensity: {
-      northDryBeltEquatorwardMassFluxKgM_1S: round(computeReturnBranchIntensity(transportTracing, 'northDryBelt', 'equatorward_nh'), 5),
-      southDryBeltEquatorwardMassFluxKgM_1S: round(computeReturnBranchIntensity(transportTracing, 'southDryBelt', 'equatorward_sh'), 5)
+      northDryBeltEquatorwardMassFluxKgM_1S: round(northReturnBranch, 5),
+      southDryBeltEquatorwardMassFluxKgM_1S: round(southReturnBranch, 5)
+    },
+    massContinuityDiagnostics: {
+      northDryBelt: {
+        ...lowLevelBranchMassFluxes(transportTracing, 'northDryBelt'),
+        equatorwardReturnClosed: (northReturnBranch || 0) > 0
+      },
+      southDryBelt: {
+        ...lowLevelBranchMassFluxes(transportTracing, 'southDryBelt'),
+        equatorwardReturnClosed: (southReturnBranch || 0) > 0
+      }
     },
     northDryBeltTransport: {
       dominantVaporImport: findDominantNhDryBeltImport(transportTracing, 'vaporFluxNorthKgM_1S'),
