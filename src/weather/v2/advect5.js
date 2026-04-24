@@ -36,7 +36,8 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
     polarLatStartDeg = 60,
     filterMoisture = false,
     maxBacktraceCells = 2,
-    conserveWater = true
+    conserveWater = true,
+    conservativeWaterRemap = true
   } = params;
 
   const { nx, ny, invDx, invDy, sinLat, latDeg, polarWeight, cellLonDeg, cosLat } = grid;
@@ -137,6 +138,126 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
     src.set(tmp3D);
   };
 
+  const layerMassAt = (lev, cell) => {
+    if (!(pHalf instanceof Float32Array) || pHalf.length !== (nz + 1) * N) return 0;
+    const dp = pHalf[(lev + 1) * N + cell] - pHalf[lev * N + cell];
+    return dp > 0 ? dp / GRAVITY : 0;
+  };
+
+  let conservativeWaterPlan = null;
+  const getConservativeWaterPlan = () => {
+    if (conservativeWaterPlan) return conservativeWaterPlan;
+    const len = state.SZ;
+    const src00 = new Int32Array(len);
+    const src10 = new Int32Array(len);
+    const src01 = new Int32Array(len);
+    const src11 = new Int32Array(len);
+    const w00 = new Float64Array(len);
+    const w10 = new Float64Array(len);
+    const w01 = new Float64Array(len);
+    const w11 = new Float64Array(len);
+    const sourceDemandMass = new Float64Array(len);
+    const sourceScale = new Float64Array(len);
+    sourceScale.fill(1);
+    const addDemand = (srcIdx, weight, destMass) => {
+      if (weight <= 0 || destMass <= 0) return;
+      sourceDemandMass[srcIdx] += weight * destMass;
+    };
+
+    for (let lev = 0; lev < nz; lev++) {
+      const base = lev * N;
+      for (let j = 0; j < ny; j++) {
+        const row = j * nx;
+        const invDxRow = invDx[j];
+        const invDyRow = invDy[j];
+        for (let i = 0; i < nx; i++) {
+          const k = row + i;
+          const idx = base + k;
+          const destMass = layerMassAt(lev, k) * columnWeight(k);
+          const u0 = u[idx];
+          const v0 = v[idx];
+          let di = u0 * dt * invDxRow;
+          let dj = v0 * dt * invDyRow;
+          di = clamp(di, -maxBacktraceCells, maxBacktraceCells);
+          dj = clamp(dj, -maxBacktraceCells, maxBacktraceCells);
+          let iSrc = i - di;
+          let jSrc = j - dj;
+          if (jSrc < 0) jSrc = 0;
+          if (jSrc > ny - 1.001) jSrc = ny - 1.001;
+          let i0 = Math.floor(iSrc);
+          let j0 = Math.floor(jSrc);
+          const fx = iSrc - i0;
+          const fy = jSrc - j0;
+          if (i0 < 0) i0 += nx;
+          if (i0 >= nx) i0 -= nx;
+          let i1 = i0 + 1;
+          if (i1 >= nx) i1 -= nx;
+          let j1 = j0 + 1;
+          if (j1 >= ny) j1 = ny - 1;
+          const k00 = base + j0 * nx + i0;
+          const k10 = base + j0 * nx + i1;
+          const k01 = base + j1 * nx + i0;
+          const k11 = base + j1 * nx + i1;
+          const weight00 = (1 - fx) * (1 - fy);
+          const weight10 = fx * (1 - fy);
+          const weight01 = (1 - fx) * fy;
+          const weight11 = fx * fy;
+          src00[idx] = k00;
+          src10[idx] = k10;
+          src01[idx] = k01;
+          src11[idx] = k11;
+          w00[idx] = weight00;
+          w10[idx] = weight10;
+          w01[idx] = weight01;
+          w11[idx] = weight11;
+          addDemand(k00, weight00, destMass);
+          addDemand(k10, weight10, destMass);
+          addDemand(k01, weight01, destMass);
+          addDemand(k11, weight11, destMass);
+        }
+      }
+    }
+
+    for (let idx = 0; idx < len; idx += 1) {
+      const cell = idx % N;
+      const lev = Math.floor(idx / N);
+      const srcMass = layerMassAt(lev, cell) * columnWeight(cell);
+      const demand = sourceDemandMass[idx];
+      if (srcMass > 0 && demand > WATER_REPAIR_EPS_KG_M2) {
+        sourceScale[idx] = srcMass / demand;
+      }
+    }
+
+    conservativeWaterPlan = { src00, src10, src01, src11, w00, w10, w01, w11, sourceScale };
+    return conservativeWaterPlan;
+  };
+
+  const advectWaterScalarConservative = (src) => {
+    if (
+      !conserveWater
+      || !conservativeWaterRemap
+      || !(pHalf instanceof Float32Array)
+      || pHalf.length !== (nz + 1) * N
+    ) {
+      advectScalar(src);
+      return;
+    }
+
+    const plan = getConservativeWaterPlan();
+    for (let idx = 0; idx < state.SZ; idx += 1) {
+      const k00 = plan.src00[idx];
+      const k10 = plan.src10[idx];
+      const k01 = plan.src01[idx];
+      const k11 = plan.src11[idx];
+      tmp3D[idx] =
+        (src[k00] || 0) * plan.w00[idx] * plan.sourceScale[k00]
+        + (src[k10] || 0) * plan.w10[idx] * plan.sourceScale[k10]
+        + (src[k01] || 0) * plan.w01[idx] * plan.sourceScale[k01]
+        + (src[k11] || 0) * plan.w11[idx] * plan.sourceScale[k11];
+    }
+    src.set(tmp3D);
+  };
+
   for (let lev = 0; lev < nz; lev++) {
     const base = lev * N;
     for (let j = 0; j < ny; j++) {
@@ -203,16 +324,16 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
   }
 
   advectScalar(theta);
-  advectScalar(qv);
-  advectScalar(qc);
-  advectScalar(qi);
-  advectScalar(qr);
+  advectWaterScalarConservative(qv);
+  advectWaterScalarConservative(qc);
+  advectWaterScalarConservative(qi);
+  advectWaterScalarConservative(qr);
   if (qs instanceof Float32Array && qs.length === qv.length) {
-    advectScalar(qs);
+    advectWaterScalarConservative(qs);
   }
   for (const fieldName of SURFACE_MOISTURE_SOURCE_FIELDS) {
     if (state[fieldName] instanceof Float32Array && state[fieldName].length === qv.length) {
-      advectScalar(state[fieldName]);
+      advectWaterScalarConservative(state[fieldName]);
     }
   }
 

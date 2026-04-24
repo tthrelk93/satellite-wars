@@ -1,13 +1,21 @@
 # World-Class Weather Status
 
-Updated: 2026-04-09
+Updated: 2026-04-24
 Verdict: NOT WORLD CLASS YET
 
 ## Current baseline
 
 - Clean worker worktree: `codex/world-class-weather-loop`
-- Latest verified cycle: `cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun`
+- Latest verified cycle: `cycle-2026-04-24T09-38-30Z-phase2-conservative-moisture-long-horizon`
 - Earth accuracy suite: PASS (`weather-validation/reports/earth-accuracy-status.md`)
+- Phase 2 conservative moisture transport now has fresh annual evidence:
+  - annual E/P relative imbalance: `0.00967`
+  - annual TCW drift: `5.13903 kg/m²`
+  - advection net delta: `0.0000007 kg/m²`
+  - vertical net delta: `0`
+  - advection repair: `0.0002 kg/m²`
+  - tropical-source numerical residual: `-0.0000003 kg/m²`
+  - numerical integrity: PASS
 - Latest verified physics baseline in `src/weather/v2/core5.js` still holds:
   - `vertParams.thetaeCoeff: 11 -> 10.5`
   - current dry-belt metrics remain:
@@ -29,32 +37,30 @@ Verdict: NOT WORLD CLASS YET
 
 ## Fresh evidence from the latest cycle
 
-- The recent particle-path profiler work identified `WindStreamlineRenderer._evolveParticles(...)` with `sample0Ms` dominant on the mature live baseline.
-- The verified follow-up changed real app code in `src/WindStreamlineRenderer.js`:
-  - added a dedicated in-range bilinear fast path for the common all-valid sample case
-  - stopped building/destructuring large sample argument objects on every particle sample
-  - reused scratch sample objects inside `_evolveParticles(...)`
-- Two fresh live reruns on the same patch confirm the win is not a one-off:
-  - mature pre-patch baseline: `Earth.update p95 = 42.01 ms`, `sample0Ms p95 = 2.60 ms`
-  - first rerun: `Earth.update p95 = 34.20 ms`
-  - confirming rerun: `Earth.update p95 = 33.39 ms`, `sample0Ms p95 = 2.30 ms`
-- The hotspot mix also changed materially:
-  - mature pre-patch top spikes: `particle_evolve = 6`, `unknown = 2`
-  - confirming rerun top spikes: `particle_evolve = 2`, `unknown = 6`
-- What still blocks signoff after this fix:
-  - larger `Earth.update` max spikes still remain
-  - the remaining worst spikes are now mostly unknown / startup-ish rather than clearly `sample0Ms` dominated
+- The Phase 2 cycle changed real weather-core code:
+  - conservative source-demand remap for `qv`, `qc`, `qi`, `qr`, `qs`, and vapor-source tracers
+  - default-off QV nudging so water closure is no longer hidden by climatology relaxation
+  - stronger physical rainout/autoconversion defaults and organized supersaturation rainout tracing
+  - water-cycle reporting now separates physical tropical-source redistribution from true global source-tracer residual
+  - numerical limiter scoring now compares accumulated limiter mass on a 90-day-equivalent basis while preserving raw diagnostics
+- Fresh annual artifact:
+  - `waterCycleBudget.pass = true`
+  - `sampledDays = 365`
+  - `evaporationMeanMm = 533.48408`
+  - `precipitationMeanMm = 528.32495`
+  - `advectionRepairMeanKgM2 = 0.0002`
+  - `numericalIntegrityPass = true`
 - Fresh cycle artifacts:
-  - `weather-validation/output/cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun/runtime-summary.json`
-  - `weather-validation/output/cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun/hotspot-profile.json`
-  - `weather-validation/output/cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun/runtime-summary-rerun.json`
-  - `weather-validation/output/cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun/hotspot-profile-rerun.json`
+  - `weather-validation/output/cycle-2026-04-24T09-38-30Z-phase2-conservative-moisture-long-horizon/conservative-remap-final-annual-baseline.json`
+  - `weather-validation/output/cycle-2026-04-24T09-38-30Z-phase2-conservative-moisture-long-horizon/checkpoint.md`
+  - `weather-validation/output/cycle-2026-04-24T09-38-30Z-phase2-conservative-moisture-long-horizon/evidence-summary.json`
 
 ## What still blocks "world class"
 
-- Northern subtropical dry-belt moisture partitioning is still the dominant planetary blocker, even though the quick and seasonal ratios are now down to `1.029` and `1.015`.
+- ITCZ width and south subtropical dry-belt wetness are the next broad climate blockers after Phase 2 transport closure.
+- Northern subtropical dry-belt moisture partitioning still needs a fresh broad-realism follow-through under the new conservative transport baseline.
 - Browser/runtime signoff is no longer blocked by the old white panel or the full-grid model-diagnostics payload, but it still fails on larger remaining `Earth.update` spikes and weak wind-target diagnostics in the latest live run.
-- Annual / 365-day stability and seasonality evidence is still required before any long-horizon or world-class claim.
+- A full annual planetary-realism pass is still required before any world-class claim; the new annual evidence only clears the conservative moisture-transport contract.
 - World-class status still requires realism and smoothness to pass in the same browser-backed run.
 
 ## Canonical cycle inputs
@@ -70,11 +76,10 @@ Verdict: NOT WORLD CLASS YET
 
 ## Default next priority
 
-1. Run one bounded live diagnostic cycle on the remaining unknown `Earth.update` max spikes before another renderer tweak; the old `sample0Ms` bottleneck is materially reduced.
-2. If that diagnostic cycle does not expose a sharper runtime/app target, return the next physics cycle to northern subtropical dry-belt moisture partitioning while keeping the faster particle sampler.
-3. Re-run live verification on the current `thetaeCoeff = 10.5` baseline after the next targeted runtime or dry-belt fix.
-4. Run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through.
-5. Keep validation on the clean world-class checkout only.
+1. Start Phase 3 with ITCZ width and south subtropical dry-belt moisture partitioning under the new conservative transport baseline.
+2. Keep the annual water-cycle contract as a guardrail for every broad hydrology/circulation change.
+3. Run bounded live/browser verification after the next verified climate fix or when runtime debt becomes blocking again.
+4. Keep validation on the clean world-class checkout only.
 
 ## Commit discipline
 

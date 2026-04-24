@@ -124,6 +124,44 @@ test('microphysics records large-scale condensation and re-evaporation diagnosti
   assert.ok(Array.from(state.saturationAdjustmentCloudBirthByBandMass).some((value) => value > 0));
 });
 
+test('organized supersaturation can rain out directly instead of storing all excess as cloud', () => {
+  const makeState = (organized) => {
+    const state = setupState(281);
+    state.qv.fill(0.002);
+    state.qc.fill(0);
+    state.qi.fill(0);
+    state.qr.fill(0);
+    state.qs.fill(0);
+    state.landMask[0] = 0;
+    state.convectiveOrganization[0] = organized ? 0.9 : 0.0;
+    state.convectiveMassFlux[0] = organized ? 0.03 : 0.0;
+    state.convectiveAnvilSource[0] = organized ? 0.8 : 0.0;
+    state.omega.fill(organized ? -0.24 : -0.02);
+    state.qv[1] = 0.018;
+    return state;
+  };
+
+  const weak = makeState(false);
+  const organized = makeState(true);
+  const params = {
+    enableConvectiveOutcome: true,
+    convectiveSaturationRainoutMaxFrac: 0.7,
+    kFallRain: 1 / 900,
+    tauEvapRainMin: 3600,
+    tauEvapRainMax: 86400
+  };
+
+  stepMicrophysics5({ dt: 900, state: weak, params });
+  stepMicrophysics5({ dt: 900, state: organized, params });
+
+  const weakPrecipSupport = Array.from(weak.microphysicsCloudToPrecipByBandMass).reduce((sum, value) => sum + value, 0);
+  const organizedPrecipSupport = Array.from(organized.microphysicsCloudToPrecipByBandMass).reduce((sum, value) => sum + value, 0);
+
+  assert.ok(organized.saturationAdjustmentRainoutMass[0] > weak.saturationAdjustmentRainoutMass[0]);
+  assert.ok(organizedPrecipSupport > weakPrecipSupport);
+  assert.ok(Array.from(organized.qr).some((value) => value > 0));
+});
+
 test('microphysics records weak-engine subtropical maintenance occupancy for marginal marine saturation adjustment', () => {
   const state = setupState(279);
   state.qv.fill(0.002);

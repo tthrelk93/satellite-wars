@@ -178,6 +178,7 @@ const createConservationModuleAccumulator = (moduleName) => ({
     tropicalSourceWaterMidlatMeanKgM2: 0,
     tropicalSourceWaterPolarMeanKgM2: 0,
     tropicalSourceWaterMidlatPolarMeanKgM2: 0,
+    tropicalSourceWaterGlobalMeanKgM2: 0,
     globalSurfaceTempMeanK: 0,
     globalSurfaceThetaMeanK: 0,
     globalUpperThetaMeanK: 0,
@@ -225,8 +226,9 @@ const buildWaterCycleClosureSummary = (budget) => {
     advectionRepairRemovedMeanKgM2: delta('stepAdvection5', 'globalNumericalAdvectionRemovedMeanKgM2'),
     advectionRepairResidualMeanKgM2: delta('stepAdvection5', 'globalNumericalAdvectionResidualMeanKgM2'),
     tropicalSourceMidlatPolarDeltaKgM2: delta('stepAdvection5', 'tropicalSourceWaterMidlatPolarMeanKgM2'),
+    tropicalSourceNumericalResidualKgM2: delta('stepAdvection5', 'tropicalSourceWaterGlobalMeanKgM2'),
     notes: {
-      interpretation: 'Evaporation and precipitation are cumulative surface fluxes in mm water equivalent. TCW drift is atmospheric total-column water change. Advection and vertical unaccounted deltas should stay near zero for conservative transport. Subtropical drying demand and cloud erosion-to-vapor are tracked as non-sink process demand/phase conversion.'
+      interpretation: 'Evaporation and precipitation are cumulative surface fluxes in mm water equivalent. TCW drift is atmospheric total-column water change. Advection and vertical unaccounted deltas should stay near zero for conservative transport. Tropical-source midlat/polar delta is physical tracer redistribution; tropical-source numerical residual is the global tracer source/sink check. Subtropical drying demand and cloud erosion-to-vapor are tracked as non-sink process demand/phase conversion.'
     }
   };
 };
@@ -282,6 +284,7 @@ const createCloudTransitionLedgerAccumulator = (cellCount) => ({
 const VERTICAL_CLOUD_BIRTH_TRACE_FIELDS = [
   'resolvedAscentCloudBirthAccumMass',
   'saturationAdjustmentCloudBirthAccumMass',
+  'saturationAdjustmentRainoutMass',
   'convectiveDetrainmentCloudBirthAccumMass',
   'carryOverUpperCloudEnteringAccumMass',
   'carryOverUpperCloudSurvivingAccumMass',
@@ -477,9 +480,9 @@ export class WeatherCore5 {
       smoothLat: 13,
       enablePs: true,
       enableThetaS: true,
-      enableQvS: true,
+      enableQvS: false,
       enableThetaColumn: true,
-      enableQvColumn: true,
+      enableQvColumn: false,
       enableWindColumn: true,
       thetaSource: 'auto',
       qvSource: 'auto',
@@ -687,29 +690,29 @@ export class WeatherCore5 {
     this.microParams = {
       p0: 100000,
       pTop: P_TOP,
-      qc0: 5e-4,
-      qi0: 3e-4,
-      qs0: 4e-4,
-      kAutoRain: 1.2e-3,
-      kAutoSnow: 1.5e-3,
-      kAccreteRain: 4e-4,
-      kAccreteSnow: 4e-4,
-      autoMaxFrac: 0.65,
-      precipEffMicro: 0.95,
+      qc0: 2e-4,
+      qi0: 1.5e-4,
+      qs0: 2e-4,
+      kAutoRain: 2.4e-3,
+      kAutoSnow: 3.0e-3,
+      kAccreteRain: 8e-4,
+      kAccreteSnow: 8e-4,
+      autoMaxFrac: 0.85,
+      precipEffMicro: 1.0,
       tauFreeze: 5400,
       tauMelt: 5400,
       tauFreezeRain: 3600,
       tauMeltSnow: 3600,
       Tfreeze: 273.15,
       TiceFull: 253.15,
-      kFallRain: 1 / 1800,
-      kFallSnow: 1 / (1.5 * 3600),
+      kFallRain: 1 / 900,
+      kFallSnow: 1 / 3600,
       tauEvapCloudMin: 900,
       tauEvapCloudMax: 7200,
-      tauEvapRainMin: 900,
-      tauEvapRainMax: 28800,
-      tauSubSnowMin: 1200,
-      tauSubSnowMax: 36000,
+      tauEvapRainMin: 3600,
+      tauEvapRainMax: 86400,
+      tauSubSnowMin: 3600,
+      tauSubSnowMax: 86400,
       dThetaMaxMicroPerStep: 1.0,
       rhEvap0: 0.9,
       rhEvap1: 0.3,
@@ -731,6 +734,14 @@ export class WeatherCore5 {
       shoulderAbsorptionGuardSuppressedMassMode: 'buffered_rainout',
       shoulderBufferedEquatorialEdgeBoost: 0.35,
       shoulderBufferedInnerLanePenalty: 0.2,
+      convectiveSaturationRainoutMaxFrac: 0.65,
+      convectiveSaturationRainoutSupersat0: 0.025,
+      convectiveSaturationRainoutSupersat1: 0.18,
+      convectiveSaturationRainoutAscent0: 0.04,
+      convectiveSaturationRainoutAscent1: 0.18,
+      convectiveSaturationRainoutSigma0: 0.25,
+      convectiveSaturationRainoutSigma1: 0.92,
+      convectiveSaturationRainoutSigmaTop: 0.98,
       terrainLeeWarmRainSuppress: 0.9,
       dThetaMaxMicroPerStepConv: 2.5,
       enable: true
@@ -1504,6 +1515,7 @@ export class WeatherCore5 {
     let waterTotal = 0;
     let vaporTotal = 0;
     let condensateTotal = 0;
+    let tropicalSourceTotal = 0;
     let evapAccumTotal = 0;
     let precipAccumTotal = 0;
     let verticalDryingDemandTotal = 0;
@@ -1555,6 +1567,7 @@ export class WeatherCore5 {
       const columnWater = vaporColumn + condensateColumn;
       vaporTotal += vaporColumn * weight;
       condensateTotal += condensateColumn * weight;
+      tropicalSourceTotal += tropicalSourceColumn * weight;
       waterTotal += columnWater * weight;
       for (const band of CONSERVATION_WATER_BANDS) {
         const inBand = Number.isFinite(band.absLat0)
@@ -1594,6 +1607,7 @@ export class WeatherCore5 {
       tropicalSourceWaterMidlatMeanKgM2: bandMean('midlat', 'tropicalSourceWater'),
       tropicalSourceWaterPolarMeanKgM2: bandMean('polar', 'tropicalSourceWater'),
       tropicalSourceWaterMidlatPolarMeanKgM2: bandMean('midlatPolar', 'tropicalSourceWater'),
+      tropicalSourceWaterGlobalMeanKgM2: mean(tropicalSourceTotal),
       globalSurfaceTempMeanK: mean(surfaceTempTotal),
       globalSurfaceThetaMeanK: mean(surfaceThetaTotal),
       globalUpperThetaMeanK: mean(upperThetaTotal),

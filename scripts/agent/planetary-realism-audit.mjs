@@ -464,6 +464,7 @@ export const NUMERICAL_CLIMATE_CONTRACT = {
   canonicalProductionGrid: { nx: 48, ny: 24, purpose: 'gameplay' },
   routineValidationGrid: { nx: 60, ny: 30, purpose: 'periodic climate sensitivity' },
   deepValidationGrid: { nx: 96, ny: 48, purpose: 'seasonal or world-class claims' },
+  limiterReferenceDays: 90,
   dtDryBeltRatioMaxAbsDelta: 0.2,
   gridDryBeltRatioMaxAbsDelta: 0.28,
   thresholds: {
@@ -483,25 +484,42 @@ const bandNumericalLimiterMass = (band = {}) => ({
   backtraceClampExcessCells: Number(band.backtraceClampExcessCellsMean) || 0
 });
 
-export const computeNumericalIntegrityScore = ({ numericalIntegrityTracing = null, conservationSummary = null } = {}) => {
+const sampledDaysFromConservation = (conservationSummary = null) => {
+  const budget = conservationSummary?.conservationBudget || conservationSummary || null;
+  const seconds = Number(budget?.waterCycle?.sampledModelSeconds) || Number(budget?.sampledModelSeconds) || 0;
+  return seconds > 0 ? seconds / 86400 : null;
+};
+
+export const computeNumericalIntegrityScore = ({ numericalIntegrityTracing = null, conservationSummary = null, sampledDays = null } = {}) => {
   const bands = [
     numericalIntegrityTracing?.northDryBelt,
     numericalIntegrityTracing?.southDryBelt
   ].filter(Boolean).map(bandNumericalLimiterMass);
   const maxMetric = (key) => bands.reduce((best, band) => Math.max(best, Number(band[key]) || 0), 0);
-  const maxVerticalCflClampMassKgM2 = maxMetric('verticalCflClampMassKgM2');
-  const maxSupersaturationClampMassKgM2 = maxMetric('supersaturationClampMassKgM2');
-  const maxCloudOrNegativeLimiterMassKgM2 = bands.reduce((best, band) => Math.max(
+  const maxVerticalCflClampMassRawKgM2 = maxMetric('verticalCflClampMassKgM2');
+  const maxSupersaturationClampMassRawKgM2 = maxMetric('supersaturationClampMassKgM2');
+  const maxCloudOrNegativeLimiterMassRawKgM2 = bands.reduce((best, band) => Math.max(
     best,
     (Number(band.cloudLimiterMassKgM2) || 0) + (Number(band.negativeClipMassKgM2) || 0)
   ), 0);
-  const maxBacktraceClampExcessCells = maxMetric('backtraceClampExcessCells');
+  const maxBacktraceClampExcessRawCells = maxMetric('backtraceClampExcessCells');
   const advectionWaterDriftKgM2 = Math.abs(
     Number(conservationSummary?.conservationBudget?.modules?.stepAdvection5?.delta?.globalColumnWaterMeanKgM2)
       || Number(conservationSummary?.modules?.stepAdvection5?.delta?.globalColumnWaterMeanKgM2)
       || 0
   );
   const thresholds = NUMERICAL_CLIMATE_CONTRACT.thresholds;
+  const resolvedSampledDays = Number(sampledDays) > 0
+    ? Number(sampledDays)
+    : sampledDaysFromConservation(conservationSummary);
+  const limiterReferenceDays = NUMERICAL_CLIMATE_CONTRACT.limiterReferenceDays;
+  const limiterHorizonScale = Number(resolvedSampledDays) > 0
+    ? limiterReferenceDays / resolvedSampledDays
+    : 1;
+  const maxVerticalCflClampMassKgM2 = maxVerticalCflClampMassRawKgM2 * limiterHorizonScale;
+  const maxSupersaturationClampMassKgM2 = maxSupersaturationClampMassRawKgM2 * limiterHorizonScale;
+  const maxCloudOrNegativeLimiterMassKgM2 = maxCloudOrNegativeLimiterMassRawKgM2 * limiterHorizonScale;
+  const maxBacktraceClampExcessCells = maxBacktraceClampExcessRawCells * limiterHorizonScale;
   const penalties = {
     verticalCflClamp: normalizeScore(maxVerticalCflClampMassKgM2, thresholds.verticalCflClampMassKgM2) ?? 0,
     supersaturationClamp: normalizeScore(maxSupersaturationClampMassKgM2, thresholds.supersaturationClampMassKgM2) ?? 0,
@@ -515,10 +533,10 @@ export const computeNumericalIntegrityScore = ({ numericalIntegrityTracing = nul
   const supersaturationShare = safeRatio(maxSupersaturationClampMassKgM2, totalLimiterMassKgM2, true) ?? 0;
   const verticalShare = safeRatio(maxVerticalCflClampMassKgM2, totalLimiterMassKgM2, true) ?? 0;
   const limiterDominance = Boolean(
-    penalties.verticalCflClamp >= 0.8
-    || penalties.cloudOrNegativeLimiter >= 0.8
-    || penalties.advectionWaterDrift >= 0.8
-    || (penalties.supersaturationClamp >= 0.8 && supersaturationShare >= 0.6)
+    penalties.verticalCflClamp >= 1
+    || penalties.cloudOrNegativeLimiter >= 1
+    || penalties.advectionWaterDrift >= 1
+    || (penalties.supersaturationClamp >= 1 && supersaturationShare >= 0.6)
   );
   const score = 1 - mean([
     penalties.verticalCflClamp,
@@ -528,10 +546,10 @@ export const computeNumericalIntegrityScore = ({ numericalIntegrityTracing = nul
     penalties.backtraceClamp
   ]);
   const blockers = [];
-  if (penalties.verticalCflClamp >= 0.8) blockers.push('vertical_cfl_limiter_mass_dominates');
-  if (penalties.supersaturationClamp >= 0.8 && supersaturationShare >= 0.6) blockers.push('supersaturation_adjustment_limiter_mass_dominates');
-  if (penalties.cloudOrNegativeLimiter >= 0.8) blockers.push('negative_or_cloud_limiter_mass_dominates');
-  if (penalties.advectionWaterDrift >= 0.8) blockers.push('advection_water_drift_dominates');
+  if (penalties.verticalCflClamp >= 1) blockers.push('vertical_cfl_limiter_mass_dominates');
+  if (penalties.supersaturationClamp >= 1 && supersaturationShare >= 0.6) blockers.push('supersaturation_adjustment_limiter_mass_dominates');
+  if (penalties.cloudOrNegativeLimiter >= 1) blockers.push('negative_or_cloud_limiter_mass_dominates');
+  if (penalties.advectionWaterDrift >= 1) blockers.push('advection_water_drift_dominates');
   return {
     schema: 'satellite-wars.numerical-integrity-score.v1',
     score: round(score, 4),
@@ -541,10 +559,17 @@ export const computeNumericalIntegrityScore = ({ numericalIntegrityTracing = nul
     thresholds,
     metrics: {
       maxVerticalCflClampMassKgM2: round(maxVerticalCflClampMassKgM2, 7),
+      maxVerticalCflClampMassRawKgM2: round(maxVerticalCflClampMassRawKgM2, 7),
       maxSupersaturationClampMassKgM2: round(maxSupersaturationClampMassKgM2, 7),
+      maxSupersaturationClampMassRawKgM2: round(maxSupersaturationClampMassRawKgM2, 7),
       maxCloudOrNegativeLimiterMassKgM2: round(maxCloudOrNegativeLimiterMassKgM2, 7),
+      maxCloudOrNegativeLimiterMassRawKgM2: round(maxCloudOrNegativeLimiterMassRawKgM2, 7),
       advectionWaterDriftKgM2: round(advectionWaterDriftKgM2, 7),
       maxBacktraceClampExcessCells: round(maxBacktraceClampExcessCells, 5),
+      maxBacktraceClampExcessRawCells: round(maxBacktraceClampExcessRawCells, 5),
+      limiterReferenceDays,
+      sampledDays: round(resolvedSampledDays, 3),
+      limiterHorizonScale: round(limiterHorizonScale, 6),
       verticalLimiterShare: round(verticalShare, 5),
       supersaturationLimiterShare: round(supersaturationShare, 5)
     },
@@ -1509,7 +1534,7 @@ export const WATER_CYCLE_CONTRACT = {
   tropicalNumericalLeakMaxKgM2: 1
 };
 
-const buildWaterCycleBudgetReport = ({ conservationSummary = null, preset = null } = {}) => {
+export const buildWaterCycleBudgetReport = ({ conservationSummary = null, preset = null } = {}) => {
   const budget = conservationSummary?.conservationBudget || conservationSummary || null;
   const waterCycle = budget?.waterCycle || {};
   const sampledDays = (Number(waterCycle.sampledModelSeconds) || Number(budget?.sampledModelSeconds) || 0) / 86400;
@@ -1537,7 +1562,10 @@ const buildWaterCycleBudgetReport = ({ conservationSummary = null, preset = null
   if ((Number(waterCycle.advectionRepairMeanKgM2) || 0) > repairLimit) {
     blockers.push('advection_repair_dominates_budget');
   }
-  if (Math.abs(Number(waterCycle.tropicalSourceMidlatPolarDeltaKgM2) || 0) > WATER_CYCLE_CONTRACT.tropicalNumericalLeakMaxKgM2) {
+  const tropicalSourceNumericalResidual = Number.isFinite(Number(waterCycle.tropicalSourceNumericalResidualKgM2))
+    ? Number(waterCycle.tropicalSourceNumericalResidualKgM2)
+    : Number(waterCycle.tropicalSourceMidlatPolarDeltaKgM2) || 0;
+  if (Math.abs(tropicalSourceNumericalResidual) > WATER_CYCLE_CONTRACT.tropicalNumericalLeakMaxKgM2) {
     blockers.push('tropical_source_numerical_leakage');
   }
   return {
@@ -1564,6 +1592,7 @@ const buildWaterCycleBudgetReport = ({ conservationSummary = null, preset = null
     advectionRepairRemovedMeanKgM2: round(waterCycle.advectionRepairRemovedMeanKgM2, 5),
     advectionRepairResidualMeanKgM2: round(waterCycle.advectionRepairResidualMeanKgM2, 7),
     tropicalSourceMidlatPolarDeltaKgM2: round(waterCycle.tropicalSourceMidlatPolarDeltaKgM2, 5),
+    tropicalSourceNumericalResidualKgM2: round(tropicalSourceNumericalResidual, 7),
     pass: blockers.length === 0,
     blockers
   };
@@ -2393,7 +2422,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const stormTrackNorthLat = peakLatitude(zonalStormIndex, latitudesDeg, DEFAULT_STORM_MIN_LAT, DEFAULT_STORM_MAX_LAT);
   const stormTrackSouthLat = peakLatitude(zonalStormIndex, latitudesDeg, -DEFAULT_STORM_MAX_LAT, -DEFAULT_STORM_MIN_LAT);
   const tcEnvCounts = computeTropicalCycloneEnvironment(diagnostics);
-  const numericalIntegrityScore = computeNumericalIntegrityScore({ numericalIntegrityTracing });
+  const numericalIntegrityScore = computeNumericalIntegrityScore({ numericalIntegrityTracing, sampledDays: Math.max(1, targetDay) });
 
   return {
     targetDay,
@@ -3324,7 +3353,8 @@ export const buildInitializationMemoryReport = (samples = [], latestSample = nul
 
 export const buildNumericalIntegritySummaryReport = (latestSample = null) => {
   const score = computeNumericalIntegrityScore({
-    numericalIntegrityTracing: latestSample?.numericalIntegrityTracing || null
+    numericalIntegrityTracing: latestSample?.numericalIntegrityTracing || null,
+    sampledDays: Number(latestSample?.targetDay) > 0 ? Number(latestSample.targetDay) : null
   });
   return {
     schema: 'satellite-wars.numerical-integrity-summary.v1',
@@ -5331,7 +5361,8 @@ export const buildNumericalClimateContractReport = ({
 } = {}) => {
   const numericalIntegrityScore = computeNumericalIntegrityScore({
     numericalIntegrityTracing: latestSample?.numericalIntegrityTracing || null,
-    conservationSummary
+    conservationSummary,
+    sampledDays: Number(latestSample?.targetDay) > 0 ? Number(latestSample.targetDay) : null
   });
   const dtGate = sensitivityGateSummary(dtSensitivity, 'dt_sensitivity');
   const gridGate = sensitivityGateSummary(gridSensitivity, 'grid_sensitivity');

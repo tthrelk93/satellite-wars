@@ -19,13 +19,14 @@ test('WeatherCore5 defaults keep the stronger broad-circulation surface wind res
   assert.equal(core.vertParams.subtropicalSubsidenceTau, 8 * 3600);
   assert.equal(core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac, 0.58);
   assert.equal(core.vertParams.subtropicalSubsidenceWeakHemiBoost, 0.35);
-  assert.equal(core.microParams.qc0, 5e-4);
-  assert.equal(core.microParams.qi0, 3e-4);
-  assert.equal(core.microParams.kAutoRain, 1.2e-3);
-  assert.equal(core.microParams.kAutoSnow, 1.5e-3);
-  assert.equal(core.microParams.kFallRain, 1 / 1800);
-  assert.equal(core.microParams.kFallSnow, 1 / (1.5 * 3600));
-  assert.equal(core.microParams.precipEffMicro, 0.95);
+  assert.equal(core.microParams.qc0, 2e-4);
+  assert.equal(core.microParams.qi0, 1.5e-4);
+  assert.equal(core.microParams.kAutoRain, 2.4e-3);
+  assert.equal(core.microParams.kAutoSnow, 3.0e-3);
+  assert.equal(core.microParams.kFallRain, 1 / 900);
+  assert.equal(core.microParams.kFallSnow, 1 / 3600);
+  assert.equal(core.microParams.precipEffMicro, 1.0);
+  assert.equal(core.microParams.convectiveSaturationRainoutMaxFrac, 0.65);
   assert.equal(core.nudgeParams.organizedConvectionQvColumnRelief, 1.05);
   assert.equal(core.nudgeParams.subtropicalSubsidenceQvRelief, 1.65);
 });
@@ -34,14 +35,14 @@ test('WeatherCore5 refreshes runtime nudge params from current nudgeParams befor
   const core = new WeatherCore5({ nx: 16, ny: 8, seed: 12345 });
   await core._initPromise;
 
-  assert.equal(core._nudgeParamsRuntime.enableQvColumn, true);
+  assert.equal(core._nudgeParamsRuntime.enableQvColumn, false);
 
-  core.nudgeParams.enableQvColumn = false;
+  core.nudgeParams.enableQvColumn = true;
   core.nudgeParams.tauQvColumn = 20 * 86400;
   core._nudgeAccumSeconds = core.nudgeParams.cadenceSeconds;
   core._stepOnce(core.modelDt);
 
-  assert.equal(core._nudgeParamsRuntime.enableQvColumn, false);
+  assert.equal(core._nudgeParamsRuntime.enableQvColumn, true);
   assert.equal(core._nudgeParamsRuntime.tauQvColumn, 20 * 86400);
 });
 

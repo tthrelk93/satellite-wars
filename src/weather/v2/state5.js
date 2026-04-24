@@ -122,6 +122,7 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const carryInputOverrideAccumInputMass = makeArray(N);
   const resolvedAscentCloudBirthAccumMass = makeArray(N);
   const saturationAdjustmentCloudBirthAccumMass = makeArray(N);
+  const saturationAdjustmentRainoutMass = makeArray(N);
   const convectiveDetrainmentCloudBirthAccumMass = makeArray(N);
   const carryOverUpperCloudEnteringAccumMass = makeArray(N);
   const carryOverUpperCloudSurvivingAccumMass = makeArray(N);
@@ -420,6 +421,7 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     carryInputOverrideAccumInputMass,
     resolvedAscentCloudBirthAccumMass,
     saturationAdjustmentCloudBirthAccumMass,
+    saturationAdjustmentRainoutMass,
     convectiveDetrainmentCloudBirthAccumMass,
     carryOverUpperCloudEnteringAccumMass,
     carryOverUpperCloudSurvivingAccumMass,

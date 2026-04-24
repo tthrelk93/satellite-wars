@@ -1,25 +1,26 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-09T11:28:44.725Z",
+  "updatedAt": "2026-04-24T14:34:58.623Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
   "baselineCommit": "94d5805",
   "latestCycle": {
-    "id": "cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun",
-    "goal": "reduce the dominant sample0Ms cost inside WindStreamlineRenderer._evolveParticles without breaking the live solo path",
-    "verifiedImprovement": "adding an in-range bilinear fast path plus scratch-sample reuse in WindStreamlineRenderer reduced the mature live Earth.update p95 from 42.01 ms on the recent sample0 baseline to 34.20 ms and then 33.39 ms on two fresh reruns, while lowering sample0Ms p95 from 2.60 ms to 2.30 ms on the confirming rerun; the overall smoothness gate still fails because larger unknown max spikes and weak wind targets remain",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun/checkpoint.md",
-    "runtimeLogPath": "logs/weather-2026-04-09T11-21-35Z-24721.jsonl"
+    "id": "cycle-2026-04-24T09-38-30Z-phase2-conservative-moisture-long-horizon",
+    "goal": "close the Phase 2 conservative moisture-transport contract over seasonal and annual horizons",
+    "verifiedImprovement": "annual water-cycle budget now passes with E/P relative imbalance 0.00967, TCW drift 5.13903 kg/m2, advection net delta 0.0000007 kg/m2, vertical net delta 0, advection repair 0.0002 kg/m2, tropical-source numerical residual -0.0000003 kg/m2, and numerical integrity passing; remaining warnings are ITCZ width and south subtropical dry-belt wetness",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-24T09-38-30Z-phase2-conservative-moisture-long-horizon/checkpoint.md",
+    "runtimeLogPath": null
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
     "overallPass": true
   },
   "blockingGaps": [
-    "northern subtropical dry-belt moisture partitioning still fails in both fresh quick and seasonal audits, though the gap is now smaller at 1.029 at 30 days and 1.015 at 90 days",
+    "ITCZ width and south subtropical dry-belt wetness remain broad realism blockers after Phase 2 transport closure",
+    "northern subtropical dry-belt moisture partitioning still needs a fresh broad-realism follow-through under the new conservative transport baseline",
     "browser/runtime signoff is still blocked by larger remaining Earth.update max spikes and weak wind-target diagnostics in the latest live run, even after reducing both the model-diagnostics payload cost and the dominant particle sample0 path",
-    "annual / 365-day evidence is still missing for any long-horizon or world-class claim",
+    "a full annual planetary-realism pass is still required before any world-class claim; the new annual evidence only clears the conservative moisture-transport contract",
     "world-class status still requires realism and smoothness to pass in the same browser-backed run"
   ],
   "cycleInputs": [
@@ -144,10 +145,9 @@
     }
   },
   "defaultNextPriority": [
-    "run one bounded live diagnostic cycle on the remaining unknown Earth.update max spikes before another renderer tweak; the old sample0 bottleneck is materially reduced",
-    "if that diagnostic cycle does not expose a sharper runtime/app target, return the next physics cycle to northern subtropical dry-belt moisture partitioning while keeping the faster particle sampler",
-    "rerun live verification on the thetaeCoeff=10.5 baseline after the next targeted runtime or dry-belt fix",
-    "run the annual planetary audit after the dry-belt fix holds through another seasonal follow-through",
+    "start Phase 3 with ITCZ width and south subtropical dry-belt moisture partitioning under the new conservative transport baseline",
+    "keep the annual water-cycle contract as a guardrail for every broad hydrology/circulation change",
+    "run bounded live/browser verification after the next verified climate fix or when runtime debt becomes blocking again",
     "keep validation on the clean world-class checkout only"
   ],
   "rules": {

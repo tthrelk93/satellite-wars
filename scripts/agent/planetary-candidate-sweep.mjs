@@ -6,7 +6,13 @@ import { WeatherCore5 } from '../../src/weather/v2/core5.js';
 import { buildValidationDiagnostics } from '../../src/weather/validation/diagnostics.js';
 import { applyHeadlessTerrainFixture } from './headless-terrain-fixture.mjs';
 import { ensureCyclePlanReady } from './plan-guard.mjs';
-import { PLANETARY_PRESETS, buildSampleTargetsDays, classifySnapshot, evaluateHorizons } from './planetary-realism-audit.mjs';
+import {
+  PLANETARY_PRESETS,
+  buildSampleTargetsDays,
+  buildWaterCycleBudgetReport,
+  classifySnapshot,
+  evaluateHorizons
+} from './planetary-realism-audit.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +24,7 @@ let seed = 12345;
 let candidatesFile = null;
 let outPath = null;
 let mdOutPath = null;
+let baselineOnly = false;
 
 for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i];
@@ -31,6 +38,7 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg.startsWith('--out=')) outPath = path.resolve(arg.slice('--out='.length));
   else if (arg === '--md-out' && argv[i + 1]) mdOutPath = path.resolve(argv[++i]);
   else if (arg.startsWith('--md-out=')) mdOutPath = path.resolve(arg.slice('--md-out='.length));
+  else if (arg === '--baseline-only') baselineOnly = true;
 }
 
 const { cycleState } = ensureCyclePlanReady({
@@ -44,12 +52,12 @@ const { cycleState } = ensureCyclePlanReady({
 const effectivePreset = preset || cycleState?.defaultAuditPreset || 'quick';
 const presetConfig = PLANETARY_PRESETS[effectivePreset];
 if (!presetConfig) throw new Error(`Unsupported preset ${JSON.stringify(effectivePreset)} for candidate sweep.`);
-if (!candidatesFile) throw new Error('Missing required --candidates-file');
+if (!candidatesFile && !baselineOnly) throw new Error('Missing required --candidates-file');
 if (!outPath) throw new Error('Missing required --out');
 if (!Number.isFinite(seed)) seed = 12345;
 
-const candidates = JSON.parse(fs.readFileSync(candidatesFile, 'utf8'));
-if (!Array.isArray(candidates) || !candidates.length) {
+const candidates = baselineOnly ? [] : JSON.parse(fs.readFileSync(candidatesFile, 'utf8'));
+if (!Array.isArray(candidates) || (!baselineOnly && !candidates.length)) {
   throw new Error('Candidate sweep file must be a non-empty JSON array.');
 }
 
@@ -99,11 +107,17 @@ const runCandidate = async (candidate) => {
   const horizonDays = presetConfig.horizonsDays[presetConfig.horizonsDays.length - 1];
   const evaluation = evaluateHorizons(samples, horizonDays);
   const latest = samples.find((sample) => sample.targetDay === horizonDays) || samples[samples.length - 1];
+  const conservationSummary = core.getConservationSummary ? core.getConservationSummary() : null;
+  const waterCycleBudget = buildWaterCycleBudgetReport({
+    conservationSummary,
+    preset: effectivePreset
+  });
   return {
     name: candidate.name,
     applied: candidate.set || candidate.overrides || {},
     horizonDays,
     latestMetrics: latest?.metrics || {},
+    waterCycleBudget,
     warnings: evaluation.warnings,
     overallPass: evaluation.overallPass,
     categories: evaluation.categories
@@ -122,20 +136,40 @@ const keyMetrics = [
   'tropicalTradesSouthU10Ms',
   'midlatitudeWesterliesSouthU10Ms',
   'subtropicalDryNorthRatio',
-  'itczLatDeg'
+  'itczLatDeg',
+  'globalPrecipMeanMmHr',
+  'globalTcwMeanKgM2',
+  'tropicalConvectiveFraction'
 ];
 
 const deltaResults = candidateResults.map((candidate) => ({
-  ...candidate,
-  deltaFromBaseline: Object.fromEntries(
-    keyMetrics.map((key) => [
-      key,
+    ...candidate,
+    deltaFromBaseline: Object.fromEntries(
+      keyMetrics.map((key) => [
+        key,
       Number.isFinite(candidate.latestMetrics[key]) && Number.isFinite(baselineResult.latestMetrics[key])
         ? Number((candidate.latestMetrics[key] - baselineResult.latestMetrics[key]).toFixed(3))
         : null
-    ])
-  )
-}));
+      ])
+    ),
+    waterCycleDeltaFromBaseline: {
+      evaporationMeanMm: Number.isFinite(candidate.waterCycleBudget?.evaporationMeanMm) && Number.isFinite(baselineResult.waterCycleBudget?.evaporationMeanMm)
+        ? Number((candidate.waterCycleBudget.evaporationMeanMm - baselineResult.waterCycleBudget.evaporationMeanMm).toFixed(5))
+        : null,
+      precipitationMeanMm: Number.isFinite(candidate.waterCycleBudget?.precipitationMeanMm) && Number.isFinite(baselineResult.waterCycleBudget?.precipitationMeanMm)
+        ? Number((candidate.waterCycleBudget.precipitationMeanMm - baselineResult.waterCycleBudget.precipitationMeanMm).toFixed(5))
+        : null,
+      evapPrecipRelativeImbalance: Number.isFinite(candidate.waterCycleBudget?.evapPrecipRelativeImbalance) && Number.isFinite(baselineResult.waterCycleBudget?.evapPrecipRelativeImbalance)
+        ? Number((candidate.waterCycleBudget.evapPrecipRelativeImbalance - baselineResult.waterCycleBudget.evapPrecipRelativeImbalance).toFixed(5))
+        : null,
+      tcwDriftKgM2: Number.isFinite(candidate.waterCycleBudget?.tcwDriftKgM2) && Number.isFinite(baselineResult.waterCycleBudget?.tcwDriftKgM2)
+        ? Number((candidate.waterCycleBudget.tcwDriftKgM2 - baselineResult.waterCycleBudget.tcwDriftKgM2).toFixed(5))
+        : null,
+      advectionRepairMeanKgM2: Number.isFinite(candidate.waterCycleBudget?.advectionRepairMeanKgM2) && Number.isFinite(baselineResult.waterCycleBudget?.advectionRepairMeanKgM2)
+        ? Number((candidate.waterCycleBudget.advectionRepairMeanKgM2 - baselineResult.waterCycleBudget.advectionRepairMeanKgM2).toFixed(5))
+        : null
+    }
+  }));
 
 const payload = {
   schema: 'satellite-wars.planetary-candidate-sweep.v1',
@@ -166,6 +200,11 @@ if (mdOutPath) {
       `### ${candidate.name}`,
       '',
       `- Warnings: ${(candidate.warnings || []).join(', ') || 'none'}`,
+      `- Water-cycle pass: ${candidate.waterCycleBudget?.pass ? 'yes' : 'no'} (${(candidate.waterCycleBudget?.blockers || []).join(', ') || 'no blockers'})`,
+      `- E/P: ${candidate.waterCycleBudget?.evaporationMeanMm} / ${candidate.waterCycleBudget?.precipitationMeanMm} mm (relative imbalance ${candidate.waterCycleBudget?.evapPrecipRelativeImbalance}, delta ${candidate.waterCycleDeltaFromBaseline.evapPrecipRelativeImbalance})`,
+      `- TCW drift: ${candidate.waterCycleBudget?.tcwDriftKgM2} kg/m2 (delta ${candidate.waterCycleDeltaFromBaseline.tcwDriftKgM2})`,
+      `- Advection net / vertical net: ${candidate.waterCycleBudget?.advectionNetDeltaKgM2} / ${candidate.waterCycleBudget?.verticalNetDeltaKgM2} kg/m2`,
+      `- Advection repair: ${candidate.waterCycleBudget?.advectionRepairMeanKgM2} kg/m2 (delta ${candidate.waterCycleDeltaFromBaseline.advectionRepairMeanKgM2})`,
       ...keyMetrics.map((key) => `- ${key}: ${candidate.latestMetrics[key]} (delta ${candidate.deltaFromBaseline[key]})`),
       ''
     ])

@@ -137,6 +137,14 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
     shoulderAbsorptionGuardSuppressedMassMode = 'retain',
     shoulderBufferedEquatorialEdgeBoost = 0.35,
     shoulderBufferedInnerLanePenalty = 0.2,
+    convectiveSaturationRainoutMaxFrac = 0,
+    convectiveSaturationRainoutSupersat0 = 0.025,
+    convectiveSaturationRainoutSupersat1 = 0.18,
+    convectiveSaturationRainoutAscent0 = 0.04,
+    convectiveSaturationRainoutAscent1 = 0.18,
+    convectiveSaturationRainoutSigma0 = 0.25,
+    convectiveSaturationRainoutSigma1 = 0.92,
+    convectiveSaturationRainoutSigmaTop = 0.98,
     enable = true
   } = params;
   if (!enable) return;
@@ -153,6 +161,9 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   }
   if (!state.saturationAdjustmentCloudBirthAccumMass || state.saturationAdjustmentCloudBirthAccumMass.length !== N) {
     state.saturationAdjustmentCloudBirthAccumMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentRainoutMass || state.saturationAdjustmentRainoutMass.length !== N) {
+    state.saturationAdjustmentRainoutMass = new Float32Array(N);
   }
   if (!state.saturationAdjustmentEventCount || state.saturationAdjustmentEventCount.length !== N) {
     state.saturationAdjustmentEventCount = new Uint32Array(N);
@@ -316,6 +327,7 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   state.largeScaleCondensationSource.fill(0);
   state.cloudReevaporationMass.fill(0);
   state.precipReevaporationMass.fill(0);
+  state.saturationAdjustmentRainoutMass.fill(0);
   state.saturationAdjustmentMaintenanceCandidateMass.fill(0);
   state.saturationAdjustmentMaintenancePotentialSuppressedMass.fill(0);
   state.saturationAdjustmentMaintenanceCandidateEventCount.fill(0);
@@ -852,9 +864,48 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         }
         let dq = dqRaw - dqSuppressed;
         if (dq > 0) {
+          const rainoutAscentSupport = enableConvectiveOutcome
+            ? smoothstep(convectiveSaturationRainoutAscent0, convectiveSaturationRainoutAscent1, ascentMagnitudePaS)
+            : 0;
+          const rainoutSupersaturationSupport = enableConvectiveOutcome
+            ? smoothstep(convectiveSaturationRainoutSupersat0, convectiveSaturationRainoutSupersat1, supersaturationFrac)
+            : 0;
+          const rainoutLayerSupport = enableConvectiveOutcome
+            ? clamp(
+                smoothstep(convectiveSaturationRainoutSigma0, convectiveSaturationRainoutSigma1, sigmaMid)
+                  * (1 - smoothstep(convectiveSaturationRainoutSigma1, convectiveSaturationRainoutSigmaTop, sigmaMid)),
+                0,
+                1
+              )
+            : 0;
+          const rainoutEngineSupport = enableConvectiveOutcome
+            ? clamp(
+                Math.max(
+                  convStrength,
+                  0.65 * rainoutAscentSupport + 0.35 * convMassFluxStrength
+                ) * (0.35 + 0.65 * rainoutSupersaturationSupport),
+                0,
+                1
+              )
+            : 0;
+          const rainoutDryTaper = enableConvectiveOutcome
+            ? 1 - clamp(0.35 * marginalSubsiding + 0.25 * freshSubtropicalSuppression * weakEngineSupport, 0, 0.65)
+            : 1;
+          const directRainoutFrac = clamp(
+            convectiveSaturationRainoutMaxFrac
+              * rainoutEngineSupport
+              * rainoutLayerSupport
+              * rainoutDryTaper,
+            0,
+            0.9
+          );
+          const dqRainout = Math.min(dq, dq * directRainoutFrac);
+          const dqCloud = dq - dqRainout;
           qvVal -= dq;
           if (traceEnabled && massCell > 0) {
             const condMass = dq * massCell;
+            const cloudBirthMass = dqCloud * massCell;
+            const rainoutMass = dqRainout * massCell;
             const condMassRaw = dqRaw * massCell;
             const condSuppressedMass = dqSuppressed * massCell;
             const condShoulderSuppressedMass = dqShoulderSuppressed * massCell;
@@ -911,9 +962,11 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               }
             }
             if (isUpperCloudSigma(sigmaMid)) {
-              state.microphysicsUpperCloudSaturationBirthMass[k] += condMass;
+              state.microphysicsUpperCloudSaturationBirthMass[k] += cloudBirthMass;
+              state.microphysicsUpperCloudCloudToPrecipMass[k] += rainoutMass;
             }
-            state.saturationAdjustmentCloudBirthAccumMass[k] += condMass;
+            state.saturationAdjustmentCloudBirthAccumMass[k] += cloudBirthMass;
+            state.saturationAdjustmentRainoutMass[k] += rainoutMass;
             state.saturationAdjustmentEventCount[k] += 1;
             state.saturationAdjustmentSupersaturationMassWeighted[k] += supersaturationFrac * condMass;
             state.numericalSupersaturationClampCount[k] += 1;
@@ -922,13 +975,16 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
             state.saturationAdjustmentOmegaMassWeighted[k] += ascentMagnitudePaS * condMass;
             if (ascentMagnitudePaS <= 0.08) state.weakAscentCloudBirthAccumMass[k] += condMass;
             if (ascentMagnitudePaS >= 0.18) state.strongAscentCloudBirthAccumMass[k] += condMass;
-            state.saturationAdjustmentCloudBirthByBandMass[cloudBirthBandOffset(cloudBirthBandIndex, k, N)] += condMass;
+            state.saturationAdjustmentCloudBirthByBandMass[cloudBirthBandOffset(cloudBirthBandIndex, k, N)] += cloudBirthMass;
+            state.microphysicsCloudToPrecipByBandMass[cloudBirthBandOffset(cloudBirthBandIndex, k, N)] += rainoutMass;
           }
           if (iceFrac > 0.5) {
-            qiVal += dq;
+            qiVal += dqCloud;
+            qsVal += dqRainout;
             thetaVal = applyThetaLatent(thetaVal, dq, Ls, Pi);
           } else {
-            qcVal += dq;
+            qcVal += dqCloud;
+            qrVal += dqRainout;
             thetaVal = applyThetaLatent(thetaVal, dq, Lv, Pi);
           }
         }

@@ -678,6 +678,28 @@ test('buildPhase7And9Reports preserve helper-opposition, initialization-memory, 
   });
   assert.equal(blockedScore.pass, false);
   assert.ok(blockedScore.blockers.includes('vertical_cfl_limiter_mass_dominates'));
+
+  const annualEquivalentScore = planetaryAuditTest.computeNumericalIntegrityScore({
+    sampledDays: 365,
+    numericalIntegrityTracing: {
+      northDryBelt: {
+        supersaturationClampMassMeanKgM2: 790,
+        verticalCflClampMassMeanKgM2: 0,
+        cloudLimiterMassMeanKgM2: 0,
+        negativeClipMassMeanKgM2: 0
+      },
+      southDryBelt: {
+        supersaturationClampMassMeanKgM2: 700,
+        verticalCflClampMassMeanKgM2: 0,
+        cloudLimiterMassMeanKgM2: 0,
+        negativeClipMassMeanKgM2: 0
+      }
+    }
+  });
+  assert.equal(annualEquivalentScore.pass, true);
+  assert.equal(annualEquivalentScore.metrics.limiterReferenceDays, 90);
+  assert.ok(annualEquivalentScore.metrics.maxSupersaturationClampMassKgM2 < 250);
+  assert.ok(annualEquivalentScore.metrics.maxSupersaturationClampMassRawKgM2 > 700);
 });
 
 test('water-cycle budget report separates physical E/P closure from numerical transport residuals', () => {
@@ -704,7 +726,8 @@ test('water-cycle budget report separates physical E/P closure from numerical tr
           advectionRepairAddedMeanKgM2: 6,
           advectionRepairRemovedMeanKgM2: 6,
           advectionRepairResidualMeanKgM2: 0.00001,
-          tropicalSourceMidlatPolarDeltaKgM2: 0.2
+          tropicalSourceMidlatPolarDeltaKgM2: 3,
+          tropicalSourceNumericalResidualKgM2: 0.2
         }
       }
     }
@@ -732,7 +755,8 @@ test('water-cycle budget report separates physical E/P closure from numerical tr
           verticalUnaccountedDeltaKgM2: 2,
           transportNumericalResidualKgM2: 6,
           advectionRepairMeanKgM2: 120,
-          tropicalSourceMidlatPolarDeltaKgM2: 3
+          tropicalSourceMidlatPolarDeltaKgM2: 0.2,
+          tropicalSourceNumericalResidualKgM2: 3
         }
       }
     }
