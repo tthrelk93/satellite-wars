@@ -90,6 +90,13 @@ const CONSERVATION_SAMPLE_MODULES = new Set([
   'stepNudging5',
   'stepAnalysisIncrement5'
 ]);
+const CONSERVATION_WATER_BANDS = [
+  { key: 'tropical', lat0: -15, lat1: 15 },
+  { key: 'subtropical', absLat0: 15, absLat1: 35 },
+  { key: 'midlat', absLat0: 35, absLat1: 60 },
+  { key: 'polar', absLat0: 60, absLat1: 90 },
+  { key: 'midlatPolar', absLat0: 35, absLat1: 90 }
+];
 
 const createBandDeltaAccumulator = () => ({
   surfaceVaporDeltaKgKg: 0,
@@ -153,13 +160,76 @@ const createConservationModuleAccumulator = (moduleName) => ({
     globalColumnWaterMeanKgM2: 0,
     globalVaporMeanKgM2: 0,
     globalCondensateMeanKgM2: 0,
+    globalEvapAccumMeanMm: 0,
     globalPrecipAccumMeanMm: 0,
+    globalNumericalAdvectionRepairMeanKgM2: 0,
+    globalNumericalAdvectionAddedMeanKgM2: 0,
+    globalNumericalAdvectionRemovedMeanKgM2: 0,
+    globalNumericalAdvectionResidualMeanKgM2: 0,
+    globalVerticalSubtropicalDryingDemandMeanKgM2: 0,
+    globalVerticalCloudErosionToVaporMeanKgM2: 0,
+    tropicalColumnWaterMeanKgM2: 0,
+    subtropicalColumnWaterMeanKgM2: 0,
+    midlatColumnWaterMeanKgM2: 0,
+    polarColumnWaterMeanKgM2: 0,
+    midlatPolarColumnWaterMeanKgM2: 0,
+    tropicalSourceWaterTropicalMeanKgM2: 0,
+    tropicalSourceWaterSubtropicalMeanKgM2: 0,
+    tropicalSourceWaterMidlatMeanKgM2: 0,
+    tropicalSourceWaterPolarMeanKgM2: 0,
+    tropicalSourceWaterMidlatPolarMeanKgM2: 0,
     globalSurfaceTempMeanK: 0,
     globalSurfaceThetaMeanK: 0,
     globalUpperThetaMeanK: 0,
     globalSurfacePressureMeanPa: 0
   }
 });
+
+const buildWaterCycleClosureSummary = (budget) => {
+  const modules = budget?.modules || {};
+  const delta = (moduleName, key) => Number(modules[moduleName]?.delta?.[key]) || 0;
+  const evaporationMeanMm = delta('stepSurface2D5', 'globalEvapAccumMeanMm');
+  const precipitationMeanMm = delta('stepMicrophysics5', 'globalPrecipAccumMeanMm');
+  const advectionNetDeltaKgM2 = delta('stepAdvection5', 'globalColumnWaterMeanKgM2');
+  const verticalNetDeltaKgM2 = delta('stepVertical5', 'globalColumnWaterMeanKgM2');
+  const verticalSubtropicalDryingDemandKgM2 = delta('stepVertical5', 'globalVerticalSubtropicalDryingDemandMeanKgM2');
+  const verticalCloudErosionToVaporKgM2 = delta('stepVertical5', 'globalVerticalCloudErosionToVaporMeanKgM2');
+  const verticalUnaccountedDeltaKgM2 = verticalNetDeltaKgM2;
+  const nudgingNetDeltaKgM2 = delta('stepNudging5', 'globalColumnWaterMeanKgM2')
+    + delta('stepAnalysisIncrement5', 'globalColumnWaterMeanKgM2');
+  const tcwDriftKgM2 = Object.values(modules).reduce(
+    (sum, moduleBudget) => sum + (Number(moduleBudget?.delta?.globalColumnWaterMeanKgM2) || 0),
+    0
+  );
+  const physicalAtmosphericSourceKgM2 = evaporationMeanMm - precipitationMeanMm;
+  const transportNumericalResidualKgM2 = advectionNetDeltaKgM2 + verticalUnaccountedDeltaKgM2;
+  const denominator = Math.max(1, Math.abs(evaporationMeanMm), Math.abs(precipitationMeanMm));
+  return {
+    schema: 'satellite-wars.water-cycle-closure.v1',
+    sampledModelSeconds: Number(budget?.sampledModelSeconds) || 0,
+    evaporationMeanMm,
+    precipitationMeanMm,
+    evapMinusPrecipMeanMm: evaporationMeanMm - precipitationMeanMm,
+    evapPrecipRelativeImbalance: (evaporationMeanMm - precipitationMeanMm) / denominator,
+    tcwDriftKgM2,
+    physicalAtmosphericSourceKgM2,
+    nudgingNetDeltaKgM2,
+    advectionNetDeltaKgM2,
+    verticalNetDeltaKgM2,
+    verticalUnaccountedDeltaKgM2,
+    verticalSubtropicalDryingDemandKgM2,
+    verticalCloudErosionToVaporKgM2,
+    transportNumericalResidualKgM2,
+    advectionRepairMeanKgM2: delta('stepAdvection5', 'globalNumericalAdvectionRepairMeanKgM2'),
+    advectionRepairAddedMeanKgM2: delta('stepAdvection5', 'globalNumericalAdvectionAddedMeanKgM2'),
+    advectionRepairRemovedMeanKgM2: delta('stepAdvection5', 'globalNumericalAdvectionRemovedMeanKgM2'),
+    advectionRepairResidualMeanKgM2: delta('stepAdvection5', 'globalNumericalAdvectionResidualMeanKgM2'),
+    tropicalSourceMidlatPolarDeltaKgM2: delta('stepAdvection5', 'tropicalSourceWaterMidlatPolarMeanKgM2'),
+    notes: {
+      interpretation: 'Evaporation and precipitation are cumulative surface fluxes in mm water equivalent. TCW drift is atmospheric total-column water change. Advection and vertical unaccounted deltas should stay near zero for conservative transport. Subtropical drying demand and cloud erosion-to-vapor are tracked as non-sink process demand/phase conversion.'
+    }
+  };
+};
 
 const CLOUD_TRANSITION_LEDGER_MODULES = new Set([
   'stepAdvection5',
@@ -617,28 +687,29 @@ export class WeatherCore5 {
     this.microParams = {
       p0: 100000,
       pTop: P_TOP,
-      qc0: 1e-3,
-      qi0: 6e-4,
-      kAuto: 3e-4,
-      kAutoIce: 8e-4,
-      kAutoColdBoost: 3.0,
-      qc0ColdReduce: 0.5,
-      autoMaxFrac: 0.25,
-      precipEffMicro: 0.72,
+      qc0: 5e-4,
+      qi0: 3e-4,
+      qs0: 4e-4,
+      kAutoRain: 1.2e-3,
+      kAutoSnow: 1.5e-3,
+      kAccreteRain: 4e-4,
+      kAccreteSnow: 4e-4,
+      autoMaxFrac: 0.65,
+      precipEffMicro: 0.95,
       tauFreeze: 5400,
       tauMelt: 5400,
+      tauFreezeRain: 3600,
+      tauMeltSnow: 3600,
       Tfreeze: 273.15,
       TiceFull: 253.15,
-      kFall: 1 / 3600,
-      enableFluxSedimentation: true,
-      enableIceSedimentation: true,
-      kFallIce: 1 / (6 * 3600),
-      enableIceMeltToRain: true,
-      tauMeltIceToRain: 3600,
+      kFallRain: 1 / 1800,
+      kFallSnow: 1 / (1.5 * 3600),
       tauEvapCloudMin: 900,
       tauEvapCloudMax: 7200,
       tauEvapRainMin: 900,
       tauEvapRainMax: 28800,
+      tauSubSnowMin: 1200,
+      tauSubSnowMax: 36000,
       dThetaMaxMicroPerStep: 1.0,
       rhEvap0: 0.9,
       rhEvap1: 0.3,
@@ -1280,10 +1351,23 @@ export class WeatherCore5 {
 
   resetConservationDiagnostics() {
     this._conservationBudget = createConservationBudgetAccumulator();
+    if (this.state) {
+      this.state.numericalAdvectionWaterRepairMassMeanKgM2 = 0;
+      this.state.numericalAdvectionWaterAddedMassMeanKgM2 = 0;
+      this.state.numericalAdvectionWaterRemovedMassMeanKgM2 = 0;
+      this.state.numericalAdvectionWaterResidualMassMeanKgM2 = 0;
+      this.state.numericalAdvectionWaterRepairMass?.fill?.(0);
+      this.state.numericalAdvectionWaterAddedMass?.fill?.(0);
+      this.state.numericalAdvectionWaterRemovedMass?.fill?.(0);
+      this.state.verticalSubtropicalDryingDemandMass?.fill?.(0);
+      this.state.verticalCloudErosionToVaporMass?.fill?.(0);
+    }
   }
 
   getConservationSummary() {
-    return JSON.parse(JSON.stringify(this._conservationBudget));
+    const summary = JSON.parse(JSON.stringify(this._conservationBudget));
+    summary.waterCycle = buildWaterCycleClosureSummary(summary);
+    return summary;
   }
 
   _bindFieldViews() {
@@ -1415,29 +1499,41 @@ export class WeatherCore5 {
   _captureConservationSnapshot() {
     const { grid, state } = this;
     const { nx, ny, cosLat } = grid;
-    const { N, nz, qv, qc, qi, qr, qs, pHalf, ps, Ts, theta } = state;
+    const { N, nz, qv, qc, qi, qr, qs, pHalf, ps, Ts, theta, surfaceEvapAccum } = state;
     let weightTotal = 0;
     let waterTotal = 0;
     let vaporTotal = 0;
     let condensateTotal = 0;
+    let evapAccumTotal = 0;
     let precipAccumTotal = 0;
+    let verticalDryingDemandTotal = 0;
+    let verticalCloudErosionToVaporTotal = 0;
     let surfaceTempTotal = 0;
     let surfaceThetaTotal = 0;
     let upperThetaTotal = 0;
     let psTotal = 0;
+    const bandSums = Object.fromEntries(
+      CONSERVATION_WATER_BANDS.map(({ key }) => [key, { weight: 0, columnWater: 0, tropicalSourceWater: 0 }])
+    );
     const surfaceBase = (nz - 1) * N;
     const upperBase = (this.verticalLayout?.upperTroposphere || 0) * N;
     for (let cell = 0; cell < N; cell += 1) {
       const row = Math.floor(cell / nx);
+      const lat = grid.latDeg[row];
+      const latAbs = Math.abs(lat);
       const weight = Math.max(0.05, cosLat[row] || 0);
       weightTotal += weight;
       psTotal += (ps[cell] || 0) * weight;
+      evapAccumTotal += (surfaceEvapAccum?.[cell] || 0) * weight;
       precipAccumTotal += (state.precipAccum?.[cell] || 0) * weight;
+      verticalDryingDemandTotal += (state.verticalSubtropicalDryingDemandMass?.[cell] || 0) * weight;
+      verticalCloudErosionToVaporTotal += (state.verticalCloudErosionToVaporMass?.[cell] || 0) * weight;
       surfaceTempTotal += (Ts[cell] || 0) * weight;
       surfaceThetaTotal += (theta[surfaceBase + cell] || 0) * weight;
       upperThetaTotal += (theta[upperBase + cell] || 0) * weight;
       let vaporColumn = 0;
       let condensateColumn = 0;
+      let tropicalSourceColumn = 0;
       for (let lev = 0; lev < nz; lev += 1) {
         const idx = lev * N + cell;
         const dp = pHalf[(lev + 1) * N + cell] - pHalf[lev * N + cell];
@@ -1451,17 +1547,53 @@ export class WeatherCore5 {
         ) * layerMass;
         vaporColumn += vapor;
         condensateColumn += condensate;
+        tropicalSourceColumn += (
+          Math.max(0, state.qvSourceTropicalOceanNorth?.[idx] || 0)
+          + Math.max(0, state.qvSourceTropicalOceanSouth?.[idx] || 0)
+        ) * layerMass;
       }
+      const columnWater = vaporColumn + condensateColumn;
       vaporTotal += vaporColumn * weight;
       condensateTotal += condensateColumn * weight;
-      waterTotal += (vaporColumn + condensateColumn) * weight;
+      waterTotal += columnWater * weight;
+      for (const band of CONSERVATION_WATER_BANDS) {
+        const inBand = Number.isFinite(band.absLat0)
+          ? latAbs >= band.absLat0 && latAbs < band.absLat1
+          : lat >= band.lat0 && lat < band.lat1;
+        if (!inBand) continue;
+        const acc = bandSums[band.key];
+        acc.weight += weight;
+        acc.columnWater += columnWater * weight;
+        acc.tropicalSourceWater += tropicalSourceColumn * weight;
+      }
     }
     const mean = (value) => weightTotal > 0 ? value / weightTotal : 0;
+    const bandMean = (key, field) => {
+      const band = bandSums[key];
+      return band?.weight > 0 ? band[field] / band.weight : 0;
+    };
     return {
       globalColumnWaterMeanKgM2: mean(waterTotal),
       globalVaporMeanKgM2: mean(vaporTotal),
       globalCondensateMeanKgM2: mean(condensateTotal),
+      globalEvapAccumMeanMm: mean(evapAccumTotal),
       globalPrecipAccumMeanMm: mean(precipAccumTotal),
+      globalNumericalAdvectionRepairMeanKgM2: state.numericalAdvectionWaterRepairMassMeanKgM2 || 0,
+      globalNumericalAdvectionAddedMeanKgM2: state.numericalAdvectionWaterAddedMassMeanKgM2 || 0,
+      globalNumericalAdvectionRemovedMeanKgM2: state.numericalAdvectionWaterRemovedMassMeanKgM2 || 0,
+      globalNumericalAdvectionResidualMeanKgM2: state.numericalAdvectionWaterResidualMassMeanKgM2 || 0,
+      globalVerticalSubtropicalDryingDemandMeanKgM2: mean(verticalDryingDemandTotal),
+      globalVerticalCloudErosionToVaporMeanKgM2: mean(verticalCloudErosionToVaporTotal),
+      tropicalColumnWaterMeanKgM2: bandMean('tropical', 'columnWater'),
+      subtropicalColumnWaterMeanKgM2: bandMean('subtropical', 'columnWater'),
+      midlatColumnWaterMeanKgM2: bandMean('midlat', 'columnWater'),
+      polarColumnWaterMeanKgM2: bandMean('polar', 'columnWater'),
+      midlatPolarColumnWaterMeanKgM2: bandMean('midlatPolar', 'columnWater'),
+      tropicalSourceWaterTropicalMeanKgM2: bandMean('tropical', 'tropicalSourceWater'),
+      tropicalSourceWaterSubtropicalMeanKgM2: bandMean('subtropical', 'tropicalSourceWater'),
+      tropicalSourceWaterMidlatMeanKgM2: bandMean('midlat', 'tropicalSourceWater'),
+      tropicalSourceWaterPolarMeanKgM2: bandMean('polar', 'tropicalSourceWater'),
+      tropicalSourceWaterMidlatPolarMeanKgM2: bandMean('midlatPolar', 'tropicalSourceWater'),
       globalSurfaceTempMeanK: mean(surfaceTempTotal),
       globalSurfaceThetaMeanK: mean(surfaceThetaTotal),
       globalUpperThetaMeanK: mean(upperThetaTotal),

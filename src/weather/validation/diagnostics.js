@@ -1558,6 +1558,11 @@ const buildNumericalIntegrityTracing = (state, grid) => {
   return {
     schema: 'satellite-wars.numerical-integrity-tracing.v1',
     advectionWaterRepairMassMeanKgM2: round(state.numericalAdvectionWaterRepairMassMeanKgM2 || 0, 7),
+    advectionWaterAddedMassMeanKgM2: round(state.numericalAdvectionWaterAddedMassMeanKgM2 || 0, 7),
+    advectionWaterRemovedMassMeanKgM2: round(state.numericalAdvectionWaterRemovedMassMeanKgM2 || 0, 7),
+    advectionWaterResidualMassMeanKgM2: round(state.numericalAdvectionWaterResidualMassMeanKgM2 || 0, 7),
+    verticalSubtropicalDryingDemandMeanKgM2: round(weightedAccumulationMean(state.verticalSubtropicalDryingDemandMass, nx, ny, latitudesDeg, rowWeights, -90, 90), 7),
+    verticalCloudErosionToVaporMeanKgM2: round(weightedAccumulationMean(state.verticalCloudErosionToVaporMass, nx, ny, latitudesDeg, rowWeights, -90, 90), 7),
     northDryBelt: north,
     southDryBelt: south,
     levelBands,

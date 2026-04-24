@@ -27,6 +27,25 @@ const globalWaterMean = (state, grid) => {
   return total / weightTotal;
 };
 
+const globalFieldMean = (state, grid, fieldName) => {
+  const field = state[fieldName];
+  let total = 0;
+  let weightTotal = 0;
+  for (let k = 0; k < state.N; k += 1) {
+    const row = Math.floor(k / grid.nx);
+    const weight = Math.max(0.05, grid.cosLat[row] || 0);
+    let column = 0;
+    for (let lev = 0; lev < state.nz; lev += 1) {
+      const idx = lev * state.N + k;
+      const dp = state.pHalf[(lev + 1) * state.N + k] - state.pHalf[lev * state.N + k];
+      column += Math.max(0, field[idx] || 0) * (dp / 9.80665);
+    }
+    total += column * weight;
+    weightTotal += weight;
+  }
+  return total / weightTotal;
+};
+
 test('stepAdvection5 advects snow condensate with the rest of atmospheric water', () => {
   const grid = {
     nx: 2,
@@ -92,8 +111,14 @@ test('stepAdvection5 repairs semi-Lagrangian global water drift', () => {
   state.qv[1] = 0.014;
   state.qv[2] = 0.002;
   state.qv[3] = 0.003;
+  state.qc[0] = 0.001;
+  state.qc[1] = 0.0008;
+  state.qc[2] = 0.0001;
+  state.qc[3] = 0.0002;
 
   const before = globalWaterMean(state, grid);
+  const qvBefore = globalFieldMean(state, grid, 'qv');
+  const qcBefore = globalFieldMean(state, grid, 'qc');
   stepAdvection5({
     dt: 0.5,
     grid,
@@ -107,7 +132,12 @@ test('stepAdvection5 repairs semi-Lagrangian global water drift', () => {
     }
   });
   const after = globalWaterMean(state, grid);
+  const qvAfter = globalFieldMean(state, grid, 'qv');
+  const qcAfter = globalFieldMean(state, grid, 'qc');
 
   assert.ok(Math.abs(after - before) < 1e-5);
+  assert.ok(Math.abs(qvAfter - qvBefore) < 1e-5);
+  assert.ok(Math.abs(qcAfter - qcBefore) < 1e-5);
   assert.ok(state.numericalAdvectionWaterRepairMassMeanKgM2 > 0);
+  assert.ok(state.numericalAdvectionWaterResidualMassMeanKgM2 < 1e-5);
 });

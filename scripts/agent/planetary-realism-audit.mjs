@@ -66,6 +66,19 @@ export const PLANETARY_PRESETS = {
   }
 };
 
+export const resolveAuditExecutionModes = ({ preset = 'quick', reproCheck = null, counterfactuals = null } = {}) => {
+  const runDeepProofDiagnosticsByDefault = preset !== 'quick';
+  const runSensitivityDiagnosticsByDefault = true;
+  const resolvedReproCheck = reproCheck == null ? runSensitivityDiagnosticsByDefault : reproCheck;
+  const resolvedCounterfactuals = counterfactuals == null ? runDeepProofDiagnosticsByDefault : counterfactuals;
+  return {
+    reproCheck: resolvedReproCheck,
+    counterfactuals: resolvedCounterfactuals,
+    runSensitivityDiagnostics: resolvedReproCheck === true,
+    runDeepProofDiagnostics: resolvedCounterfactuals === true
+  };
+};
+
 const argv = process.argv.slice(2);
 const isMainInvocation = Boolean(process.argv[1]) && path.resolve(process.argv[1]) === __filename;
 const unknownCliFlags = isMainInvocation ? collectUnknownAuditCliFlags(argv) : [];
@@ -193,8 +206,6 @@ for (let i = 0; i < argv.length; i += 1) {
 }
 
 const presetConfig = PLANETARY_PRESETS[preset] || PLANETARY_PRESETS.quick;
-const runDeepProofDiagnosticsByDefault = preset !== 'quick';
-const runSensitivityDiagnosticsByDefault = true;
 nx = Number.isFinite(nx) && nx > 0 ? nx : presetConfig.nx;
 ny = Number.isFinite(ny) && ny > 0 ? ny : presetConfig.ny;
 dt = Number.isFinite(dt) && dt > 0 ? dt : presetConfig.dt;
@@ -203,10 +214,11 @@ horizonsDays = Array.isArray(horizonsDays) && horizonsDays.length
   ? [...new Set(horizonsDays.filter((value) => Number.isFinite(value) && value > 0))].sort((a, b) => a - b)
   : presetConfig.horizonsDays.slice();
 if (!Number.isFinite(seed)) seed = 12345;
-if (reproCheck == null) reproCheck = runSensitivityDiagnosticsByDefault;
-if (counterfactuals == null) counterfactuals = runDeepProofDiagnosticsByDefault;
-const runSensitivityDiagnostics = reproCheck === true;
-const runDeepProofDiagnostics = preset !== 'quick' || counterfactuals === true;
+const auditExecutionModes = resolveAuditExecutionModes({ preset, reproCheck, counterfactuals });
+reproCheck = auditExecutionModes.reproCheck;
+counterfactuals = auditExecutionModes.counterfactuals;
+const runSensitivityDiagnostics = auditExecutionModes.runSensitivityDiagnostics;
+const runDeepProofDiagnostics = auditExecutionModes.runDeepProofDiagnostics;
 instrumentationMode = instrumentationMode === 'disabled'
   ? 'disabled'
   : instrumentationMode === 'noop'
@@ -1484,6 +1496,78 @@ const buildConservationSummary = ({ core }) => ({
   gitCommit: getRepoCommitSha(),
   conservationBudget: core.getConservationSummary ? core.getConservationSummary() : null
 });
+
+export const WATER_CYCLE_CONTRACT = {
+  schema: 'satellite-wars.water-cycle-budget-contract.v1',
+  annualMinSampledDays: 330,
+  evapPrecipRelativeImbalanceMax: 0.15,
+  tcwDriftMaxKgM2: 25,
+  advectionNetDeltaMaxKgM2: 1,
+  transportNumericalResidualMaxKgM2: 1,
+  advectionRepairRelativeMax: 0.08,
+  advectionRepairAbsoluteMaxKgM2: 50,
+  tropicalNumericalLeakMaxKgM2: 1
+};
+
+const buildWaterCycleBudgetReport = ({ conservationSummary = null, preset = null } = {}) => {
+  const budget = conservationSummary?.conservationBudget || conservationSummary || null;
+  const waterCycle = budget?.waterCycle || {};
+  const sampledDays = (Number(waterCycle.sampledModelSeconds) || Number(budget?.sampledModelSeconds) || 0) / 86400;
+  const evaporation = Number(waterCycle.evaporationMeanMm) || 0;
+  const precipitation = Number(waterCycle.precipitationMeanMm) || 0;
+  const repairLimit = Math.max(
+    WATER_CYCLE_CONTRACT.advectionRepairAbsoluteMaxKgM2,
+    WATER_CYCLE_CONTRACT.advectionRepairRelativeMax * Math.max(1, evaporation, precipitation)
+  );
+  const blockers = [];
+  const annualReady = sampledDays >= WATER_CYCLE_CONTRACT.annualMinSampledDays;
+  if (String(preset || '').toLowerCase() === 'annual' && !annualReady) blockers.push('annual_sample_too_short');
+  if (Math.abs(Number(waterCycle.evapPrecipRelativeImbalance) || 0) > WATER_CYCLE_CONTRACT.evapPrecipRelativeImbalanceMax) {
+    blockers.push('evap_precip_imbalance');
+  }
+  if (Math.abs(Number(waterCycle.tcwDriftKgM2) || 0) > WATER_CYCLE_CONTRACT.tcwDriftMaxKgM2) {
+    blockers.push('tcw_drift_unbounded');
+  }
+  if (Math.abs(Number(waterCycle.advectionNetDeltaKgM2) || 0) > WATER_CYCLE_CONTRACT.advectionNetDeltaMaxKgM2) {
+    blockers.push('advection_net_water_source_sink');
+  }
+  if (Math.abs(Number(waterCycle.transportNumericalResidualKgM2) || 0) > WATER_CYCLE_CONTRACT.transportNumericalResidualMaxKgM2) {
+    blockers.push('transport_numerical_residual');
+  }
+  if ((Number(waterCycle.advectionRepairMeanKgM2) || 0) > repairLimit) {
+    blockers.push('advection_repair_dominates_budget');
+  }
+  if (Math.abs(Number(waterCycle.tropicalSourceMidlatPolarDeltaKgM2) || 0) > WATER_CYCLE_CONTRACT.tropicalNumericalLeakMaxKgM2) {
+    blockers.push('tropical_source_numerical_leakage');
+  }
+  return {
+    schema: 'satellite-wars.water-cycle-budget.v1',
+    generatedAt: new Date().toISOString(),
+    contract: WATER_CYCLE_CONTRACT,
+    preset,
+    sampledDays: round(sampledDays, 3),
+    annualReady,
+    evaporationMeanMm: round(evaporation, 5),
+    precipitationMeanMm: round(precipitation, 5),
+    evapMinusPrecipMeanMm: round(waterCycle.evapMinusPrecipMeanMm, 5),
+    evapPrecipRelativeImbalance: round(waterCycle.evapPrecipRelativeImbalance, 5),
+    tcwDriftKgM2: round(waterCycle.tcwDriftKgM2, 5),
+    nudgingNetDeltaKgM2: round(waterCycle.nudgingNetDeltaKgM2, 5),
+    advectionNetDeltaKgM2: round(waterCycle.advectionNetDeltaKgM2, 7),
+    verticalNetDeltaKgM2: round(waterCycle.verticalNetDeltaKgM2, 5),
+    verticalUnaccountedDeltaKgM2: round(waterCycle.verticalUnaccountedDeltaKgM2, 5),
+    verticalSubtropicalDryingDemandKgM2: round(waterCycle.verticalSubtropicalDryingDemandKgM2, 5),
+    verticalCloudErosionToVaporKgM2: round(waterCycle.verticalCloudErosionToVaporKgM2, 5),
+    transportNumericalResidualKgM2: round(waterCycle.transportNumericalResidualKgM2, 5),
+    advectionRepairMeanKgM2: round(waterCycle.advectionRepairMeanKgM2, 5),
+    advectionRepairAddedMeanKgM2: round(waterCycle.advectionRepairAddedMeanKgM2, 5),
+    advectionRepairRemovedMeanKgM2: round(waterCycle.advectionRepairRemovedMeanKgM2, 5),
+    advectionRepairResidualMeanKgM2: round(waterCycle.advectionRepairResidualMeanKgM2, 7),
+    tropicalSourceMidlatPolarDeltaKgM2: round(waterCycle.tropicalSourceMidlatPolarDeltaKgM2, 5),
+    pass: blockers.length === 0,
+    blockers
+  };
+};
 
 const areaWeightedMax = (field) => field.reduce((best, value) => Math.max(best, Number.isFinite(value) ? value : -Infinity), -Infinity);
 
@@ -5453,6 +5537,11 @@ const renderMarkdown = (summary) => {
     lines.push(`- Tropical cyclone environment counts (N/S): ${latest.metrics.tropicalCycloneEnvironmentCountNh} / ${latest.metrics.tropicalCycloneEnvironmentCountSh}`);
     lines.push(`- Global precip/cloud/tcw/max wind: ${latest.metrics.globalPrecipMeanMmHr} mm/hr / ${latest.metrics.globalCloudMeanFrac} / ${latest.metrics.globalTcwMeanKgM2} kg/m² / ${latest.metrics.maxWind10mMs} m/s`);
     lines.push(`- Numerical integrity score/pass: ${latest.metrics.numericalIntegrityScore} / ${latest.metrics.numericalIntegrityPass}`);
+    if (summary.waterCycleBudget) {
+      lines.push(`- Water cycle E/P/TCW drift: ${summary.waterCycleBudget.evaporationMeanMm} / ${summary.waterCycleBudget.precipitationMeanMm} mm / ${summary.waterCycleBudget.tcwDriftKgM2} kg/m²`);
+      lines.push(`- Advection net/repair: ${summary.waterCycleBudget.advectionNetDeltaKgM2} / ${summary.waterCycleBudget.advectionRepairMeanKgM2} kg/m²`);
+      lines.push(`- Transport residual / vertical drying demand: ${summary.waterCycleBudget.transportNumericalResidualKgM2} / ${summary.waterCycleBudget.verticalSubtropicalDryingDemandKgM2} kg/m²`);
+    }
     if (horizon.warnings.length) {
       lines.push('- Warnings:');
       horizon.warnings.forEach((warning) => lines.push(`  - ${warning}`));
@@ -5521,6 +5610,9 @@ const renderMarkdown = (summary) => {
     }
     if (summary.artifacts.conservationSummaryJsonPath) {
       lines.push(`- Conservation summary JSON: ${summary.artifacts.conservationSummaryJsonPath}`);
+    }
+    if (summary.artifacts.waterCycleBudgetJsonPath) {
+      lines.push(`- Water-cycle budget JSON: ${summary.artifacts.waterCycleBudgetJsonPath}`);
     }
     if (summary.artifacts.restartParityJsonPath) {
       lines.push(`- Restart parity JSON: ${summary.artifacts.restartParityJsonPath}`);
@@ -5806,6 +5898,7 @@ export async function main() {
   const moistureAttribution = buildMoistureAttributionReport(latestSample?.processMoistureBudget, latestSample?.metrics);
   const runManifest = buildRunManifest({ core, terrainFallback, sampleTargetsDays, targetsSeconds });
   const conservationSummary = buildConservationSummary({ core });
+  const waterCycleBudget = buildWaterCycleBudgetReport({ conservationSummary, preset });
   const surfaceSourceAttribution = buildSurfaceSourceAttributionReport(latestSample);
   const surfaceFluxDecomposition = buildSurfaceFluxDecompositionReport(latestSample);
   const nhDryBeltSourceSectorSummary = buildNhDryBeltSourceSectorReport(latestSample);
@@ -6129,6 +6222,7 @@ export async function main() {
     moistureAttributionJsonPath: `${artifactBase}-moisture-attribution.json`,
     runManifestJsonPath: `${artifactBase}-run-manifest.json`,
     conservationSummaryJsonPath: `${artifactBase}-conservation-summary.json`,
+    waterCycleBudgetJsonPath: `${artifactBase}-water-cycle-budget.json`,
     restartParityJsonPath: `${artifactBase}-restart-parity.json`,
     surfaceSourceAttributionJsonPath: `${artifactBase}-surface-source-tracers.json`,
     surfaceFluxDecompositionJsonPath: `${artifactBase}-surface-flux-decomposition.json`,
@@ -6224,6 +6318,7 @@ export async function main() {
     moistureAttribution,
     runManifest,
     conservationSummary,
+    waterCycleBudget,
     restartParity,
     surfaceSourceAttribution,
     surfaceFluxDecomposition,
@@ -6303,6 +6398,7 @@ export async function main() {
     writeAuditJsonArtifact(artifacts.moistureAttributionJsonPath, moistureAttribution, 'moistureAttribution');
     writeAuditJsonArtifact(artifacts.runManifestJsonPath, runManifest, 'runManifest');
     writeAuditJsonArtifact(artifacts.conservationSummaryJsonPath, conservationSummary, 'conservationSummary');
+    writeAuditJsonArtifact(artifacts.waterCycleBudgetJsonPath, waterCycleBudget, 'waterCycleBudget');
     writeAuditJsonArtifact(artifacts.restartParityJsonPath, restartParity, 'restartParity');
     writeAuditJsonArtifact(artifacts.surfaceSourceAttributionJsonPath, surfaceSourceAttribution, 'surfaceSourceAttribution');
     writeAuditJsonArtifact(artifacts.surfaceFluxDecompositionJsonPath, surfaceFluxDecomposition, 'surfaceFluxDecomposition');
@@ -6418,6 +6514,8 @@ export const _test = {
   buildNumericalIntegritySummaryReport,
   buildNumericalClimateContractReport,
   computeNumericalIntegrityScore,
+  resolveAuditExecutionModes,
+  buildWaterCycleBudgetReport,
   buildDtSensitivityReport,
   buildGridSensitivityReport,
   buildStormSpilloverCatalogReport,

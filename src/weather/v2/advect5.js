@@ -14,6 +14,8 @@ import {
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
 const smoothstep01 = (t) => t * t * (3 - 2 * t);
+const GRAVITY = 9.80665;
+const WATER_REPAIR_EPS_KG_M2 = 1e-9;
 
 const accumulateBandValue = (field, bandIndex, cell, cellCount, value, enabled = true) => {
   if (
@@ -57,32 +59,38 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
       cloudBefore[idx] = (qc[idx] || 0) + (qi[idx] || 0) + (qr[idx] || 0) + (qs?.[idx] || 0);
     }
   }
-  const waterFields = [qv, qc, qi, qr].filter((field) => field instanceof Float32Array && field.length === qv.length);
-  if (qs instanceof Float32Array && qs.length === qv.length) waterFields.push(qs);
-  const computeGlobalWaterMean = () => {
+  const waterFieldSpecs = [
+    { key: 'qv', field: qv },
+    { key: 'qc', field: qc },
+    { key: 'qi', field: qi },
+    { key: 'qr', field: qr },
+    { key: 'qs', field: qs }
+  ].filter(({ field }) => field instanceof Float32Array && field.length === qv.length);
+  const computeColumnMass = (field) => {
     if (!(pHalf instanceof Float32Array) || pHalf.length !== (nz + 1) * N) return null;
-    let waterTotal = 0;
-    let weightTotal = 0;
+    const columnMass = new Float64Array(N);
     for (let k = 0; k < N; k += 1) {
-      const row = Math.floor(k / nx);
-      const rowWeight = Math.max(0.05, cosLat?.[row] || 0);
-      let columnWater = 0;
       for (let lev = 0; lev < nz; lev += 1) {
         const idx = lev * N + k;
         const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
         if (!(dp > 0)) continue;
-        let mixingRatio = 0;
-        for (const field of waterFields) {
-          mixingRatio += Math.max(0, field[idx] || 0);
-        }
-        columnWater += mixingRatio * (dp / 9.80665);
+        columnMass[k] += Math.max(0, field[idx] || 0) * (dp / GRAVITY);
       }
-      waterTotal += columnWater * rowWeight;
-      weightTotal += rowWeight;
     }
-    return weightTotal > 0 ? waterTotal / weightTotal : null;
+    return columnMass;
   };
-  const globalWaterBefore = conserveWater ? computeGlobalWaterMean() : null;
+  const columnWeight = (cell) => Math.max(0.05, cosLat?.[Math.floor(cell / nx)] || 0);
+  let weightTotal = 0;
+  for (let k = 0; k < N; k += 1) weightTotal += columnWeight(k);
+  const weightedColumnTotal = (columnMass) => {
+    if (!columnMass || weightTotal <= 0) return null;
+    let total = 0;
+    for (let k = 0; k < N; k += 1) total += (columnMass[k] || 0) * columnWeight(k);
+    return total;
+  };
+  const waterBeforeByField = conserveWater
+    ? waterFieldSpecs.map((spec) => ({ ...spec, beforeColumn: computeColumnMass(spec.field) }))
+    : [];
 
   const advectScalar = (src) => {
     for (let lev = 0; lev < nz; lev++) {
@@ -260,28 +268,167 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
     }
   }
 
-  if (conserveWater && Number.isFinite(globalWaterBefore) && globalWaterBefore > 0) {
-    const globalWaterAfter = computeGlobalWaterMean();
-    if (Number.isFinite(globalWaterAfter) && globalWaterAfter > 0) {
-      const scale = clamp(globalWaterBefore / globalWaterAfter, 0.5, 2);
-      if (Number.isFinite(scale) && Math.abs(scale - 1) > 1e-9) {
-        for (const field of waterFields) {
-          for (let idx = 0; idx < field.length; idx += 1) {
-            field[idx] = Math.max(0, field[idx] * scale);
-          }
+  if (conserveWater && weightTotal > 0 && waterBeforeByField.length) {
+    let repairAbsWeighted = 0;
+    let repairAddedWeighted = 0;
+    let repairRemovedWeighted = 0;
+    let repairResidualWeighted = 0;
+
+    const adjustQvSourceTracers = (cell, levelScales, levelAdds) => {
+      for (const fieldName of SURFACE_MOISTURE_SOURCE_FIELDS) {
+        const field = state[fieldName];
+        if (!(field instanceof Float32Array) || field.length !== qv.length) continue;
+        for (let lev = 0; lev < nz; lev += 1) {
+          const idx = lev * N + cell;
+          if (levelScales) field[idx] = Math.max(0, (field[idx] || 0) * levelScales[lev]);
         }
-        for (const fieldName of SURFACE_MOISTURE_SOURCE_FIELDS) {
-          const field = state[fieldName];
-          if (field instanceof Float32Array && field.length === qv.length) {
-            for (let idx = 0; idx < field.length; idx += 1) {
-              field[idx] = Math.max(0, field[idx] * scale);
+      }
+      const carryover = state.qvSourceAtmosphericCarryover;
+      if (carryover instanceof Float32Array && carryover.length === qv.length && levelAdds) {
+        for (let lev = 0; lev < nz; lev += 1) {
+          const add = levelAdds[lev] || 0;
+          if (add > 0) carryover[lev * N + cell] += add;
+        }
+      }
+    };
+
+    const applyColumnCorrection = ({ key, field, beforeColumn }, correctionByCell) => {
+      for (let k = 0; k < N; k += 1) {
+        const correction = correctionByCell[k] || 0;
+        if (Math.abs(correction) <= WATER_REPAIR_EPS_KG_M2) continue;
+        const levelScales = key === 'qv' ? new Float64Array(nz) : null;
+        const levelAdds = key === 'qv' ? new Float64Array(nz) : null;
+        let afterColumn = 0;
+        for (let lev = 0; lev < nz; lev += 1) {
+          const idx = lev * N + k;
+          const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+          if (dp > 0) afterColumn += Math.max(0, field[idx] || 0) * (dp / GRAVITY);
+        }
+        if (correction < 0 && afterColumn > WATER_REPAIR_EPS_KG_M2) {
+          const removeMass = Math.min(afterColumn, -correction);
+          const scale = clamp((afterColumn - removeMass) / afterColumn, 0, 1);
+          for (let lev = 0; lev < nz; lev += 1) {
+            const idx = lev * N + k;
+            field[idx] = Math.max(0, (field[idx] || 0) * scale);
+            if (levelScales) levelScales[lev] = scale;
+          }
+          if (key === 'qv') adjustQvSourceTracers(k, levelScales, null);
+        } else if (correction > 0) {
+          if (afterColumn > WATER_REPAIR_EPS_KG_M2) {
+            const scale = (afterColumn + correction) / afterColumn;
+            for (let lev = 0; lev < nz; lev += 1) {
+              const idx = lev * N + k;
+              const before = Math.max(0, field[idx] || 0);
+              const after = before * scale;
+              field[idx] = after;
+              if (levelScales) levelScales[lev] = 1;
+              if (levelAdds) levelAdds[lev] = Math.max(0, after - before);
+            }
+          } else {
+            let targetLev = nz - 1;
+            let layerMass = 0;
+            for (let lev = nz - 1; lev >= 0; lev -= 1) {
+              const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+              if (dp > 0) {
+                targetLev = lev;
+                layerMass = dp / GRAVITY;
+                break;
+              }
+            }
+            if (layerMass > 0) {
+              const idx = targetLev * N + k;
+              const dq = correction / layerMass;
+              field[idx] = Math.max(0, (field[idx] || 0) + dq);
+              if (levelScales) {
+                for (let lev = 0; lev < nz; lev += 1) levelScales[lev] = 1;
+              }
+              if (levelAdds) levelAdds[targetLev] = dq;
             }
           }
+          if (key === 'qv') adjustQvSourceTracers(k, levelScales, levelAdds);
         }
-        state.numericalAdvectionWaterRepairMassMeanKgM2 =
-          (state.numericalAdvectionWaterRepairMassMeanKgM2 || 0) + Math.abs(globalWaterAfter - globalWaterBefore);
+      }
+    };
+
+    for (const spec of waterBeforeByField) {
+      const { key, field, beforeColumn } = spec;
+      if (!beforeColumn) continue;
+      const afterColumn = computeColumnMass(field);
+      const beforeWeighted = weightedColumnTotal(beforeColumn);
+      const afterWeighted = weightedColumnTotal(afterColumn);
+      if (!Number.isFinite(beforeWeighted) || !Number.isFinite(afterWeighted)) continue;
+      const driftWeighted = afterWeighted - beforeWeighted;
+      if (Math.abs(driftWeighted) / weightTotal <= WATER_REPAIR_EPS_KG_M2) continue;
+
+      const correctionByCell = new Float64Array(N);
+      if (driftWeighted > 0) {
+        let candidateWeighted = 0;
+        let useFallback = false;
+        for (let k = 0; k < N; k += 1) {
+          const gain = Math.max(0, (afterColumn[k] || 0) - (beforeColumn[k] || 0));
+          candidateWeighted += gain * columnWeight(k);
+        }
+        if (candidateWeighted <= WATER_REPAIR_EPS_KG_M2) {
+          useFallback = true;
+          for (let k = 0; k < N; k += 1) candidateWeighted += Math.max(0, afterColumn[k] || 0) * columnWeight(k);
+        }
+        if (candidateWeighted > WATER_REPAIR_EPS_KG_M2) {
+          for (let k = 0; k < N; k += 1) {
+            const preferred = Math.max(0, (afterColumn[k] || 0) - (beforeColumn[k] || 0));
+            const fallback = Math.max(0, afterColumn[k] || 0);
+            const basis = useFallback ? fallback : preferred;
+            if (!(basis > 0)) continue;
+            correctionByCell[k] = -((driftWeighted * (basis * columnWeight(k)) / candidateWeighted) / columnWeight(k));
+          }
+        }
+      } else {
+        const deficitWeighted = -driftWeighted;
+        let candidateWeighted = 0;
+        let useFallback = false;
+        for (let k = 0; k < N; k += 1) {
+          const loss = Math.max(0, (beforeColumn[k] || 0) - (afterColumn[k] || 0));
+          candidateWeighted += loss * columnWeight(k);
+        }
+        if (candidateWeighted <= WATER_REPAIR_EPS_KG_M2) {
+          useFallback = true;
+          for (let k = 0; k < N; k += 1) candidateWeighted += Math.max(0, beforeColumn[k] || 0) * columnWeight(k);
+        }
+        if (candidateWeighted > WATER_REPAIR_EPS_KG_M2) {
+          for (let k = 0; k < N; k += 1) {
+            const preferred = Math.max(0, (beforeColumn[k] || 0) - (afterColumn[k] || 0));
+            const fallback = Math.max(0, beforeColumn[k] || 0);
+            const basis = useFallback ? fallback : preferred;
+            if (!(basis > 0)) continue;
+            correctionByCell[k] = (deficitWeighted * (basis * columnWeight(k)) / candidateWeighted) / columnWeight(k);
+          }
+        }
+      }
+
+      applyColumnCorrection({ key, field, beforeColumn }, correctionByCell);
+      const finalColumn = computeColumnMass(field);
+      const finalWeighted = weightedColumnTotal(finalColumn);
+      const fieldResidualWeighted = Number.isFinite(finalWeighted) ? finalWeighted - beforeWeighted : 0;
+      repairResidualWeighted += Math.abs(fieldResidualWeighted);
+      for (let k = 0; k < N; k += 1) {
+        const correction = correctionByCell[k] || 0;
+        const weighted = Math.abs(correction) * columnWeight(k);
+        repairAbsWeighted += weighted;
+        if (correction > 0) repairAddedWeighted += correction * columnWeight(k);
+        if (correction < 0) repairRemovedWeighted += -correction * columnWeight(k);
+        if (state.numericalAdvectionWaterRepairMass) state.numericalAdvectionWaterRepairMass[k] += Math.abs(correction);
+        if (correction > 0 && state.numericalAdvectionWaterAddedMass) state.numericalAdvectionWaterAddedMass[k] += correction;
+        if (correction < 0 && state.numericalAdvectionWaterRemovedMass) state.numericalAdvectionWaterRemovedMass[k] += -correction;
       }
     }
+
+    state.numericalAdvectionWaterRepairMassMeanKgM2 =
+      (state.numericalAdvectionWaterRepairMassMeanKgM2 || 0) + repairAbsWeighted / weightTotal;
+    state.numericalAdvectionWaterAddedMassMeanKgM2 =
+      (state.numericalAdvectionWaterAddedMassMeanKgM2 || 0) + repairAddedWeighted / weightTotal;
+    state.numericalAdvectionWaterRemovedMassMeanKgM2 =
+      (state.numericalAdvectionWaterRemovedMassMeanKgM2 || 0) + repairRemovedWeighted / weightTotal;
+    state.numericalAdvectionWaterResidualMassMeanKgM2 =
+      (state.numericalAdvectionWaterResidualMassMeanKgM2 || 0) + repairResidualWeighted / weightTotal;
   }
 
   if (cloudBefore && state.pHalf) {

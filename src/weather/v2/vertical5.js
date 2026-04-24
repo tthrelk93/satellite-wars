@@ -48,17 +48,31 @@ const sumUpperCloudMassAtCell = (state, pHalf, sigmaHalf, nz, cellIndex, qFields
   }
   return upperCloudMass;
 };
-const scaleUpperCloudMassAtCell = (state, sigmaHalf, nz, cellIndex, keepFrac) => {
+const scaleUpperCloudMassAtCell = (state, pHalf, sigmaHalf, nz, cellIndex, keepFrac, { evaporateToVapor = false } = {}) => {
   const boundedKeepFrac = clamp01(keepFrac);
+  const removeFrac = 1 - boundedKeepFrac;
+  let convertedMass = 0;
   for (let lev = 0; lev < nz; lev += 1) {
     const sigmaMid = sigmaMidAtLevel(sigmaHalf, lev, nz);
     if (!isUpperCloudSigma(sigmaMid)) continue;
     const idx = lev * state.N + cellIndex;
+    const condensateMixingRatio =
+      (Number(state.qc[idx]) || 0)
+      + (Number(state.qi[idx]) || 0)
+      + (Number(state.qr[idx]) || 0)
+      + (Number(state.qs[idx]) || 0);
+    const removedMixingRatio = condensateMixingRatio * removeFrac;
     state.qc[idx] *= boundedKeepFrac;
     state.qi[idx] *= boundedKeepFrac;
     state.qr[idx] *= boundedKeepFrac;
     state.qs[idx] *= boundedKeepFrac;
+    if (evaporateToVapor && removedMixingRatio > 0) {
+      state.qv[idx] += removedMixingRatio;
+      const dp = pHalf[(lev + 1) * state.N + cellIndex] - pHalf[lev * state.N + cellIndex];
+      if (dp > 0) convertedMass += removedMixingRatio * (dp / g);
+    }
   }
+  return convertedMass;
 };
 const computeCirculationReboundContainment = ({
   enabled,
@@ -965,6 +979,12 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.upperCloudBlockedErosionByBandMass || state.upperCloudBlockedErosionByBandMass.length !== N * CLOUD_BIRTH_LEVEL_BAND_COUNT) {
     state.upperCloudBlockedErosionByBandMass = new Float32Array(N * CLOUD_BIRTH_LEVEL_BAND_COUNT);
   }
+  if (!state.verticalSubtropicalDryingDemandMass || state.verticalSubtropicalDryingDemandMass.length !== N) {
+    state.verticalSubtropicalDryingDemandMass = new Float32Array(N);
+  }
+  if (!state.verticalCloudErosionToVaporMass || state.verticalCloudErosionToVaporMass.length !== N) {
+    state.verticalCloudErosionToVaporMass = new Float32Array(N);
+  }
   const convMask = state.convMask;
   const convectivePotential = state.convectivePotential;
   const convectiveOrganization = state.convectiveOrganization;
@@ -1085,6 +1105,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const upperCloudPotentialErosionByBandMass = state.upperCloudPotentialErosionByBandMass;
   const upperCloudAppliedErosionByBandMass = state.upperCloudAppliedErosionByBandMass;
   const upperCloudBlockedErosionByBandMass = state.upperCloudBlockedErosionByBandMass;
+  const verticalSubtropicalDryingDemandMass = state.verticalSubtropicalDryingDemandMass;
+  const verticalCloudErosionToVaporMass = state.verticalCloudErosionToVaporMass;
   convMask.fill(0);
   convectiveMassFlux.fill(0);
   convectiveDetrainmentMass.fill(0);
@@ -1225,7 +1247,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       for (let lev = 0; lev < nz; lev++) {
         const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
         const idx = lev * N + k;
-        w += (qv[idx] + qc[idx] + qi[idx] + qr[idx]) * (dp / g);
+        w += (qv[idx] + qc[idx] + qi[idx] + qr[idx] + qs[idx]) * (dp / g);
       }
       waterBefore[s] = w;
     }
@@ -1404,6 +1426,10 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const taperExp = Math.max(0, verticalAdvectionSigmaTaperExp);
       const levS = nz - 1;
       const lowLevelStart = Math.max(0, nz - 4);
+      if (!state._vertAdvLayerMass || state._vertAdvLayerMass.length !== nz) {
+        state._vertAdvLayerMass = new Float64Array(nz);
+      }
+      const layerMass = state._vertAdvLayerMass;
       const computeTransport = (lev, k) => {
         const omegaTop = omega[lev * N + k];
         const omegaBot = omega[(lev + 1) * N + k];
@@ -1444,20 +1470,29 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         const terrainFlowForcing = terrainFlowForcingDiag[k];
         let maxRawFrac = 0;
         for (let lev = 0; lev < nz; lev++) {
-          const idx = lev * N + k;
-          const { omegaMid, transportScale } = computeTransport(lev, k);
-          if (omegaMid < 0 && lev < nz - 1) {
-            const idxBelow = (lev + 1) * N + k;
-            const dpNeighbor = pMid[idxBelow] - pMid[idx];
-            if (dpNeighbor > 0) {
-              maxRawFrac = Math.max(maxRawFrac, ((-omegaMid) * dt * transportScale) / dpNeighbor);
-            }
-          } else if (omegaMid > 0 && lev > 0) {
-            const idxAbove = (lev - 1) * N + k;
-            const dpNeighbor = pMid[idx] - pMid[idxAbove];
-            if (dpNeighbor > 0) {
-              maxRawFrac = Math.max(maxRawFrac, (omegaMid * dt * transportScale) / dpNeighbor);
-            }
+          const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+          layerMass[lev] = dpLev > 0 ? dpLev / g : 0;
+        }
+        const computeInterfaceTransport = (iface) => {
+          const levAbove = iface - 1;
+          const levBelow = iface;
+          const above = computeTransport(levAbove, k);
+          const below = computeTransport(levBelow, k);
+          const sigmaMid = clamp01(0.5 * (above.sigmaMid + below.sigmaMid));
+          const transportScale = 0.5 * (above.transportScale + below.transportScale);
+          return {
+            omegaMid: 0.5 * (above.omegaMid + below.omegaMid),
+            sigmaMid,
+            transportScale
+          };
+        };
+        for (let iface = 1; iface < nz; iface++) {
+          const { omegaMid, transportScale } = computeInterfaceTransport(iface);
+          if (omegaMid === 0) continue;
+          const sourceLev = omegaMid > 0 ? iface - 1 : iface;
+          const dpSource = pHalf[(sourceLev + 1) * N + k] - pHalf[sourceLev * N + k];
+          if (dpSource > 0) {
+            maxRawFrac = Math.max(maxRawFrac, (Math.abs(omegaMid) * dt * transportScale) / dpSource);
           }
         }
         const substeps = Math.max(1, Math.min(maxSubsteps, Math.ceil(maxRawFrac / cflMax)));
@@ -1466,78 +1501,61 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         for (let substep = 0; substep < substeps; substep++) {
           for (let lev = 0; lev < nz; lev++) {
             const idx = lev * N + k;
-            let qvUpdated = qv[idx];
-            let thetaUpdated = theta[idx];
-            const { omegaMid, sigmaMid, transportScale } = computeTransport(lev, k);
-
-            if (omegaMid < 0 && lev < nz - 1) {
-              const idxBelow = (lev + 1) * N + k;
-              const dpNeighbor = pMid[idxBelow] - pMid[idx];
-              if (dpNeighbor > 0) {
-                const rawFrac = ((-omegaMid) * subDt * transportScale) / dpNeighbor;
-                const frac = clamp(rawFrac, 0, cflMax);
-                if (rawFrac > cflMax) recordVerticalCflClamp(lev, k, sigmaMid, rawFrac);
-                const qvDelta = frac * (qv[idxBelow] - qv[idx]);
-                qvUpdated += qvDelta;
-                thetaUpdated += frac * (theta[idxBelow] - theta[idx]);
-                if (traceEnabled && qvDelta > 0 && sigmaMid <= 0.55) {
-                  const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-                  if (dpLev > 0) {
-                    const cloudBirthMass = qvDelta * (dpLev / g);
-                    resolvedAscentCloudBirthPotential[k] += cloudBirthMass;
-                    verticalUpperCloudResolvedBirthMass[k] += cloudBirthMass;
-                    resolvedAscentCloudBirthAccumMass[k] += cloudBirthMass;
-                    const bandIndex = findCloudBirthLevelBandIndex(sigmaMid);
-                    resolvedAscentCloudBirthByBandMass[cloudBirthBandOffset(bandIndex, k, N)] += cloudBirthMass;
-                  }
-                }
-                if (terrainFlowForcing > 0 && lev >= lowLevelStart) {
-                  columnExposure += (-omegaMid) * subDt;
-                  if (qvDelta > 0) {
-                    const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-                    if (dpLev > 0) {
-                      columnDelivery += qvDelta * (dpLev / g);
-                    }
-                  }
-                }
-              }
-            } else if (omegaMid > 0 && lev > 0) {
-              const idxAbove = (lev - 1) * N + k;
-              const dpNeighbor = pMid[idx] - pMid[idxAbove];
-              if (dpNeighbor > 0) {
-                const rawFrac = (omegaMid * subDt * transportScale) / dpNeighbor;
-                const frac = clamp(rawFrac, 0, cflMax);
-                if (rawFrac > cflMax) recordVerticalCflClamp(lev, k, sigmaMid, rawFrac);
-                qvUpdated += frac * (qv[idxAbove] - qv[idx]);
-                thetaUpdated += frac * (theta[idxAbove] - theta[idx]);
-              }
+            qvNext[idx] = qv[idx];
+            thetaNext[idx] = theta[idx];
+          }
+          for (let iface = 1; iface < nz; iface++) {
+            const { omegaMid, sigmaMid, transportScale } = computeInterfaceTransport(iface);
+            if (omegaMid === 0) continue;
+            const sourceLev = omegaMid > 0 ? iface - 1 : iface;
+            const destLev = omegaMid > 0 ? iface : iface - 1;
+            const idxSource = sourceLev * N + k;
+            const idxDest = destLev * N + k;
+            const sourceMass = layerMass[sourceLev];
+            const destMass = layerMass[destLev];
+            const dpSource = pHalf[(sourceLev + 1) * N + k] - pHalf[sourceLev * N + k];
+            if (!(sourceMass > 0) || !(destMass > 0) || !(dpSource > 0)) continue;
+            const rawFrac = (Math.abs(omegaMid) * subDt * transportScale) / dpSource;
+            const frac = clamp(rawFrac, 0, cflMax);
+            if (!(frac > 0)) continue;
+            if (rawFrac > cflMax) recordVerticalCflClamp(sourceLev, k, sigmaMid, rawFrac);
+            const qvMass = Math.max(0, qv[idxSource] || 0) * sourceMass * frac;
+            qvNext[idxSource] -= qvMass / sourceMass;
+            qvNext[idxDest] += qvMass / destMass;
+            thetaNext[idxDest] += frac * ((theta[idxSource] || 0) - (theta[idxDest] || 0));
+            if (omegaMid < 0 && traceEnabled && qvMass > 0 && sigmaMid <= 0.55) {
+              resolvedAscentCloudBirthPotential[k] += qvMass;
+              verticalUpperCloudResolvedBirthMass[k] += qvMass;
+              resolvedAscentCloudBirthAccumMass[k] += qvMass;
+              const bandIndex = findCloudBirthLevelBandIndex(sigmaMid);
+              resolvedAscentCloudBirthByBandMass[cloudBirthBandOffset(bandIndex, k, N)] += qvMass;
             }
-
-            if (qvUpdated < 0) {
-              const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-              const clippedMass = dpLev > 0 ? (-qvUpdated) * (dpLev / g) : 0;
+            if (omegaMid < 0 && terrainFlowForcing > 0 && destLev >= lowLevelStart) {
+              columnExposure += (-omegaMid) * subDt;
+              columnDelivery += qvMass;
+            }
+          }
+          for (let lev = 0; lev < nz; lev++) {
+            const idx = lev * N + k;
+            if (qvNext[idx] < 0) {
+              const clippedMass = layerMass[lev] > 0 ? (-qvNext[idx]) * layerMass[lev] : 0;
               state.numericalNegativeClipCount[k] += 1;
               state.numericalNegativeClipMass[k] += clippedMass;
               recordBandValue(
                 state.numericalNegativeClipByBandMass,
-                findInstrumentationLevelBandIndex(sigmaMid),
+                findInstrumentationLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz)),
                 k,
                 N,
                 clippedMass
               );
             }
-            qvNext[idx] = Math.max(0, qvUpdated);
+            qv[idx] = Math.max(0, qvNext[idx]);
             if (dThetaLimit > 0) {
-              const dTheta = thetaUpdated - theta[idx];
-              thetaNext[idx] = theta[idx] + clamp(dTheta, -dThetaLimit, dThetaLimit);
+              const dTheta = thetaNext[idx] - theta[idx];
+              theta[idx] += clamp(dTheta, -dThetaLimit, dThetaLimit);
             } else {
-              thetaNext[idx] = thetaUpdated;
+              theta[idx] = thetaNext[idx];
             }
-          }
-          for (let lev = 0; lev < nz; lev++) {
-            const idx = lev * N + k;
-            qv[idx] = qvNext[idx];
-            theta[idx] = thetaNext[idx];
           }
         }
         orographicDeliveryLastStep[k] = columnDelivery;
@@ -2451,7 +2469,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             const idx = lev * N + k;
             const dryFrac = dryFracBase * layerWeight;
             const dq = qv[idx] * dryFrac;
-            qv[idx] = Math.max(0, qv[idx] - dq);
+            const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+            if (dq > 0 && dp > 0) verticalSubtropicalDryingDemandMass[k] += dq * (dp / g);
             theta[idx] += subtropicalSubsidenceThetaStepK * dryFrac * (0.65 + 0.55 * layerWeight);
           }
           subsidenceDryingWeightedSum += taperedDryDriver * cosLat[j];
@@ -2727,7 +2746,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const removalMass = upperCloudMass * clamp01(carryInputClearFrac);
       if (!(removalMass > 0)) continue;
       const keepFrac = Math.max(0, (upperCloudMass - removalMass) / Math.max(upperCloudMass, eps));
-      scaleUpperCloudMassAtCell(state, sigmaHalf, nz, k, keepFrac);
+      verticalCloudErosionToVaporMass[k] += scaleUpperCloudMassAtCell(state, pHalf, sigmaHalf, nz, k, keepFrac, {
+        evaporateToVapor: true
+      });
       carryInputOverrideHitCount[k] += 1;
       carryInputOverrideRemovedMass[k] += removalMass;
       carryInputOverrideInputMass[k] += actualInputMass;
@@ -2789,7 +2810,9 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     if (atlanticTransitionCarryoverContainmentFrac > 0 && upperCloudMass > eps && candidateOverlap > 0) {
       const removalMass = Math.min(candidateOverlap * atlanticTransitionCarryoverContainmentFrac, upperCloudMass);
       const keepFrac = Math.max(0, (upperCloudMass - removalMass) / Math.max(upperCloudMass, eps));
-      scaleUpperCloudMassAtCell(state, sigmaHalf, nz, k, keepFrac);
+      verticalCloudErosionToVaporMass[k] += scaleUpperCloudMassAtCell(state, pHalf, sigmaHalf, nz, k, keepFrac, {
+        evaporateToVapor: true
+      });
       upperCloudMass *= keepFrac;
       for (let bandIndex = 0; bandIndex < CLOUD_BIRTH_LEVEL_BAND_COUNT; bandIndex += 1) {
         upperCloudBandMass[bandIndex] *= keepFrac;
@@ -2944,13 +2967,13 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     const bandIndex = findInstrumentationLevelBandIndex(sigmaMidAtLevel(sigmaHalf, lev, nz));
     const dpLev = pHalf[(lev + 1) * N + cell] - pHalf[lev * N + cell];
     const clipMass = dpLev > 0
-      ? ((-Math.min(0, qv[m])) + (-Math.min(0, qc[m])) + (-Math.min(0, qi[m])) + (-Math.min(0, qr[m]))) * (dpLev / g)
+      ? ((-Math.min(0, qv[m])) + (-Math.min(0, qc[m])) + (-Math.min(0, qi[m])) + (-Math.min(0, qr[m])) + (-Math.min(0, qs[m]))) * (dpLev / g)
       : 0;
     const cloudClipMass = dpLev > 0
-      ? ((-Math.min(0, qc[m])) + (-Math.min(0, qi[m])) + (-Math.min(0, qr[m]))) * (dpLev / g)
+      ? ((-Math.min(0, qc[m])) + (-Math.min(0, qi[m])) + (-Math.min(0, qr[m])) + (-Math.min(0, qs[m]))) * (dpLev / g)
       : 0;
-    const clipCount = (qv[m] < 0) + (qc[m] < 0) + (qi[m] < 0) + (qr[m] < 0);
-    const cloudClipCount = (qc[m] < 0) + (qi[m] < 0) + (qr[m] < 0);
+    const clipCount = (qv[m] < 0) + (qc[m] < 0) + (qi[m] < 0) + (qr[m] < 0) + (qs[m] < 0);
+    const cloudClipCount = (qc[m] < 0) + (qi[m] < 0) + (qr[m] < 0) + (qs[m] < 0);
     if (clipCount > 0) {
       state.numericalNegativeClipCount[cell] += clipCount;
       state.numericalNegativeClipMass[cell] += clipMass;
@@ -2965,6 +2988,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     qc[m] = Math.max(0, qc[m]);
     qi[m] = Math.max(0, qi[m]);
     qr[m] = Math.max(0, qr[m]);
+    qs[m] = Math.max(0, qs[m]);
   }
 
   let omegaSurfMinusDpsDtRms = null;
@@ -3031,7 +3055,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       for (let lev = 0; lev < nz; lev++) {
         const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
         const idx = lev * N + k;
-        w += (qv[idx] + qc[idx] + qi[idx] + qr[idx]) * (dp / g);
+      w += (qv[idx] + qc[idx] + qi[idx] + qr[idx] + qs[idx]) * (dp / g);
       }
       const delta = Math.abs(w - waterBefore[s]);
       if (delta > 1e-6) {

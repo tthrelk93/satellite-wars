@@ -21,6 +21,15 @@ import {
   stepVertical5
 } from './vertical5.js';
 
+const columnVaporMass = (state) => {
+  let total = 0;
+  for (let lev = 0; lev < state.nz; lev += 1) {
+    const dp = state.pHalf[(lev + 1) * state.N] - state.pHalf[lev * state.N];
+    total += Math.max(0, state.qv[lev * state.N] || 0) * (dp / 9.80665);
+  }
+  return total;
+};
+
 test('stepVertical5 keeps thin upper layers bounded during strong ascent-driven transport', () => {
   const sigmaHalf = new Float32Array([0, 0.5, 1]);
   const state = createState5({
@@ -49,6 +58,7 @@ test('stepVertical5 keeps thin upper layers bounded during strong ascent-driven 
   state.T[0] = 220;
   state.T[1] = 290;
   state.dpsDtApplied[0] = -1000;
+  const vaporBefore = columnVaporMass(state);
 
   stepVertical5({
     dt: 60,
@@ -71,6 +81,7 @@ test('stepVertical5 keeps thin upper layers bounded during strong ascent-driven 
   assert.ok(state.qv[0] <= 0.02);
   assert.ok(state.theta[1] >= 260);
   assert.ok(state.theta[1] <= 320);
+  assert.ok(Math.abs(columnVaporMass(state) - vaporBefore) < 1e-5);
   assert.ok(state.resolvedAscentCloudBirthAccumMass[0] > 0);
   assert.ok(Array.from(state.resolvedAscentCloudBirthByBandMass).some((value) => value > 0));
 });
@@ -176,7 +187,7 @@ test('stepVertical5 builds a persistent continuous convective state from moist a
       enableConvectiveMixing: false,
       enableConvection: true,
       enableOmegaMassFix: true,
-      enableLargeScaleVerticalAdvection: true
+      enableLargeScaleVerticalAdvection: false
     }
   });
 

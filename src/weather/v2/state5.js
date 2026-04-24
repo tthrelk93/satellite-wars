@@ -32,6 +32,7 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const precipRate = makeArray(N);
   const precipRainRate = makeArray(N);
   const precipSnowRate = makeArray(N);
+  const surfaceEvapAccum = makeArray(N);
   const surfaceEvapRate = makeArray(N);
   const surfaceLatentFlux = makeArray(N);
   const surfaceSensibleFlux = makeArray(N);
@@ -288,6 +289,11 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const numericalVerticalCflClampCount = makeArray(N);
   const numericalVerticalCflClampMass = makeArray(N);
   const numericalVerticalCflClampByBandMass = makeArray(N * INSTRUMENTATION_LEVEL_BAND_COUNT);
+  const numericalAdvectionWaterRepairMass = makeArray(N);
+  const numericalAdvectionWaterAddedMass = makeArray(N);
+  const numericalAdvectionWaterRemovedMass = makeArray(N);
+  const verticalSubtropicalDryingDemandMass = makeArray(N);
+  const verticalCloudErosionToVaporMass = makeArray(N);
   const analysisIauPs = makeArray(N);
   const analysisIauTs = makeArray(N);
   const analysisIauU = makeArray(SZ);
@@ -329,6 +335,7 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     precipRate,
     precipRainRate,
     precipSnowRate,
+    surfaceEvapAccum,
     surfaceEvapRate,
     surfaceLatentFlux,
     surfaceSensibleFlux,
@@ -566,6 +573,11 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     numericalVerticalCflClampCount,
     numericalVerticalCflClampMass,
     numericalVerticalCflClampByBandMass,
+    numericalAdvectionWaterRepairMass,
+    numericalAdvectionWaterAddedMass,
+    numericalAdvectionWaterRemovedMass,
+    verticalSubtropicalDryingDemandMass,
+    verticalCloudErosionToVaporMass,
     ...sourceTracer3D,
     surfaceEvapPotentialRate,
     surfaceEvapTransferCoeff,

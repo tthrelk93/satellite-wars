@@ -19,7 +19,13 @@ test('WeatherCore5 defaults keep the stronger broad-circulation surface wind res
   assert.equal(core.vertParams.subtropicalSubsidenceTau, 8 * 3600);
   assert.equal(core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac, 0.58);
   assert.equal(core.vertParams.subtropicalSubsidenceWeakHemiBoost, 0.35);
-  assert.equal(core.microParams.precipEffMicro, 0.72);
+  assert.equal(core.microParams.qc0, 5e-4);
+  assert.equal(core.microParams.qi0, 3e-4);
+  assert.equal(core.microParams.kAutoRain, 1.2e-3);
+  assert.equal(core.microParams.kAutoSnow, 1.5e-3);
+  assert.equal(core.microParams.kFallRain, 1 / 1800);
+  assert.equal(core.microParams.kFallSnow, 1 / (1.5 * 3600));
+  assert.equal(core.microParams.precipEffMicro, 0.95);
   assert.equal(core.nudgeParams.organizedConvectionQvColumnRelief, 1.05);
   assert.equal(core.nudgeParams.subtropicalSubsidenceQvRelief, 1.65);
 });
@@ -115,6 +121,12 @@ test('WeatherCore5 records module timings and conservation summaries during step
   assert.ok(timing.modules.stepVertical5.totalWallMs >= 0);
   assert.ok(conservation.modules.stepSurface2D5.callCount >= 1);
   assert.ok(Number.isFinite(conservation.modules.stepSurface2D5.delta.globalColumnWaterMeanKgM2));
+  assert.ok(Number.isFinite(conservation.modules.stepSurface2D5.delta.globalEvapAccumMeanMm));
+  assert.ok(Number.isFinite(conservation.waterCycle.evapMinusPrecipMeanMm));
+  assert.ok(Number.isFinite(conservation.waterCycle.tcwDriftKgM2));
+  assert.ok(Number.isFinite(conservation.waterCycle.verticalUnaccountedDeltaKgM2));
+  assert.ok(Number.isFinite(conservation.waterCycle.verticalSubtropicalDryingDemandKgM2));
+  assert.ok(Number.isFinite(conservation.waterCycle.verticalCloudErosionToVaporKgM2));
 });
 
 test('WeatherCore5 keeps terrain-fixture surface theta bounded during early stepping', async () => {

@@ -22,6 +22,21 @@ test('planetary audit CLI rejects unknown flags and supports label artifact base
   );
 });
 
+test('annual audit execution modes honor explicit no-counterfactuals', () => {
+  assert.equal(
+    planetaryAuditTest.resolveAuditExecutionModes({ preset: 'annual', counterfactuals: false }).runDeepProofDiagnostics,
+    false
+  );
+  assert.equal(
+    planetaryAuditTest.resolveAuditExecutionModes({ preset: 'annual', counterfactuals: null }).runDeepProofDiagnostics,
+    true
+  );
+  assert.equal(
+    planetaryAuditTest.resolveAuditExecutionModes({ preset: 'quick', counterfactuals: true }).runDeepProofDiagnostics,
+    true
+  );
+});
+
 test('audit artifact metadata preserves object schemas and wraps array payloads', () => {
   const auditRun = planetaryAuditTest.buildAuditRunMetadata({
     repoRoot,
@@ -663,6 +678,71 @@ test('buildPhase7And9Reports preserve helper-opposition, initialization-memory, 
   });
   assert.equal(blockedScore.pass, false);
   assert.ok(blockedScore.blockers.includes('vertical_cfl_limiter_mass_dominates'));
+});
+
+test('water-cycle budget report separates physical E/P closure from numerical transport residuals', () => {
+  const report = planetaryAuditTest.buildWaterCycleBudgetReport({
+    preset: 'annual',
+    conservationSummary: {
+      conservationBudget: {
+        sampledModelSeconds: 365 * 86400,
+        waterCycle: {
+          sampledModelSeconds: 365 * 86400,
+          evaporationMeanMm: 1000,
+          precipitationMeanMm: 960,
+          evapMinusPrecipMeanMm: 40,
+          evapPrecipRelativeImbalance: 0.04,
+          tcwDriftKgM2: 8,
+          nudgingNetDeltaKgM2: 0.5,
+          advectionNetDeltaKgM2: 0.02,
+          verticalNetDeltaKgM2: 0.3,
+          verticalUnaccountedDeltaKgM2: 0.3,
+          verticalSubtropicalDryingDemandKgM2: 25,
+          verticalCloudErosionToVaporKgM2: 5,
+          transportNumericalResidualKgM2: 0.32,
+          advectionRepairMeanKgM2: 12,
+          advectionRepairAddedMeanKgM2: 6,
+          advectionRepairRemovedMeanKgM2: 6,
+          advectionRepairResidualMeanKgM2: 0.00001,
+          tropicalSourceMidlatPolarDeltaKgM2: 0.2
+        }
+      }
+    }
+  });
+
+  assert.equal(report.pass, true);
+  assert.equal(report.annualReady, true);
+  assert.equal(report.evapPrecipRelativeImbalance, 0.04);
+  assert.equal(report.verticalSubtropicalDryingDemandKgM2, 25);
+
+  const blocked = planetaryAuditTest.buildWaterCycleBudgetReport({
+    preset: 'annual',
+    conservationSummary: {
+      conservationBudget: {
+        sampledModelSeconds: 365 * 86400,
+        waterCycle: {
+          sampledModelSeconds: 365 * 86400,
+          evaporationMeanMm: 1000,
+          precipitationMeanMm: 700,
+          evapMinusPrecipMeanMm: 300,
+          evapPrecipRelativeImbalance: 0.3,
+          tcwDriftKgM2: 60,
+          advectionNetDeltaKgM2: 4,
+          verticalNetDeltaKgM2: 2,
+          verticalUnaccountedDeltaKgM2: 2,
+          transportNumericalResidualKgM2: 6,
+          advectionRepairMeanKgM2: 120,
+          tropicalSourceMidlatPolarDeltaKgM2: 3
+        }
+      }
+    }
+  });
+
+  assert.equal(blocked.pass, false);
+  assert.ok(blocked.blockers.includes('evap_precip_imbalance'));
+  assert.ok(blocked.blockers.includes('advection_net_water_source_sink'));
+  assert.ok(blocked.blockers.includes('transport_numerical_residual'));
+  assert.ok(blocked.blockers.includes('tropical_source_numerical_leakage'));
 });
 
 test('buildMonthlyClimatology averages metrics and zonal profiles by month', () => {

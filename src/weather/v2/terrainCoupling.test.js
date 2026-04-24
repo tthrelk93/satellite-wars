@@ -320,13 +320,14 @@ test('stepVertical5 damps lee-side ascent-driven low-level transport when no del
   const protectedExposure = runCase({ terrainLeeAscentDamp: 1, deliveryExposure: 20 });
   const lev = noDamp.nz - 2;
   const levBase = lev * noDamp.N;
+  const initialQv = 0.002;
   const noDampQv = noDamp.qv[levBase];
   const dampedQv = damped.qv[levBase];
   const protectedQv = protectedExposure.qv[levBase];
 
   assert.ok(Math.max(...damped.terrainLeeNoDelivery) > 0.9);
-  assert.ok(dampedQv < noDampQv);
-  assert.ok(protectedQv > dampedQv);
+  assert.ok(Math.abs(dampedQv - initialQv) < Math.abs(noDampQv - initialQv));
+  assert.ok(Math.abs(protectedQv - noDampQv) < 1e-6);
 });
 
 test('stepVertical5 blends lee-side effective omega back toward terrain subsidence when residual ascent disagrees', () => {
@@ -381,11 +382,12 @@ test('stepVertical5 blends lee-side effective omega back toward terrain subsiden
   const protectedExposure = runCase({ terrainLeeOmegaFloorBlend: 1, deliveryExposure: 20 });
   const lev = noFloor.nz - 2;
   const levBase = lev * noFloor.N;
+  const initialQv = 0.002;
   const noFloorQv = noFloor.qv[levBase];
   const flooredQv = floored.qv[levBase];
   const protectedQv = protectedExposure.qv[levBase];
 
   assert.ok(Math.max(...floored.terrainLeeNoDelivery) > 0.9);
-  assert.ok(flooredQv < noFloorQv);
-  assert.ok(protectedQv > flooredQv);
+  assert.ok(Math.abs(flooredQv - initialQv) < Math.abs(noFloorQv - initialQv));
+  assert.ok(Math.abs(protectedQv - noFloorQv) < 1e-6);
 });

@@ -65,7 +65,7 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
   } = params;
   if (!enable) return;
 
-  const { N, nz, theta, T, u, v, qv, Ts, soilW, soilCap, landMask, sstNow, seaIceFrac, seaIceThicknessM, surfaceRadiativeFlux, precipRate, pHalf, pMid, surfaceEvapRate, surfaceLatentFlux, surfaceSensibleFlux, surfaceEvapPotentialRate, surfaceEvapTransferCoeff, surfaceEvapWindSpeed, surfaceEvapHumidityGradient, surfaceEvapSurfaceTemp, surfaceEvapAirTemp, surfaceEvapSoilGate, surfaceEvapRunoffLossRate, surfaceEvapSeaIceSuppression, surfaceEvapSurfaceSaturationMixingRatio, surfaceEvapAirMixingRatio } = state;
+  const { N, nz, theta, T, u, v, qv, Ts, soilW, soilCap, landMask, sstNow, seaIceFrac, seaIceThicknessM, surfaceRadiativeFlux, precipRate, pHalf, pMid, surfaceEvapAccum, surfaceEvapRate, surfaceLatentFlux, surfaceSensibleFlux, surfaceEvapPotentialRate, surfaceEvapTransferCoeff, surfaceEvapWindSpeed, surfaceEvapHumidityGradient, surfaceEvapSurfaceTemp, surfaceEvapAirTemp, surfaceEvapSoilGate, surfaceEvapRunoffLossRate, surfaceEvapSeaIceSuppression, surfaceEvapSurfaceSaturationMixingRatio, surfaceEvapAirMixingRatio } = state;
   const { nx, ny, latDeg, invDx, invDy } = grid;
   const sourceTracerByKey = Object.fromEntries(
     SURFACE_MOISTURE_SOURCE_TRACERS.map(({ key, field }) => [key, state[field]])
@@ -218,6 +218,7 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     const m0 = Math.max(1e-6, dp0 / g);
     const dqv = (E * dt) / m0;
     qv[idxS] += dqv;
+    if (surfaceEvapAccum) surfaceEvapAccum[k] += E * dt;
     if (traceEnabled && dqv > 0) {
       const sourceKey = classifySurfaceMoistureSource({
         latDeg: latDeg[row],
