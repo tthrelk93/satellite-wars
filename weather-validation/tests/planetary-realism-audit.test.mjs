@@ -637,8 +637,32 @@ test('buildPhase7And9Reports preserve helper-opposition, initialization-memory, 
   assert.equal(initMemory.milestones[0].requestedDay, 10);
   assert.equal(initMemory.milestones[1].sampledDay, 30);
   assert.equal(numerical.northDryBelt.verticalCflClampMassMeanKgM2, 0.003);
+  assert.equal(numerical.numericalIntegrityScore.pass, true);
   assert.equal(dtSensitivity.storyStablePass, true);
+  assert.equal(dtSensitivity.dryBeltRatioStablePass, true);
+  assert.equal(dtSensitivity.pass, true);
   assert.equal(gridSensitivity.storyStablePass, true);
+  assert.equal(gridSensitivity.rootCauseRankingStablePass, true);
+  assert.equal(gridSensitivity.pass, true);
+
+  const blockedScore = planetaryAuditTest.computeNumericalIntegrityScore({
+    numericalIntegrityTracing: {
+      northDryBelt: {
+        supersaturationClampMassMeanKgM2: 5,
+        verticalCflClampMassMeanKgM2: 100,
+        cloudLimiterMassMeanKgM2: 0,
+        negativeClipMassMeanKgM2: 0
+      },
+      southDryBelt: {
+        supersaturationClampMassMeanKgM2: 3,
+        verticalCflClampMassMeanKgM2: 80,
+        cloudLimiterMassMeanKgM2: 0,
+        negativeClipMassMeanKgM2: 0
+      }
+    }
+  });
+  assert.equal(blockedScore.pass, false);
+  assert.ok(blockedScore.blockers.includes('vertical_cfl_limiter_mass_dominates'));
 });
 
 test('buildMonthlyClimatology averages metrics and zonal profiles by month', () => {

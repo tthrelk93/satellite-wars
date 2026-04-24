@@ -33,11 +33,12 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
   const {
     polarLatStartDeg = 60,
     filterMoisture = false,
-    maxBacktraceCells = 2
+    maxBacktraceCells = 2,
+    conserveWater = true
   } = params;
 
-  const { nx, ny, invDx, invDy, sinLat, latDeg, polarWeight, cellLonDeg } = grid;
-  const { N, nz, u, v, theta, qv, qc, qi, qr } = state;
+  const { nx, ny, invDx, invDy, sinLat, latDeg, polarWeight, cellLonDeg, cosLat } = grid;
+  const { N, nz, u, v, theta, qv, qc, qi, qr, pHalf } = state;
   const qs = state.qs;
   const { tmpU, tmpV, tmp3D, rowA, rowB } = scratch;
   if (!tmpU || !tmpV || !tmp3D || !rowA || !rowB) return;
@@ -56,6 +57,32 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
       cloudBefore[idx] = (qc[idx] || 0) + (qi[idx] || 0) + (qr[idx] || 0) + (qs?.[idx] || 0);
     }
   }
+  const waterFields = [qv, qc, qi, qr].filter((field) => field instanceof Float32Array && field.length === qv.length);
+  if (qs instanceof Float32Array && qs.length === qv.length) waterFields.push(qs);
+  const computeGlobalWaterMean = () => {
+    if (!(pHalf instanceof Float32Array) || pHalf.length !== (nz + 1) * N) return null;
+    let waterTotal = 0;
+    let weightTotal = 0;
+    for (let k = 0; k < N; k += 1) {
+      const row = Math.floor(k / nx);
+      const rowWeight = Math.max(0.05, cosLat?.[row] || 0);
+      let columnWater = 0;
+      for (let lev = 0; lev < nz; lev += 1) {
+        const idx = lev * N + k;
+        const dp = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+        if (!(dp > 0)) continue;
+        let mixingRatio = 0;
+        for (const field of waterFields) {
+          mixingRatio += Math.max(0, field[idx] || 0);
+        }
+        columnWater += mixingRatio * (dp / 9.80665);
+      }
+      waterTotal += columnWater * rowWeight;
+      weightTotal += rowWeight;
+    }
+    return weightTotal > 0 ? waterTotal / weightTotal : null;
+  };
+  const globalWaterBefore = conserveWater ? computeGlobalWaterMean() : null;
 
   const advectScalar = (src) => {
     for (let lev = 0; lev < nz; lev++) {
@@ -172,6 +199,9 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
   advectScalar(qc);
   advectScalar(qi);
   advectScalar(qr);
+  if (qs instanceof Float32Array && qs.length === qv.length) {
+    advectScalar(qs);
+  }
   for (const fieldName of SURFACE_MOISTURE_SOURCE_FIELDS) {
     if (state[fieldName] instanceof Float32Array && state[fieldName].length === qv.length) {
       advectScalar(state[fieldName]);
@@ -223,6 +253,33 @@ export function stepAdvection5({ dt, grid, state, params = {}, scratch }) {
         applyFilter(qc, base, j, passes);
         applyFilter(qi, base, j, passes);
         applyFilter(qr, base, j, passes);
+        if (qs instanceof Float32Array && qs.length === qv.length) {
+          applyFilter(qs, base, j, passes);
+        }
+      }
+    }
+  }
+
+  if (conserveWater && Number.isFinite(globalWaterBefore) && globalWaterBefore > 0) {
+    const globalWaterAfter = computeGlobalWaterMean();
+    if (Number.isFinite(globalWaterAfter) && globalWaterAfter > 0) {
+      const scale = clamp(globalWaterBefore / globalWaterAfter, 0.5, 2);
+      if (Number.isFinite(scale) && Math.abs(scale - 1) > 1e-9) {
+        for (const field of waterFields) {
+          for (let idx = 0; idx < field.length; idx += 1) {
+            field[idx] = Math.max(0, field[idx] * scale);
+          }
+        }
+        for (const fieldName of SURFACE_MOISTURE_SOURCE_FIELDS) {
+          const field = state[fieldName];
+          if (field instanceof Float32Array && field.length === qv.length) {
+            for (let idx = 0; idx < field.length; idx += 1) {
+              field[idx] = Math.max(0, field[idx] * scale);
+            }
+          }
+        }
+        state.numericalAdvectionWaterRepairMassMeanKgM2 =
+          (state.numericalAdvectionWaterRepairMassMeanKgM2 || 0) + Math.abs(globalWaterAfter - globalWaterBefore);
       }
     }
   }

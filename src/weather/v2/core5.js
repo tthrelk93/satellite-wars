@@ -284,7 +284,8 @@ export class WeatherCore5 {
     nz = 26,
     sigmaHalf,
     pressureLevelsPa = DEFAULT_PRESSURE_LEVELS_PA,
-    instrumentationMode = 'full'
+    instrumentationMode = 'full',
+    maxInternalDt = 900
   } = {}) {
     this.grid = createLatLonGridV2(nx, ny, { minDxMeters: 80000 });
     if (typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production') {
@@ -309,6 +310,7 @@ export class WeatherCore5 {
     const { N } = this.state;
 
     this.modelDt = dt;
+    this.maxInternalDt = Math.max(1, Math.min(this.modelDt, Number(maxInternalDt) || this.modelDt));
     this.timeUTC = 0;
     this.seed = Number.isFinite(seed) ? seed : Math.floor(Math.random() * 1e9);
     this.ready = false;
@@ -361,7 +363,8 @@ export class WeatherCore5 {
     this.advectParams = {
       polarLatStartDeg: 80,
       filterMoisture: false,
-      maxBacktraceCells: 2
+      maxBacktraceCells: 2,
+      conserveWater: true
     };
     this.surfaceParams = {
       enable: true,
@@ -514,6 +517,7 @@ export class WeatherCore5 {
       dThetaMaxConvPerStep: 2.5,
       enableLargeScaleVerticalAdvection: true,
       verticalAdvectionCflMax: 0.4,
+      verticalAdvectionMaxSubsteps: 8,
       dThetaMaxVertAdvPerStep: 2.0,
       enableOmegaMassFix: true,
       orographicLiftScale: 0.5,
@@ -820,18 +824,25 @@ export class WeatherCore5 {
     const steps = Math.floor(this._accum / this.modelDt);
     const maxSteps = Math.max(1000, Math.ceil(86400 / this.modelDt) + 10);
     const stepsToRun = Math.min(steps, maxSteps);
-    if (this._loggerContext) {
-      this._loggerContext.stepsRanThisTick = stepsToRun;
-    }
+    let internalStepsRun = 0;
     for (let i = 0; i < stepsToRun; i++) {
-      this._stepOnce(this.modelDt);
+      let remaining = this.modelDt;
+      while (remaining > 1e-9) {
+        const subDt = Math.min(this.maxInternalDt, remaining);
+        this._stepOnce(subDt);
+        internalStepsRun += 1;
+        remaining -= subDt;
+      }
+    }
+    if (this._loggerContext) {
+      this._loggerContext.stepsRanThisTick = internalStepsRun;
     }
     this._accum -= stepsToRun * this.modelDt;
     if (stepsToRun < steps) {
       this._accum = Math.min(this._accum, this.modelDt * maxSteps);
     }
-    this._lastAdvanceSteps = stepsToRun;
-    return stepsToRun;
+    this._lastAdvanceSteps = internalStepsRun;
+    return internalStepsRun;
   }
 
   setLogger(logger) {
@@ -1138,6 +1149,7 @@ export class WeatherCore5 {
       runtime: {
         timeUTC: this.timeUTC,
         modelDt: this.modelDt,
+        maxInternalDt: this.maxInternalDt,
         accumSeconds: this._accum,
         dynStepIndex: this._dynStepIndex,
         nudgeAccumSeconds: this._nudgeAccumSeconds,
@@ -1239,6 +1251,7 @@ export class WeatherCore5 {
 
     this.timeUTC = Number(snapshot?.runtime?.timeUTC) || 0;
     this.modelDt = Number(snapshot?.runtime?.modelDt) || this.modelDt;
+    this.maxInternalDt = Math.max(1, Math.min(this.modelDt, Number(snapshot?.runtime?.maxInternalDt) || this.maxInternalDt || this.modelDt));
     this._accum = Number(snapshot?.runtime?.accumSeconds) || 0;
     this._dynStepIndex = Number(snapshot?.runtime?.dynStepIndex) || 0;
     this._nudgeAccumSeconds = Number(snapshot?.runtime?.nudgeAccumSeconds) || 0;

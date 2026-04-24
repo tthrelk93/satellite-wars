@@ -516,6 +516,7 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'dThetaMaxConvPerStep',
   'enableLargeScaleVerticalAdvection',
   'verticalAdvectionCflMax',
+  'verticalAdvectionMaxSubsteps',
   'verticalAdvectionSigmaTaperExp',
   'dThetaMaxVertAdvPerStep',
   'enableOmegaMassFix',
@@ -703,6 +704,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     // Large-scale vertical advection (omega-based)
     enableLargeScaleVerticalAdvection = true,
     verticalAdvectionCflMax = 0.4,
+    verticalAdvectionMaxSubsteps = 8,
     verticalAdvectionSigmaTaperExp = 2.0,
     dThetaMaxVertAdvPerStep = 2.0,
 
@@ -1390,6 +1392,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (enableLargeScaleVerticalAdvection && dt > 0) {
     const cflMax = clamp(verticalAdvectionCflMax, 0, 1);
     if (cflMax > 0) {
+      const maxSubsteps = Math.max(1, Math.floor(verticalAdvectionMaxSubsteps || 1));
       if (!state._vertAdvQv || state._vertAdvQv.length !== qv.length) {
         state._vertAdvQv = new Float32Array(qv.length);
       }
@@ -1401,120 +1404,140 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const taperExp = Math.max(0, verticalAdvectionSigmaTaperExp);
       const levS = nz - 1;
       const lowLevelStart = Math.max(0, nz - 4);
+      const computeTransport = (lev, k) => {
+        const omegaTop = omega[lev * N + k];
+        const omegaBot = omega[(lev + 1) * N + k];
+        const omegaMidRaw = 0.5 * (omegaTop + omegaBot);
+        const sigmaMid = sigmaHalf && sigmaHalf.length > lev + 1
+          ? clamp01(0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1]))
+          : 1;
+        const transportScale = taperExp > 0 ? Math.pow(sigmaMid, taperExp) : 1;
+        const leeNoDelivery = lev >= lowLevelStart ? terrainLeeNoDeliveryDiag[k] : 0;
+        const leeOmegaFloorBlend = leeNoDelivery * clamp(terrainLeeOmegaFloorBlend, 0, 1);
+        const terrainOmegaMid = lev >= lowLevelStart
+          ? Math.max(0, terrainOmegaSurfaceDiag[k]) * Math.exp(-Math.max(0, levS - lev) * orographicDecayFrac)
+          : 0;
+        let omegaMidEffective = omegaMidRaw;
+        if (leeOmegaFloorBlend > 0 && terrainOmegaMid > omegaMidEffective) {
+          omegaMidEffective += (terrainOmegaMid - omegaMidEffective) * leeOmegaFloorBlend;
+        }
+        const ascentDamp = 1 - leeNoDelivery * clamp(terrainLeeAscentDamp, 0, 1);
+        const omegaMid = omegaMidEffective < 0 ? omegaMidEffective * ascentDamp : omegaMidEffective;
+        return { omegaMid, sigmaMid, transportScale };
+      };
+      const recordVerticalCflClamp = (lev, k, sigmaMid, rawFrac) => {
+        const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+        const excessMass = dpLev > 0 ? (dpLev / g) * Math.max(0, rawFrac - cflMax) : 0;
+        state.numericalVerticalCflClampCount[k] += 1;
+        state.numericalVerticalCflClampMass[k] += excessMass;
+        recordBandValue(
+          state.numericalVerticalCflClampByBandMass,
+          findInstrumentationLevelBandIndex(sigmaMid),
+          k,
+          N,
+          excessMass
+        );
+      };
       for (let k = 0; k < N; k++) {
         let columnDelivery = 0;
         let columnExposure = 0;
         const terrainFlowForcing = terrainFlowForcingDiag[k];
+        let maxRawFrac = 0;
         for (let lev = 0; lev < nz; lev++) {
           const idx = lev * N + k;
-          let qvUpdated = qv[idx];
-          let thetaUpdated = theta[idx];
-          const omegaTop = omega[lev * N + k];
-          const omegaBot = omega[(lev + 1) * N + k];
-          const omegaMidRaw = 0.5 * (omegaTop + omegaBot);
-          const sigmaMid = sigmaHalf && sigmaHalf.length > lev + 1
-            ? clamp01(0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1]))
-            : 1;
-          const transportScale = taperExp > 0 ? Math.pow(sigmaMid, taperExp) : 1;
-          const leeNoDelivery = lev >= lowLevelStart ? terrainLeeNoDeliveryDiag[k] : 0;
-          const leeOmegaFloorBlend = leeNoDelivery * clamp(terrainLeeOmegaFloorBlend, 0, 1);
-          const terrainOmegaMid = lev >= lowLevelStart
-            ? Math.max(0, terrainOmegaSurfaceDiag[k]) * Math.exp(-Math.max(0, levS - lev) * orographicDecayFrac)
-            : 0;
-          let omegaMidEffective = omegaMidRaw;
-          if (leeOmegaFloorBlend > 0 && terrainOmegaMid > omegaMidEffective) {
-            omegaMidEffective += (terrainOmegaMid - omegaMidEffective) * leeOmegaFloorBlend;
-          }
-          const ascentDamp = 1 - leeNoDelivery * clamp(terrainLeeAscentDamp, 0, 1);
-          const omegaMid = omegaMidEffective < 0 ? omegaMidEffective * ascentDamp : omegaMidEffective;
-
+          const { omegaMid, transportScale } = computeTransport(lev, k);
           if (omegaMid < 0 && lev < nz - 1) {
             const idxBelow = (lev + 1) * N + k;
             const dpNeighbor = pMid[idxBelow] - pMid[idx];
             if (dpNeighbor > 0) {
-              const rawFrac = ((-omegaMid) * dt * transportScale) / dpNeighbor;
-              const frac = clamp(rawFrac, 0, cflMax);
-              if (rawFrac > cflMax) {
-                const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-                const excessMass = dpLev > 0 ? (dpLev / g) * Math.max(0, rawFrac - cflMax) : 0;
-                state.numericalVerticalCflClampCount[k] += 1;
-                state.numericalVerticalCflClampMass[k] += excessMass;
-                recordBandValue(
-                  state.numericalVerticalCflClampByBandMass,
-                  findInstrumentationLevelBandIndex(sigmaMid),
-                  k,
-                  N,
-                  excessMass
-                );
-              }
-              const qvDelta = frac * (qv[idxBelow] - qv[idx]);
-              qvUpdated += qvDelta;
-              thetaUpdated += frac * (theta[idxBelow] - theta[idx]);
-              if (traceEnabled && qvDelta > 0 && sigmaMid <= 0.55) {
-                const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-                if (dpLev > 0) {
-                  const cloudBirthMass = qvDelta * (dpLev / g);
-                  resolvedAscentCloudBirthPotential[k] += cloudBirthMass;
-                  verticalUpperCloudResolvedBirthMass[k] += cloudBirthMass;
-                  resolvedAscentCloudBirthAccumMass[k] += cloudBirthMass;
-                  const bandIndex = findCloudBirthLevelBandIndex(sigmaMid);
-                  resolvedAscentCloudBirthByBandMass[cloudBirthBandOffset(bandIndex, k, N)] += cloudBirthMass;
-                }
-              }
-              if (terrainFlowForcing > 0 && lev >= lowLevelStart) {
-                columnExposure += (-omegaMid) * dt;
-                if (qvDelta > 0) {
-                  const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-                  if (dpLev > 0) {
-                    columnDelivery += qvDelta * (dpLev / g);
-                  }
-                }
-              }
+              maxRawFrac = Math.max(maxRawFrac, ((-omegaMid) * dt * transportScale) / dpNeighbor);
             }
           } else if (omegaMid > 0 && lev > 0) {
             const idxAbove = (lev - 1) * N + k;
             const dpNeighbor = pMid[idx] - pMid[idxAbove];
             if (dpNeighbor > 0) {
-              const rawFrac = (omegaMid * dt * transportScale) / dpNeighbor;
-              const frac = clamp(rawFrac, 0, cflMax);
-              if (rawFrac > cflMax) {
-                const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-                const excessMass = dpLev > 0 ? (dpLev / g) * Math.max(0, rawFrac - cflMax) : 0;
-                state.numericalVerticalCflClampCount[k] += 1;
-                state.numericalVerticalCflClampMass[k] += excessMass;
-                recordBandValue(
-                  state.numericalVerticalCflClampByBandMass,
-                  findInstrumentationLevelBandIndex(sigmaMid),
-                  k,
-                  N,
-                  excessMass
-                );
-              }
-              qvUpdated += frac * (qv[idxAbove] - qv[idx]);
-              thetaUpdated += frac * (theta[idxAbove] - theta[idx]);
+              maxRawFrac = Math.max(maxRawFrac, (omegaMid * dt * transportScale) / dpNeighbor);
             }
           }
+        }
+        const substeps = Math.max(1, Math.min(maxSubsteps, Math.ceil(maxRawFrac / cflMax)));
+        const subDt = dt / substeps;
+        const dThetaLimit = dThetaMaxVertAdvPerStep > 0 ? dThetaMaxVertAdvPerStep / substeps : 0;
+        for (let substep = 0; substep < substeps; substep++) {
+          for (let lev = 0; lev < nz; lev++) {
+            const idx = lev * N + k;
+            let qvUpdated = qv[idx];
+            let thetaUpdated = theta[idx];
+            const { omegaMid, sigmaMid, transportScale } = computeTransport(lev, k);
 
-          if (qvUpdated < 0) {
-            const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
-            const clippedMass = dpLev > 0 ? (-qvUpdated) * (dpLev / g) : 0;
-            state.numericalNegativeClipCount[k] += 1;
-            state.numericalNegativeClipMass[k] += clippedMass;
-            recordBandValue(
-              state.numericalNegativeClipByBandMass,
-              findInstrumentationLevelBandIndex(sigmaMid),
-              k,
-              N,
-              clippedMass
-            );
+            if (omegaMid < 0 && lev < nz - 1) {
+              const idxBelow = (lev + 1) * N + k;
+              const dpNeighbor = pMid[idxBelow] - pMid[idx];
+              if (dpNeighbor > 0) {
+                const rawFrac = ((-omegaMid) * subDt * transportScale) / dpNeighbor;
+                const frac = clamp(rawFrac, 0, cflMax);
+                if (rawFrac > cflMax) recordVerticalCflClamp(lev, k, sigmaMid, rawFrac);
+                const qvDelta = frac * (qv[idxBelow] - qv[idx]);
+                qvUpdated += qvDelta;
+                thetaUpdated += frac * (theta[idxBelow] - theta[idx]);
+                if (traceEnabled && qvDelta > 0 && sigmaMid <= 0.55) {
+                  const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+                  if (dpLev > 0) {
+                    const cloudBirthMass = qvDelta * (dpLev / g);
+                    resolvedAscentCloudBirthPotential[k] += cloudBirthMass;
+                    verticalUpperCloudResolvedBirthMass[k] += cloudBirthMass;
+                    resolvedAscentCloudBirthAccumMass[k] += cloudBirthMass;
+                    const bandIndex = findCloudBirthLevelBandIndex(sigmaMid);
+                    resolvedAscentCloudBirthByBandMass[cloudBirthBandOffset(bandIndex, k, N)] += cloudBirthMass;
+                  }
+                }
+                if (terrainFlowForcing > 0 && lev >= lowLevelStart) {
+                  columnExposure += (-omegaMid) * subDt;
+                  if (qvDelta > 0) {
+                    const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+                    if (dpLev > 0) {
+                      columnDelivery += qvDelta * (dpLev / g);
+                    }
+                  }
+                }
+              }
+            } else if (omegaMid > 0 && lev > 0) {
+              const idxAbove = (lev - 1) * N + k;
+              const dpNeighbor = pMid[idx] - pMid[idxAbove];
+              if (dpNeighbor > 0) {
+                const rawFrac = (omegaMid * subDt * transportScale) / dpNeighbor;
+                const frac = clamp(rawFrac, 0, cflMax);
+                if (rawFrac > cflMax) recordVerticalCflClamp(lev, k, sigmaMid, rawFrac);
+                qvUpdated += frac * (qv[idxAbove] - qv[idx]);
+                thetaUpdated += frac * (theta[idxAbove] - theta[idx]);
+              }
+            }
+
+            if (qvUpdated < 0) {
+              const dpLev = pHalf[(lev + 1) * N + k] - pHalf[lev * N + k];
+              const clippedMass = dpLev > 0 ? (-qvUpdated) * (dpLev / g) : 0;
+              state.numericalNegativeClipCount[k] += 1;
+              state.numericalNegativeClipMass[k] += clippedMass;
+              recordBandValue(
+                state.numericalNegativeClipByBandMass,
+                findInstrumentationLevelBandIndex(sigmaMid),
+                k,
+                N,
+                clippedMass
+              );
+            }
+            qvNext[idx] = Math.max(0, qvUpdated);
+            if (dThetaLimit > 0) {
+              const dTheta = thetaUpdated - theta[idx];
+              thetaNext[idx] = theta[idx] + clamp(dTheta, -dThetaLimit, dThetaLimit);
+            } else {
+              thetaNext[idx] = thetaUpdated;
+            }
           }
-          qvNext[idx] = Math.max(0, qvUpdated);
-          if (dThetaMaxVertAdvPerStep > 0) {
-            const dTheta = thetaUpdated - theta[idx];
-            thetaNext[idx] =
-              theta[idx] + clamp(dTheta, -dThetaMaxVertAdvPerStep, dThetaMaxVertAdvPerStep);
-          } else {
-            thetaNext[idx] = thetaUpdated;
+          for (let lev = 0; lev < nz; lev++) {
+            const idx = lev * N + k;
+            qv[idx] = qvNext[idx];
+            theta[idx] = thetaNext[idx];
           }
         }
         orographicDeliveryLastStep[k] = columnDelivery;
@@ -1526,8 +1549,6 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           }
         }
       }
-      qv.set(qvNext);
-      theta.set(thetaNext);
       for (let m = 0; m < qv.length; m++) {
         if (qv[m] < 0) {
           const cell = m % N;

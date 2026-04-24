@@ -75,6 +75,61 @@ test('stepVertical5 keeps thin upper layers bounded during strong ascent-driven 
   assert.ok(Array.from(state.resolvedAscentCloudBirthByBandMass).some((value) => value > 0));
 });
 
+test('stepVertical5 substeps over-CFL vertical advection instead of dropping most transport', () => {
+  const runCase = (verticalAdvectionMaxSubsteps) => {
+    const sigmaHalf = new Float32Array([0, 0.5, 1]);
+    const state = createState5({
+      grid: { count: 1 },
+      nz: 2,
+      sigmaHalf
+    });
+    const grid = {
+      nx: 1,
+      ny: 1,
+      invDx: new Float32Array([1]),
+      invDy: new Float32Array([1]),
+      cosLat: new Float32Array([1])
+    };
+
+    state.ps[0] = 100000;
+    state.pHalf[0] = 20000;
+    state.pHalf[1] = 45000;
+    state.pHalf[2] = 100000;
+    state.pMid[0] = 32500;
+    state.pMid[1] = 72500;
+    state.theta[0] = 265;
+    state.theta[1] = 305;
+    state.qv[0] = 0.001;
+    state.qv[1] = 0.018;
+    state.T[0] = 230;
+    state.T[1] = 290;
+    state.dpsDtApplied[0] = -1000;
+
+    stepVertical5({
+      dt: 900,
+      grid,
+      state,
+      params: {
+        enableMixing: false,
+        enableConvection: false,
+        enableOmegaMassFix: true,
+        enableLargeScaleVerticalAdvection: true,
+        verticalAdvectionCflMax: 0.4,
+        verticalAdvectionMaxSubsteps,
+        verticalAdvectionSigmaTaperExp: 0,
+        dThetaMaxVertAdvPerStep: 0
+      }
+    });
+    return state;
+  };
+
+  const singleStep = runCase(1);
+  const splitStep = runCase(8);
+
+  assert.ok(splitStep.numericalVerticalCflClampMass[0] < singleStep.numericalVerticalCflClampMass[0]);
+  assert.ok(splitStep.qv[0] > singleStep.qv[0]);
+});
+
 test('stepVertical5 builds a persistent continuous convective state from moist ascent', () => {
   const sigmaHalf = new Float32Array([0, 0.35, 0.7, 1]);
   const state = createState5({

@@ -16,6 +16,7 @@ weather-validation/reports/worker-brief.json
 weather-validation/reports/worker-brief.md
 weather-validation/reports/planetary-realism-status.json
 weather-validation/reports/planetary-realism-status.md
+weather-validation/reports/planetary-realism-status-*.json
 tools/wind-fixtures/
 *.grib2.*.idx
 *.grb2.*.idx
