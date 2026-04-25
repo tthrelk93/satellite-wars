@@ -77,6 +77,39 @@ test('terrain-coupled lee columns evaporate and convert warm rain less when deli
   assert.ok(leeNoDelivery.qv[lowIdx] >= leeWithDelivery.qv[lowIdx]);
 });
 
+test('subtropical virga boost evaporates weak-engine dry-belt precipitation', () => {
+  const makeDryBeltState = () => {
+    const state = setupState(286);
+    const lowIdx = (state.nz - 1) * state.N;
+    state.qv.fill(0.0025);
+    state.qc.fill(0);
+    state.qr.fill(0);
+    state.qr[lowIdx] = 0.01;
+    state.landMask[0] = 0;
+    state.subtropicalSubsidenceDrying[0] = 0.09;
+    state.convectiveOrganization[0] = 0.02;
+    state.convectiveMassFlux[0] = 0.0;
+    return state;
+  };
+
+  const base = makeDryBeltState();
+  const boosted = makeDryBeltState();
+  const lowIdx = (base.nz - 1) * base.N;
+
+  stepMicrophysics5({ dt: 300, state: base, params: { enableConvectiveOutcome: true } });
+  stepMicrophysics5({
+    dt: 300,
+    state: boosted,
+    params: {
+      enableConvectiveOutcome: true,
+      subtropicalVirgaEvapBoost: 4.0
+    }
+  });
+  assert.ok(boosted.precipReevaporationMass[0] > base.precipReevaporationMass[0]);
+  assert.ok(boosted.qr[lowIdx] < base.qr[lowIdx]);
+  assert.ok(boosted.qv[lowIdx] > base.qv[lowIdx]);
+});
+
 test('microphysics scales convective autoconversion continuously with organized mass flux', () => {
   const weak = setupState(281);
   const strong = setupState(281);
@@ -101,6 +134,43 @@ test('microphysics scales convective autoconversion continuously with organized 
   assert.ok(strong.precipRainRate[0] > weak.precipRainRate[0]);
   assert.ok(strong.precipRate[0] >= weak.precipRate[0]);
   assert.ok(strong.qr[lowIdx] >= weak.qr[lowIdx]);
+});
+
+test('microphysics applies configured convective autoconversion scale in organized rain columns', () => {
+  const makeState = () => {
+    const state = setupState(281);
+    const lowIdx = (state.nz - 1) * state.N;
+    state.qv.fill(0.010);
+    state.qc.fill(0);
+    state.qr.fill(0);
+    state.qc[lowIdx] = 0.0020;
+    state.convectiveOrganization[0] = 0.85;
+    state.convectiveMassFlux[0] = 0.03;
+    return state;
+  };
+
+  const lowScale = makeState();
+  const highScale = makeState();
+
+  stepMicrophysics5({
+    dt: 900,
+    state: lowScale,
+    params: {
+      enableConvectiveOutcome: true,
+      convKAutoScale: 1.0
+    }
+  });
+  stepMicrophysics5({
+    dt: 900,
+    state: highScale,
+    params: {
+      enableConvectiveOutcome: true,
+      convKAutoScale: 3.0
+    }
+  });
+
+  assert.ok(highScale.precipRainRate[0] > lowScale.precipRainRate[0]);
+  assert.ok(highScale.qr[(highScale.nz - 1) * highScale.N] > lowScale.qr[(lowScale.nz - 1) * lowScale.N]);
 });
 
 test('microphysics records large-scale condensation and re-evaporation diagnostics', () => {
@@ -366,6 +436,139 @@ test('microphysics soft live-state maintenance patch suppresses selected marine 
     patchOn.saturationAdjustmentSoftLiveGateCandidateMass[0]
       >= patchOn.saturationAdjustmentSoftLiveGateAppliedSuppressionMass[0]
   );
+});
+
+test('microphysics soft live-state fate modes either retain, export, or buffer suppressed marine-deck mass', () => {
+  const makeState = () => {
+    const state = setupState(279);
+    state.qv.fill(0.002);
+    state.qc.fill(0);
+    state.qi.fill(0);
+    state.qr.fill(0);
+    state.qs.fill(0);
+    state.landMask[0] = 0;
+    state.convectiveOrganization[0] = 0.04;
+    state.convectiveMassFlux[0] = 2e-4;
+    state.convectiveAnvilSource[0] = 0.02;
+    state.subtropicalSubsidenceDrying[0] = 0.0;
+    state.freshSubtropicalSuppressionDiag[0] = 0.68;
+    state.freshSubtropicalBandDiag[0] = 0.86;
+    state.freshNeutralToSubsidingSupportDiag[0] = 0.03;
+    state.freshOrganizedSupportDiag[0] = 0.2;
+    state.freshRhMidSupportDiag[0] = 0.97;
+    state.omega.fill(-0.03);
+    state.qv[1] = 0.011;
+    return state;
+  };
+
+  const retain = makeState();
+  const exported = makeState();
+  const buffered = makeState();
+
+  stepMicrophysics5({
+    dt: 900,
+    state: retain,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: true,
+      softLiveStateMaintenanceSuppressedMassMode: 'retain'
+    }
+  });
+  stepMicrophysics5({
+    dt: 900,
+    state: exported,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: true,
+      softLiveStateMaintenanceSuppressedMassMode: 'sink_export'
+    }
+  });
+  stepMicrophysics5({
+    dt: 900,
+    state: buffered,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: true,
+      softLiveStateMaintenanceSuppressedMassMode: 'buffered_rainout'
+    }
+  });
+
+  assert.ok(retain.saturationAdjustmentSoftLiveGateRetainedVaporMass[0] > 0);
+  assert.ok(exported.saturationAdjustmentSoftLiveGateSinkExportMass[0] > 0);
+  assert.ok(buffered.saturationAdjustmentSoftLiveGateBufferedRainoutMass[0] > 0);
+  assert.ok(exported.qv[1] < retain.qv[1]);
+  assert.ok(buffered.qv[1] < retain.qv[1]);
+  assert.ok(buffered.qr[1] > retain.qr[1] || buffered.qs[1] > retain.qs[1]);
+});
+
+test('microphysics can conservatively export soft live-state marine-deck excess toward the tropical rain lane', () => {
+  const sigmaHalf = createSigmaHalfLevels({ nz: 4 });
+  const grid = {
+    nx: 1,
+    ny: 3,
+    count: 3,
+    latDeg: new Float32Array([3.75, -3.75, -18.75])
+  };
+  const state = createState5({ grid, nz: 4, sigmaHalf });
+  state.ps.fill(100000);
+  state.pMid.set(computeModelMidPressurePa({ surfacePressurePa: state.ps, sigmaHalf, pTop: 20000 }));
+  for (let lev = 0; lev <= state.nz; lev += 1) {
+    for (let k = 0; k < state.N; k += 1) {
+      state.pHalf[lev * state.N + k] = 20000 + (state.ps[k] - 20000) * sigmaHalf[lev];
+    }
+  }
+  state.theta.fill(279 / Math.pow(state.pMid[0] / 100000, 287.05 / 1004));
+  state.T.fill(279);
+  state.qv.fill(0.002);
+  state.qc.fill(0);
+  state.qi.fill(0);
+  state.qr.fill(0);
+  state.qs.fill(0);
+  state.landMask.fill(0);
+  const sourceCell = 2;
+  const targetCell = 1;
+  const sourceIdx = 1 * state.N + sourceCell;
+  const targetIdx = 1 * state.N + targetCell;
+  state.qv[sourceIdx] = 0.011;
+  state.convectiveOrganization[sourceCell] = 0.04;
+  state.convectiveMassFlux[sourceCell] = 2e-4;
+  state.convectiveAnvilSource[sourceCell] = 0.02;
+  state.freshSubtropicalSuppressionDiag[sourceCell] = 0.68;
+  state.freshSubtropicalBandDiag[sourceCell] = 0.86;
+  state.freshNeutralToSubsidingSupportDiag[sourceCell] = 0.03;
+  state.freshOrganizedSupportDiag[sourceCell] = 0.2;
+  state.freshRhMidSupportDiag[sourceCell] = 0.97;
+  state.omega.fill(-0.03);
+
+  const layerMassAt = (lev, cell) => (state.pHalf[(lev + 1) * state.N + cell] - state.pHalf[lev * state.N + cell]) / 9.80665;
+  const columnWaterMass = (cell) => {
+    let mass = state.precipAccum[cell] || 0;
+    for (let lev = 0; lev < state.nz; lev += 1) {
+      const idx = lev * state.N + cell;
+      const mixingRatio = state.qv[idx] + state.qc[idx] + state.qi[idx] + state.qr[idx] + state.qs[idx];
+      mass += mixingRatio * layerMassAt(lev, cell);
+    }
+    return mass;
+  };
+  const beforeMass = columnWaterMass(sourceCell) + columnWaterMass(targetCell);
+
+  stepMicrophysics5({
+    dt: 900,
+    grid,
+    state,
+    params: {
+      enableConvectiveOutcome: true,
+      enableSoftLiveStateMaintenanceSuppression: true,
+      softLiveStateMaintenanceSuppressedMassMode: 'equatorward_export',
+      softLiveStateMaintenanceExportTargetAbsLatDeg: 4
+    }
+  });
+
+  const afterMass = columnWaterMass(sourceCell) + columnWaterMass(targetCell);
+  assert.ok(state.saturationAdjustmentSoftLiveGateEquatorwardExportMass[sourceCell] > 0);
+  assert.ok(state.qv[sourceIdx] < 0.011);
+  assert.ok(state.qv[targetIdx] > 0.002);
+  assert.ok(Math.abs(afterMass - beforeMass) < 1e-3);
 });
 
 test('microphysics shoulder absorption guard suppresses bridge-silent tropical shoulder condensation when enabled', () => {

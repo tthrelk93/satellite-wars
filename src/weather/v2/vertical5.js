@@ -144,6 +144,42 @@ export const computeTransitionReturnFlowCouplingFrac = ({
     maxFrac
   );
 };
+export const computeSubtropicalDescentVentilationPaS = ({
+  enabled,
+  sourceDriver,
+  latShape,
+  walkerSubsidenceSupport,
+  convectiveOrganization,
+  convectivePotential,
+  existingOmegaPaS,
+  source0,
+  source1,
+  maxPaS,
+  maxStepPaS,
+  organizationMax,
+  potentialMax
+}) => {
+  if (!enabled) return 0;
+  const ventilationSourceSupport = smoothstep(source0, source1, sourceDriver);
+  const weakOrganizationVent = 1 - smoothstep(
+    organizationMax * 0.55,
+    organizationMax,
+    convectiveOrganization
+  );
+  const weakPotentialVent = 1 - smoothstep(
+    potentialMax * 0.55,
+    potentialMax,
+    convectivePotential
+  );
+  const targetDescentPaS = Math.max(0, maxPaS)
+    * clamp01(latShape)
+    * ventilationSourceSupport
+    * weakOrganizationVent
+    * weakPotentialVent
+    * (0.75 + 0.25 * clamp01(walkerSubsidenceSupport));
+  const existingDescentPaS = Math.max(0, existingOmegaPaS);
+  return clamp(targetDescentPaS - existingDescentPaS, 0, Math.max(0, maxStepPaS));
+};
 export const computeHadleyReturnFlowWindTendencyMs = ({
   enabled,
   latDeg,
@@ -567,6 +603,11 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'convRainoutBase',
   'convRainoutOrganizationWeight',
   'convRainoutHumidityWeight',
+  'tropicalCoreConvectiveMuBoost',
+  'tropicalCoreRainoutBoost',
+  'equatorialCoreConvectiveMuBoost',
+  'equatorialCoreRainoutBoost',
+  'equatorialCoreWidthDeg',
   'buoyTrigK',
   'dThetaMaxConvPerStep',
   'enableLargeScaleVerticalAdvection',
@@ -597,6 +638,13 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'subtropicalSubsidenceBottomSigma',
   'subtropicalSubsidenceCrossHemiFloorFrac',
   'subtropicalSubsidenceWeakHemiBoost',
+  'enableSubtropicalDescentVentilation',
+  'subtropicalDescentVentilationSource0',
+  'subtropicalDescentVentilationSource1',
+  'subtropicalDescentVentilationMaxPaS',
+  'subtropicalDescentVentilationMaxStepPaS',
+  'subtropicalDescentVentilationOrganizationMax',
+  'subtropicalDescentVentilationPotentialMax',
   'enableCirculationReboundContainment',
   'circulationReboundContainmentScale',
   'circulationReboundOrganizationScale',
@@ -765,6 +813,11 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     convRainoutBase = 0.28,
     convRainoutOrganizationWeight = 0.32,
     convRainoutHumidityWeight = 0.2,
+    tropicalCoreConvectiveMuBoost = 0,
+    tropicalCoreRainoutBoost = 0,
+    equatorialCoreConvectiveMuBoost = 0,
+    equatorialCoreRainoutBoost = 0,
+    equatorialCoreWidthDeg = 6,
     buoyTrigK = 0.0,
     dThetaMaxConvPerStep = 2.5,
 
@@ -799,6 +852,13 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     subtropicalSubsidenceBottomSigma = 0.85,
     subtropicalSubsidenceCrossHemiFloorFrac = 0.45,
     subtropicalSubsidenceWeakHemiBoost = 0.0,
+    enableSubtropicalDescentVentilation = false,
+    subtropicalDescentVentilationSource0 = 0.12,
+    subtropicalDescentVentilationSource1 = 0.22,
+    subtropicalDescentVentilationMaxPaS = 0.045,
+    subtropicalDescentVentilationMaxStepPaS = 0.018,
+    subtropicalDescentVentilationOrganizationMax = 0.14,
+    subtropicalDescentVentilationPotentialMax = 0.38,
     enableCirculationReboundContainment = true,
     circulationReboundContainmentScale = 1.35,
     circulationReboundOrganizationScale = 0.6,
@@ -1917,6 +1977,10 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         ? smoothstep(subtropicalSubsidenceLat0 - 5, subtropicalSubsidenceLat0 + 2, latAbs)
             * (1 - smoothstep(subtropicalSubsidenceLat1 - 4, subtropicalSubsidenceLat1 + 2, latAbs))
         : 0;
+      const tropicalCoreOnlySupport = tropicalCore * (1 - subtropicalBand);
+      const equatorialCoreSupport = latDeg
+        ? 1 - smoothstep(Math.max(1, equatorialCoreWidthDeg), Math.max(2, equatorialCoreWidthDeg + 2), latAbs)
+        : 1;
       const shoulderEquatorialEdgeWindow = latDeg
         ? clamp01(
             smoothstep(1.5, 3.25, latDeg[rowIndex])
@@ -2050,6 +2114,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         baseMu
           * activity
           * (0.55 + 0.95 * activityOrganization + 0.3 * tropicalCore)
+          * (1 + Math.max(0, tropicalCoreConvectiveMuBoost) * tropicalCoreOnlySupport)
+          * (1 + Math.max(0, equatorialCoreConvectiveMuBoost) * equatorialCoreSupport)
           * (1 - 0.45 * subtropicalSuppression),
         0,
         0.35
@@ -2155,6 +2221,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           + 0.18 * subtropicalSuppression
           + 0.08 * (1 - moistureConvergenceSupport)
           + 0.08 * convMassFluxSupport * tropicalCore
+          + Math.max(0, tropicalCoreRainoutBoost) * tropicalCoreOnlySupport * (0.55 + 0.45 * rhMidSupport)
+          + Math.max(0, equatorialCoreRainoutBoost) * equatorialCoreSupport * (0.55 + 0.45 * rhMidSupport)
           - 0.08 * tropicalCore,
         0.08,
         0.88
@@ -2450,6 +2518,26 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
             ? clamp01(0.5 + clamp(walkerSourceAnomaly, -1, 1) * clamp(walkerLongitudinalCouplingScale, 0, 1))
             : 0.5;
           walkerLongitudinalSubsidenceSupportDiag[k] = walkerSubsidenceSupport;
+          const ventilationDeltaPaS = computeSubtropicalDescentVentilationPaS({
+            enabled: enableSubtropicalDescentVentilation,
+            sourceDriver,
+            latShape,
+            walkerSubsidenceSupport,
+            convectiveOrganization: convectiveOrganization[k],
+            convectivePotential: convectivePotential[k],
+            existingOmegaPaS: lowLevelOmegaEffective[k],
+            source0: subtropicalDescentVentilationSource0,
+            source1: subtropicalDescentVentilationSource1,
+            maxPaS: subtropicalDescentVentilationMaxPaS,
+            maxStepPaS: subtropicalDescentVentilationMaxStepPaS,
+            organizationMax: subtropicalDescentVentilationOrganizationMax,
+            potentialMax: subtropicalDescentVentilationPotentialMax
+          });
+          if (ventilationDeltaPaS > 0) {
+            lowLevelOmegaEffective[k] += ventilationDeltaPaS;
+            omega[levS * N + k] += ventilationDeltaPaS;
+            if (levS > 0) omega[(levS - 1) * N + k] += ventilationDeltaPaS * 0.35;
+          }
           const returnFlowOpportunity = clamp01(
             2.2 * hemiTransitionSuppressedSource
             * latShape

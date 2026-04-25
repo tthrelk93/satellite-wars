@@ -14,6 +14,7 @@ import {
   computeAtlanticDryCoreReceiverTaperFrac,
   computeAtlanticTransitionCarryoverContainmentFrac,
   computeSubtropicalBalanceContract,
+  computeSubtropicalDescentVentilationPaS,
   computeEquatorialEdgeSubsidenceGuardSourceSupport,
   computeEquatorialEdgeSubsidenceGuardTargetWeight,
   computeWeakHemiCrossHemiFloorTaperFrac,
@@ -197,6 +198,139 @@ test('stepVertical5 builds a persistent continuous convective state from moist a
   assert.ok(state.convectiveMassFlux[0] > 0);
   assert.ok(state.convectiveRainoutFraction[0] > 0);
   assert.ok(state.convMask[0] === 0 || state.convMask[0] === 1);
+});
+
+test('stepVertical5 can confine extra plume strength and rainout to tropical-core columns', () => {
+  const runCase = ({ latDeg, boosted }) => {
+    const sigmaHalf = new Float32Array([0, 0.35, 0.7, 1]);
+    const state = createState5({
+      grid: { count: 1 },
+      nz: 3,
+      sigmaHalf
+    });
+    const grid = {
+      nx: 1,
+      ny: 1,
+      latDeg: new Float32Array([latDeg]),
+      invDx: new Float32Array([1]),
+      invDy: new Float32Array([1]),
+      cosLat: new Float32Array([1])
+    };
+
+    state.ps[0] = 100000;
+    state.pHalf[0] = 20000;
+    state.pHalf[1] = 35000;
+    state.pHalf[2] = 65000;
+    state.pHalf[3] = 100000;
+    state.pMid[0] = 27500;
+    state.pMid[1] = 50000;
+    state.pMid[2] = 82500;
+    state.theta[0] = 303;
+    state.theta[1] = 295;
+    state.theta[2] = 304;
+    state.qv[0] = 0.001;
+    state.qv[1] = 0.008;
+    state.qv[2] = 0.02;
+    state.T[0] = 250;
+    state.T[1] = 275;
+    state.T[2] = 299;
+    state.u.fill(0);
+    state.v.fill(0);
+    state.dpsDtApplied[0] = -1800;
+
+    stepVertical5({
+      dt: 1800,
+      grid,
+      state,
+      params: {
+        enableMixing: false,
+        enableConvectiveMixing: false,
+        enableConvection: true,
+        enableOmegaMassFix: true,
+        enableLargeScaleVerticalAdvection: false,
+        tropicalCoreConvectiveMuBoost: boosted ? 0.7 : 0,
+        tropicalCoreRainoutBoost: boosted ? 0.35 : 0
+      }
+    });
+    return state;
+  };
+
+  const tropicalBase = runCase({ latDeg: 3.75, boosted: false });
+  const tropicalBoosted = runCase({ latDeg: 3.75, boosted: true });
+  const subtropicalBase = runCase({ latDeg: 24, boosted: false });
+  const subtropicalBoosted = runCase({ latDeg: 24, boosted: true });
+
+  assert.ok(tropicalBoosted.convectiveMassFlux[0] > tropicalBase.convectiveMassFlux[0]);
+  assert.ok(tropicalBoosted.convectiveRainoutFraction[0] > tropicalBase.convectiveRainoutFraction[0]);
+  assert.equal(subtropicalBoosted.convectiveMassFlux[0], subtropicalBase.convectiveMassFlux[0]);
+  assert.equal(subtropicalBoosted.convectiveRainoutFraction[0], subtropicalBase.convectiveRainoutFraction[0]);
+});
+
+test('stepVertical5 can boost the equatorial core without energizing the tropical shoulder', () => {
+  const runCase = ({ latDeg, boosted }) => {
+    const sigmaHalf = new Float32Array([0, 0.35, 0.7, 1]);
+    const state = createState5({
+      grid: { count: 1 },
+      nz: 3,
+      sigmaHalf
+    });
+    const grid = {
+      nx: 1,
+      ny: 1,
+      latDeg: new Float32Array([latDeg]),
+      invDx: new Float32Array([1]),
+      invDy: new Float32Array([1]),
+      cosLat: new Float32Array([1])
+    };
+
+    state.ps[0] = 100000;
+    state.pHalf[0] = 20000;
+    state.pHalf[1] = 35000;
+    state.pHalf[2] = 65000;
+    state.pHalf[3] = 100000;
+    state.pMid[0] = 27500;
+    state.pMid[1] = 50000;
+    state.pMid[2] = 82500;
+    state.theta[0] = 303;
+    state.theta[1] = 295;
+    state.theta[2] = 304;
+    state.qv[0] = 0.001;
+    state.qv[1] = 0.008;
+    state.qv[2] = 0.02;
+    state.T[0] = 250;
+    state.T[1] = 275;
+    state.T[2] = 299;
+    state.u.fill(0);
+    state.v.fill(0);
+    state.dpsDtApplied[0] = -1800;
+
+    stepVertical5({
+      dt: 1800,
+      grid,
+      state,
+      params: {
+        enableMixing: false,
+        enableConvectiveMixing: false,
+        enableConvection: true,
+        enableOmegaMassFix: true,
+        enableLargeScaleVerticalAdvection: false,
+        equatorialCoreConvectiveMuBoost: boosted ? 0.7 : 0,
+        equatorialCoreRainoutBoost: boosted ? 0.35 : 0,
+        equatorialCoreWidthDeg: 5
+      }
+    });
+    return state;
+  };
+
+  const equatorialBase = runCase({ latDeg: 3.75, boosted: false });
+  const equatorialBoosted = runCase({ latDeg: 3.75, boosted: true });
+  const shoulderBase = runCase({ latDeg: 11.25, boosted: false });
+  const shoulderBoosted = runCase({ latDeg: 11.25, boosted: true });
+
+  assert.ok(equatorialBoosted.convectiveMassFlux[0] > equatorialBase.convectiveMassFlux[0]);
+  assert.ok(equatorialBoosted.convectiveRainoutFraction[0] > equatorialBase.convectiveRainoutFraction[0]);
+  assert.equal(shoulderBoosted.convectiveMassFlux[0], shoulderBase.convectiveMassFlux[0]);
+  assert.equal(shoulderBoosted.convectiveRainoutFraction[0], shoulderBase.convectiveRainoutFraction[0]);
 });
 
 test('stepVertical5 tracks imported upper-cloud persistence when cloud lingers without local convection', () => {
@@ -793,6 +927,31 @@ test('computeTransitionReturnFlowCouplingFrac is capped and only active when ena
   });
   assert.ok(active > 0);
   assert.ok(active <= 0.14);
+});
+
+test('computeSubtropicalDescentVentilationPaS fills weak coarse-grid descent only for weak subtropical engines', () => {
+  const common = {
+    enabled: true,
+    sourceDriver: 0.19,
+    latShape: 0.95,
+    walkerSubsidenceSupport: 0.55,
+    convectiveOrganization: 0.02,
+    convectivePotential: 0.18,
+    existingOmegaPaS: 0.006,
+    source0: 0.12,
+    source1: 0.22,
+    maxPaS: 0.045,
+    maxStepPaS: 0.018,
+    organizationMax: 0.14,
+    potentialMax: 0.38
+  };
+
+  const active = computeSubtropicalDescentVentilationPaS(common);
+  assert.ok(active > 0);
+  assert.ok(active <= common.maxStepPaS);
+  assert.equal(computeSubtropicalDescentVentilationPaS({ ...common, enabled: false }), 0);
+  assert.equal(computeSubtropicalDescentVentilationPaS({ ...common, existingOmegaPaS: 0.08 }), 0);
+  assert.equal(computeSubtropicalDescentVentilationPaS({ ...common, convectiveOrganization: 0.3 }), 0);
 });
 
 test('computeHadleyReturnFlowWindTendencyMs only accelerates low-level flow equatorward', () => {

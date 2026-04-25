@@ -77,7 +77,7 @@ const accumulateBandValue = (field, bandIndex, cell, cellCount, value, enabled =
   field[instrumentationBandOffset(bandIndex, cell, cellCount)] += value;
 };
 
-export function stepMicrophysics5({ dt, state, params = {} }) {
+export function stepMicrophysics5({ dt, grid = null, state, params = {} }) {
   if (!state || !Number.isFinite(dt) || dt <= 0) return;
   const traceEnabled = state.instrumentationEnabled !== false;
   const recordBandValue = (field, bandIndex, cell, cellCount, value) => {
@@ -120,6 +120,8 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
     convTauEvapCloudScale = 0.35,
     convKAutoScale = 2.0,
     convPrecipEffBoost = 0.15,
+    subtropicalCloudEvapBoost = 0,
+    subtropicalVirgaEvapBoost = 0,
     terrainLeeOmega0 = 0.15,
     terrainLeeOmega1 = 1.2,
     terrainLeeEvapBoost = 1.0,
@@ -129,6 +131,8 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
     enableSoftLiveStateMaintenanceSuppression = false,
     softLiveStateMaintenanceSuppressionScale = 2.0,
     softLiveStateMaintenanceSuppressionMaxFrac = 0.4,
+    softLiveStateMaintenanceSuppressedMassMode = 'retain',
+    softLiveStateMaintenanceExportTargetAbsLatDeg = 4,
     enableExplicitSubtropicalBalanceContract = false,
     explicitSubtropicalBalanceContractScale = 1.0,
     enableShoulderAbsorptionGuard = false,
@@ -252,6 +256,18 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   if (!state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass || state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass.length !== N) {
     state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass = new Float32Array(N);
   }
+  if (!state.saturationAdjustmentSoftLiveGateRetainedVaporMass || state.saturationAdjustmentSoftLiveGateRetainedVaporMass.length !== N) {
+    state.saturationAdjustmentSoftLiveGateRetainedVaporMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentSoftLiveGateSinkExportMass || state.saturationAdjustmentSoftLiveGateSinkExportMass.length !== N) {
+    state.saturationAdjustmentSoftLiveGateSinkExportMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentSoftLiveGateBufferedRainoutMass || state.saturationAdjustmentSoftLiveGateBufferedRainoutMass.length !== N) {
+    state.saturationAdjustmentSoftLiveGateBufferedRainoutMass = new Float32Array(N);
+  }
+  if (!state.saturationAdjustmentSoftLiveGateEquatorwardExportMass || state.saturationAdjustmentSoftLiveGateEquatorwardExportMass.length !== N) {
+    state.saturationAdjustmentSoftLiveGateEquatorwardExportMass = new Float32Array(N);
+  }
   if (!state.saturationAdjustmentShoulderGuardCandidateMass || state.saturationAdjustmentShoulderGuardCandidateMass.length !== N) {
     state.saturationAdjustmentShoulderGuardCandidateMass = new Float32Array(N);
   }
@@ -354,6 +370,10 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   state.saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted.fill(0);
   state.saturationAdjustmentSoftLiveGateAscentModulationMassWeighted.fill(0);
   state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass.fill(0);
+  state.saturationAdjustmentSoftLiveGateRetainedVaporMass.fill(0);
+  state.saturationAdjustmentSoftLiveGateSinkExportMass.fill(0);
+  state.saturationAdjustmentSoftLiveGateBufferedRainoutMass.fill(0);
+  state.saturationAdjustmentSoftLiveGateEquatorwardExportMass.fill(0);
   state.saturationAdjustmentShoulderGuardCandidateMass.fill(0);
   state.saturationAdjustmentShoulderGuardPotentialSuppressedMass.fill(0);
   state.saturationAdjustmentShoulderGuardEventCount.fill(0);
@@ -388,6 +408,41 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
   const tauIceAggSafe = Math.max(1e-6, tauIceAgg);
   const Ls = Lv + Lf;
   const lowLevelStart = Math.max(0, nz - 4);
+  const canEquatorwardExport =
+    softLiveStateMaintenanceSuppressedMassMode === 'equatorward_export'
+    && grid
+    && Number.isFinite(grid.nx)
+    && Number.isFinite(grid.ny)
+    && grid.latDeg?.length === grid.ny;
+  const softLiveEquatorwardExportScratch = canEquatorwardExport
+    ? (state._softLiveEquatorwardExportQvScratch?.length === N * nz
+        ? state._softLiveEquatorwardExportQvScratch
+        : (state._softLiveEquatorwardExportQvScratch = new Float32Array(N * nz)))
+    : null;
+  if (softLiveEquatorwardExportScratch) softLiveEquatorwardExportScratch.fill(0);
+  const findEquatorwardExportTargetCell = (cell) => {
+    if (!canEquatorwardExport) return cell;
+    const nx = grid.nx;
+    const ny = grid.ny;
+    const row = Math.floor(cell / nx);
+    const col = cell - row * nx;
+    const sourceLat = Number(grid.latDeg[row]) || 0;
+    if (Math.abs(sourceLat) < 1e-6) return cell;
+    const hemiSign = sourceLat >= 0 ? 1 : -1;
+    const targetLat = hemiSign * Math.max(0, Math.abs(softLiveStateMaintenanceExportTargetAbsLatDeg));
+    let bestRow = row;
+    let bestDistance = Infinity;
+    for (let j = 0; j < ny; j += 1) {
+      const lat = Number(grid.latDeg[j]) || 0;
+      if (lat * hemiSign < -1e-6) continue;
+      const distance = Math.abs(lat - targetLat);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestRow = j;
+      }
+    }
+    return bestRow === row ? cell : bestRow * nx + col;
+  };
 
   for (let lev = 0; lev < nz; lev++) {
     const base = lev * N;
@@ -450,12 +505,23 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         : 1;
       const tauEvapCloudMinEffBase = Math.max(1, tauEvapCloudMin * tauEvapCloudScaleEff);
       const tauEvapCloudMaxEffBase = Math.max(1, tauEvapCloudMax * tauEvapCloudScaleEff);
-      const tauEvapCloudMinEff = Math.max(1, tauEvapCloudMinEffBase / evapScale);
-      const tauEvapCloudMaxEff = Math.max(1, tauEvapCloudMaxEffBase / evapScale);
-      const tauEvapRainMinEff = Math.max(1, tauEvapRainMin / evapScale);
-      const tauEvapRainMaxEff = Math.max(1, tauEvapRainMax / evapScale);
-      const tauSubSnowMinEff = tauSubSnowMin;
-      const tauSubSnowMaxEff = tauSubSnowMax;
+      const subtropicalEvapSupport = enableConvectiveOutcome
+        ? clamp(
+            marginalSubsiding
+              * (1 - 0.55 * convMassFluxStrength)
+              * (1 - 0.45 * convOrganization),
+            0,
+            1
+          )
+        : 0;
+      const cloudEvapScale = evapScale * (1 + Math.max(0, subtropicalCloudEvapBoost) * subtropicalEvapSupport);
+      const virgaEvapScale = evapScale * (1 + Math.max(0, subtropicalVirgaEvapBoost) * subtropicalEvapSupport);
+      const tauEvapCloudMinEff = Math.max(1, tauEvapCloudMinEffBase / cloudEvapScale);
+      const tauEvapCloudMaxEff = Math.max(1, tauEvapCloudMaxEffBase / cloudEvapScale);
+      const tauEvapRainMinEff = Math.max(1, tauEvapRainMin / virgaEvapScale);
+      const tauEvapRainMaxEff = Math.max(1, tauEvapRainMax / virgaEvapScale);
+      const tauSubSnowMinEff = Math.max(1, tauSubSnowMin / virgaEvapScale);
+      const tauSubSnowMaxEff = Math.max(1, tauSubSnowMax / virgaEvapScale);
       const leeWarmRainSuppress = 1 - leeNoDelivery * clamp(terrainLeeWarmRainSuppress, 0, 1);
       const organizedWarmRainSuppress = 1 - 0.2 * organizedOutflow;
       const subtropicalDrizzleSuppress = 1 - 0.68 * marginalSubsiding;
@@ -464,8 +530,11 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
         0.1,
         1
       );
-      const kAutoRainEff = kAutoRain * warmRainSuppress * (1 + 0.25 * convMassFluxStrength);
-      const kAutoSnowEff = kAutoSnow * (1 + 0.15 * convMassFluxStrength + 0.15 * organizedOutflow);
+      const convectiveAutoScale = enableConvectiveOutcome
+        ? 1 + Math.max(0, convKAutoScale - 1) * convMassFluxStrength
+        : 1;
+      const kAutoRainEff = kAutoRain * warmRainSuppress * convectiveAutoScale;
+      const kAutoSnowEff = kAutoSnow * (1 + Math.max(0, convKAutoScale - 1) * (0.6 * convMassFluxStrength + 0.4 * organizedOutflow));
       const precipEff = clamp(
         (
           basePrecipEff
@@ -843,11 +912,44 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
             )
           : 0;
         const combinedSuppressionFrac = Math.max(softLiveGateSuppressionFrac, shoulderGuardSuppressionFrac);
+        const effectiveSoftLiveSuppressionFrac = softLiveGateSuppressionFrac > shoulderGuardSuppressionFrac
+          ? softLiveGateSuppressionFrac
+          : 0;
         const effectiveShoulderGuardSuppressionFrac = shoulderGuardSuppressionFrac >= softLiveGateSuppressionFrac
           ? shoulderGuardSuppressionFrac
           : 0;
         const dqSuppressed = dqRaw * combinedSuppressionFrac;
+        const dqSoftLiveSuppressed = dqRaw * effectiveSoftLiveSuppressionFrac;
         const dqShoulderSuppressed = dqRaw * effectiveShoulderGuardSuppressionFrac;
+        const softLiveSuppressedMassMode = softLiveStateMaintenanceSuppressedMassMode === 'sink_export'
+          ? 'sink_export'
+          : softLiveStateMaintenanceSuppressedMassMode === 'buffered_rainout'
+            ? 'buffered_rainout'
+            : softLiveStateMaintenanceSuppressedMassMode === 'equatorward_export' && canEquatorwardExport
+              ? 'equatorward_export'
+            : 'retain';
+        if (dqSoftLiveSuppressed > 0) {
+          if (softLiveSuppressedMassMode === 'sink_export') {
+            qvVal -= dqSoftLiveSuppressed;
+          } else if (softLiveSuppressedMassMode === 'buffered_rainout') {
+            qvVal -= dqSoftLiveSuppressed;
+            if (iceFrac > 0.5) {
+              qsVal += dqSoftLiveSuppressed;
+              thetaVal = applyThetaLatent(thetaVal, dqSoftLiveSuppressed, Ls, Pi);
+            } else {
+              qrVal += dqSoftLiveSuppressed;
+              thetaVal = applyThetaLatent(thetaVal, dqSoftLiveSuppressed, Lv, Pi);
+            }
+          } else if (softLiveSuppressedMassMode === 'equatorward_export' && massCell > 0) {
+            const targetCell = findEquatorwardExportTargetCell(k);
+            const targetIdx = lev * N + targetCell;
+            const targetMassCell = (pHalf[(lev + 1) * N + targetCell] - pHalf[lev * N + targetCell]) / g;
+            if (targetCell !== k && targetMassCell > 0) {
+              qvVal -= dqSoftLiveSuppressed;
+              softLiveEquatorwardExportScratch[targetIdx] += (dqSoftLiveSuppressed * massCell) / targetMassCell;
+            }
+          }
+        }
         if (dqShoulderSuppressed > 0) {
           if (shoulderSuppressedMassMode === 'sink_export') {
             qvVal -= dqShoulderSuppressed;
@@ -944,6 +1046,16 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
               state.saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted[k] += softLiveGateSelectorSupport * condMassRaw;
               state.saturationAdjustmentSoftLiveGateAscentModulationMassWeighted[k] += softLiveGateAscentModulation * condMassRaw;
               state.saturationAdjustmentSoftLiveGateAppliedSuppressionMass[k] += condSuppressedMass;
+              const condSoftLiveSuppressedMass = dqSoftLiveSuppressed * massCell;
+              if (softLiveSuppressedMassMode === 'sink_export') {
+                state.saturationAdjustmentSoftLiveGateSinkExportMass[k] += condSoftLiveSuppressedMass;
+              } else if (softLiveSuppressedMassMode === 'buffered_rainout') {
+                state.saturationAdjustmentSoftLiveGateBufferedRainoutMass[k] += condSoftLiveSuppressedMass;
+              } else if (softLiveSuppressedMassMode === 'equatorward_export') {
+                state.saturationAdjustmentSoftLiveGateEquatorwardExportMass[k] += condSoftLiveSuppressedMass;
+              } else {
+                state.saturationAdjustmentSoftLiveGateRetainedVaporMass[k] += condSoftLiveSuppressedMass;
+              }
             }
             if (shoulderSelectorSupport >= SUBTROPICAL_MAINTENANCE_DIAG.supportThreshold) {
               state.saturationAdjustmentShoulderGuardCandidateMass[k] += condMassRaw;
@@ -1114,6 +1226,13 @@ export function stepMicrophysics5({ dt, state, params = {} }) {
       qr[idx] = Math.max(0, qrVal);
       qs[idx] = Math.max(0, qsVal);
       theta[idx] = thetaVal;
+    }
+  }
+
+  if (softLiveEquatorwardExportScratch) {
+    for (let idx = 0; idx < softLiveEquatorwardExportScratch.length; idx += 1) {
+      const dq = softLiveEquatorwardExportScratch[idx];
+      if (dq > 0) qv[idx] += dq;
     }
   }
 

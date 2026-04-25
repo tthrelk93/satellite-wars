@@ -1,15 +1,15 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-24T18:48:00.000Z",
+  "updatedAt": "2026-04-25T18:11:21.114Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
   "baselineCommit": "94d5805",
   "latestCycle": {
-    "id": "cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure",
-    "goal": "close the Phase 3 Hadley and Walker circulation branch diagnostics and improve coupled subtropical dry-belt circulation",
-    "verifiedImprovement": "fresh quick evidence shows the southern Hadley return branch is no longer zero, with southDryBeltEquatorwardMassFluxKgM_1S 41.57037, both dry-belt mass-continuity diagnostics closed, water-cycle budget passing, and numerical integrity passing; Phase 3 remains incomplete because south subtropical dry-belt ratio is still 1.134 vs target < 0.8",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/checkpoint.md",
+    "id": "cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker",
+    "goal": "clear the remaining Phase 3 south subtropical cloud/condensation persistence and rainout blocker while preserving Hadley/Walker closure and water/numerical guards",
+    "verifiedImprovement": "fresh quick and 90-day seasonal planetary audits pass after conservative equatorward export of selected soft live-state subtropical marine-deck excess; the 365-day annual-lite climate horizon also passes realism, water, and seasonality categories, with the caveat that annual dt/grid repro checks were intentionally disabled",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/checkpoint.md",
     "runtimeLogPath": null
   },
   "benchmarkSuite": {
@@ -17,10 +17,9 @@
     "overallPass": true
   },
   "blockingGaps": [
-    "south subtropical dry-belt wetness remains the active Phase 3 blocker after return-flow closure",
-    "south subtropical cloud/condensation persistence and moisture-belt rainout need direct physics work; circulation closure alone did not clear the dry-belt gate",
+    "Phase 3 is ready to hand off to Phase 4, but a full annual planetary-realism run with dt/grid repro enabled is still required before any world-class or annual-seasonality claim",
     "browser/runtime signoff is still blocked by larger remaining Earth.update max spikes and weak wind-target diagnostics in the latest live run, even after reducing both the model-diagnostics payload cost and the dominant particle sample0 path",
-    "a full annual planetary-realism pass is still required before any world-class claim; the new annual evidence only clears the conservative moisture-transport contract",
+    "the annual-lite run supports the Phase 3 handoff but intentionally skipped annual dt/grid repro sidecars",
     "world-class status still requires realism and smoothness to pass in the same browser-backed run"
   ],
   "cycleInputs": [
@@ -143,30 +142,44 @@
       "singlePlayerLoaded": true,
       "note": "Both fresh solo reruns stayed single-tab, kept the texture-warning and minimap fixes intact, and advanced cleanly through Day 2 while the WindStreamlineRenderer fast path lowered the repeated Earth.update p95 baseline."
     },
-    "phase3HadleyWalkerClosure": {
-      "cycleId": "cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure",
-      "checkpointPath": "weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/checkpoint.md",
-      "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/evidence-summary.json",
-      "finalQuickAuditPath": "weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/final-quick.json",
-      "hadleyPartitionSummaryPath": "weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/final-quick-hadley-partition-summary.json",
-      "result": "verified partial Phase 3 improvement: the south dry-belt Hadley return branch is nonzero and both branch continuity diagnostics close, but the south dry-belt ratio remains too wet",
+    "phase3CondensationRainoutClosure": {
+      "cycleId": "cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker",
+      "checkpointPath": "weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/checkpoint.md",
+      "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/evidence-summary.json",
+      "quickAuditPath": "weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/phase3-equatorward-medium-quick.json",
+      "seasonalAuditPath": "weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/phase3-equatorward-medium-seasonal.json",
+      "annualLiteAuditPath": "weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/phase3-equatorward-medium-annual-lite.json",
+      "result": "verified Phase 3 handoff: quick and seasonal planetary audits pass, the annual-lite climate horizon passes all realism categories, and the south subtropical dry-belt blocker is cleared without breaking Hadley/Walker closure or water-cycle guards",
       "metrics": {
-        "overallPass": false,
-        "subtropicalDryNorthRatio": 0.795,
-        "subtropicalDrySouthRatio": 1.134,
-        "itczLatDeg": -3.639,
-        "itczWidthDeg": 23.641,
-        "northDryBeltEquatorwardMassFluxKgM_1S": 2026.61061,
-        "southDryBeltEquatorwardMassFluxKgM_1S": 41.57037,
+        "quickOverallPass": true,
+        "seasonalOverallPass": true,
+        "annualLiteHorizonPass": true,
+        "quickSubtropicalDryNorthRatio": 0.545,
+        "quickSubtropicalDrySouthRatio": 0.653,
+        "quickItczLatDeg": -2.515,
+        "quickItczWidthDeg": 22.06,
+        "quickSouthDryBeltHadleyReturnFlowWindAppliedMeanMs": 0.29116,
+        "quickSouthDryBeltWalkerLongitudinalSubsidenceSupportMeanFrac": 0.5105,
+        "annualLiteSubtropicalDryNorthRatio": 0.522,
+        "annualLiteSubtropicalDrySouthRatio": 0.536,
+        "annualLiteItczLatDeg": -1.473,
+        "annualLiteItczWidthDeg": 22.269,
+        "annualLiteSouthDryBeltHadleyReturnFlowWindAppliedMeanMs": 0.27903,
         "waterCyclePass": true,
-        "numericalIntegrityScore": 0.8689,
-        "numericalIntegrityPass": true
+        "seasonalEvapPrecipRelativeImbalance": 0.03347,
+        "annualLiteEvapPrecipRelativeImbalance": -0.01077,
+        "quickNumericalIntegrityScore": 0.9064,
+        "quickNumericalIntegrityPass": true,
+        "seasonalDtSensitivityPass": true,
+        "seasonalGridSensitivityPass": true,
+        "annualLiteTopLevelPass": false,
+        "annualLiteCaveat": "top-level annual-lite pass is false because --no-repro-check skipped annual dt/grid sensitivity sidecars"
       }
     }
   },
   "defaultNextPriority": [
-    "continue Phase 3 with south subtropical cloud/condensation persistence and moisture-belt rainout under the new closed-return-branch baseline",
-    "keep the annual water-cycle contract as a guardrail for every broad hydrology/circulation change",
+    "move to Phase 4 from the verified Phase 3 circulation/moisture-belt baseline",
+    "before any world-class or annual-seasonality claim, rerun full annual planetary realism with dt/grid repro enabled",
     "run bounded live/browser verification after the next verified climate fix or when runtime debt becomes blocking again",
     "keep validation on the clean world-class checkout only"
   ],

@@ -586,6 +586,11 @@ export class WeatherCore5 {
       convRainoutBase: 0.28,
       convRainoutOrganizationWeight: 0.32,
       convRainoutHumidityWeight: 0.2,
+      tropicalCoreConvectiveMuBoost: 0,
+      tropicalCoreRainoutBoost: 0,
+      equatorialCoreConvectiveMuBoost: 0,
+      equatorialCoreRainoutBoost: 0,
+      equatorialCoreWidthDeg: 6,
       buoyTrigK: 0.0,
       dThetaMaxConvPerStep: 2.5,
       enableLargeScaleVerticalAdvection: true,
@@ -612,6 +617,13 @@ export class WeatherCore5 {
       subtropicalSubsidenceBottomSigma: 0.85,
       subtropicalSubsidenceCrossHemiFloorFrac: 0.58,
       subtropicalSubsidenceWeakHemiBoost: 0.35,
+      enableSubtropicalDescentVentilation: false,
+      subtropicalDescentVentilationSource0: 0.12,
+      subtropicalDescentVentilationSource1: 0.22,
+      subtropicalDescentVentilationMaxPaS: 0.045,
+      subtropicalDescentVentilationMaxStepPaS: 0.018,
+      subtropicalDescentVentilationOrganizationMax: 0.14,
+      subtropicalDescentVentilationPotentialMax: 0.38,
       enableCirculationReboundContainment: true,
       circulationReboundContainmentScale: 1.35,
       circulationReboundOrganizationScale: 0.6,
@@ -735,9 +747,13 @@ export class WeatherCore5 {
       convTauEvapCloudScale: 0.35,
       convKAutoScale: 2.0,
       convPrecipEffBoost: 0.12,
+      subtropicalCloudEvapBoost: 0,
+      subtropicalVirgaEvapBoost: 0,
       enableSoftLiveStateMaintenanceSuppression: true,
-      softLiveStateMaintenanceSuppressionScale: 2.0,
-      softLiveStateMaintenanceSuppressionMaxFrac: 0.4,
+      softLiveStateMaintenanceSuppressionScale: 2.6,
+      softLiveStateMaintenanceSuppressionMaxFrac: 0.55,
+      softLiveStateMaintenanceSuppressedMassMode: 'equatorward_export',
+      softLiveStateMaintenanceExportTargetAbsLatDeg: 4,
       enableExplicitSubtropicalBalanceContract: false,
       explicitSubtropicalBalanceContractScale: 1.0,
       enableShoulderAbsorptionGuard: true,
@@ -2317,7 +2333,7 @@ export class WeatherCore5 {
     }
     if (doMicrophysics) {
       runWithDiagnostics('stepMicrophysics5', () => {
-        stepMicrophysics5({ dt, state: this.state, params: this.microParams });
+        stepMicrophysics5({ dt, grid: this.grid, state: this.state, params: this.microParams });
         this._closeSurfaceSourceTracerBudget('qvSourceAtmosphericCarryover');
       });
     }

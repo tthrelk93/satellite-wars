@@ -158,6 +158,10 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted = makeArray(N);
   const saturationAdjustmentSoftLiveGateAscentModulationMassWeighted = makeArray(N);
   const saturationAdjustmentSoftLiveGateAppliedSuppressionMass = makeArray(N);
+  const saturationAdjustmentSoftLiveGateRetainedVaporMass = makeArray(N);
+  const saturationAdjustmentSoftLiveGateSinkExportMass = makeArray(N);
+  const saturationAdjustmentSoftLiveGateBufferedRainoutMass = makeArray(N);
+  const saturationAdjustmentSoftLiveGateEquatorwardExportMass = makeArray(N);
   const saturationAdjustmentShoulderGuardCandidateMass = makeArray(N);
   const saturationAdjustmentShoulderGuardPotentialSuppressedMass = makeArray(N);
   const saturationAdjustmentShoulderGuardEventCount = new Uint32Array(N);
@@ -460,6 +464,10 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     saturationAdjustmentSoftLiveGateSelectorSupportMassWeighted,
     saturationAdjustmentSoftLiveGateAscentModulationMassWeighted,
     saturationAdjustmentSoftLiveGateAppliedSuppressionMass,
+    saturationAdjustmentSoftLiveGateRetainedVaporMass,
+    saturationAdjustmentSoftLiveGateSinkExportMass,
+    saturationAdjustmentSoftLiveGateBufferedRainoutMass,
+    saturationAdjustmentSoftLiveGateEquatorwardExportMass,
     saturationAdjustmentShoulderGuardCandidateMass,
     saturationAdjustmentShoulderGuardPotentialSuppressedMass,
     saturationAdjustmentShoulderGuardEventCount,

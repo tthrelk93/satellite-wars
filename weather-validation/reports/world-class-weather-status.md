@@ -1,12 +1,12 @@
 # World-Class Weather Status
 
-Updated: 2026-04-24
+Updated: 2026-04-25
 Verdict: NOT WORLD CLASS YET
 
 ## Current baseline
 
 - Clean worker worktree: `codex/world-class-weather-loop`
-- Latest verified cycle: `cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure`
+- Latest verified cycle: `cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker`
 - Earth accuracy suite: PASS (`weather-validation/reports/earth-accuracy-status.md`)
 - Phase 2 conservative moisture transport now has fresh annual evidence:
   - annual E/P relative imbalance: `0.00967`
@@ -16,15 +16,21 @@ Verdict: NOT WORLD CLASS YET
   - advection repair: `0.0002 kg/m²`
   - tropical-source numerical residual: `-0.0000003 kg/m²`
   - numerical integrity: PASS
-- Phase 3 Hadley/Walker closure now has fresh quick evidence:
-  - southern dry-belt return branch: `0 -> 41.57037 kg/m/s`
-  - northern dry-belt return branch: `2026.61061 kg/m/s`
-  - branch continuity diagnostics: north and south `equatorwardReturnClosed = true`
-  - return-flow wind diagnostics: north `0.20897 m/s`, south `0.28446 m/s`
-  - Walker longitudinal support diagnostics: north/south `0.5196`
-  - water-cycle budget: PASS
-  - numerical integrity score/pass: `0.8689 / true`
-  - Phase 3 is not fully passed because the south subtropical dry-belt ratio remains `1.134` vs target `< 0.8`
+- Phase 3 Hadley/Walker closure and SH subtropical condensation/rainout are now ready to hand off to Phase 4:
+  - promoted quick audit: PASS
+  - 90-day seasonal audit: PASS
+  - 365-day annual-lite climate horizon: PASS for realism categories, water, and seasonality
+  - quick dry-belt ratios N/S: `0.545 / 0.653`
+  - seasonal dry-belt ratios stay in range through day 90
+  - annual-lite day-365 dry-belt ratios N/S: `0.522 / 0.536`
+  - quick ITCZ latitude/width: `-2.515 / 22.06 deg`
+  - seasonal ITCZ latitude/width at day 90: `-3.26 / 22.201 deg`
+  - annual-lite day-365 ITCZ latitude/width: `-1.473 / 22.269 deg`
+  - return-flow wind diagnostics remain nonzero: quick south `0.29116 m/s`, annual-lite south `0.27903 m/s`
+  - Walker longitudinal support remains nonzero: quick south `0.5105`
+  - water-cycle budget: PASS in quick, seasonal, and annual-lite
+  - quick and seasonal dt/grid sensitivity gates: PASS
+  - annual-lite caveat: top-level `overallPass = false` only because `--no-repro-check` intentionally skipped annual dt/grid repro sidecars; do not use it as a full annual world-class claim
 - Latest verified physics baseline in `src/weather/v2/core5.js` still holds:
   - `vertParams.thetaeCoeff: 11 -> 10.5`
   - current dry-belt metrics remain:
@@ -46,32 +52,55 @@ Verdict: NOT WORLD CLASS YET
 
 ## Fresh evidence from the latest cycle
 
-- The Phase 3 cycle changed real weather-core code:
-  - added bounded low-level Hadley return-flow wind coupling in `src/weather/v2/vertical5.js`
-  - added Walker-style longitudinal tropical source support diagnostics
-  - added explicit Hadley branch mass-continuity diagnostics in the planetary audit
-  - removed the tested direct return-flow subsidence experiment after it worsened the dry-belt gate
+- The Phase 3 blocker-breaker cycle changed real weather-core code:
+  - added conservative soft live-state marine-deck mass fate handling in `src/weather/v2/microphysics5.js`
+  - exported selected SH/NH subtropical excess vapor equatorward into the same-hemisphere tropical rain lane instead of retaining it locally or deleting it
+  - promoted the minimal passing medium default in `src/weather/v2/core5.js`: mode `equatorward_export`, scale `2.6`, max fraction `0.55`
+  - added diagnostics in `src/weather/v2/state5.js` and `src/weather/validation/diagnostics.js`
+  - added targeted microphysics and vertical tests for the new fate/transport behavior
 - Fresh quick artifact:
-  - `overallPass = false`
-  - `subtropicalDryNorthRatio = 0.795`
-  - `subtropicalDrySouthRatio = 1.134`
-  - `itczLatDeg = -3.639`
-  - `itczWidthDeg = 23.641`
-  - `southDryBeltEquatorwardMassFluxKgM_1S = 41.57037`
+  - `overallPass = true`
+  - `subtropicalDryNorthRatio = 0.545`
+  - `subtropicalDrySouthRatio = 0.653`
+  - `itczLatDeg = -2.515`
+  - `itczWidthDeg = 22.06`
+  - `southDryBeltHadleyReturnFlowWindAppliedMeanMs = 0.29116`
+  - `southDryBeltWalkerLongitudinalSubsidenceSupportMeanFrac = 0.5105`
   - `waterCycleBudget.pass = true`
   - `numericalIntegrityPass = true`
+  - `dtSensitivity.pass = true`
+  - `gridSensitivity.pass = true`
+- Fresh seasonal artifact:
+  - `overallPass = true`
+  - `waterCycleBudget.pass = true`
+  - `evapPrecipRelativeImbalance = 0.03347`
+  - `tcwDriftKgM2 = 6.43601`
+  - `stableAcrossMonthsPass = true`
+  - `stableAcrossSeasonsPass = true`
+  - `dtSensitivity.pass = true`
+  - `gridSensitivity.pass = true`
+- Fresh annual-lite artifact:
+  - day-365 realism categories: PASS
+  - top-level `overallPass = false` due expected `dt_sensitivity_not_evaluated` and `grid_sensitivity_not_evaluated`
+  - day-365 dry-belt ratios N/S: `0.522 / 0.536`
+  - day-365 ITCZ latitude/width: `-1.473 / 22.269`
+  - day-365 south return-flow diagnostic: `0.27903 m/s`
+  - water-cycle budget: PASS
+  - annual E/P relative imbalance: `-0.01077`
+  - annual TCW drift: `6.03275 kg/m²`
+  - NH/SH tropical cyclone seasonality: PASS/PASS
 - Fresh cycle artifacts:
-  - `weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/final-quick.json`
-  - `weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/final-quick-hadley-partition-summary.json`
-  - `weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/checkpoint.md`
-  - `weather-validation/output/cycle-2026-04-24T14-42-58Z-phase3-hadley-walker-closure/evidence-summary.json`
+  - `weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/phase3-equatorward-medium-quick.json`
+  - `weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/phase3-equatorward-medium-seasonal.json`
+  - `weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/phase3-equatorward-medium-annual-lite.json`
+  - `weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/checkpoint.md`
+  - `weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/evidence-summary.json`
 
 ## What still blocks "world class"
 
-- South subtropical dry-belt wetness remains the active Phase 3 blocker after return-flow closure.
-- The next physics target is south subtropical cloud/condensation persistence and moisture-belt rainout; circulation closure alone did not clear the dry-belt gate.
+- Phase 3 is ready to hand off to Phase 4, but the next world-class claim still needs a full annual audit with dt/grid repro enabled.
 - Browser/runtime signoff is no longer blocked by the old white panel or the full-grid model-diagnostics payload, but it still fails on larger remaining `Earth.update` spikes and weak wind-target diagnostics in the latest live run.
-- A full annual planetary-realism pass is still required before any world-class claim; the new annual evidence only clears the conservative moisture-transport contract.
+- A full annual planetary-realism pass with dt/grid repro is still required before any world-class claim; the annual-lite run intentionally skipped repro sidecars.
 - World-class status still requires realism and smoothness to pass in the same browser-backed run.
 
 ## Canonical cycle inputs
@@ -87,8 +116,8 @@ Verdict: NOT WORLD CLASS YET
 
 ## Default next priority
 
-1. Continue Phase 3 with south subtropical cloud/condensation persistence and moisture-belt rainout under the new closed-return-branch baseline.
-2. Keep the annual water-cycle contract as a guardrail for every broad hydrology/circulation change.
+1. Move to Phase 4 from the verified Phase 3 circulation/moisture-belt baseline.
+2. Before any world-class or annual-seasonality claim, rerun full annual planetary realism with dt/grid repro enabled.
 3. Run bounded live/browser verification after the next verified climate fix or when runtime debt becomes blocking again.
 4. Keep validation on the clean world-class checkout only.
 
