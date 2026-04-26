@@ -1822,6 +1822,22 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     surfaceEvapSeaIceSuppressionFrac,
     surfaceEvapSurfaceSaturationMixingRatioKgKg,
     surfaceEvapAirMixingRatioKgKg,
+    surfaceNetFluxWm2,
+    landEnergyTempTendencyK,
+    landClimoTempTendencyK,
+    landHeatCapacityJm2K,
+    soilWaterKgM2,
+    soilCapacityKgM2,
+    soilMoistureFraction,
+    vegetationProxyFrac,
+    rainforestCanopySupportFrac,
+    rainforestRootZoneRechargeRateMmHr,
+    oceanMixedLayerTempTendencyK,
+    oceanClimoTempTendencyK,
+    seaIceThermoTendencyM,
+    surfaceTemperatureK,
+    surfaceAlbedo,
+    surfaceElevationM,
     processMoistureBudget,
     transportTracing,
     verticalCloudBirthTracing,
@@ -1932,6 +1948,18 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalSubsidenceDrying = zonalMean(subtropicalSubsidenceDryingFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalSurfaceEvap = zonalMean(surfaceEvapRateMmHr || new Array(nx * ny).fill(0), nx, ny);
   const zonalSurfaceEvapPotential = zonalMean(surfaceEvapPotentialRateMmHr || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSurfaceNetFlux = zonalMean(surfaceNetFluxWm2 || new Array(nx * ny).fill(0), nx, ny);
+  const zonalLandEnergyTempTendency = zonalMean(landEnergyTempTendencyK || new Array(nx * ny).fill(0), nx, ny);
+  const zonalLandClimoTempTendency = zonalMean(landClimoTempTendencyK || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSoilMoisture = zonalMean(soilMoistureFraction || new Array(nx * ny).fill(0), nx, ny);
+  const zonalVegetationProxy = zonalMean(vegetationProxyFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalRainforestCanopySupport = zonalMean(rainforestCanopySupportFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalRainforestRootZoneRecharge = zonalMean(rainforestRootZoneRechargeRateMmHr || new Array(nx * ny).fill(0), nx, ny);
+  const zonalOceanMixedLayerTempTendency = zonalMean(oceanMixedLayerTempTendencyK || new Array(nx * ny).fill(0), nx, ny);
+  const zonalOceanClimoTempTendency = zonalMean(oceanClimoTempTendencyK || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSeaIceThermoTendency = zonalMean(seaIceThermoTendencyM || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSurfaceTemperature = zonalMean(surfaceTemperatureK || surfaceEvapSurfaceTempK || new Array(nx * ny).fill(0), nx, ny);
+  const zonalSurfaceAlbedo = zonalMean(surfaceAlbedo || new Array(nx * ny).fill(0), nx, ny);
   const zonalVaporFluxNorth = zonalMean(verticallyIntegratedVaporFluxNorthKgM_1S || new Array(nx * ny).fill(0), nx, ny);
   const zonalTotalWaterFluxNorth = zonalMean(verticallyIntegratedTotalWaterFluxNorthKgM_1S || new Array(nx * ny).fill(0), nx, ny);
   const sourceTracerZonal = Object.fromEntries(
@@ -2452,6 +2480,132 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     northDryBeltSurfaceQsMeanKgKg: round(weightedFieldBandMean(surfaceEvapSurfaceSaturationMixingRatioKgKg || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 6),
     northDryBeltSurfaceQaMeanKgKg: round(weightedFieldBandMean(surfaceEvapAirMixingRatioKgKg || new Array(nx * ny).fill(0), nx, ny, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT), 6)
   };
+  const zeroField = new Array(nx * ny).fill(0);
+  const fieldMean = (field, lat0, lat1, predicate) => weightedFieldBandMeanWithFilter(
+    field || zeroField,
+    nx,
+    ny,
+    latitudesDeg,
+    longitudesDeg,
+    rowWeights,
+    lat0,
+    lat1,
+    predicate
+  );
+  const landPredicate = ({ idx }) => landMask?.[idx] === 1;
+  const oceanPredicate = ({ idx }) => landMask?.[idx] !== 1;
+  const easternBoundaryOceanPredicate = ({ idx, lonDeg }) => {
+    if (landMask?.[idx] === 1) return false;
+    const lon = Number(lonDeg);
+    return (lon >= -150 && lon <= -70)
+      || (lon >= -35 && lon <= 25)
+      || (lon >= 70 && lon <= 125);
+  };
+  const tropicalLandPredicate = ({ idx, latDeg }) => landMask?.[idx] === 1 && Math.abs(latDeg) <= 15;
+  const rainforestPotentialPredicate = ({ idx, latDeg }) => {
+    if (landMask?.[idx] !== 1 || Math.abs(latDeg) > 15) return false;
+    const albedo = surfaceAlbedo?.[idx] ?? 0.2;
+    const elevation = surfaceElevationM?.[idx] ?? 0;
+    const canopySupport = rainforestCanopySupportFrac?.[idx] ?? 0;
+    return elevation <= 2600 && (albedo <= 0.32 || canopySupport >= 0.25);
+  };
+  const subtropicalLandPredicate = ({ idx, latDeg }) => landMask?.[idx] === 1 && Math.abs(latDeg) >= 15 && Math.abs(latDeg) <= 35;
+  const monsoonLandPredicate = ({ idx, latDeg }) => landMask?.[idx] === 1 && Math.abs(latDeg) >= 5 && Math.abs(latDeg) <= 25;
+  const tundraLandPredicate = ({ idx, latDeg }) => landMask?.[idx] === 1 && Math.abs(latDeg) >= 55 && Math.abs(latDeg) <= 75;
+  const mediterraneanPredicate = ({ idx, latDeg, lonDeg }) => {
+    if (landMask?.[idx] !== 1 || Math.abs(latDeg) < 30 || Math.abs(latDeg) > 45) return false;
+    const lon = Number(lonDeg);
+    return (lon >= -125 && lon <= -110)
+      || (lon >= -15 && lon <= 45)
+      || (lon >= 110 && lon <= 155)
+      || (lon >= -75 && lon <= -55);
+  };
+  const rainforestScoreField = (surfaceTemperatureK || zeroField).map((_, idx) => {
+    const precipSupport = smoothstep(0.07, 0.16, precipRateMmHr?.[idx] || 0);
+    const convectiveSupport = smoothstep(0.02, 0.08, precipConvectiveRateMmHr?.[idx] || 0);
+    const soilSupport = smoothstep(0.35, 0.72, soilMoistureFraction?.[idx] || 0);
+    const vegetationSupport = smoothstep(0.25, 0.7, vegetationProxyFrac?.[idx] || 0);
+    return precipSupport * (0.35 + 0.25 * convectiveSupport + 0.2 * soilSupport + 0.2 * vegetationSupport);
+  });
+  const desertScoreField = (surfaceTemperatureK || zeroField).map((value, idx) => {
+    const surfaceTemp = value || surfaceEvapSurfaceTempK?.[idx] || 0;
+    const precipDry = 1 - smoothstep(0.025, 0.09, precipRateMmHr?.[idx] || 0);
+    const soilDry = 1 - smoothstep(0.16, 0.42, soilMoistureFraction?.[idx] || 0);
+    const hotSurface = smoothstep(292, 309, surfaceTemp);
+    const energyDominance = Math.abs(landEnergyTempTendencyK?.[idx] || 0)
+      / Math.max(0.01, Math.abs(landEnergyTempTendencyK?.[idx] || 0) + Math.abs(landClimoTempTendencyK?.[idx] || 0));
+    return precipDry * (0.3 * soilDry + 0.3 * hotSurface + 0.4 * clamp01(energyDominance));
+  });
+  const savannaScoreField = (surfaceTemperatureK || zeroField).map((_, idx) => {
+    const precip = precipRateMmHr?.[idx] || 0;
+    const soil = soilMoistureFraction?.[idx] || 0;
+    return smoothstep(0.025, 0.09, precip)
+      * (1 - smoothstep(0.14, 0.2, precip))
+      * smoothstep(0.18, 0.55, soil)
+      * (1 - smoothstep(0.72, 0.92, soil));
+  });
+  const monsoonScoreField = (surfaceTemperatureK || zeroField).map((value, idx) => {
+    const landHeating = smoothstep(0.02, 0.35, landEnergyTempTendencyK?.[idx] || 0);
+    const moistConvergence = smoothstep(0.000001, 0.00001, lowLevelMoistureConvergenceS_1?.[idx] || 0);
+    const rain = smoothstep(0.04, 0.16, precipRateMmHr?.[idx] || 0);
+    const soilMemory = smoothstep(0.25, 0.7, soilMoistureFraction?.[idx] || 0);
+    return 0.35 * landHeating + 0.25 * moistConvergence + 0.25 * rain + 0.15 * soilMemory;
+  });
+  const mediterraneanScoreField = (surfaceTemperatureK || zeroField).map((value, idx) => {
+    const mildWarmth = smoothstep(284, 296, value || 0) * (1 - smoothstep(307, 315, value || 0));
+    const drySeasonSupport = 1 - smoothstep(0.035, 0.11, precipRateMmHr?.[idx] || 0);
+    const modestSoil = smoothstep(0.18, 0.55, soilMoistureFraction?.[idx] || 0);
+    return mildWarmth * (0.45 * drySeasonSupport + 0.55 * modestSoil);
+  });
+  const tundraScoreField = (surfaceTemperatureK || zeroField).map((value, idx) => {
+    const coldSurface = 1 - smoothstep(266, 281, value || 0);
+    const lowEvap = 1 - smoothstep(0.01, 0.05, surfaceEvapRateMmHr?.[idx] || 0);
+    return coldSurface * lowEvap;
+  });
+  const stratocumulusScoreField = (surfaceTemperatureK || zeroField).map((_, idx) => {
+    const lowCloud = cloudTotalFraction?.[idx] || 0;
+    const inversion = smoothstep(2, 9, lowerTroposphericInversionStrengthK?.[idx] || 0);
+    const shielding = smoothstep(15, 110, surfaceCloudShortwaveShieldingWm2?.[idx] || 0);
+    const coolSst = 1 - smoothstep(296, 302, surfaceTemperatureK?.[idx] || surfaceEvapSurfaceTempK?.[idx] || 0);
+    return lowCloud * (0.35 * inversion + 0.35 * shielding + 0.3 * coolSst);
+  });
+  const biomeDiagnostics = {
+    rainforestWetScore: round(fieldMean(rainforestScoreField, -15, 15, rainforestPotentialPredicate), 5),
+    rainforestPrecipMeanMmHr: round(fieldMean(precipRateMmHr || zeroField, -15, 15, rainforestPotentialPredicate), 5),
+    rainforestConvectivePrecipMeanMmHr: round(fieldMean(precipConvectiveRateMmHr || zeroField, -15, 15, rainforestPotentialPredicate), 5),
+    rainforestEvapMeanMmHr: round(fieldMean(surfaceEvapRateMmHr || zeroField, -15, 15, rainforestPotentialPredicate), 5),
+    rainforestSoilMoistureMeanFrac: round(fieldMean(soilMoistureFraction || zeroField, -15, 15, rainforestPotentialPredicate), 5),
+    rainforestVegetationProxyMeanFrac: round(fieldMean(vegetationProxyFrac || zeroField, -15, 15, rainforestPotentialPredicate), 5),
+    rainforestCanopySupportMeanFrac: round(fieldMean(rainforestCanopySupportFrac || zeroField, -15, 15, rainforestPotentialPredicate), 5),
+    rainforestRootZoneRechargeMeanMmHr: round(fieldMean(rainforestRootZoneRechargeRateMmHr || zeroField, -15, 15, rainforestPotentialPredicate), 5),
+    tropicalLandWetScore: round(fieldMean(rainforestScoreField, -15, 15, tropicalLandPredicate), 5),
+    tropicalLandPrecipMeanMmHr: round(fieldMean(precipRateMmHr || zeroField, -15, 15, tropicalLandPredicate), 5),
+    tropicalLandEvapMeanMmHr: round(fieldMean(surfaceEvapRateMmHr || zeroField, -15, 15, tropicalLandPredicate), 5),
+    tropicalLandSoilMoistureMeanFrac: round(fieldMean(soilMoistureFraction || zeroField, -15, 15, tropicalLandPredicate), 5),
+    desertPhysicalScore: round(fieldMean(desertScoreField, -35, 35, subtropicalLandPredicate), 5),
+    desertSurfaceTempMeanK: round(fieldMean(surfaceTemperatureK || surfaceEvapSurfaceTempK || zeroField, -35, 35, subtropicalLandPredicate), 5),
+    desertAirTempMeanK: round(fieldMean(surfaceEvapAirTempK || zeroField, -35, 35, subtropicalLandPredicate), 5),
+    desertSoilMoistureMeanFrac: round(fieldMean(soilMoistureFraction || zeroField, -35, 35, subtropicalLandPredicate), 5),
+    desertEnergyVsClimoRatio: round(fieldMean((landEnergyTempTendencyK || zeroField).map((value, idx) => Math.abs(value || 0) / Math.max(0.01, Math.abs(value || 0) + Math.abs(landClimoTempTendencyK?.[idx] || 0))), -35, 35, subtropicalLandPredicate), 5),
+    savannaTransitionScore: round(fieldMean(savannaScoreField, -25, 25, landPredicate), 5),
+    monsoonPotentialScore: round(fieldMean(monsoonScoreField, -25, 25, monsoonLandPredicate), 5),
+    mediterraneanScore: round(fieldMean(mediterraneanScoreField, -45, 45, mediterraneanPredicate), 5),
+    tundraScore: round(fieldMean(tundraScoreField, -75, 75, tundraLandPredicate), 5),
+    easternBoundaryStratocumulusScore: round(fieldMean(stratocumulusScoreField, -35, 35, easternBoundaryOceanPredicate), 5),
+    easternBoundaryLowCloudMeanFrac: round(fieldMean(cloudTotalFraction || zeroField, -35, 35, easternBoundaryOceanPredicate), 5),
+    easternBoundaryInversionMeanK: round(fieldMean(lowerTroposphericInversionStrengthK || zeroField, -35, 35, easternBoundaryOceanPredicate), 5),
+    easternBoundaryShieldingMeanWm2: round(fieldMean(surfaceCloudShortwaveShieldingWm2 || zeroField, -35, 35, easternBoundaryOceanPredicate), 5),
+    landOceanSurfaceTempContrastK: round(
+      fieldMean(surfaceTemperatureK || surfaceEvapSurfaceTempK || zeroField, -35, 35, landPredicate)
+        - fieldMean(surfaceTemperatureK || surfaceEvapSurfaceTempK || zeroField, -35, 35, oceanPredicate),
+      5
+    ),
+    landEnergyTempTendencyMeanK: round(fieldMean(landEnergyTempTendencyK || zeroField, -60, 60, landPredicate), 5),
+    landClimoTempTendencyMeanK: round(fieldMean(landClimoTempTendencyK || zeroField, -60, 60, landPredicate), 5),
+    oceanMixedLayerTempTendencyMeanK: round(fieldMean(oceanMixedLayerTempTendencyK || zeroField, -60, 60, oceanPredicate), 5),
+    oceanClimoTempTendencyMeanK: round(fieldMean(oceanClimoTempTendencyK || zeroField, -60, 60, oceanPredicate), 5),
+    seaIceThermoTendencyMeanM: round(fieldMean(seaIceThermoTendencyM || zeroField, -90, 90, oceanPredicate), 7)
+  };
   const tradesNorth = weightedBandMean(zonalU10, latitudesDeg, rowWeights, 5, 25);
   const tradesSouth = weightedBandMean(zonalU10, latitudesDeg, rowWeights, -25, -5);
   const westerliesNorth = weightedBandMean(zonalU10, latitudesDeg, rowWeights, 30, 60);
@@ -2757,6 +2911,37 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       stormDecayPotentialMean: round(midlatitudeBandMean(stormDecayPotentialDiagFrac || new Array(nx * ny).fill(0)), 5),
       stormWarmSectorMean: round(midlatitudeBandMean(stormWarmSectorDiagFrac || new Array(nx * ny).fill(0)), 5),
       stormColdSectorMean: round(midlatitudeBandMean(stormColdSectorDiagFrac || new Array(nx * ny).fill(0)), 5),
+      rainforestWetScore: biomeDiagnostics.rainforestWetScore,
+      rainforestPrecipMeanMmHr: biomeDiagnostics.rainforestPrecipMeanMmHr,
+      rainforestConvectivePrecipMeanMmHr: biomeDiagnostics.rainforestConvectivePrecipMeanMmHr,
+      rainforestEvapMeanMmHr: biomeDiagnostics.rainforestEvapMeanMmHr,
+      rainforestSoilMoistureMeanFrac: biomeDiagnostics.rainforestSoilMoistureMeanFrac,
+      rainforestVegetationProxyMeanFrac: biomeDiagnostics.rainforestVegetationProxyMeanFrac,
+      rainforestCanopySupportMeanFrac: biomeDiagnostics.rainforestCanopySupportMeanFrac,
+      rainforestRootZoneRechargeMeanMmHr: biomeDiagnostics.rainforestRootZoneRechargeMeanMmHr,
+      tropicalLandWetScore: biomeDiagnostics.tropicalLandWetScore,
+      tropicalLandPrecipMeanMmHr: biomeDiagnostics.tropicalLandPrecipMeanMmHr,
+      tropicalLandEvapMeanMmHr: biomeDiagnostics.tropicalLandEvapMeanMmHr,
+      tropicalLandSoilMoistureMeanFrac: biomeDiagnostics.tropicalLandSoilMoistureMeanFrac,
+      desertPhysicalScore: biomeDiagnostics.desertPhysicalScore,
+      desertSurfaceTempMeanK: biomeDiagnostics.desertSurfaceTempMeanK,
+      desertAirTempMeanK: biomeDiagnostics.desertAirTempMeanK,
+      desertSoilMoistureMeanFrac: biomeDiagnostics.desertSoilMoistureMeanFrac,
+      desertEnergyVsClimoRatio: biomeDiagnostics.desertEnergyVsClimoRatio,
+      savannaTransitionScore: biomeDiagnostics.savannaTransitionScore,
+      monsoonPotentialScore: biomeDiagnostics.monsoonPotentialScore,
+      mediterraneanScore: biomeDiagnostics.mediterraneanScore,
+      tundraScore: biomeDiagnostics.tundraScore,
+      easternBoundaryStratocumulusScore: biomeDiagnostics.easternBoundaryStratocumulusScore,
+      easternBoundaryLowCloudMeanFrac: biomeDiagnostics.easternBoundaryLowCloudMeanFrac,
+      easternBoundaryInversionMeanK: biomeDiagnostics.easternBoundaryInversionMeanK,
+      easternBoundaryShieldingMeanWm2: biomeDiagnostics.easternBoundaryShieldingMeanWm2,
+      landOceanSurfaceTempContrastK: biomeDiagnostics.landOceanSurfaceTempContrastK,
+      landEnergyTempTendencyMeanK: biomeDiagnostics.landEnergyTempTendencyMeanK,
+      landClimoTempTendencyMeanK: biomeDiagnostics.landClimoTempTendencyMeanK,
+      oceanMixedLayerTempTendencyMeanK: biomeDiagnostics.oceanMixedLayerTempTendencyMeanK,
+      oceanClimoTempTendencyMeanK: biomeDiagnostics.oceanClimoTempTendencyMeanK,
+      seaIceThermoTendencyMeanM: biomeDiagnostics.seaIceThermoTendencyMeanM,
       tropicalCycloneEnvironmentCountNh: tcEnvCounts.nh,
       tropicalCycloneEnvironmentCountSh: tcEnvCounts.sh,
       numericalIntegrityScore: numericalIntegrityScore.score,
@@ -2776,6 +2961,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       nhDryBeltSectorSummary
     },
     surfaceFluxDecomposition,
+    biomeDiagnostics,
     transportTracing: transportTracing || null,
     verticalCloudBirthTracing: verticalCloudBirthTracing || null,
     upperCloudResidenceTracing: upperCloudResidenceTracing || null,
@@ -2805,6 +2991,18 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         lowerTroposphericOmegaPaS: roundSeries(zonalLowerTroposphericOmega, 5),
         midTroposphericOmegaPaS: roundSeries(zonalMidTroposphericOmega, 5),
         upperTroposphericOmegaPaS: roundSeries(zonalUpperTroposphericOmega, 5),
+        surfaceTemperatureK: roundSeries(zonalSurfaceTemperature, 5),
+        surfaceNetFluxWm2: roundSeries(zonalSurfaceNetFlux, 5),
+        landEnergyTempTendencyK: roundSeries(zonalLandEnergyTempTendency, 5),
+        landClimoTempTendencyK: roundSeries(zonalLandClimoTempTendency, 5),
+        soilMoistureFraction: roundSeries(zonalSoilMoisture, 5),
+        vegetationProxyFrac: roundSeries(zonalVegetationProxy, 5),
+        rainforestCanopySupportFrac: roundSeries(zonalRainforestCanopySupport, 5),
+        rainforestRootZoneRechargeRateMmHr: roundSeries(zonalRainforestRootZoneRecharge, 5),
+        oceanMixedLayerTempTendencyK: roundSeries(zonalOceanMixedLayerTempTendency, 5),
+        oceanClimoTempTendencyK: roundSeries(zonalOceanClimoTempTendency, 5),
+        seaIceThermoTendencyM: roundSeries(zonalSeaIceThermoTendency, 7),
+        surfaceAlbedo: roundSeries(zonalSurfaceAlbedo, 5),
         frontalAscentSupportFrac: roundSeries(zonalFrontalAscentSupport, 5),
         frontalAscentAddedPaS: roundSeries(zonalFrontalAscentAdded, 5),
         frontalAscentCompensationPaS: roundSeries(zonalFrontalAscentCompensation, 5),

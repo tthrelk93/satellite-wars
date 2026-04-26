@@ -40,6 +40,17 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const surfaceEvapRate = makeArray(N);
   const surfaceLatentFlux = makeArray(N);
   const surfaceSensibleFlux = makeArray(N);
+  const surfaceNetFlux = makeArray(N);
+  const landEnergyTempTendency = makeArray(N);
+  const landClimoTempTendency = makeArray(N);
+  const landHeatCapacity = makeArray(N);
+  const soilMoistureFraction = makeArray(N);
+  const vegetationProxy = makeArray(N);
+  const rainforestCanopySupport = makeArray(N);
+  const rainforestRootZoneRechargeRate = makeArray(N);
+  const oceanMixedLayerTempTendency = makeArray(N);
+  const oceanClimoTempTendency = makeArray(N);
+  const seaIceThermoTendency = makeArray(N);
   const sstNow = makeArray(N, 300);
   const seaIceFrac = makeArray(N);
   const seaIceThicknessM = makeArray(N);
@@ -369,6 +380,17 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     surfaceEvapRate,
     surfaceLatentFlux,
     surfaceSensibleFlux,
+    surfaceNetFlux,
+    landEnergyTempTendency,
+    landClimoTempTendency,
+    landHeatCapacity,
+    soilMoistureFraction,
+    vegetationProxy,
+    rainforestCanopySupport,
+    rainforestRootZoneRechargeRate,
+    oceanMixedLayerTempTendency,
+    oceanClimoTempTendency,
+    seaIceThermoTendency,
     landMask,
     convMask,
     convectivePotential,

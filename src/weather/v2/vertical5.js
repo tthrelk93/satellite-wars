@@ -608,6 +608,10 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'equatorialCoreConvectiveMuBoost',
   'equatorialCoreRainoutBoost',
   'equatorialCoreWidthDeg',
+  'rainforestSurfaceConvectionBoost',
+  'rainforestSurfaceOrganizationBoost',
+  'rainforestSurfaceMuBoost',
+  'rainforestSurfaceRainoutBoost',
   'buoyTrigK',
   'dThetaMaxConvPerStep',
   'enableLargeScaleVerticalAdvection',
@@ -834,6 +838,10 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     equatorialCoreConvectiveMuBoost = 0,
     equatorialCoreRainoutBoost = 0,
     equatorialCoreWidthDeg = 6,
+    rainforestSurfaceConvectionBoost = 0,
+    rainforestSurfaceOrganizationBoost = 0,
+    rainforestSurfaceMuBoost = 0,
+    rainforestSurfaceRainoutBoost = 0,
     buoyTrigK = 0.0,
     dThetaMaxConvPerStep = 2.5,
 
@@ -2268,6 +2276,18 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const equatorialCoreSupport = latDeg
         ? 1 - smoothstep(Math.max(1, equatorialCoreWidthDeg), Math.max(2, equatorialCoreWidthDeg + 2), latAbs)
         : 1;
+      const rainforestCanopy = clamp01(state.rainforestCanopySupport?.[k] || 0);
+      const rainforestEvapSupport = smoothstep(0.012, 0.07, state.surfaceEvapRate?.[k] || 0);
+      const rainforestSoilSupport = smoothstep(0.06, 0.28, state.soilMoistureFraction?.[k] || 0);
+      const rainforestSurfaceSupport = clamp01(
+        rainforestCanopy
+          * tropicalCoreOnlySupport
+          * (0.45 + 0.35 * rainforestEvapSupport + 0.2 * rainforestSoilSupport)
+      );
+      potentialTarget = clamp01(
+        potentialTarget
+          + Math.max(0, rainforestSurfaceConvectionBoost) * rainforestSurfaceSupport * (1 - potentialTarget)
+      );
       const shoulderEquatorialEdgeWindow = latDeg
         ? clamp01(
             smoothstep(1.5, 3.25, latDeg[rowIndex])
@@ -2290,7 +2310,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       const organizedSupport = clamp01(
         0.5 * moistureConvergenceSupport +
         0.35 * ascentSupport +
-        0.15 * rhMidSupport
+        0.15 * rhMidSupport +
+        Math.max(0, rainforestSurfaceOrganizationBoost) * rainforestSurfaceSupport
       );
       const neutralToSubsidingSupport = smoothstep(-0.015, 0.18, omegaLow);
       const subtropicalSuppression = clamp01(
@@ -2388,8 +2409,8 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       );
       const hasSupport = activity > 0
         && (qvSupport > 0.08 || rhSupport > 0.08)
-        && (ascentSupport > 0.05 || moistureConvergenceSupport > 0.05)
-        && instabSupport > 0.05;
+        && (ascentSupport > 0.05 || moistureConvergenceSupport > 0.05 || rainforestSurfaceSupport > 0.12)
+        && (instabSupport > 0.05 || rainforestSurfaceSupport > 0.18);
       if (!hasSupport) continue;
 
       convMask[k] = activity > 0.22 ? 1 : 0;
@@ -2403,6 +2424,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           * (0.55 + 0.95 * activityOrganization + 0.3 * tropicalCore)
           * (1 + Math.max(0, tropicalCoreConvectiveMuBoost) * tropicalCoreOnlySupport)
           * (1 + Math.max(0, equatorialCoreConvectiveMuBoost) * equatorialCoreSupport)
+          * (1 + Math.max(0, rainforestSurfaceMuBoost) * rainforestSurfaceSupport)
           * (1 - 0.45 * subtropicalSuppression),
         0,
         0.35
@@ -2510,6 +2532,7 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
           + 0.08 * convMassFluxSupport * tropicalCore
           + Math.max(0, tropicalCoreRainoutBoost) * tropicalCoreOnlySupport * (0.55 + 0.45 * rhMidSupport)
           + Math.max(0, equatorialCoreRainoutBoost) * equatorialCoreSupport * (0.55 + 0.45 * rhMidSupport)
+          + Math.max(0, rainforestSurfaceRainoutBoost) * rainforestSurfaceSupport * (0.55 + 0.45 * rhMidSupport)
           - 0.08 * tropicalCore,
         0.08,
         0.88
