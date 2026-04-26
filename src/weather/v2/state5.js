@@ -57,6 +57,20 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const convectiveTopLevel = makeArray(N);
   const lowLevelMoistureConvergence = makeArray(N);
   const lowLevelOmegaEffective = makeArray(N);
+  const frontalAscentSupportDiag = makeArray(N);
+  const frontalAscentAddedDiag = makeArray(N);
+  const frontalAscentCompensationDiag = makeArray(N);
+  const frontalBaroclinicSupportDiag = makeArray(N);
+  const frontalJetSupportDiag = makeArray(N);
+  const frontalLandOceanSupportDiag = makeArray(N);
+  const frontalMoistureSupportDiag = makeArray(N);
+  const stormGenesisPotentialDiag = makeArray(N);
+  const stormDeepeningPotentialDiag = makeArray(N);
+  const stormOcclusionPotentialDiag = makeArray(N);
+  const stormDecayPotentialDiag = makeArray(N);
+  const stormPrecipShieldDiag = makeArray(N);
+  const stormWarmSectorDiag = makeArray(N);
+  const stormColdSectorDiag = makeArray(N);
   const subtropicalSubsidenceDrying = makeArray(N);
   const freshPotentialTargetDiag = makeArray(N);
   const freshOrganizedSupportDiag = makeArray(N);
@@ -367,6 +381,20 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     convectiveTopLevel,
     lowLevelMoistureConvergence,
     lowLevelOmegaEffective,
+    frontalAscentSupportDiag,
+    frontalAscentAddedDiag,
+    frontalAscentCompensationDiag,
+    frontalBaroclinicSupportDiag,
+    frontalJetSupportDiag,
+    frontalLandOceanSupportDiag,
+    frontalMoistureSupportDiag,
+    stormGenesisPotentialDiag,
+    stormDeepeningPotentialDiag,
+    stormOcclusionPotentialDiag,
+    stormDecayPotentialDiag,
+    stormPrecipShieldDiag,
+    stormWarmSectorDiag,
+    stormColdSectorDiag,
     subtropicalSubsidenceDrying,
     freshPotentialTargetDiag,
     freshOrganizedSupportDiag,

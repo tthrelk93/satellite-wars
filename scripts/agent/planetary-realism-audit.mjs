@@ -1747,6 +1747,20 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     northsideLeakCarrierSignalMean,
     lowLevelMoistureConvergenceS_1,
     lowLevelOmegaEffectivePaS,
+    frontalAscentSupportDiagFrac,
+    frontalAscentAddedDiagPaS,
+    frontalAscentCompensationDiagPaS,
+    frontalBaroclinicSupportDiagFrac,
+    frontalJetSupportDiagFrac,
+    frontalLandOceanSupportDiagFrac,
+    frontalMoistureSupportDiagFrac,
+    stormGenesisPotentialDiagFrac,
+    stormDeepeningPotentialDiagFrac,
+    stormOcclusionPotentialDiagFrac,
+    stormDecayPotentialDiagFrac,
+    stormPrecipShieldDiagFrac,
+    stormWarmSectorDiagFrac,
+    stormColdSectorDiagFrac,
     lowerTroposphericRhFrac,
     subtropicalSubsidenceDryingFrac,
     freshPotentialTargetDiagFrac,
@@ -1885,6 +1899,20 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalSurfaceCloudShielding = zonalMean(surfaceCloudShortwaveShieldingWm2 || new Array(nx * ny).fill(0), nx, ny);
   const zonalMoistureConvergence = zonalMean(lowLevelMoistureConvergenceS_1 || new Array(nx * ny).fill(0), nx, ny);
   const zonalLowLevelOmegaEffective = zonalMean(lowLevelOmegaEffectivePaS || new Array(nx * ny).fill(0), nx, ny);
+  const zonalFrontalAscentSupport = zonalMean(frontalAscentSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalFrontalAscentAdded = zonalMean(frontalAscentAddedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
+  const zonalFrontalAscentCompensation = zonalMean(frontalAscentCompensationDiagPaS || new Array(nx * ny).fill(0), nx, ny);
+  const zonalFrontalBaroclinicSupport = zonalMean(frontalBaroclinicSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalFrontalJetSupport = zonalMean(frontalJetSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalFrontalLandOceanSupport = zonalMean(frontalLandOceanSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalFrontalMoistureSupport = zonalMean(frontalMoistureSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalStormGenesisPotential = zonalMean(stormGenesisPotentialDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalStormDeepeningPotential = zonalMean(stormDeepeningPotentialDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalStormOcclusionPotential = zonalMean(stormOcclusionPotentialDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalStormDecayPotential = zonalMean(stormDecayPotentialDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalStormPrecipShield = zonalMean(stormPrecipShieldDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalStormWarmSector = zonalMean(stormWarmSectorDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalStormColdSector = zonalMean(stormColdSectorDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalDryingOmegaBridgeLocalApplied = zonalMean(dryingOmegaBridgeLocalAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
   const zonalDryingOmegaBridgeProjectedApplied = zonalMean(dryingOmegaBridgeProjectedAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
   const zonalEquatorialEdgeSubsidenceGuardSourceSupport = zonalMean(equatorialEdgeSubsidenceGuardSourceSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
@@ -1911,34 +1939,23 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   );
   // Storm-track proxy.
   //
-  // The previous proxy (zonal mean of |ζ| × precip × wind) was intended to
-  // locate active cyclones, but in a coarse 48×24 model the relative
-  // vorticity field is dominated by the meridional shear of the subtropical
-  // trade-wind easterlies.  Combined with a quiet SH midlatitude band (no
-  // resolvable baroclinic eddies at this resolution), the product's argmax
-  // in the [25, 70]° band is pulled onto the subtropical edge (~±26°) even
-  // when the actual midlatitude rain maximum sits at -55° to -65°.  That
-  // produced the spurious south_storm_track_out_of_range warning for the
-  // post-R5 annual audit (-26.25° vs target [-65, -30]°).
-  //
-  // A direct and more physically defensible proxy is just the zonal-mean
-  // precipitation rate: extratropical storm tracks are defined, in reality
-  // and in reanalyses, by where zonal-mean midlatitude rain peaks.  We keep
-  // the band restriction [25, 70]° so tropical ITCZ rain cannot contaminate
-  // the metric, and add a poleward weighting so that among roughly equal
-  // precip peaks within the band the truly midlatitude one is preferred.
-  // This weighting is `(|lat| - DEFAULT_STORM_MIN_LAT) / (DEFAULT_STORM_MAX_LAT - DEFAULT_STORM_MIN_LAT)`
-  // which is 0 at the subtropical edge of the band and 1 at the poleward
-  // edge.  The fix does not change NH behaviour (the NH midlat rain peak at
-  // 63.75° was already in the gate) and gracefully moves the SH argmax to
-  // the genuine midlat rain peak instead of the subtropical shear edge.
+  // Phase 5 adds explicit sub-grid frontal diagnostics, so the track metric
+  // now scores precipitation where it overlaps a plausible baroclinic storm
+  // belt.  The old poleward weighting made a coarse-grid polar rain maximum
+  // look like the preferred storm track; the bell-shaped midlatitude weight
+  // below keeps the proxy focused on fronts/cyclones instead of polar drizzle
+  // or subtropical trade-wind shear.
   const zonalStormIndex = zonalPrecip.map((value, j) => {
     const latAbs = Math.abs(latitudesDeg[j] || 0);
-    const bandSpan = DEFAULT_STORM_MAX_LAT - DEFAULT_STORM_MIN_LAT;
-    const polewardWeight = bandSpan > 0
-      ? Math.max(0, Math.min(1, (latAbs - DEFAULT_STORM_MIN_LAT) / bandSpan))
-      : 0;
-    return Math.max(0, value || 0) * polewardWeight;
+    const midlatitudeWindow = smoothstep(DEFAULT_STORM_MIN_LAT, 36, latAbs)
+      * (1 - smoothstep(60, DEFAULT_STORM_MAX_LAT, latAbs));
+    const lifecycleSupport = clamp01(
+      0.6 * (zonalFrontalAscentSupport[j] || 0)
+        + 0.25 * (zonalStormDeepeningPotential[j] || 0)
+        + 0.15 * (zonalStormPrecipShield[j] || 0)
+    );
+    const supportWeight = 0.55 + 1.1 * lifecycleSupport;
+    return Math.max(0, value || 0) * midlatitudeWindow * supportWeight;
   });
   const globalPrecipMean = areaWeightedMean(precipRateMmHr, nx, ny, rowWeights);
   const globalConvectivePrecipMean = areaWeightedMean(precipConvectiveRateMmHr || new Array(nx * ny).fill(0), nx, ny, rowWeights);
@@ -2443,6 +2460,50 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const stormTrackSouthLat = peakLatitude(zonalStormIndex, latitudesDeg, -DEFAULT_STORM_MAX_LAT, -DEFAULT_STORM_MIN_LAT);
   const tcEnvCounts = computeTropicalCycloneEnvironment(diagnostics);
   const numericalIntegrityScore = computeNumericalIntegrityScore({ numericalIntegrityTracing, sampledDays: Math.max(1, targetDay) });
+  const midlatitudeBandMean = (field) => {
+    let total = 0;
+    let weightTotal = 0;
+    for (let j = 0; j < ny; j += 1) {
+      const latAbs = Math.abs(latitudesDeg[j] || 0);
+      if (latAbs < 30 || latAbs > 60) continue;
+      const row = j * nx;
+      const rowWeight = rowWeights[j];
+      for (let i = 0; i < nx; i += 1) {
+        const value = field?.[row + i];
+        total += (Number.isFinite(value) ? value : 0) * rowWeight;
+        weightTotal += rowWeight;
+      }
+    }
+    return weightTotal > 0 ? total / weightTotal : 0;
+  };
+  const midlatitudeOmegaField = midTroposphericOmegaPaS || new Array(nx * ny).fill(0);
+  const midlatitudeAscentMask = midlatitudeOmegaField.map((omegaPaS) => (omegaPaS < -0.025 ? 1 : 0));
+  const midlatitudeAscentMagnitude = midlatitudeOmegaField.map((omegaPaS) => Math.max(0, -(omegaPaS || 0)));
+  const midlatitudeAscentFraction = midlatitudeBandMean(midlatitudeAscentMask);
+  const midlatitudeAscentMean = midlatitudeBandMean(midlatitudeAscentMagnitude);
+  const stormLifecycleSupportField = (frontalAscentSupportDiagFrac || new Array(nx * ny).fill(0)).map((support, idx) => clamp01(
+    0.45 * (support || 0)
+      + 0.25 * ((stormDeepeningPotentialDiagFrac || [])[idx] || 0)
+      + 0.2 * ((stormPrecipShieldDiagFrac || [])[idx] || 0)
+      + 0.1 * ((stormGenesisPotentialDiagFrac || [])[idx] || 0)
+  ));
+  let midlatitudePrecipTotal = 0;
+  let midlatitudeStormPrecipTotal = 0;
+  for (let j = 0; j < ny; j += 1) {
+    const latAbs = Math.abs(latitudesDeg[j] || 0);
+    if (latAbs < 30 || latAbs > 60) continue;
+    const row = j * nx;
+    const rowWeight = rowWeights[j];
+    for (let i = 0; i < nx; i += 1) {
+      const idx = row + i;
+      const precip = Math.max(0, precipRateMmHr?.[idx] || 0) * rowWeight;
+      midlatitudePrecipTotal += precip;
+      midlatitudeStormPrecipTotal += precip * clamp01(stormLifecycleSupportField[idx] || 0);
+    }
+  }
+  const midlatitudeStormBandPrecipShare = midlatitudePrecipTotal > 0
+    ? midlatitudeStormPrecipTotal / midlatitudePrecipTotal
+    : 0;
 
   return {
     targetDay,
@@ -2684,6 +2745,18 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       midlatitudeWesterliesSouthU10Ms: round(westerliesSouth),
       stormTrackNorthLatDeg: round(stormTrackNorthLat),
       stormTrackSouthLatDeg: round(stormTrackSouthLat),
+      midlatitudeAscentFraction: round(midlatitudeAscentFraction, 5),
+      midlatitudeAscentMeanPaS: round(midlatitudeAscentMean, 5),
+      midlatitudeFrontalAscentSupportMean: round(midlatitudeBandMean(frontalAscentSupportDiagFrac || new Array(nx * ny).fill(0)), 5),
+      midlatitudeFrontalAscentAddedMeanPaS: round(midlatitudeBandMean(frontalAscentAddedDiagPaS || new Array(nx * ny).fill(0)), 5),
+      midlatitudeFrontalAscentCompensationMeanPaS: round(midlatitudeBandMean(frontalAscentCompensationDiagPaS || new Array(nx * ny).fill(0)), 5),
+      midlatitudeStormBandPrecipShare: round(midlatitudeStormBandPrecipShare, 5),
+      stormGenesisPotentialMean: round(midlatitudeBandMean(stormGenesisPotentialDiagFrac || new Array(nx * ny).fill(0)), 5),
+      stormDeepeningPotentialMean: round(midlatitudeBandMean(stormDeepeningPotentialDiagFrac || new Array(nx * ny).fill(0)), 5),
+      stormOcclusionPotentialMean: round(midlatitudeBandMean(stormOcclusionPotentialDiagFrac || new Array(nx * ny).fill(0)), 5),
+      stormDecayPotentialMean: round(midlatitudeBandMean(stormDecayPotentialDiagFrac || new Array(nx * ny).fill(0)), 5),
+      stormWarmSectorMean: round(midlatitudeBandMean(stormWarmSectorDiagFrac || new Array(nx * ny).fill(0)), 5),
+      stormColdSectorMean: round(midlatitudeBandMean(stormColdSectorDiagFrac || new Array(nx * ny).fill(0)), 5),
       tropicalCycloneEnvironmentCountNh: tcEnvCounts.nh,
       tropicalCycloneEnvironmentCountSh: tcEnvCounts.sh,
       numericalIntegrityScore: numericalIntegrityScore.score,
@@ -2732,6 +2805,20 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         lowerTroposphericOmegaPaS: roundSeries(zonalLowerTroposphericOmega, 5),
         midTroposphericOmegaPaS: roundSeries(zonalMidTroposphericOmega, 5),
         upperTroposphericOmegaPaS: roundSeries(zonalUpperTroposphericOmega, 5),
+        frontalAscentSupportFrac: roundSeries(zonalFrontalAscentSupport, 5),
+        frontalAscentAddedPaS: roundSeries(zonalFrontalAscentAdded, 5),
+        frontalAscentCompensationPaS: roundSeries(zonalFrontalAscentCompensation, 5),
+        frontalBaroclinicSupportFrac: roundSeries(zonalFrontalBaroclinicSupport, 5),
+        frontalJetSupportFrac: roundSeries(zonalFrontalJetSupport, 5),
+        frontalLandOceanSupportFrac: roundSeries(zonalFrontalLandOceanSupport, 5),
+        frontalMoistureSupportFrac: roundSeries(zonalFrontalMoistureSupport, 5),
+        stormGenesisPotentialFrac: roundSeries(zonalStormGenesisPotential, 5),
+        stormDeepeningPotentialFrac: roundSeries(zonalStormDeepeningPotential, 5),
+        stormOcclusionPotentialFrac: roundSeries(zonalStormOcclusionPotential, 5),
+        stormDecayPotentialFrac: roundSeries(zonalStormDecayPotential, 5),
+        stormPrecipShieldFrac: roundSeries(zonalStormPrecipShield, 5),
+        stormWarmSectorFrac: roundSeries(zonalStormWarmSector, 5),
+        stormColdSectorFrac: roundSeries(zonalStormColdSector, 5),
         boundaryLayerThetaeK: roundSeries(zonalBoundaryLayerThetae, 5),
         lowerTroposphereThetaeK: roundSeries(zonalLowerTroposphereThetae, 5),
         thetaeGradientBoundaryMinusLowerK: roundSeries(zonalThetaeGradient, 5),
@@ -4404,11 +4491,11 @@ const buildGapEntry = (warning, horizon) => {
       entry.category = 'stormTracks';
       entry.metricKey = 'stormTrackNorthLatDeg';
       entry.actual = gateValue('stormTrackNorthLatDeg');
-      entry.target = '30-65 deg';
+      entry.target = '30-60 deg';
       entry.severity = clamp01(
         Number(entry.actual) < 30
           ? (30 - Number(entry.actual)) / 20
-          : (Number(entry.actual) - 65) / 20
+          : (Number(entry.actual) - 60) / 20
       );
       break;
     case 'south_storm_track_out_of_range':
@@ -4416,11 +4503,11 @@ const buildGapEntry = (warning, horizon) => {
       entry.category = 'stormTracks';
       entry.metricKey = 'stormTrackSouthLatDeg';
       entry.actual = gateValue('stormTrackSouthLatDeg');
-      entry.target = '-65 to -30 deg';
+      entry.target = '-60 to -30 deg';
       entry.severity = clamp01(
         Number(entry.actual) > -30
           ? (Number(entry.actual) + 30) / 20
-          : (-65 - Number(entry.actual)) / 20
+          : (-60 - Number(entry.actual)) / 20
       );
       break;
     case 'cloud_field_unbalanced':
@@ -5529,9 +5616,9 @@ export const evaluateHorizons = (samples, horizonDays) => {
     stormTracks: Number.isFinite(gateMetric('stormTrackNorthLatDeg'))
       && Number.isFinite(gateMetric('stormTrackSouthLatDeg'))
       && gateMetric('stormTrackNorthLatDeg') >= 30
-      && gateMetric('stormTrackNorthLatDeg') <= 65
+      && gateMetric('stormTrackNorthLatDeg') <= 60
       && gateMetric('stormTrackSouthLatDeg') <= -30
-      && gateMetric('stormTrackSouthLatDeg') >= -65,
+      && gateMetric('stormTrackSouthLatDeg') >= -60,
     cloudBalance: metrics.globalCloudMeanFrac >= 0.15 && metrics.globalCloudMeanFrac <= 0.85,
     stability: metrics.maxWind10mMs <= 120
       && metrics.globalPrecipMeanMmHr <= 5
@@ -5555,8 +5642,8 @@ export const evaluateHorizons = (samples, horizonDays) => {
   {
     const n = gateMetric('stormTrackNorthLatDeg');
     const s = gateMetric('stormTrackSouthLatDeg');
-    if (!(Number.isFinite(n) && n >= 30 && n <= 65)) warnings.push('north_storm_track_out_of_range');
-    if (!(Number.isFinite(s) && s <= -30 && s >= -65)) warnings.push('south_storm_track_out_of_range');
+    if (!(Number.isFinite(n) && n >= 30 && n <= 60)) warnings.push('north_storm_track_out_of_range');
+    if (!(Number.isFinite(s) && s <= -30 && s >= -60)) warnings.push('south_storm_track_out_of_range');
   }
   if (!(metrics.globalCloudMeanFrac >= 0.15 && metrics.globalCloudMeanFrac <= 0.85)) warnings.push('cloud_field_unbalanced');
   if (!(metrics.maxWind10mMs <= 120)) warnings.push('runaway_surface_winds');

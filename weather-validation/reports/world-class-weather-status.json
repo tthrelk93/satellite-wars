@@ -1,16 +1,16 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-26T02:21:40.783Z",
+  "updatedAt": "2026-04-26T08:58:41.839Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
-  "baselineCommit": "14d53bc",
+  "baselineCommit": "4bba8f3",
   "latestCycle": {
-    "id": "cycle-2026-04-25T22-47-48Z-phase4-tropical-rain-engine-seasonal",
-    "goal": "turn high atmospheric water into Earth-like tropical rainfall while preserving dry belts, water budget, and numerical climate gates",
-    "verifiedImprovement": "Phase 4 tropical rain engine passes the 90-day seasonal repro gate with higher organized tropical precipitation, bounded TCW, preserved dry belts, passing water budget, and passing dt/grid numerical climate contract",
-    "checkpointPath": "weather-validation/output/cycle-2026-04-25T22-47-48Z-phase4-tropical-rain-engine-seasonal/checkpoint.md",
-    "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-25T22-47-48Z-phase4-tropical-rain-engine-seasonal/evidence-summary.json"
+    "id": "cycle-2026-04-26T04-52-50Z-phase5-midlatitude-storm-tracks",
+    "goal": "make believable fronts, cyclones, westerlies, and seasonal storm belts",
+    "verifiedImprovement": "Phase 5 midlatitude storm tracks pass quick and 90-day seasonal repro gates with storm-track peaks inside the tightened 30-60 degree bands, no warnings, passing water budget, and passing dt/grid numerical climate contract",
+    "checkpointPath": "weather-validation/output/cycle-2026-04-26T04-52-50Z-phase5-midlatitude-storm-tracks/checkpoint.md",
+    "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-26T04-52-50Z-phase5-midlatitude-storm-tracks/evidence-summary.json"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
@@ -22,36 +22,38 @@
     "preset": "seasonal",
     "reproCheck": true,
     "counterfactuals": false,
-    "latestArtifact": "weather-validation/output/cycle-2026-04-25T22-47-48Z-phase4-tropical-rain-engine-seasonal/phase4-production-seasonal-repro.json",
+    "latestArtifact": "weather-validation/output/cycle-2026-04-26T04-52-50Z-phase5-midlatitude-storm-tracks/frontal-final-seasonal.json",
+    "canonicalReportGeneratedAt": "2026-04-26T08:58:41.839Z",
     "metrics": {
+      "stormTrackNorthLatDeg": 33.75,
+      "stormTrackSouthLatDeg": -48.75,
+      "midlatitudeAscentFraction": 0.50031,
+      "midlatitudeAscentMeanPaS": 0.23745,
+      "midlatitudeFrontalAscentSupportMean": 0.18604,
+      "midlatitudeFrontalAscentAddedMeanPaS": 0.00838,
+      "midlatitudeFrontalAscentCompensationMeanPaS": 0.00767,
+      "midlatitudeStormBandPrecipShare": 0.15677,
+      "stormGenesisPotentialMean": 0.12173,
+      "stormDeepeningPotentialMean": 0.05621,
+      "stormOcclusionPotentialMean": 0.00349,
+      "stormDecayPotentialMean": 0.07331,
       "globalPrecipMeanMmHr": 0.065,
-      "equatorialPrecipMeanMmHr": 0.128,
-      "globalConvectivePrecipMeanMmHr": 0.019,
-      "globalStratiformPrecipMeanMmHr": 0.045,
-      "tropicalConvectivePrecipMeanMmHr": 0.055,
-      "tropicalStratiformPrecipMeanMmHr": 0.074,
-      "tropicalConvectivePrecipShare": 0.426,
-      "tropicalConvectiveMassFluxKgM2S": 0.00482,
-      "globalTcwMeanKgM2": 10.304,
-      "subtropicalDryNorthRatio": 0.315,
-      "subtropicalDrySouthRatio": 0.475,
-      "itczLatDeg": -2.156,
-      "itczWidthDeg": 21.327,
-      "waterCyclePass": true,
-      "evapPrecipRelativeImbalance": 0.02904,
-      "tcwDriftKgM2": 6.60572,
-      "numericalIntegrityScore": 0.8872,
+      "equatorialPrecipMeanMmHr": 0.132,
+      "subtropicalDryNorthRatio": 0.313,
+      "subtropicalDrySouthRatio": 0.44,
+      "numericalIntegrityScore": 0.8873,
       "numericalIntegrityPass": true,
       "numericalLimiterDominance": false,
       "numericalClimateContractPass": true,
       "dtSensitivityPass": true,
-      "gridSensitivityPass": true
+      "gridSensitivityPass": true,
+      "waterCyclePass": true
     }
   },
   "blockingGaps": [
-    "This is a 90-day seasonal Phase 4 claim, not a full annual world-class claim.",
+    "This is a 90-day seasonal Phase 5 claim, not a full annual world-class claim.",
     "A full annual planetary-realism pass with dt/grid repro enabled is still required before any annual or world-class claim.",
-    "Browser/runtime signoff is still required after the verified climate fix, including smoothness telemetry and visual observation in the live app.",
+    "Browser/runtime signoff is still required after the verified climate fixes, including smoothness telemetry and visual observation in the live app.",
     "World-class status still requires realism and smoothness to pass in the same browser-backed run."
   ],
   "cycleInputs": [
@@ -65,7 +67,7 @@
     "latest runtime summary from npm run agent:summarize-runtime-log"
   ],
   "defaultNextPriorities": [
-    "Move to Phase 5 from the verified Phase 4 tropical rain baseline.",
+    "Move to the next climate phase from the verified Phase 5 storm-track baseline.",
     "Run bounded live/browser verification after this verified climate fix or when runtime debt becomes blocking again.",
     "Before any world-class or annual-seasonality claim, run full annual planetary realism with dt/grid repro enabled.",
     "Keep validation on the clean world-class checkout only."

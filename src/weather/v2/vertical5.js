@@ -680,6 +680,22 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'dryingOmegaBridgeEquatorwardLeakLat0',
   'dryingOmegaBridgeEquatorwardLeakLat1',
   'dryingOmegaBridgeProjectedMaxPaS',
+  'enableFrontalAscentConcentration',
+  'frontalAscentPeakLatDeg',
+  'frontalAscentSeasonalShiftDeg',
+  'frontalAscentWidthDeg',
+  'frontalAscentMinLatDeg',
+  'frontalAscentMaxLatDeg',
+  'frontalAscentMaxPaS',
+  'frontalAscentMaxStepPaS',
+  'frontalAscentSigmaTop',
+  'frontalAscentSigmaBottom',
+  'frontalAscentConcentrationPower',
+  'frontalAscentCompensationFloor',
+  'frontalAscentMinSupport',
+  'frontalAscentDiffuseDampingFrac',
+  'frontalAscentDiffuseDampingMaxStepPaS',
+  'frontalAscentCoreGatherSupport',
   'enableEquatorialEdgeSubsidenceGuard',
   'equatorialEdgeSubsidenceGuardMaxPaS',
   'equatorialEdgeSubsidenceGuardSourceLat0',
@@ -894,6 +910,22 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     dryingOmegaBridgeEquatorwardLeakLat0 = 18,
     dryingOmegaBridgeEquatorwardLeakLat1 = 22,
     dryingOmegaBridgeProjectedMaxPaS = 0.006,
+    enableFrontalAscentConcentration = false,
+    frontalAscentPeakLatDeg = 47,
+    frontalAscentSeasonalShiftDeg = 5,
+    frontalAscentWidthDeg = 10,
+    frontalAscentMinLatDeg = 30,
+    frontalAscentMaxLatDeg = 62,
+    frontalAscentMaxPaS = 0.055,
+    frontalAscentMaxStepPaS = 0.035,
+    frontalAscentSigmaTop = 0.42,
+    frontalAscentSigmaBottom = 0.98,
+    frontalAscentConcentrationPower = 1.35,
+    frontalAscentCompensationFloor = 0.28,
+    frontalAscentMinSupport = 0.025,
+    frontalAscentDiffuseDampingFrac = 0,
+    frontalAscentDiffuseDampingMaxStepPaS = 0.045,
+    frontalAscentCoreGatherSupport = 0.08,
     enableEquatorialEdgeSubsidenceGuard = false,
     equatorialEdgeSubsidenceGuardMaxPaS = 0.007,
     equatorialEdgeSubsidenceGuardSourceLat0 = 8,
@@ -1004,6 +1036,21 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.dryingOmegaBridgeAppliedDiag || state.dryingOmegaBridgeAppliedDiag.length !== N) state.dryingOmegaBridgeAppliedDiag = new Float32Array(N);
   if (!state.dryingOmegaBridgeLocalAppliedDiag || state.dryingOmegaBridgeLocalAppliedDiag.length !== N) state.dryingOmegaBridgeLocalAppliedDiag = new Float32Array(N);
   if (!state.dryingOmegaBridgeProjectedAppliedDiag || state.dryingOmegaBridgeProjectedAppliedDiag.length !== N) state.dryingOmegaBridgeProjectedAppliedDiag = new Float32Array(N);
+  if (!state.frontalAscentSupportDiag || state.frontalAscentSupportDiag.length !== N) state.frontalAscentSupportDiag = new Float32Array(N);
+  if (!state.frontalAscentAddedDiag || state.frontalAscentAddedDiag.length !== N) state.frontalAscentAddedDiag = new Float32Array(N);
+  if (!state.frontalAscentCompensationDiag || state.frontalAscentCompensationDiag.length !== N) state.frontalAscentCompensationDiag = new Float32Array(N);
+  if (!state.frontalBaroclinicSupportDiag || state.frontalBaroclinicSupportDiag.length !== N) state.frontalBaroclinicSupportDiag = new Float32Array(N);
+  if (!state.frontalJetSupportDiag || state.frontalJetSupportDiag.length !== N) state.frontalJetSupportDiag = new Float32Array(N);
+  if (!state.frontalLandOceanSupportDiag || state.frontalLandOceanSupportDiag.length !== N) state.frontalLandOceanSupportDiag = new Float32Array(N);
+  if (!state.frontalMoistureSupportDiag || state.frontalMoistureSupportDiag.length !== N) state.frontalMoistureSupportDiag = new Float32Array(N);
+  if (!state.stormGenesisPotentialDiag || state.stormGenesisPotentialDiag.length !== N) state.stormGenesisPotentialDiag = new Float32Array(N);
+  if (!state.stormDeepeningPotentialDiag || state.stormDeepeningPotentialDiag.length !== N) state.stormDeepeningPotentialDiag = new Float32Array(N);
+  if (!state.stormOcclusionPotentialDiag || state.stormOcclusionPotentialDiag.length !== N) state.stormOcclusionPotentialDiag = new Float32Array(N);
+  if (!state.stormDecayPotentialDiag || state.stormDecayPotentialDiag.length !== N) state.stormDecayPotentialDiag = new Float32Array(N);
+  if (!state.stormPrecipShieldDiag || state.stormPrecipShieldDiag.length !== N) state.stormPrecipShieldDiag = new Float32Array(N);
+  if (!state.stormWarmSectorDiag || state.stormWarmSectorDiag.length !== N) state.stormWarmSectorDiag = new Float32Array(N);
+  if (!state.stormColdSectorDiag || state.stormColdSectorDiag.length !== N) state.stormColdSectorDiag = new Float32Array(N);
+  if (!state._frontalAscentOmegaDelta || state._frontalAscentOmegaDelta.length !== N) state._frontalAscentOmegaDelta = new Float32Array(N);
   if (!state.equatorialEdgeSubsidenceGuardSourceSupportDiag || state.equatorialEdgeSubsidenceGuardSourceSupportDiag.length !== N) state.equatorialEdgeSubsidenceGuardSourceSupportDiag = new Float32Array(N);
   if (!state.equatorialEdgeSubsidenceGuardTargetWeightDiag || state.equatorialEdgeSubsidenceGuardTargetWeightDiag.length !== N) state.equatorialEdgeSubsidenceGuardTargetWeightDiag = new Float32Array(N);
   if (!state.equatorialEdgeSubsidenceGuardAppliedDiag || state.equatorialEdgeSubsidenceGuardAppliedDiag.length !== N) state.equatorialEdgeSubsidenceGuardAppliedDiag = new Float32Array(N);
@@ -1149,6 +1196,21 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const dryingOmegaBridgeAppliedDiag = state.dryingOmegaBridgeAppliedDiag;
   const dryingOmegaBridgeLocalAppliedDiag = state.dryingOmegaBridgeLocalAppliedDiag;
   const dryingOmegaBridgeProjectedAppliedDiag = state.dryingOmegaBridgeProjectedAppliedDiag;
+  const frontalAscentSupportDiag = state.frontalAscentSupportDiag;
+  const frontalAscentAddedDiag = state.frontalAscentAddedDiag;
+  const frontalAscentCompensationDiag = state.frontalAscentCompensationDiag;
+  const frontalBaroclinicSupportDiag = state.frontalBaroclinicSupportDiag;
+  const frontalJetSupportDiag = state.frontalJetSupportDiag;
+  const frontalLandOceanSupportDiag = state.frontalLandOceanSupportDiag;
+  const frontalMoistureSupportDiag = state.frontalMoistureSupportDiag;
+  const stormGenesisPotentialDiag = state.stormGenesisPotentialDiag;
+  const stormDeepeningPotentialDiag = state.stormDeepeningPotentialDiag;
+  const stormOcclusionPotentialDiag = state.stormOcclusionPotentialDiag;
+  const stormDecayPotentialDiag = state.stormDecayPotentialDiag;
+  const stormPrecipShieldDiag = state.stormPrecipShieldDiag;
+  const stormWarmSectorDiag = state.stormWarmSectorDiag;
+  const stormColdSectorDiag = state.stormColdSectorDiag;
+  const frontalAscentOmegaDelta = state._frontalAscentOmegaDelta;
   const equatorialEdgeSubsidenceGuardSourceSupportDiag = state.equatorialEdgeSubsidenceGuardSourceSupportDiag;
   const equatorialEdgeSubsidenceGuardTargetWeightDiag = state.equatorialEdgeSubsidenceGuardTargetWeightDiag;
   const equatorialEdgeSubsidenceGuardAppliedDiag = state.equatorialEdgeSubsidenceGuardAppliedDiag;
@@ -1267,6 +1329,21 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   dryingOmegaBridgeAppliedDiag.fill(0);
   dryingOmegaBridgeLocalAppliedDiag.fill(0);
   dryingOmegaBridgeProjectedAppliedDiag.fill(0);
+  frontalAscentSupportDiag.fill(0);
+  frontalAscentAddedDiag.fill(0);
+  frontalAscentCompensationDiag.fill(0);
+  frontalBaroclinicSupportDiag.fill(0);
+  frontalJetSupportDiag.fill(0);
+  frontalLandOceanSupportDiag.fill(0);
+  frontalMoistureSupportDiag.fill(0);
+  stormGenesisPotentialDiag.fill(0);
+  stormDeepeningPotentialDiag.fill(0);
+  stormOcclusionPotentialDiag.fill(0);
+  stormDecayPotentialDiag.fill(0);
+  stormPrecipShieldDiag.fill(0);
+  stormWarmSectorDiag.fill(0);
+  stormColdSectorDiag.fill(0);
+  frontalAscentOmegaDelta.fill(0);
   equatorialEdgeSubsidenceGuardSourceSupportDiag.fill(0);
   equatorialEdgeSubsidenceGuardTargetWeightDiag.fill(0);
   equatorialEdgeSubsidenceGuardAppliedDiag.fill(0);
@@ -1541,6 +1618,216 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
         const sigma = clamp01(sigmaHalf[lev]);
         const weight = taperExp > 0 ? Math.pow(sigma, taperExp) : sigma;
         omega[lev * N + k] += delta * weight;
+      }
+    }
+  }
+
+  if (
+    enableFrontalAscentConcentration &&
+    dt > 0 &&
+    grid.latDeg &&
+    grid.latDeg.length >= ny &&
+    sigmaHalf &&
+    sigmaHalf.length >= nz + 1
+  ) {
+    const levS = nz - 1;
+    const lowBase = levS * N;
+    const upperJetLev = clamp(Math.floor(nz * 0.32), 0, nz - 1);
+    const upperJetBase = upperJetLev * N;
+    const midBase = clamp(Math.floor(nz * 0.58), 0, nz - 1) * N;
+    const dayOfYear = ((Number(state.timeUTC) || 0) / 86400) % 365;
+    const seasonalPhase = Math.cos((2 * Math.PI * (dayOfYear - 15)) / 365);
+    const minLat = Math.max(20, Math.min(frontalAscentMinLatDeg, frontalAscentMaxLatDeg - 2));
+    const maxLat = Math.min(75, Math.max(frontalAscentMaxLatDeg, minLat + 2));
+    const peakLat = clamp(frontalAscentPeakLatDeg, minLat, maxLat);
+    const beltWidth = Math.max(3, frontalAscentWidthDeg);
+    const maxAscentPaS = Math.max(0, frontalAscentMaxPaS);
+    const maxStepPaS = Math.max(0, frontalAscentMaxStepPaS);
+    const supportFloor = clamp01(frontalAscentMinSupport);
+    const diffuseDampingFrac = clamp01(frontalAscentDiffuseDampingFrac);
+    const diffuseDampingMaxStepPaS = Math.max(0, frontalAscentDiffuseDampingMaxStepPaS);
+    const coreGatherSupport = clamp01(frontalAscentCoreGatherSupport);
+    const concentrationPower = Math.max(0.25, frontalAscentConcentrationPower);
+    const compensationFloor = Math.max(0.02, frontalAscentCompensationFloor);
+    const topSigma = Math.max(0, Math.min(frontalAscentSigmaTop, frontalAscentSigmaBottom));
+    const bottomSigma = Math.min(1, Math.max(frontalAscentSigmaTop, frontalAscentSigmaBottom));
+    const sigmaRamp = Math.max(0.03, (bottomSigma - topSigma) * 0.25);
+    const lonField = lonDeg && lonDeg.length >= nx ? lonDeg : null;
+    const landField = landMask && landMask.length === N ? landMask : null;
+
+    for (let j = 0; j < ny; j += 1) {
+      const row = j * nx;
+      const rowN = Math.max(0, j - 1) * nx;
+      const rowS = Math.min(ny - 1, j + 1) * nx;
+      const lat = grid.latDeg[j] || 0;
+      const latAbs = Math.abs(lat);
+      const hemi = lat >= 0 ? 1 : -1;
+      const seasonalCenter = clamp(peakLat - hemi * frontalAscentSeasonalShiftDeg * seasonalPhase, minLat, maxLat);
+      const latitudeWindow = smoothstep(minLat - 3, minLat + 2, latAbs)
+        * (1 - smoothstep(maxLat - 2, maxLat + 3, latAbs));
+      const belt = latitudeWindow * Math.exp(-((latAbs - seasonalCenter) ** 2) / Math.max(1e-6, 2 * beltWidth * beltWidth));
+      if (!(belt > 0)) continue;
+      const invDxRow = invDx[j];
+      const invDyRow = invDy[j];
+      const wavePhase = (2 * Math.PI * dayOfYear) / 12;
+
+      for (let i = 0; i < nx; i += 1) {
+        const iE = (i + 1) % nx;
+        const iW = (i - 1 + nx) % nx;
+        const k = row + i;
+        const kE = row + iE;
+        const kW = row + iW;
+        const kN = rowN + i;
+        const kS = rowS + i;
+        const dTdx = (T[lowBase + kE] - T[lowBase + kW]) * 0.5 * invDxRow;
+        const dTdy = (T[lowBase + kN] - T[lowBase + kS]) * 0.5 * invDyRow;
+        const gradKPer1000Km = Math.hypot(dTdx, dTdy) * 1e6;
+        const baroclinicSupport = smoothstep(1.5, 7.5, gradKPer1000Km);
+        const uLow = u[lowBase + k] || 0;
+        const uJet = u[upperJetBase + k] || 0;
+        const jetSupport = clamp01(
+          0.62 * smoothstep(1.5, 18, uJet)
+            + 0.38 * smoothstep(1.0, 15, uJet - uLow)
+        );
+        const moistureSupport = smoothstep(0.0015, 0.0075, qv[lowBase + k] || 0);
+        let landOceanSupport = 0;
+        if (landField) {
+          const landHere = landField[k] === 1;
+          const landEdge = (landField[kE] === 1) !== landHere
+            || (landField[kW] === 1) !== landHere
+            || (landField[kN] === 1) !== landHere
+            || (landField[kS] === 1) !== landHere;
+          if (landEdge) landOceanSupport = 1;
+          else {
+            const neighborThermalContrast = Math.max(
+              Math.abs((T[lowBase + kE] || 0) - (T[lowBase + k] || 0)),
+              Math.abs((T[lowBase + kW] || 0) - (T[lowBase + k] || 0)),
+              Math.abs((T[lowBase + kN] || 0) - (T[lowBase + k] || 0)),
+              Math.abs((T[lowBase + kS] || 0) - (T[lowBase + k] || 0))
+            );
+            landOceanSupport = 0.45 * smoothstep(1.5, 8, neighborThermalContrast);
+          }
+        }
+        const lonRadians = ((lonField ? lonField[i] : -180 + ((i + 0.5) * 360) / Math.max(1, nx)) * Math.PI) / 180;
+        const waveRaw = 0.52
+          + 0.28 * Math.sin(3 * lonRadians + wavePhase * hemi)
+          + 0.2 * Math.sin(5 * lonRadians - 0.7 * wavePhase);
+        const waveSupport = Math.pow(clamp01(waveRaw), concentrationPower);
+        const dynamicSupport = clamp01(
+          0.12
+            + 0.32 * baroclinicSupport
+            + 0.24 * jetSupport
+            + 0.18 * moistureSupport
+            + 0.14 * landOceanSupport
+        );
+        const support = belt * waveSupport * dynamicSupport;
+        if (support <= supportFloor) continue;
+        frontalAscentSupportDiag[k] = support;
+        frontalBaroclinicSupportDiag[k] = baroclinicSupport;
+        frontalJetSupportDiag[k] = jetSupport;
+        frontalLandOceanSupportDiag[k] = landOceanSupport;
+        frontalMoistureSupportDiag[k] = moistureSupport;
+
+        const warmAdvection = hemi * (v[lowBase + k] || 0);
+        const coldAdvection = -warmAdvection;
+        const cloudShield = smoothstep(0.01, 0.25, (
+          (qc[midBase + k] || 0) + (qi[midBase + k] || 0) + (qr[midBase + k] || 0) + (qs[midBase + k] || 0)
+        ) * 1000);
+        const priorPrecipShield = smoothstep(0.015, 0.16, state.precipRate?.[k] || 0);
+        const ascentSeed = smoothstep(0.1, 0.55, support);
+        stormGenesisPotentialDiag[k] = clamp01(support * (0.5 * baroclinicSupport + 0.3 * jetSupport + 0.2 * moistureSupport));
+        stormDeepeningPotentialDiag[k] = clamp01(support * ascentSeed * (0.55 + 0.45 * jetSupport));
+        stormPrecipShieldDiag[k] = clamp01(support * Math.max(priorPrecipShield, cloudShield));
+        stormOcclusionPotentialDiag[k] = clamp01(support * stormPrecipShieldDiag[k] * (1 - 0.65 * baroclinicSupport));
+        stormDecayPotentialDiag[k] = clamp01(support * (1 - moistureSupport) * (1 - 0.6 * jetSupport));
+        stormWarmSectorDiag[k] = clamp01(support * smoothstep(0.4, 6, warmAdvection));
+        stormColdSectorDiag[k] = clamp01(support * smoothstep(0.4, 6, coldAdvection));
+      }
+    }
+
+    if (maxAscentPaS > 0 && maxStepPaS > 0) {
+      for (let lev = 1; lev < nz; lev += 1) {
+        const sigma = clamp01(sigmaHalf[lev]);
+        if (sigma < topSigma || sigma > bottomSigma) continue;
+        const verticalWeight = smoothstep(topSigma, topSigma + sigmaRamp, sigma)
+          * (1 - smoothstep(bottomSigma - sigmaRamp, bottomSigma, sigma));
+        if (!(verticalWeight > 0)) continue;
+        frontalAscentOmegaDelta.fill(0);
+        for (let j = 0; j < ny; j += 1) {
+          const row = j * nx;
+          let rowAscentDeltaSum = 0;
+          let rowCompWeightSum = 0;
+          for (let i = 0; i < nx; i += 1) {
+            const k = row + i;
+            const support = frontalAscentSupportDiag[k];
+            const existingAscent = Math.max(0, -omega[lev * N + k]);
+            const saturatedAscentTaper = 1 - smoothstep(0.22, 0.55, existingAscent);
+            const ascentDelta = support > supportFloor
+              ? -Math.min(maxStepPaS, maxAscentPaS * support * verticalWeight * saturatedAscentTaper)
+              : 0;
+            frontalAscentOmegaDelta[k] = ascentDelta;
+            rowAscentDeltaSum += ascentDelta;
+            rowCompWeightSum += compensationFloor + Math.pow(1 - clamp01(support), 1.5);
+          }
+          if (!(rowAscentDeltaSum < 0) || !(rowCompWeightSum > 0)) continue;
+          for (let i = 0; i < nx; i += 1) {
+            const k = row + i;
+            const support = frontalAscentSupportDiag[k];
+            const compWeight = compensationFloor + Math.pow(1 - clamp01(support), 1.5);
+            const compensationDelta = (-rowAscentDeltaSum * compWeight) / rowCompWeightSum;
+            const ascentDelta = frontalAscentOmegaDelta[k];
+            omega[lev * N + k] += ascentDelta + compensationDelta;
+            if (-ascentDelta > frontalAscentAddedDiag[k]) {
+              frontalAscentAddedDiag[k] = -ascentDelta;
+            }
+            if (compensationDelta > frontalAscentCompensationDiag[k]) {
+              frontalAscentCompensationDiag[k] = compensationDelta;
+            }
+          }
+        }
+      }
+
+      if (diffuseDampingFrac > 0 && diffuseDampingMaxStepPaS > 0) {
+        for (let lev = 1; lev < nz; lev += 1) {
+          const sigma = clamp01(sigmaHalf[lev]);
+          if (sigma < topSigma || sigma > bottomSigma) continue;
+          const verticalWeight = smoothstep(topSigma, topSigma + sigmaRamp, sigma)
+            * (1 - smoothstep(bottomSigma - sigmaRamp, bottomSigma, sigma));
+          if (!(verticalWeight > 0)) continue;
+          frontalAscentOmegaDelta.fill(0);
+          for (let j = 0; j < ny; j += 1) {
+            const row = j * nx;
+            let rowDampDeltaSum = 0;
+            let rowCoreWeightSum = 0;
+            for (let i = 0; i < nx; i += 1) {
+              const k = row + i;
+              const support = frontalAscentSupportDiag[k];
+              const diffuseWeight = 1 - smoothstep(coreGatherSupport * 0.5, Math.max(coreGatherSupport, supportFloor + 0.01), support);
+              const existingAscent = Math.max(0, -omega[lev * N + k]);
+              const dampDelta = Math.min(
+                diffuseDampingMaxStepPaS,
+                existingAscent * diffuseDampingFrac * diffuseWeight * verticalWeight
+              );
+              frontalAscentOmegaDelta[k] = dampDelta;
+              rowDampDeltaSum += dampDelta;
+              rowCoreWeightSum += Math.pow(smoothstep(coreGatherSupport, 0.55, support), 1.25);
+            }
+            if (!(rowDampDeltaSum > 0) || !(rowCoreWeightSum > 0)) continue;
+            for (let i = 0; i < nx; i += 1) {
+              const k = row + i;
+              const coreWeight = Math.pow(smoothstep(coreGatherSupport, 0.55, frontalAscentSupportDiag[k]), 1.25);
+              const gatherDelta = -(rowDampDeltaSum * coreWeight) / rowCoreWeightSum;
+              const dampDelta = frontalAscentOmegaDelta[k];
+              omega[lev * N + k] += dampDelta + gatherDelta;
+              if (-gatherDelta > frontalAscentAddedDiag[k]) {
+                frontalAscentAddedDiag[k] = -gatherDelta;
+              }
+              if (dampDelta > frontalAscentCompensationDiag[k]) {
+                frontalAscentCompensationDiag[k] = dampDelta;
+              }
+            }
+          }
+        }
       }
     }
   }

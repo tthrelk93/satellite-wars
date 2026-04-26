@@ -143,6 +143,85 @@ test('stepVertical5 substeps over-CFL vertical advection instead of dropping mos
   assert.ok(splitStep.qv[0] > singleStep.qv[0]);
 });
 
+test('stepVertical5 concentrates frontal ascent while preserving row-mean omega', () => {
+  const nx = 8;
+  const ny = 5;
+  const N = nx * ny;
+  const sigmaHalf = new Float32Array([0, 0.35, 0.65, 0.9, 1]);
+  const state = createState5({
+    grid: { count: N },
+    nz: 4,
+    sigmaHalf
+  });
+  const grid = {
+    nx,
+    ny,
+    invDx: new Float32Array(ny).fill(1 / 1_000_000),
+    invDy: new Float32Array(ny).fill(1 / 1_000_000),
+    cosLat: new Float32Array([0.5, 0.707, 1, 0.707, 0.5]),
+    latDeg: new Float32Array([-60, -45, 0, 45, 60]),
+    lonDeg: new Float32Array(Array.from({ length: nx }, (_, i) => -180 + ((i + 0.5) * 360) / nx))
+  };
+  for (let k = 0; k < N; k += 1) {
+    state.ps[k] = 100000;
+    for (let lev = 0; lev <= state.nz; lev += 1) {
+      state.pHalf[lev * N + k] = 10000 + sigmaHalf[lev] * 90000;
+    }
+  }
+  for (let lev = 0; lev < state.nz; lev += 1) {
+    for (let j = 0; j < ny; j += 1) {
+      const row = j * nx;
+      for (let i = 0; i < nx; i += 1) {
+        const idx = lev * N + row + i;
+        const waveTemp = 6 * Math.sin((2 * Math.PI * i) / nx);
+        state.T[idx] = 276 + 0.5 * grid.latDeg[j] + waveTemp;
+        state.theta[idx] = state.T[idx];
+        state.qv[idx] = lev === state.nz - 1 ? 0.007 : 0.003;
+        state.u[idx] = lev <= 1 ? 22 : 3;
+        state.v[idx] = 0;
+      }
+    }
+  }
+
+  stepVertical5({
+    dt: 300,
+    grid,
+    state,
+    params: {
+      enableMixing: false,
+      enableConvection: false,
+      enableOmegaMassFix: false,
+      enableLargeScaleVerticalAdvection: false,
+      enableFrontalAscentConcentration: true,
+      frontalAscentMaxPaS: 0.08,
+      frontalAscentMaxStepPaS: 0.05,
+      frontalAscentPeakLatDeg: 45,
+      frontalAscentSeasonalShiftDeg: 0,
+      frontalAscentMinSupport: 0.01,
+      frontalAscentDiffuseDampingFrac: 0.5,
+      frontalAscentDiffuseDampingMaxStepPaS: 0.05,
+      frontalAscentCoreGatherSupport: 0.05
+    }
+  });
+
+  const targetRow = 3 * nx;
+  const lev = 2;
+  let rowSum = 0;
+  let rowMin = Infinity;
+  let rowMax = -Infinity;
+  for (let i = 0; i < nx; i += 1) {
+    const omega = state.omega[lev * N + targetRow + i];
+    rowSum += omega;
+    rowMin = Math.min(rowMin, omega);
+    rowMax = Math.max(rowMax, omega);
+  }
+  assert.ok(Math.abs(rowSum) < 1e-6);
+  assert.ok(rowMin < -0.005);
+  assert.ok(rowMax > 0.001);
+  assert.ok(Array.from(state.frontalAscentSupportDiag).some((value) => value > 0.01));
+  assert.ok(Array.from(state.stormGenesisPotentialDiag).some((value) => value > 0.001));
+});
+
 test('stepVertical5 builds a persistent continuous convective state from moist ascent', () => {
   const sigmaHalf = new Float32Array([0, 0.35, 0.7, 1]);
   const state = createState5({

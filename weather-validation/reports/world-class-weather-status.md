@@ -6,59 +6,62 @@ Verdict: NOT WORLD CLASS YET
 ## Current Baseline
 
 - Clean worker worktree: `codex/world-class-weather-loop`
-- Latest verified cycle: `cycle-2026-04-25T22-47-48Z-phase4-tropical-rain-engine-seasonal`
+- Latest verified cycle: `cycle-2026-04-26T04-52-50Z-phase5-midlatitude-storm-tracks`
 - Earth accuracy suite: PASS (`weather-validation/reports/earth-accuracy-status.md`)
 - Planetary realism status: PASS at the latest 90-day seasonal repro gate (`weather-validation/reports/planetary-realism-status.json`)
 
 ## Fresh Evidence From The Latest Cycle
 
-Phase 4 tropical rain engine is verified and ready to hand off to Phase 5.
+Phase 5 midlatitude storm tracks are verified and ready to hand off to the next phase.
 
 - Code path changed:
-  - `src/weather/v2/surface2d.js`: bounded warm tropical open-ocean evaporation boost.
-  - `src/weather/v2/core5.js`: promoted organized tropical convection/rainout defaults.
-  - `src/weather/v2/microphysics5.js`: convective/stratiform precipitation accounting plus stronger organized convective rainout.
-  - `src/weather/v2/state5.js` and `src/weather/validation/diagnostics.js`: convective/stratiform precipitation diagnostics.
-  - `scripts/agent/planetary-realism-audit.mjs` and `scripts/agent/planetary-candidate-sweep.mjs`: audit/sweep metrics for convective vs stratiform rain.
-- Seasonal repro audit artifact: `weather-validation/output/cycle-2026-04-25T22-47-48Z-phase4-tropical-rain-engine-seasonal/phase4-production-seasonal-repro.json`
+  - `src/weather/v2/vertical5.js`: mass-neutral sub-grid frontal ascent concentration plus storm lifecycle diagnostics.
+  - `src/weather/v2/core5.js`: production frontal-ascent defaults.
+  - `src/weather/v2/state5.js` and `src/weather/validation/diagnostics.js`: frontal/lifecycle diagnostic state and snapshot fields.
+  - `scripts/agent/planetary-realism-audit.mjs`: midlatitude frontal storm-track proxy, tightened 30-60 deg storm-track gate, and storm-band/lifecycle metrics.
+  - `src/weather/v2/vertical5.test.js`: row-mean omega conservation coverage for the frontal concentration pass.
+- Final quick artifact: `weather-validation/output/cycle-2026-04-26T04-52-50Z-phase5-midlatitude-storm-tracks/frontal-final-quick.json`
   - `overallPass = true`
   - warnings: none
-  - day-90 global precipitation: `0.065 mm/hr`
-  - day-90 equatorial precipitation: `0.128 mm/hr`
-  - day-90 global convective/stratiform precipitation: `0.019 / 0.045 mm/hr`
-  - day-90 tropical convective/stratiform precipitation: `0.055 / 0.074 mm/hr`
-  - day-90 tropical convective precipitation share: `0.426`
-  - day-90 tropical convective mass flux: `0.00482 kg/m²/s`
-  - day-90 TCW: `10.304 kg/m²`
-  - day-90 dry-belt ratios N/S: `0.315 / 0.475`
-  - day-90 ITCZ latitude/width: `-2.156 / 21.327 deg`
+  - storm-track peaks N/S: `41.25 / -48.75 deg`
+  - baseline quick storm-track peaks N/S: `63.75 / -56.25 deg`
+  - midlatitude ascent fraction: `0.48214`
+  - midlatitude storm-band precip share: `0.17228`
+  - dt/grid sensitivity: PASS/PASS
   - water-cycle budget: PASS
-  - E/P relative imbalance: `0.02904`
-  - TCW drift: `6.60572 kg/m²`
-  - numerical integrity score/pass: `0.8872 / true`
+  - numerical climate contract: PASS
+- Seasonal repro audit artifact: `weather-validation/output/cycle-2026-04-26T04-52-50Z-phase5-midlatitude-storm-tracks/frontal-final-seasonal.json`
+  - `overallPass = true`
+  - warnings: none
+  - day-90 storm-track peaks N/S: `33.75 / -48.75 deg`
+  - day-90 midlatitude ascent fraction: `0.50031`
+  - day-90 midlatitude storm-band precip share: `0.15677`
+  - day-90 frontal ascent support/added/compensation: `0.18604 / 0.00838 / 0.00767`
+  - day-90 storm genesis/deepening/occlusion/decay: `0.12173 / 0.05621 / 0.00349 / 0.07331`
+  - day-90 global/equatorial precipitation: `0.065 / 0.132 mm/hr`
+  - day-90 dry-belt ratios N/S: `0.313 / 0.440`
+  - numerical integrity score/pass: `0.8873 / true`
   - numerical limiter dominance: `false`
+  - water-cycle budget: PASS
   - numerical climate contract: PASS
   - dt/grid sensitivity: PASS/PASS
-- Supporting quick artifact: `weather-validation/output/cycle-2026-04-25T20-35-23Z-phase4-tropical-rain-engine/phase4-production-quick.json`
+- Canonical seasonal report refresh: `weather-validation/reports/planetary-realism-status.json`
+  - generated at `2026-04-26T08:58:41.839Z`
+  - preset/grid/dt: `seasonal / 48x24 / 1800s`
   - `overallPass = true`
-  - global precipitation: `0.060 mm/hr`
-  - equatorial precipitation: `0.110 mm/hr`
-  - tropical convective precipitation: `0.045 mm/hr`
-  - tropical convective mass flux: `0.00453 kg/m²/s`
-  - dry-belt ratios N/S: `0.410 / 0.475`
 
 ## Validation
 
-- `node --test src/weather/v2/core5.test.js src/weather/v2/microphysicsPhase7.test.js src/weather/v2/oceanIce.test.js weather-validation/tests/planetary-realism-audit.test.mjs`: 56/56 pass
+- `node --test src/weather/v2/vertical5.test.js weather-validation/tests/planetary-realism-audit.test.mjs`: 54/54 pass
 - `npm run weather:validate:test`: 237/237 pass
 - `npm run weather:benchmark`: PASS
+- `npm run agent:planetary-realism-audit -- --preset seasonal --repro-check --no-counterfactuals --label phase5-midlatitude-storm-tracks --report-base weather-validation/reports/planetary-realism-status`: PASS
 
 ## What Still Blocks "World Class"
 
-- This is a 90-day seasonal Phase 4 claim, not a full annual world-class claim.
+- This is a 90-day seasonal Phase 5 claim, not a full annual world-class claim.
 - A full annual planetary-realism pass with dt/grid repro enabled is still required before any annual or world-class claim.
-- The default deep counterfactual seasonal proof path is still expensive; the Phase 4 gate used `--preset seasonal --repro-check --no-counterfactuals`, which is sufficient for the rain-engine pass gate but not a replacement for full annual proof.
-- Browser/runtime signoff is still required after the verified climate fix, including smoothness telemetry and visual observation in the live app.
+- Browser/runtime signoff is still required after the verified climate fixes, including smoothness telemetry and visual observation in the live app.
 - World-class status still requires realism and smoothness to pass in the same browser-backed run.
 
 ## Canonical Cycle Inputs
@@ -74,7 +77,7 @@ Phase 4 tropical rain engine is verified and ready to hand off to Phase 5.
 
 ## Default Next Priority
 
-1. Move to Phase 5 from the verified Phase 4 tropical rain baseline.
+1. Move to the next climate phase from the verified Phase 5 storm-track baseline.
 2. Run bounded live/browser verification after this verified climate fix or when runtime debt becomes blocking again.
 3. Before any world-class or annual-seasonality claim, run full annual planetary realism with dt/grid repro enabled.
 4. Keep validation on the clean world-class checkout only.
