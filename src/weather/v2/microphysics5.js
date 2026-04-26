@@ -153,7 +153,29 @@ export function stepMicrophysics5({ dt, grid = null, state, params = {} }) {
   } = params;
   if (!enable) return;
 
-  const { N, nz, theta, qv, qc, qi, qr, qs, precipRate, precipRainRate, precipSnowRate, precipAccum, pHalf, pMid, omega, T: Tstate, sigmaHalf } = state;
+  const {
+    N,
+    nz,
+    theta,
+    qv,
+    qc,
+    qi,
+    qr,
+    qs,
+    precipRate,
+    precipRainRate,
+    precipSnowRate,
+    precipConvectiveRate,
+    precipStratiformRate,
+    precipAccum,
+    precipConvectiveAccum,
+    precipStratiformAccum,
+    pHalf,
+    pMid,
+    omega,
+    T: Tstate,
+    sigmaHalf
+  } = state;
   if (!state.largeScaleCondensationSource || state.largeScaleCondensationSource.length !== N) {
     state.largeScaleCondensationSource = new Float32Array(N);
   }
@@ -394,6 +416,8 @@ export function stepMicrophysics5({ dt, grid = null, state, params = {} }) {
   if (precipRate) precipRate.fill(0);
   if (precipRainRate) precipRainRate.fill(0);
   if (precipSnowRate) precipSnowRate.fill(0);
+  if (precipConvectiveRate) precipConvectiveRate.fill(0);
+  if (precipStratiformRate) precipStratiformRate.fill(0);
 
   for (let k = 0; k < N; k += 1) {
     state.microphysicsUpperCloudInputMass[k] = sumUpperCloudMassAtCell(state, pHalf, sigmaHalf, nz, k);
@@ -1236,6 +1260,21 @@ export function stepMicrophysics5({ dt, grid = null, state, params = {} }) {
     }
   }
 
+  const surfaceConvectivePrecipFraction = (k) => {
+    if (!enableConvectiveOutcome) return 0;
+    const organization = clamp(state.convectiveOrganization?.[k] || 0, 0, 1);
+    const massFluxStrength = smoothstep(0.0005, 0.008, state.convectiveMassFlux?.[k] || 0);
+    const anvil = clamp(state.convectiveAnvilSource?.[k] || 0, 0, 1);
+    const rainout = smoothstep(0.08, 0.65, state.convectiveRainoutFraction?.[k] || 0);
+    return clamp(
+      0.58 * Math.max(organization, massFluxStrength)
+        + 0.22 * anvil
+        + 0.2 * rainout,
+      0,
+      0.95
+    );
+  };
+
   const sediment = (store, fallRate, rateOut, latentMelt = false) => {
     const fallFrac = clamp(fallRate * dt, 0, 1);
     if (fallFrac <= 0) return;
@@ -1260,6 +1299,13 @@ export function stepMicrophysics5({ dt, grid = null, state, params = {} }) {
           if (precipAccum) precipAccum[k] += massOut;
           if (rateOut) rateOut[k] += massOut * (3600 / dt);
           if (precipRate) precipRate[k] += massOut * (3600 / dt);
+          const convectiveFrac = surfaceConvectivePrecipFraction(k);
+          const convectiveMassOut = massOut * convectiveFrac;
+          const stratiformMassOut = massOut - convectiveMassOut;
+          if (precipConvectiveAccum) precipConvectiveAccum[k] += convectiveMassOut;
+          if (precipStratiformAccum) precipStratiformAccum[k] += stratiformMassOut;
+          if (precipConvectiveRate) precipConvectiveRate[k] += convectiveMassOut * (3600 / dt);
+          if (precipStratiformRate) precipStratiformRate[k] += stratiformMassOut * (3600 / dt);
           if (currentInUpper) state.microphysicsUpperCloudSedimentationExportMass[k] += massOut;
         } else {
           const dpBelow = pHalf[baseHalfBelow + k] - pHalf[baseHalfNext + k];

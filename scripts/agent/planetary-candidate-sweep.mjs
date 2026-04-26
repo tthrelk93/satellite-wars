@@ -136,10 +136,16 @@ const keyMetrics = [
   'tropicalTradesSouthU10Ms',
   'midlatitudeWesterliesSouthU10Ms',
   'subtropicalDryNorthRatio',
+  'subtropicalDrySouthRatio',
   'itczLatDeg',
   'globalPrecipMeanMmHr',
+  'equatorialPrecipMeanMmHr',
   'globalTcwMeanKgM2',
   'tropicalConvectiveFraction',
+  'tropicalConvectiveMassFluxKgM2S',
+  'tropicalConvectivePrecipMeanMmHr',
+  'tropicalStratiformPrecipMeanMmHr',
+  'tropicalConvectivePrecipShare',
   'southDryBeltHadleyReturnFlowWindAppliedMeanMs',
   'southDryBeltWalkerLongitudinalSubsidenceSupportMeanFrac'
 ];

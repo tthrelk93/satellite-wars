@@ -32,6 +32,10 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const precipRate = makeArray(N);
   const precipRainRate = makeArray(N);
   const precipSnowRate = makeArray(N);
+  const precipConvectiveAccum = makeArray(N);
+  const precipStratiformAccum = makeArray(N);
+  const precipConvectiveRate = makeArray(N);
+  const precipStratiformRate = makeArray(N);
   const surfaceEvapAccum = makeArray(N);
   const surfaceEvapRate = makeArray(N);
   const surfaceLatentFlux = makeArray(N);
@@ -343,6 +347,10 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     precipRate,
     precipRainRate,
     precipSnowRate,
+    precipConvectiveAccum,
+    precipStratiformAccum,
+    precipConvectiveRate,
+    precipStratiformRate,
     surfaceEvapAccum,
     surfaceEvapRate,
     surfaceLatentFlux,

@@ -1660,6 +1660,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     grid,
     landMask,
     precipRateMmHr,
+    precipConvectiveRateMmHr,
+    precipStratiformRateMmHr,
     cloudTotalFraction,
     wind10mU,
     wind10mSpeedMs,
@@ -1822,6 +1824,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     : Array.from({ length: nx }, (_, index) => -180 + ((index + 0.5) * 360) / Math.max(1, nx));
   const rowWeights = makeRowWeights(latitudesDeg);
   const zonalPrecip = zonalMean(precipRateMmHr, nx, ny);
+  const zonalConvectivePrecip = zonalMean(precipConvectiveRateMmHr || new Array(nx * ny).fill(0), nx, ny);
+  const zonalStratiformPrecip = zonalMean(precipStratiformRateMmHr || new Array(nx * ny).fill(0), nx, ny);
   const zonalCloud = zonalMean(cloudTotalFraction, nx, ny);
   const zonalU10 = zonalMean(wind10mU, nx, ny);
   const zonalTcw = zonalMean(totalColumnWaterKgM2, nx, ny);
@@ -1937,12 +1941,16 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     return Math.max(0, value || 0) * polewardWeight;
   });
   const globalPrecipMean = areaWeightedMean(precipRateMmHr, nx, ny, rowWeights);
+  const globalConvectivePrecipMean = areaWeightedMean(precipConvectiveRateMmHr || new Array(nx * ny).fill(0), nx, ny, rowWeights);
+  const globalStratiformPrecipMean = areaWeightedMean(precipStratiformRateMmHr || new Array(nx * ny).fill(0), nx, ny, rowWeights);
   const globalCloudMean = areaWeightedMean(cloudTotalFraction, nx, ny, rowWeights);
   const globalTcwMean = areaWeightedMean(totalColumnWaterKgM2, nx, ny, rowWeights);
   const maxWind10m = areaWeightedMax(wind10mSpeedMs);
   const itczLat = weightedBandCentroid(zonalPrecip, latitudesDeg, rowWeights, -20, 20);
   const itczWidth = weightedBandWidth(zonalPrecip, latitudesDeg, rowWeights, -25, 25, itczLat);
   const equatorialPrecip = weightedBandMean(zonalPrecip, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
+  const tropicalConvectivePrecip = weightedBandMean(zonalConvectivePrecip, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
+  const tropicalStratiformPrecip = weightedBandMean(zonalStratiformPrecip, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
   const subtropicalDryNorth = weightedBandMean(zonalPrecip, latitudesDeg, rowWeights, DEFAULT_DRY_MIN_LAT, DEFAULT_DRY_MAX_LAT);
   const subtropicalDrySouth = weightedBandMean(zonalPrecip, latitudesDeg, rowWeights, -DEFAULT_DRY_MAX_LAT, -DEFAULT_DRY_MIN_LAT);
   const tropicalConvectiveFraction = weightedBandMean(zonalConvectiveFraction, latitudesDeg, rowWeights, -DEFAULT_TROPICAL_LAT, DEFAULT_TROPICAL_LAT);
@@ -2441,12 +2449,17 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     monthIndex: dayToMonthIndex(targetDay),
     metrics: {
       globalPrecipMeanMmHr: round(globalPrecipMean),
+      globalConvectivePrecipMeanMmHr: round(globalConvectivePrecipMean),
+      globalStratiformPrecipMeanMmHr: round(globalStratiformPrecipMean),
       globalCloudMeanFrac: round(globalCloudMean),
       globalTcwMeanKgM2: round(globalTcwMean),
       maxWind10mMs: round(maxWind10m),
       itczLatDeg: round(itczLat),
       itczWidthDeg: round(itczWidth),
       equatorialPrecipMeanMmHr: round(equatorialPrecip),
+      tropicalConvectivePrecipMeanMmHr: round(tropicalConvectivePrecip),
+      tropicalStratiformPrecipMeanMmHr: round(tropicalStratiformPrecip),
+      tropicalConvectivePrecipShare: round(tropicalConvectivePrecip / Math.max(1e-6, tropicalConvectivePrecip + tropicalStratiformPrecip)),
       subtropicalDryNorthMeanMmHr: round(subtropicalDryNorth),
       subtropicalDrySouthMeanMmHr: round(subtropicalDrySouth),
       subtropicalDryNorthRatio: round(subtropicalDryNorth / Math.max(1e-6, equatorialPrecip)),
@@ -2702,6 +2715,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       latitudesDeg: roundSeries(latitudesDeg),
       series: {
         precipRateMmHr: roundSeries(zonalPrecip),
+        convectivePrecipRateMmHr: roundSeries(zonalConvectivePrecip),
+        stratiformPrecipRateMmHr: roundSeries(zonalStratiformPrecip),
         cloudTotalFraction: roundSeries(zonalCloud),
         wind10mU: roundSeries(zonalU10),
         totalColumnWaterKgM2: roundSeries(zonalTcw),

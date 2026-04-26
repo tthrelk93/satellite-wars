@@ -1,26 +1,58 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-25T18:11:21.114Z",
+  "updatedAt": "2026-04-26T02:21:40.783Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
-  "baselineCommit": "94d5805",
+  "baselineCommit": "14d53bc",
   "latestCycle": {
-    "id": "cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker",
-    "goal": "clear the remaining Phase 3 south subtropical cloud/condensation persistence and rainout blocker while preserving Hadley/Walker closure and water/numerical guards",
-    "verifiedImprovement": "fresh quick and 90-day seasonal planetary audits pass after conservative equatorward export of selected soft live-state subtropical marine-deck excess; the 365-day annual-lite climate horizon also passes realism, water, and seasonality categories, with the caveat that annual dt/grid repro checks were intentionally disabled",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/checkpoint.md",
-    "runtimeLogPath": null
+    "id": "cycle-2026-04-25T22-47-48Z-phase4-tropical-rain-engine-seasonal",
+    "goal": "turn high atmospheric water into Earth-like tropical rainfall while preserving dry belts, water budget, and numerical climate gates",
+    "verifiedImprovement": "Phase 4 tropical rain engine passes the 90-day seasonal repro gate with higher organized tropical precipitation, bounded TCW, preserved dry belts, passing water budget, and passing dt/grid numerical climate contract",
+    "checkpointPath": "weather-validation/output/cycle-2026-04-25T22-47-48Z-phase4-tropical-rain-engine-seasonal/checkpoint.md",
+    "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-25T22-47-48Z-phase4-tropical-rain-engine-seasonal/evidence-summary.json"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.md",
     "overallPass": true
   },
+  "planetaryRealism": {
+    "path": "weather-validation/reports/planetary-realism-status.json",
+    "overallPass": true,
+    "preset": "seasonal",
+    "reproCheck": true,
+    "counterfactuals": false,
+    "latestArtifact": "weather-validation/output/cycle-2026-04-25T22-47-48Z-phase4-tropical-rain-engine-seasonal/phase4-production-seasonal-repro.json",
+    "metrics": {
+      "globalPrecipMeanMmHr": 0.065,
+      "equatorialPrecipMeanMmHr": 0.128,
+      "globalConvectivePrecipMeanMmHr": 0.019,
+      "globalStratiformPrecipMeanMmHr": 0.045,
+      "tropicalConvectivePrecipMeanMmHr": 0.055,
+      "tropicalStratiformPrecipMeanMmHr": 0.074,
+      "tropicalConvectivePrecipShare": 0.426,
+      "tropicalConvectiveMassFluxKgM2S": 0.00482,
+      "globalTcwMeanKgM2": 10.304,
+      "subtropicalDryNorthRatio": 0.315,
+      "subtropicalDrySouthRatio": 0.475,
+      "itczLatDeg": -2.156,
+      "itczWidthDeg": 21.327,
+      "waterCyclePass": true,
+      "evapPrecipRelativeImbalance": 0.02904,
+      "tcwDriftKgM2": 6.60572,
+      "numericalIntegrityScore": 0.8872,
+      "numericalIntegrityPass": true,
+      "numericalLimiterDominance": false,
+      "numericalClimateContractPass": true,
+      "dtSensitivityPass": true,
+      "gridSensitivityPass": true
+    }
+  },
   "blockingGaps": [
-    "Phase 3 is ready to hand off to Phase 4, but a full annual planetary-realism run with dt/grid repro enabled is still required before any world-class or annual-seasonality claim",
-    "browser/runtime signoff is still blocked by larger remaining Earth.update max spikes and weak wind-target diagnostics in the latest live run, even after reducing both the model-diagnostics payload cost and the dominant particle sample0 path",
-    "the annual-lite run supports the Phase 3 handoff but intentionally skipped annual dt/grid repro sidecars",
-    "world-class status still requires realism and smoothness to pass in the same browser-backed run"
+    "This is a 90-day seasonal Phase 4 claim, not a full annual world-class claim.",
+    "A full annual planetary-realism pass with dt/grid repro enabled is still required before any annual or world-class claim.",
+    "Browser/runtime signoff is still required after the verified climate fix, including smoothness telemetry and visual observation in the live app.",
+    "World-class status still requires realism and smoothness to pass in the same browser-backed run."
   ],
   "cycleInputs": [
     "weather-validation/reports/earth-accuracy-status.md",
@@ -32,163 +64,10 @@
     "weather-validation/output/agent-dev-server.json",
     "latest runtime summary from npm run agent:summarize-runtime-log"
   ],
-  "latestTelemetry": {
-    "singleTabLocalhostVerified": true,
-    "localhostTabReuse": {
-      "url": "http://127.0.0.1:3000/?mode=solo",
-      "duplicatesClosed": 3,
-      "targetId": "1B3ABBD598471D43670113D5124F0BE1"
-    },
-    "seasonalDurabilityRecovery": {
-      "quickAuditPath": "weather-validation/output/cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105/postfix-planetary-audit.json",
-      "seasonalAuditPath": "weather-validation/output/cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105/postfix-seasonal-planetary-audit.json",
-      "seasonalCandidateSweepPath": "weather-validation/output/cycle-2026-04-09T05-21-25Z-seasonal-followthrough-thetae105/planetary-candidate-sweep-seasonal-thetae105.json",
-      "quickCandidateSweepPath": "weather-validation/output/cycle-2026-04-09T05-13-43Z-quick-halfstep-reverts-after-qv-fail/planetary-candidate-sweep-halfstep-reverts.json",
-      "quickMetrics": {
-        "tropicalTradesNorthU10Ms": -0.79,
-        "tropicalTradesSouthU10Ms": -0.329,
-        "midlatitudeWesterliesSouthU10Ms": 0.947,
-        "subtropicalDryNorthRatio": 1.029,
-        "warnings": [
-          "north_subtropical_dry_belt_too_wet"
-        ]
-      },
-      "seasonalMetrics": {
-        "tropicalTradesNorthU10Ms": -0.794,
-        "tropicalTradesSouthU10Ms": -0.328,
-        "midlatitudeWesterliesSouthU10Ms": 0.947,
-        "subtropicalDryNorthRatio": 1.015,
-        "warnings": [
-          "north_subtropical_dry_belt_too_wet"
-        ]
-      },
-      "tradeoffNote": "Lowering thetaeCoeff to 10.5 recovered the 30-day dry-belt ratio and slightly improved the 90-day ratio as well, so the quick-versus-seasonal tradeoff is materially smaller than before."
-    },
-    "runtimeTextureWarningFix": {
-      "cycleId": "cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard",
-      "checkpointPath": "weather-validation/output/cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard/checkpoint.md",
-      "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard/runtime-summary.json",
-      "hotspotProfilePath": "weather-validation/output/cycle-2026-04-09T04-43-24Z-earth-startup-texture-warning-guard/hotspot-profile.json",
-      "validatedBy": "node --experimental-default-type=module --experimental-specifier-resolution=node --test src/textureUtils.test.js",
-      "result": "fresh reopened localhost tab no longer reproduced the startup THREE.WebGLRenderer texture-update warning"
-    },
-    "soloMinimapFix": {
-      "cycleId": "cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix",
-      "checkpointPath": "weather-validation/output/cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix/checkpoint.md",
-      "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix/runtime-summary.json",
-      "hotspotProfilePath": "weather-validation/output/cycle-2026-04-09T05-52-10Z-solo-minimap-white-panel-fix/hotspot-profile.json",
-      "validatedBy": "node --experimental-default-type=module --experimental-specifier-resolution=node --test src/gameModeUi.test.js",
-      "result": "fresh solo localhost rerun no longer rendered the lower-right white minimap panel"
-    },
-    "windDiagnosticsSampling": {
-      "cycleId": "cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry",
-      "checkpointPath": "weather-validation/output/cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry/checkpoint.md",
-      "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry/postfix-runtime-summary.json",
-      "hotspotProfilePath": "weather-validation/output/cycle-2026-04-09T06-25-36Z-earth-wind-model-diag-sampling-retry/postfix-hotspot-profile.json",
-      "instrumentedRuntimeLog": "logs/weather-2026-04-09T06-25-49Z-26830.jsonl",
-      "result": "sampled model diagnostics reduced due-tick cost from about 30 ms to about 9-10 ms and improved Earth.update p95 to 26.32 ms, but larger unknown spikes still blocked signoff",
-      "before": {
-        "sampleStride": 1,
-        "sampleCount": 16200,
-        "modelDiagMsRange": [29.4, 32.1],
-        "earthUpdateP95Ms": 31.960000014305095
-      },
-      "after": {
-        "sampleStride": 3,
-        "sampleCount": 5400,
-        "modelDiagMsRange": [9.1, 10.2],
-        "earthUpdateP95Ms": 26.319999989867192
-      }
-    },
-    "windParticleSampleFastPath": {
-      "cycleId": "cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun",
-      "checkpointPath": "weather-validation/output/cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun/checkpoint.md",
-      "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun/runtime-summary-rerun.json",
-      "hotspotProfilePath": "weather-validation/output/cycle-2026-04-09T11-09-21Z-sample0-fastpath-live-rerun/hotspot-profile-rerun.json",
-      "instrumentedRuntimeLog": "logs/weather-2026-04-09T11-21-35Z-24721.jsonl",
-      "result": "an in-range bilinear fast path plus scratch-sample reuse reduced the recent mature live Earth.update p95 from 42.01 ms to 33.39 ms on the confirming rerun while lowering sample0Ms p95 from 2.60 ms to 2.30 ms; the remaining worst spikes are now mostly unknown instead of clearly particle-evolve dominated",
-      "before": {
-        "earthUpdateP95Ms": 42.014999996125695,
-        "earthUpdateMaxMs": 386.80000001192093,
-        "sample0P95Ms": 2.5999999940395355,
-        "sample1P95Ms": 1.8050000652670872,
-        "particleSpikeCount": 6,
-        "unknownSpikeCount": 2
-      },
-      "after": {
-        "earthUpdateP95Ms": 33.38999998569487,
-        "earthUpdateMaxMs": 449.40000000596046,
-        "sample0P95Ms": 2.3000000566244125,
-        "sample1P95Ms": 1.6500000357627869,
-        "particleSpikeCount": 2,
-        "unknownSpikeCount": 6,
-        "warnings": [
-          "earth_update_p95_high",
-          "earth_update_max_high",
-          "wind_targets_failing"
-        ]
-      }
-    },
-    "runtimeSummary": {
-      "lineCount": 1562,
-      "validationSnapshotCount": 0,
-      "warnings": [
-        "earth_update_p95_high",
-        "earth_update_max_high",
-        "wind_targets_failing"
-      ]
-    },
-    "browserObservation": {
-      "singlePlayerLoaded": true,
-      "note": "Both fresh solo reruns stayed single-tab, kept the texture-warning and minimap fixes intact, and advanced cleanly through Day 2 while the WindStreamlineRenderer fast path lowered the repeated Earth.update p95 baseline."
-    },
-    "phase3CondensationRainoutClosure": {
-      "cycleId": "cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker",
-      "checkpointPath": "weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/checkpoint.md",
-      "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/evidence-summary.json",
-      "quickAuditPath": "weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/phase3-equatorward-medium-quick.json",
-      "seasonalAuditPath": "weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/phase3-equatorward-medium-seasonal.json",
-      "annualLiteAuditPath": "weather-validation/output/cycle-2026-04-25T09-21-31Z-phase3-sh-condensation-source-breaker/phase3-equatorward-medium-annual-lite.json",
-      "result": "verified Phase 3 handoff: quick and seasonal planetary audits pass, the annual-lite climate horizon passes all realism categories, and the south subtropical dry-belt blocker is cleared without breaking Hadley/Walker closure or water-cycle guards",
-      "metrics": {
-        "quickOverallPass": true,
-        "seasonalOverallPass": true,
-        "annualLiteHorizonPass": true,
-        "quickSubtropicalDryNorthRatio": 0.545,
-        "quickSubtropicalDrySouthRatio": 0.653,
-        "quickItczLatDeg": -2.515,
-        "quickItczWidthDeg": 22.06,
-        "quickSouthDryBeltHadleyReturnFlowWindAppliedMeanMs": 0.29116,
-        "quickSouthDryBeltWalkerLongitudinalSubsidenceSupportMeanFrac": 0.5105,
-        "annualLiteSubtropicalDryNorthRatio": 0.522,
-        "annualLiteSubtropicalDrySouthRatio": 0.536,
-        "annualLiteItczLatDeg": -1.473,
-        "annualLiteItczWidthDeg": 22.269,
-        "annualLiteSouthDryBeltHadleyReturnFlowWindAppliedMeanMs": 0.27903,
-        "waterCyclePass": true,
-        "seasonalEvapPrecipRelativeImbalance": 0.03347,
-        "annualLiteEvapPrecipRelativeImbalance": -0.01077,
-        "quickNumericalIntegrityScore": 0.9064,
-        "quickNumericalIntegrityPass": true,
-        "seasonalDtSensitivityPass": true,
-        "seasonalGridSensitivityPass": true,
-        "annualLiteTopLevelPass": false,
-        "annualLiteCaveat": "top-level annual-lite pass is false because --no-repro-check skipped annual dt/grid sensitivity sidecars"
-      }
-    }
-  },
-  "defaultNextPriority": [
-    "move to Phase 4 from the verified Phase 3 circulation/moisture-belt baseline",
-    "before any world-class or annual-seasonality claim, rerun full annual planetary realism with dt/grid repro enabled",
-    "run bounded live/browser verification after the next verified climate fix or when runtime debt becomes blocking again",
-    "keep validation on the clean world-class checkout only"
-  ],
-  "rules": {
-    "commitEveryVerifiedImprovement": true,
-    "leaveCleanWorktreeAtCycleEnd": true,
-    "doNotTouchSiblingDirtyCheckout": true,
-    "doNotOpenDuplicateLocalhostTabs": true,
-    "noStatusOnlyCommitsForFailedExperiments": true,
-    "realismFirstWhileWeaknessesRemain": true
-  }
+  "defaultNextPriorities": [
+    "Move to Phase 5 from the verified Phase 4 tropical rain baseline.",
+    "Run bounded live/browser verification after this verified climate fix or when runtime debt becomes blocking again.",
+    "Before any world-class or annual-seasonality claim, run full annual planetary realism with dt/grid repro enabled.",
+    "Keep validation on the clean world-class checkout only."
+  ]
 }

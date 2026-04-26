@@ -44,6 +44,47 @@ test('stepSurface2D5 evolves slab-ocean SST with net surface flux and weak resto
   assert.ok(state.sstNow[0] > 279);
 });
 
+test('stepSurface2D5 can boost evaporation over warm tropical open ocean', () => {
+  const runCase = (boost) => {
+    const grid = makeGrid();
+    const sigmaHalf = createSigmaHalfLevels({ nz: 4 });
+    const state = createState5({ grid: { count: 2 }, nz: 4, sigmaHalf });
+    state.ps.fill(100000);
+    state.pMid.set(computeModelMidPressurePa({ surfacePressurePa: state.ps, sigmaHalf, pTop: 20000 }));
+    state.T.fill(300);
+    state.theta.fill(300);
+    state.qv.fill(0.004);
+    state.Ts.fill(302);
+    state.sstNow.fill(302);
+    state.surfaceRadiativeFlux.fill(250);
+    state.landMask.fill(0);
+    const levS = state.nz - 1;
+    for (let k = 0; k < state.N; k += 1) {
+      state.u[levS * state.N + k] = 5;
+      state.v[levS * state.N + k] = 0;
+    }
+
+    stepSurface2D5({
+      dt: 3600,
+      grid,
+      state,
+      climo: { sstNow: new Float32Array([302, 302]) },
+      geo: { elev: new Float32Array([0, 0]) },
+      params: {
+        enableLandClimoTs: false,
+        tropicalOceanEvapBoost: boost,
+        tropicalOceanEvapLat0Deg: 8,
+        tropicalOceanEvapLat1Deg: 18,
+        tropicalOceanEvapSst0K: 296,
+        tropicalOceanEvapSst1K: 301
+      }
+    });
+    return state.surfaceEvapRate[0];
+  };
+
+  assert.ok(runCase(0.6) > runCase(0));
+});
+
 test('stepSurface2D5 can grow sea ice when the ocean is below freezing', () => {
   const grid = makeGrid();
   const sigmaHalf = createSigmaHalfLevels({ nz: 4 });

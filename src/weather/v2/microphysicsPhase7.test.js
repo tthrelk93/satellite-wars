@@ -232,6 +232,35 @@ test('organized supersaturation can rain out directly instead of storing all exc
   assert.ok(Array.from(organized.qr).some((value) => value > 0));
 });
 
+test('microphysics splits surface precipitation into convective and stratiform rates', () => {
+  const makeState = (organized) => {
+    const state = setupState(280);
+    const surface = (state.nz - 1) * state.N;
+    state.qv.fill(0.004);
+    state.qr.fill(0);
+    state.qr[surface] = 0.002;
+    state.convectiveOrganization[0] = organized ? 0.8 : 0;
+    state.convectiveMassFlux[0] = organized ? 0.006 : 0;
+    state.convectiveAnvilSource[0] = organized ? 0.5 : 0;
+    state.convectiveRainoutFraction[0] = organized ? 0.45 : 0;
+    return state;
+  };
+
+  const stratiform = makeState(false);
+  const convective = makeState(true);
+
+  stepMicrophysics5({ dt: 900, state: stratiform, params: { enableConvectiveOutcome: true, kFallRain: 1 / 900 } });
+  stepMicrophysics5({ dt: 900, state: convective, params: { enableConvectiveOutcome: true, kFallRain: 1 / 900 } });
+
+  assert.equal(stratiform.precipConvectiveRate[0], 0);
+  assert.ok(stratiform.precipStratiformRate[0] > 0);
+  assert.ok(convective.precipConvectiveRate[0] > 0);
+  assert.ok(convective.precipConvectiveRate[0] > convective.precipStratiformRate[0]);
+  assert.ok(Math.abs(
+    convective.precipRate[0] - convective.precipConvectiveRate[0] - convective.precipStratiformRate[0]
+  ) < 1e-6);
+});
+
 test('microphysics records weak-engine subtropical maintenance occupancy for marginal marine saturation adjustment', () => {
   const state = setupState(279);
   state.qv.fill(0.002);

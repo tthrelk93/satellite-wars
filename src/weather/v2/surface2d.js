@@ -57,6 +57,11 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     seaIceSurfaceOffsetK = 6,
     seaIceRoughnessBoost = 0.4,
     seaIceEvapSuppression = 0.95,
+    tropicalOceanEvapBoost = 0,
+    tropicalOceanEvapLat0Deg = 8,
+    tropicalOceanEvapLat1Deg = 18,
+    tropicalOceanEvapSst0K = 296,
+    tropicalOceanEvapSst1K = 301,
     rhoIce = 917,
     latentFusion = 3.34e5,
     enableThetaClosure = true,
@@ -124,6 +129,15 @@ export function stepSurface2D5({ dt, grid, state, climo, geo, params = {} }) {
     let E = potentialE;
     if (!land) {
       E *= seaIceSuppressionFactor;
+      const latAbs = latDeg ? Math.abs(latDeg[row]) : 0;
+      const tropicalWarmWaterSupport = (
+        (1 - smoothstep(tropicalOceanEvapLat0Deg, tropicalOceanEvapLat1Deg, latAbs))
+        * smoothstep(tropicalOceanEvapSst0K, tropicalOceanEvapSst1K, TsVal)
+        * (1 - iceFrac)
+      );
+      if (tropicalOceanEvapBoost > 0 && tropicalWarmWaterSupport > 0) {
+        E *= 1 + Math.max(0, tropicalOceanEvapBoost) * tropicalWarmWaterSupport;
+      }
     }
     if (E > evapMax) E = evapMax;
 

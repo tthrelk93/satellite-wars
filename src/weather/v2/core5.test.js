@@ -16,6 +16,10 @@ test('WeatherCore5 defaults keep the stronger broad-circulation surface wind res
   assert.equal(core.vertParams.qvTrig, 0.0018);
   assert.equal(core.vertParams.thetaeCoeff, 10.5);
   assert.equal(core.vertParams.convOrganizationGrowTau, 90 * 60);
+  assert.equal(core.vertParams.convMinPotential, 0.12);
+  assert.equal(core.vertParams.convMinOrganization, 0.14);
+  assert.equal(core.vertParams.tropicalCoreConvectiveMuBoost, 0.55);
+  assert.equal(core.vertParams.equatorialCoreConvectiveMuBoost, 0.3);
   assert.equal(core.vertParams.subtropicalSubsidenceTau, 8 * 3600);
   assert.equal(core.vertParams.subtropicalSubsidenceCrossHemiFloorFrac, 0.58);
   assert.equal(core.vertParams.subtropicalSubsidenceWeakHemiBoost, 0.35);
@@ -31,7 +35,9 @@ test('WeatherCore5 defaults keep the stronger broad-circulation surface wind res
   assert.equal(core.microParams.kFallRain, 1 / 900);
   assert.equal(core.microParams.kFallSnow, 1 / 3600);
   assert.equal(core.microParams.precipEffMicro, 1.0);
-  assert.equal(core.microParams.convectiveSaturationRainoutMaxFrac, 0.65);
+  assert.equal(core.microParams.convKAutoScale, 2.35);
+  assert.equal(core.microParams.convectiveSaturationRainoutMaxFrac, 0.75);
+  assert.equal(core.surfaceParams.tropicalOceanEvapBoost, 0.85);
   assert.equal(core.nudgeParams.organizedConvectionQvColumnRelief, 1.05);
   assert.equal(core.nudgeParams.subtropicalSubsidenceQvRelief, 1.65);
 });
