@@ -1,64 +1,59 @@
 # World-Class Weather Status
 
-Updated: 2026-04-26
+Updated: 2026-04-27
 Verdict: NOT WORLD CLASS YET
 
 ## Current Baseline
 
 - Clean worker worktree: `codex/world-class-weather-loop`
-- Latest verified cycle: `cycle-2026-04-26T17-43-11Z-phase6-surface-ocean-land-biomes`
+- Latest verified cycle: `cycle-2026-04-27T02-12-02Z-phase7-tropical-cyclones-severe-weather-recovery`
 - Earth accuracy suite: PASS (`weather-validation/reports/earth-accuracy-status.md`)
-- Planetary realism status: PASS at the latest 90-day seasonal repro gate (`weather-validation/reports/planetary-realism-status.json`)
+- Planetary realism status: PASS at the latest 365-day annual repro gate (`weather-validation/output/cycle-2026-04-27T02-12-02Z-phase7-tropical-cyclones-severe-weather-recovery/phase7-final-annual-r2.json`)
 
 ## Fresh Evidence From The Latest Cycle
 
-Phase 6 surface/ocean/land/biome coupling is verified and ready to hand off to the next climate phase.
+Phase 7 tropical cyclone and severe-weather environments are verified and ready to hand off to Phase 8.
 
 - Code path changed:
-  - `src/weather/v2/surface2d.js`: bounded land surface-energy integration, soil moisture memory, vegetation/ET proxies, humid-tropical canopy/root-zone support, mixed-layer and sea-ice diagnostics.
-  - `src/weather/v2/core5.js`: production defaults for Phase 6 surface coupling and rainforest convection support.
-  - `src/weather/v2/state5.js` and `src/weather/validation/diagnostics.js`: persistent surface, soil, vegetation, rainforest, mixed-layer, and sea-ice diagnostics.
-  - `src/weather/v2/vertical5.js`: rainforest surface support for organized moist convection/rainout.
-  - `scripts/agent/planetary-realism-audit.mjs`: biome diagnostics for rainforest, desert, savanna, monsoon, Mediterranean, tundra, eastern-boundary stratocumulus, land/ocean contrast, and land-energy-vs-climo coupling.
-  - `src/weather/v2/oceanIce.test.js`: dry-land energy and humid tropical forest canopy/root-zone coverage.
-- Final seasonal artifact: `weather-validation/output/cycle-2026-04-26T17-43-11Z-phase6-surface-ocean-land-biomes/phase6-final-seasonal.json`
+  - `src/weather/v2/state5.js`: persistent tropical-cyclone and tornado-risk diagnostic arrays.
+  - `src/weather/v2/core5.js`: production defaults for severe-weather environment diagnostics.
+  - `src/weather/v2/vertical5.js`: basin-season cyclone support, TC genesis/embedded-vortex potential, and tornado-risk environment calculations tied to instability, shear, moisture, lift, and storm mode.
+  - `src/weather/validation/diagnostics.js`: 2D diagnostic exports for TC/tornado support fields.
+  - `scripts/agent/planetary-realism-audit.mjs`: severe-weather category, basin seasonality gates, false-positive checks, and basin-aware NH seasonality handling.
+  - `src/weather/v2/vertical5.test.js` and `weather-validation/tests/planetary-realism-audit.test.mjs`: focused helper and audit-gate coverage.
+- Final annual artifact: `weather-validation/output/cycle-2026-04-27T02-12-02Z-phase7-tropical-cyclones-severe-weather-recovery/phase7-final-annual-r2.json`
   - `overallPass = true`
   - warnings: none
-  - preset/grid/dt: `seasonal / 48x24 / 1800s`
-  - day-90 global/equatorial precipitation: `0.085 / 0.175 mm/hr`
-  - day-90 dry-belt ratios N/S: `0.288 / 0.398`
-  - day-90 storm-track peaks N/S: `41.25 / -41.25 deg`
-  - rainforest precipitation / convective precipitation / ET: `0.19511 / 0.1423 / 0.29364 mm/hr`
-  - rainforest vegetation/canopy/root recharge: `0.63574 / 0.66105 / 0.01679 mm/hr`
-  - desert score / surface temperature / soil moisture: `0.82365 / 312.99333 K / 0.10547`
-  - desert energy-vs-climo ratio: `0.89884`
-  - eastern-boundary stratocumulus score / low cloud / inversion: `0.19899 / 0.62611 / 6.48796 K`
-  - monsoon potential: `0.13186`
-  - land/ocean surface temperature contrast: `9.39712 K`
-  - land energy tendency vs climo tendency: `-0.0336 / -0.00515 K`
-  - numerical integrity score/pass: `0.8698 / true`
-  - numerical limiter dominance: `false`
-  - water-cycle budget: PASS
-  - numerical climate contract: PASS
+  - preset/grid/dt: `annual / 48x24 / 3600s`
+  - categories passing: circulation, moisture belts, storm tracks, cloud balance, stability, numerical integrity, severe weather, seasonality
+  - annual mean global precipitation: `0.08616 mm/hr`
+  - annual mean tropical convective fraction / mass flux: `0.44368 / 0.01272 kg/m2/s`
+  - TC environment counts N/S: `16.28 / 38.68`
+  - basin genesis means Atlantic/East Pacific/West Pacific/North Indian/SH: `0.00067 / 0.00119 / 0.0078 / 0.00246 / 0.0205`
+  - TC cold-water false positive mean: `0`
+  - TC dry-subtropical false positive mean: `0.00536`
+  - cyclone seasonality: Atlantic, East Pacific, West Pacific, North Indian, and Southern Hemisphere all PASS
+  - North America tornado warm/cool season mean: `0.00504 / 0.00427`, PASS
+  - tornado support instability/shear/lift/storm-mode: `0.6675 / 0.40583 / 0.57158 / 0.08062`
+  - numerical integrity score: `0.86399`
+  - numerical climate contract: PASS, major climate claims allowed
   - dt/grid sensitivity: PASS/PASS
-- Canonical seasonal report refresh: `weather-validation/reports/planetary-realism-status.json`
-  - generated at `2026-04-26T20:10:54.489Z`
-  - latest artifact: `weather-validation/output/cycle-2026-04-26T17-43-11Z-phase6-surface-ocean-land-biomes/phase6-final-seasonal.json`
+- Canonical benchmark refresh: `weather-validation/reports/earth-accuracy-status.json`
 
 ## Validation
 
-- `node --test src/weather/v2/oceanIce.test.js src/weather/v2/vertical5.test.js weather-validation/tests/planetary-realism-audit.test.mjs`: 59/59 pass
+- `node --test src/weather/v2/vertical5.test.js weather-validation/tests/planetary-realism-audit.test.mjs`: 57/57 pass
 - `npm run weather:validate:test`: 239/239 pass
+- `npm run agent:planetary-realism-audit -- --preset annual --repro-check --no-counterfactuals --label phase7-tropical-cyclones-severe-weather-r2 --out weather-validation/output/cycle-2026-04-27T02-12-02Z-phase7-tropical-cyclones-severe-weather-recovery/phase7-final-annual-r2.json --md-out weather-validation/output/cycle-2026-04-27T02-12-02Z-phase7-tropical-cyclones-severe-weather-recovery/phase7-final-annual-r2.md`: PASS
 - `npm run weather:benchmark`: PASS
-- `npm run agent:planetary-realism-audit -- --preset seasonal --repro-check --no-counterfactuals --label phase6-surface-ocean-land-biomes --out weather-validation/output/cycle-2026-04-26T17-43-11Z-phase6-surface-ocean-land-biomes/phase6-final-seasonal.json --md-out weather-validation/output/cycle-2026-04-26T17-43-11Z-phase6-surface-ocean-land-biomes/phase6-final-seasonal.md --report-base weather-validation/reports/planetary-realism-status`: PASS
+- `npm run agent:claim-guard`: PASS
 
 ## What Still Blocks "World Class"
 
-- This is a 90-day seasonal Phase 6 claim, not a full annual world-class claim.
-- A full annual planetary-realism pass with dt/grid repro enabled is still required before any annual or world-class claim.
 - Browser/runtime signoff is still required after the verified climate fixes, including smoothness telemetry and visual observation in the live app.
-- The latest root-cause ranking still points to subtropical cloud persistence/imported cloud maintenance as the dominant remaining realism family.
 - World-class status still requires realism and smoothness to pass in the same browser-backed run.
+- The annual root-cause sidecars still rank imported cloud persistence/helper forcing as the dominant residual realism family, even though all annual planetary gates pass.
+- South America tornado seasonality is diagnostic-only in Phase 7 and remains cool-season biased; the hard tornado warm-season gate is North America and passes.
 
 ## Canonical Cycle Inputs
 
@@ -73,11 +68,10 @@ Phase 6 surface/ocean/land/biome coupling is verified and ready to hand off to t
 
 ## Default Next Priority
 
-1. Move to the next climate phase from the verified Phase 6 surface/ocean/land/biome baseline.
+1. Move to Phase 8 from the verified Phase 7 severe-weather annual baseline.
 2. Run bounded live/browser verification after this verified climate fix or when runtime debt becomes blocking again.
-3. Attack the remaining subtropical cloud persistence/imported cloud maintenance family before any world-class claim.
-4. Before any world-class or annual-seasonality claim, run full annual planetary realism with dt/grid repro enabled.
-5. Keep validation on the clean world-class checkout only.
+3. Attack the remaining imported cloud persistence/helper-forcing family before any world-class claim.
+4. Keep validation on the clean world-class checkout only.
 
 ## Commit Discipline
 
@@ -88,4 +82,4 @@ Phase 6 surface/ocean/land/biome coupling is verified and ready to hand off to t
 
 - Do not touch `Developer/satellite-wars`.
 - Do not open duplicate localhost tabs.
-- Do not claim "world class" until live observation, telemetry, benchmark evidence, and full annual dt/grid evidence all agree.
+- Do not claim "world class" until live observation, telemetry, benchmark evidence, and annual dt/grid evidence all agree.

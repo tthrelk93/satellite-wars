@@ -1628,12 +1628,44 @@ const areaWeightedMax = (field) => field.reduce((best, value) => Math.max(best, 
 //   ny >= 48 (<= 3.8°): vort 1.5e-5, 3-of-4 magnitudes (medium)
 //   ny <  48 (> 3.8°): vort 1.0e-5, 2-of-4 magnitudes (coarse, this grid)
 const computeTropicalCycloneEnvironment = (diagnostics) => {
-  const { grid, seaLevelPressurePa, wind10mSpeedMs, totalColumnWaterKgM2, sstK, seaIceFraction, cycloneSupportFields } = diagnostics;
+  const {
+    grid,
+    seaLevelPressurePa,
+    wind10mSpeedMs,
+    totalColumnWaterKgM2,
+    sstK,
+    seaIceFraction,
+    cycloneSupportFields,
+    tropicalCycloneGenesisPotentialFrac,
+    tropicalCycloneEmbeddedVortexPotentialFrac
+  } = diagnostics;
   const { nx, ny, latitudesDeg } = grid;
+  if (Array.isArray(tropicalCycloneGenesisPotentialFrac) && tropicalCycloneGenesisPotentialFrac.length === nx * ny) {
+    const genesisThreshold = ny >= 90 ? 0.12 : (ny >= 48 ? 0.04 : 0.006);
+    const embeddedThreshold = ny >= 90 ? 0.08 : (ny >= 48 ? 0.025 : 0.003);
+    const counts = { nh: 0, sh: 0, embeddedNh: 0, embeddedSh: 0 };
+    for (let j = 0; j < ny; j += 1) {
+      const lat = latitudesDeg[j];
+      if (Math.abs(lat) < 5 || Math.abs(lat) > 30) continue;
+      const row = j * nx;
+      for (let i = 0; i < nx; i += 1) {
+        const idx = row + i;
+        const genesisPotential = tropicalCycloneGenesisPotentialFrac[idx] || 0;
+        const embeddedPotential = tropicalCycloneEmbeddedVortexPotentialFrac?.[idx] || 0;
+        if (genesisPotential >= genesisThreshold || embeddedPotential >= embeddedThreshold) {
+          counts[lat >= 0 ? 'nh' : 'sh'] += 1;
+        }
+        if (embeddedPotential >= embeddedThreshold) {
+          counts[lat >= 0 ? 'embeddedNh' : 'embeddedSh'] += 1;
+        }
+      }
+    }
+    return counts;
+  }
   const zonalSlp = zonalMean(seaLevelPressurePa, nx, ny);
   const vortThresh = ny >= 90 ? 2e-5 : (ny >= 48 ? 1.5e-5 : 1e-5);
   const minMagnitudePasses = ny >= 90 ? 4 : (ny >= 48 ? 3 : 2);
-  const counts = { nh: 0, sh: 0 };
+  const counts = { nh: 0, sh: 0, embeddedNh: 0, embeddedSh: 0 };
   for (let j = 0; j < ny; j += 1) {
     const lat = latitudesDeg[j];
     if (Math.abs(lat) < 5 || Math.abs(lat) > 30) continue;
@@ -1666,6 +1698,8 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     wind10mU,
     wind10mSpeedMs,
     totalColumnWaterKgM2,
+    sstK,
+    seaIceFraction,
     surfaceEvapRateMmHr,
     verticallyIntegratedVaporFluxNorthKgM_1S,
     verticallyIntegratedTotalWaterFluxNorthKgM_1S,
@@ -1761,6 +1795,17 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     stormPrecipShieldDiagFrac,
     stormWarmSectorDiagFrac,
     stormColdSectorDiagFrac,
+    tropicalCycloneGenesisPotentialFrac,
+    tropicalCycloneEmbeddedVortexPotentialFrac,
+    tropicalCycloneShearSupportFrac,
+    tropicalCycloneHumiditySupportFrac,
+    tropicalCycloneVorticitySupportFrac,
+    tropicalCycloneBasinSeasonSupportFrac,
+    tornadoRiskPotentialFrac,
+    tornadoInstabilitySupportFrac,
+    tornadoShearSupportFrac,
+    tornadoLiftSupportFrac,
+    tornadoStormModeSupportFrac,
     lowerTroposphericRhFrac,
     subtropicalSubsidenceDryingFrac,
     freshPotentialTargetDiagFrac,
@@ -1929,6 +1974,17 @@ export const classifySnapshot = (diagnostics, targetDay) => {
   const zonalStormPrecipShield = zonalMean(stormPrecipShieldDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalStormWarmSector = zonalMean(stormWarmSectorDiagFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalStormColdSector = zonalMean(stormColdSectorDiagFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalTropicalCycloneGenesisPotential = zonalMean(tropicalCycloneGenesisPotentialFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalTropicalCycloneEmbeddedVortex = zonalMean(tropicalCycloneEmbeddedVortexPotentialFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalTropicalCycloneShearSupport = zonalMean(tropicalCycloneShearSupportFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalTropicalCycloneHumiditySupport = zonalMean(tropicalCycloneHumiditySupportFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalTropicalCycloneVorticitySupport = zonalMean(tropicalCycloneVorticitySupportFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalTropicalCycloneBasinSeasonSupport = zonalMean(tropicalCycloneBasinSeasonSupportFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalTornadoRiskPotential = zonalMean(tornadoRiskPotentialFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalTornadoInstabilitySupport = zonalMean(tornadoInstabilitySupportFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalTornadoShearSupport = zonalMean(tornadoShearSupportFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalTornadoLiftSupport = zonalMean(tornadoLiftSupportFrac || new Array(nx * ny).fill(0), nx, ny);
+  const zonalTornadoStormModeSupport = zonalMean(tornadoStormModeSupportFrac || new Array(nx * ny).fill(0), nx, ny);
   const zonalDryingOmegaBridgeLocalApplied = zonalMean(dryingOmegaBridgeLocalAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
   const zonalDryingOmegaBridgeProjectedApplied = zonalMean(dryingOmegaBridgeProjectedAppliedDiagPaS || new Array(nx * ny).fill(0), nx, ny);
   const zonalEquatorialEdgeSubsidenceGuardSourceSupport = zonalMean(equatorialEdgeSubsidenceGuardSourceSupportDiagFrac || new Array(nx * ny).fill(0), nx, ny);
@@ -2520,6 +2576,25 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       || (lon >= 110 && lon <= 155)
       || (lon >= -75 && lon <= -55);
   };
+  const tcOceanPredicate = ({ idx, latDeg }) => landMask?.[idx] !== 1 && Math.abs(latDeg) >= 5 && Math.abs(latDeg) <= 30;
+  const tcAtlanticPredicate = ({ idx, latDeg, lonDeg }) => tcOceanPredicate({ idx, latDeg }) && latDeg >= 0 && lonDeg >= -100 && lonDeg <= -10;
+  const tcEastPacificPredicate = ({ idx, latDeg, lonDeg }) => tcOceanPredicate({ idx, latDeg }) && latDeg >= 0 && lonDeg >= -170 && lonDeg < -100;
+  const tcWestPacificPredicate = ({ idx, latDeg, lonDeg }) => tcOceanPredicate({ idx, latDeg }) && latDeg >= 0 && (lonDeg >= 105 || lonDeg < -170);
+  const tcNorthIndianPredicate = ({ idx, latDeg, lonDeg }) => tcOceanPredicate({ idx, latDeg }) && latDeg >= 0 && lonDeg >= 40 && lonDeg <= 110;
+  const tcSouthernHemispherePredicate = ({ idx, latDeg }) => tcOceanPredicate({ idx, latDeg }) && latDeg < 0;
+  const tcColdWaterPredicate = ({ idx, latDeg }) => (
+    tcOceanPredicate({ idx, latDeg })
+      && ((sstK?.[idx] || 0) < 298.2 || (seaIceFraction?.[idx] || 0) > 0.15)
+  );
+  const tcDrySubtropicalPredicate = ({ idx, latDeg }) => (
+    landMask?.[idx] !== 1
+      && Math.abs(latDeg) >= 15
+      && Math.abs(latDeg) <= 35
+      && ((totalColumnWaterKgM2?.[idx] || 0) < 26 || (lowerTroposphericRhFrac?.[idx] || 0) < 0.48)
+  );
+  const tornadoNorthAmericaPredicate = ({ idx, latDeg, lonDeg }) => landMask?.[idx] === 1 && latDeg >= 25 && latDeg <= 50 && lonDeg >= -125 && lonDeg <= -65;
+  const tornadoSouthAmericaPredicate = ({ idx, latDeg, lonDeg }) => landMask?.[idx] === 1 && latDeg >= -40 && latDeg <= -20 && lonDeg >= -75 && lonDeg <= -45;
+  const tornadoEuropePredicate = ({ idx, latDeg, lonDeg }) => landMask?.[idx] === 1 && latDeg >= 35 && latDeg <= 55 && lonDeg >= -10 && lonDeg <= 45;
   const rainforestScoreField = (surfaceTemperatureK || zeroField).map((_, idx) => {
     const precipSupport = smoothstep(0.07, 0.16, precipRateMmHr?.[idx] || 0);
     const convectiveSupport = smoothstep(0.02, 0.08, precipConvectiveRateMmHr?.[idx] || 0);
@@ -2605,6 +2680,32 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     oceanMixedLayerTempTendencyMeanK: round(fieldMean(oceanMixedLayerTempTendencyK || zeroField, -60, 60, oceanPredicate), 5),
     oceanClimoTempTendencyMeanK: round(fieldMean(oceanClimoTempTendencyK || zeroField, -60, 60, oceanPredicate), 5),
     seaIceThermoTendencyMeanM: round(fieldMean(seaIceThermoTendencyM || zeroField, -90, 90, oceanPredicate), 7)
+  };
+  const severeWeatherDiagnostics = {
+    tcGenesisPotentialMean: round(fieldMean(tropicalCycloneGenesisPotentialFrac || zeroField, -30, 30, tcOceanPredicate), 5),
+    tcEmbeddedVortexPotentialMean: round(fieldMean(tropicalCycloneEmbeddedVortexPotentialFrac || zeroField, -30, 30, tcOceanPredicate), 5),
+    tcShearSupportMean: round(fieldMean(tropicalCycloneShearSupportFrac || zeroField, -30, 30, tcOceanPredicate), 5),
+    tcHumiditySupportMean: round(fieldMean(tropicalCycloneHumiditySupportFrac || zeroField, -30, 30, tcOceanPredicate), 5),
+    tcVorticitySupportMean: round(fieldMean(tropicalCycloneVorticitySupportFrac || zeroField, -30, 30, tcOceanPredicate), 5),
+    tcBasinSeasonSupportMean: round(fieldMean(tropicalCycloneBasinSeasonSupportFrac || zeroField, -30, 30, tcOceanPredicate), 5),
+    tcAtlanticGenesisPotentialMean: round(fieldMean(tropicalCycloneGenesisPotentialFrac || zeroField, 5, 30, tcAtlanticPredicate), 5),
+    tcEastPacificGenesisPotentialMean: round(fieldMean(tropicalCycloneGenesisPotentialFrac || zeroField, 5, 30, tcEastPacificPredicate), 5),
+    tcWestPacificGenesisPotentialMean: round(fieldMean(tropicalCycloneGenesisPotentialFrac || zeroField, 5, 30, tcWestPacificPredicate), 5),
+    tcNorthIndianGenesisPotentialMean: round(fieldMean(tropicalCycloneGenesisPotentialFrac || zeroField, 5, 30, tcNorthIndianPredicate), 5),
+    tcSouthernHemisphereGenesisPotentialMean: round(fieldMean(tropicalCycloneGenesisPotentialFrac || zeroField, -30, -5, tcSouthernHemispherePredicate), 5),
+    tcAtlanticEmbeddedVortexMean: round(fieldMean(tropicalCycloneEmbeddedVortexPotentialFrac || zeroField, 5, 30, tcAtlanticPredicate), 5),
+    tcWestPacificEmbeddedVortexMean: round(fieldMean(tropicalCycloneEmbeddedVortexPotentialFrac || zeroField, 5, 30, tcWestPacificPredicate), 5),
+    tcSouthernHemisphereEmbeddedVortexMean: round(fieldMean(tropicalCycloneEmbeddedVortexPotentialFrac || zeroField, -30, -5, tcSouthernHemispherePredicate), 5),
+    tcColdWaterFalsePositiveMean: round(fieldMean(tropicalCycloneGenesisPotentialFrac || zeroField, -30, 30, tcColdWaterPredicate), 5),
+    tcDrySubtropicalFalsePositiveMean: round(fieldMean(tropicalCycloneGenesisPotentialFrac || zeroField, -35, 35, tcDrySubtropicalPredicate), 5),
+    tornadoRiskMean: round(fieldMean(tornadoRiskPotentialFrac || zeroField, -55, 55, landPredicate), 5),
+    tornadoRiskNorthAmericaMean: round(fieldMean(tornadoRiskPotentialFrac || zeroField, 25, 50, tornadoNorthAmericaPredicate), 5),
+    tornadoRiskSouthAmericaMean: round(fieldMean(tornadoRiskPotentialFrac || zeroField, -40, -20, tornadoSouthAmericaPredicate), 5),
+    tornadoRiskEuropeMean: round(fieldMean(tornadoRiskPotentialFrac || zeroField, 35, 55, tornadoEuropePredicate), 5),
+    tornadoInstabilitySupportMean: round(fieldMean(tornadoInstabilitySupportFrac || zeroField, -55, 55, landPredicate), 5),
+    tornadoShearSupportMean: round(fieldMean(tornadoShearSupportFrac || zeroField, -55, 55, landPredicate), 5),
+    tornadoLiftSupportMean: round(fieldMean(tornadoLiftSupportFrac || zeroField, -55, 55, landPredicate), 5),
+    tornadoStormModeSupportMean: round(fieldMean(tornadoStormModeSupportFrac || zeroField, -55, 55, landPredicate), 5)
   };
   const tradesNorth = weightedBandMean(zonalU10, latitudesDeg, rowWeights, 5, 25);
   const tradesSouth = weightedBandMean(zonalU10, latitudesDeg, rowWeights, -25, -5);
@@ -2944,6 +3045,32 @@ export const classifySnapshot = (diagnostics, targetDay) => {
       seaIceThermoTendencyMeanM: biomeDiagnostics.seaIceThermoTendencyMeanM,
       tropicalCycloneEnvironmentCountNh: tcEnvCounts.nh,
       tropicalCycloneEnvironmentCountSh: tcEnvCounts.sh,
+      tropicalCycloneEmbeddedVortexCountNh: tcEnvCounts.embeddedNh || 0,
+      tropicalCycloneEmbeddedVortexCountSh: tcEnvCounts.embeddedSh || 0,
+      tcGenesisPotentialMean: severeWeatherDiagnostics.tcGenesisPotentialMean,
+      tcEmbeddedVortexPotentialMean: severeWeatherDiagnostics.tcEmbeddedVortexPotentialMean,
+      tcShearSupportMean: severeWeatherDiagnostics.tcShearSupportMean,
+      tcHumiditySupportMean: severeWeatherDiagnostics.tcHumiditySupportMean,
+      tcVorticitySupportMean: severeWeatherDiagnostics.tcVorticitySupportMean,
+      tcBasinSeasonSupportMean: severeWeatherDiagnostics.tcBasinSeasonSupportMean,
+      tcAtlanticGenesisPotentialMean: severeWeatherDiagnostics.tcAtlanticGenesisPotentialMean,
+      tcEastPacificGenesisPotentialMean: severeWeatherDiagnostics.tcEastPacificGenesisPotentialMean,
+      tcWestPacificGenesisPotentialMean: severeWeatherDiagnostics.tcWestPacificGenesisPotentialMean,
+      tcNorthIndianGenesisPotentialMean: severeWeatherDiagnostics.tcNorthIndianGenesisPotentialMean,
+      tcSouthernHemisphereGenesisPotentialMean: severeWeatherDiagnostics.tcSouthernHemisphereGenesisPotentialMean,
+      tcAtlanticEmbeddedVortexMean: severeWeatherDiagnostics.tcAtlanticEmbeddedVortexMean,
+      tcWestPacificEmbeddedVortexMean: severeWeatherDiagnostics.tcWestPacificEmbeddedVortexMean,
+      tcSouthernHemisphereEmbeddedVortexMean: severeWeatherDiagnostics.tcSouthernHemisphereEmbeddedVortexMean,
+      tcColdWaterFalsePositiveMean: severeWeatherDiagnostics.tcColdWaterFalsePositiveMean,
+      tcDrySubtropicalFalsePositiveMean: severeWeatherDiagnostics.tcDrySubtropicalFalsePositiveMean,
+      tornadoRiskMean: severeWeatherDiagnostics.tornadoRiskMean,
+      tornadoRiskNorthAmericaMean: severeWeatherDiagnostics.tornadoRiskNorthAmericaMean,
+      tornadoRiskSouthAmericaMean: severeWeatherDiagnostics.tornadoRiskSouthAmericaMean,
+      tornadoRiskEuropeMean: severeWeatherDiagnostics.tornadoRiskEuropeMean,
+      tornadoInstabilitySupportMean: severeWeatherDiagnostics.tornadoInstabilitySupportMean,
+      tornadoShearSupportMean: severeWeatherDiagnostics.tornadoShearSupportMean,
+      tornadoLiftSupportMean: severeWeatherDiagnostics.tornadoLiftSupportMean,
+      tornadoStormModeSupportMean: severeWeatherDiagnostics.tornadoStormModeSupportMean,
       numericalIntegrityScore: numericalIntegrityScore.score,
       numericalIntegrityPass: numericalIntegrityScore.pass,
       numericalLimiterDominance: numericalIntegrityScore.limiterDominance,
@@ -2962,6 +3089,7 @@ export const classifySnapshot = (diagnostics, targetDay) => {
     },
     surfaceFluxDecomposition,
     biomeDiagnostics,
+    severeWeatherDiagnostics,
     transportTracing: transportTracing || null,
     verticalCloudBirthTracing: verticalCloudBirthTracing || null,
     upperCloudResidenceTracing: upperCloudResidenceTracing || null,
@@ -3017,6 +3145,17 @@ export const classifySnapshot = (diagnostics, targetDay) => {
         stormPrecipShieldFrac: roundSeries(zonalStormPrecipShield, 5),
         stormWarmSectorFrac: roundSeries(zonalStormWarmSector, 5),
         stormColdSectorFrac: roundSeries(zonalStormColdSector, 5),
+        tropicalCycloneGenesisPotentialFrac: roundSeries(zonalTropicalCycloneGenesisPotential, 5),
+        tropicalCycloneEmbeddedVortexPotentialFrac: roundSeries(zonalTropicalCycloneEmbeddedVortex, 5),
+        tropicalCycloneShearSupportFrac: roundSeries(zonalTropicalCycloneShearSupport, 5),
+        tropicalCycloneHumiditySupportFrac: roundSeries(zonalTropicalCycloneHumiditySupport, 5),
+        tropicalCycloneVorticitySupportFrac: roundSeries(zonalTropicalCycloneVorticitySupport, 5),
+        tropicalCycloneBasinSeasonSupportFrac: roundSeries(zonalTropicalCycloneBasinSeasonSupport, 5),
+        tornadoRiskPotentialFrac: roundSeries(zonalTornadoRiskPotential, 5),
+        tornadoInstabilitySupportFrac: roundSeries(zonalTornadoInstabilitySupport, 5),
+        tornadoShearSupportFrac: roundSeries(zonalTornadoShearSupport, 5),
+        tornadoLiftSupportFrac: roundSeries(zonalTornadoLiftSupport, 5),
+        tornadoStormModeSupportFrac: roundSeries(zonalTornadoStormModeSupport, 5),
         boundaryLayerThetaeK: roundSeries(zonalBoundaryLayerThetae, 5),
         lowerTroposphereThetaeK: roundSeries(zonalLowerTroposphereThetae, 5),
         thetaeGradientBoundaryMinusLowerK: roundSeries(zonalThetaeGradient, 5),
@@ -4087,33 +4226,100 @@ const runPhaseCCorridorReplay = async ({ configSnapshot, latestSample, targetDay
 export const computeSeasonalityScore = (samples) => {
   const buckets = Array.from({ length: 12 }, (_, monthIndex) => ({
     monthIndex,
-    nh: [],
-    sh: []
+    values: new Map()
   }));
+  const pushMetric = (bucket, key, value) => {
+    const bounded = Number(value);
+    if (!Number.isFinite(bounded)) return;
+    const values = bucket.values.get(key) || [];
+    values.push(bounded);
+    bucket.values.set(key, values);
+  };
   for (const sample of samples) {
     const bucket = buckets[sample.monthIndex];
-    bucket.nh.push(sample.metrics.tropicalCycloneEnvironmentCountNh || 0);
-    bucket.sh.push(sample.metrics.tropicalCycloneEnvironmentCountSh || 0);
+    pushMetric(bucket, 'nh', sample.metrics.tropicalCycloneEnvironmentCountNh || 0);
+    pushMetric(bucket, 'sh', sample.metrics.tropicalCycloneEnvironmentCountSh || 0);
+    pushMetric(bucket, 'atlantic', sample.metrics.tcAtlanticGenesisPotentialMean || 0);
+    pushMetric(bucket, 'eastPacific', sample.metrics.tcEastPacificGenesisPotentialMean || 0);
+    pushMetric(bucket, 'westPacific', sample.metrics.tcWestPacificGenesisPotentialMean || 0);
+    pushMetric(bucket, 'northIndian', sample.metrics.tcNorthIndianGenesisPotentialMean || 0);
+    pushMetric(bucket, 'southernHemisphere', sample.metrics.tcSouthernHemisphereGenesisPotentialMean || 0);
+    pushMetric(bucket, 'tornadoNorthAmerica', sample.metrics.tornadoRiskNorthAmericaMean || 0);
+    pushMetric(bucket, 'tornadoSouthAmerica', sample.metrics.tornadoRiskSouthAmericaMean || 0);
+    pushMetric(bucket, 'tornadoEurope', sample.metrics.tornadoRiskEuropeMean || 0);
   }
   const monthly = buckets.map((bucket) => ({
     monthIndex: bucket.monthIndex,
     month: monthName(bucket.monthIndex),
-    nh: round(mean(bucket.nh), 2) ?? 0,
-    sh: round(mean(bucket.sh), 2) ?? 0
+    nh: round(mean(bucket.values.get('nh') || []), 2) ?? 0,
+    sh: round(mean(bucket.values.get('sh') || []), 2) ?? 0,
+    atlantic: round(mean(bucket.values.get('atlantic') || []), 5) ?? 0,
+    eastPacific: round(mean(bucket.values.get('eastPacific') || []), 5) ?? 0,
+    westPacific: round(mean(bucket.values.get('westPacific') || []), 5) ?? 0,
+    northIndian: round(mean(bucket.values.get('northIndian') || []), 5) ?? 0,
+    southernHemisphere: round(mean(bucket.values.get('southernHemisphere') || []), 5) ?? 0,
+    tornadoNorthAmerica: round(mean(bucket.values.get('tornadoNorthAmerica') || []), 5) ?? 0,
+    tornadoSouthAmerica: round(mean(bucket.values.get('tornadoSouthAmerica') || []), 5) ?? 0,
+    tornadoEurope: round(mean(bucket.values.get('tornadoEurope') || []), 5) ?? 0
   }));
   const avg = (indices, key) => mean(indices.map((index) => monthly[index]?.[key] || 0));
   const nhWarm = avg([5, 6, 7, 8], 'nh');
   const nhCool = avg([11, 0, 1], 'nh');
   const shWarm = avg([11, 0, 1], 'sh');
   const shCool = avg([5, 6, 7], 'sh');
+  const atlanticWarm = avg([7, 8, 9], 'atlantic');
+  const atlanticCool = avg([11, 0, 1, 2], 'atlantic');
+  const eastPacificWarm = avg([5, 6, 7, 8], 'eastPacific');
+  const eastPacificCool = avg([11, 0, 1, 2], 'eastPacific');
+  const westPacificWarm = avg([6, 7, 8, 9], 'westPacific');
+  const westPacificCool = avg([0, 1, 2], 'westPacific');
+  const northIndianWarm = Math.max(avg([4, 5], 'northIndian'), avg([9, 10], 'northIndian'));
+  const northIndianCool = avg([0, 1, 6, 7], 'northIndian');
+  const southernHemisphereWarm = avg([11, 0, 1, 2], 'southernHemisphere');
+  const southernHemisphereCool = avg([5, 6, 7], 'southernHemisphere');
+  const tornadoNorthAmericaWarm = avg([3, 4, 5, 6], 'tornadoNorthAmerica');
+  const tornadoNorthAmericaCool = avg([10, 11, 0, 1], 'tornadoNorthAmerica');
+  const tornadoSouthAmericaWarm = avg([9, 10, 11, 0], 'tornadoSouthAmerica');
+  const tornadoSouthAmericaCool = avg([4, 5, 6, 7], 'tornadoSouthAmerica');
+  const warmSeasonPass = (warm, cool, floor = 0.0005, ratio = 1.12) => warm > Math.max(floor, cool * ratio);
+  const legacyNhSeasonalityPass = nhWarm > Math.max(0.1, nhCool * 1.15);
+  const legacyShSeasonalityPass = shWarm > Math.max(0.1, shCool * 1.15);
+  const basinNhSeasonalityPass = [
+    warmSeasonPass(atlanticWarm, atlanticCool),
+    warmSeasonPass(eastPacificWarm, eastPacificCool),
+    warmSeasonPass(westPacificWarm, westPacificCool, 0.0005, 1.06),
+    warmSeasonPass(northIndianWarm, northIndianCool)
+  ].filter(Boolean).length >= 3;
+  const basinShSeasonalityPass = warmSeasonPass(southernHemisphereWarm, southernHemisphereCool);
   return {
     monthly,
     nhWarmSeasonMean: round(nhWarm),
     nhCoolSeasonMean: round(nhCool),
     shWarmSeasonMean: round(shWarm),
     shCoolSeasonMean: round(shCool),
-    nhSeasonalityPass: nhWarm > Math.max(0.1, nhCool * 1.15),
-    shSeasonalityPass: shWarm > Math.max(0.1, shCool * 1.15)
+    atlanticWarmSeasonMean: round(atlanticWarm, 5),
+    atlanticCoolSeasonMean: round(atlanticCool, 5),
+    eastPacificWarmSeasonMean: round(eastPacificWarm, 5),
+    eastPacificCoolSeasonMean: round(eastPacificCool, 5),
+    westPacificWarmSeasonMean: round(westPacificWarm, 5),
+    westPacificCoolSeasonMean: round(westPacificCool, 5),
+    northIndianWarmSeasonMean: round(northIndianWarm, 5),
+    northIndianCoolSeasonMean: round(northIndianCool, 5),
+    southernHemisphereWarmSeasonMean: round(southernHemisphereWarm, 5),
+    southernHemisphereCoolSeasonMean: round(southernHemisphereCool, 5),
+    tornadoNorthAmericaWarmSeasonMean: round(tornadoNorthAmericaWarm, 5),
+    tornadoNorthAmericaCoolSeasonMean: round(tornadoNorthAmericaCool, 5),
+    tornadoSouthAmericaWarmSeasonMean: round(tornadoSouthAmericaWarm, 5),
+    tornadoSouthAmericaCoolSeasonMean: round(tornadoSouthAmericaCool, 5),
+    nhSeasonalityPass: legacyNhSeasonalityPass || basinNhSeasonalityPass,
+    shSeasonalityPass: legacyShSeasonalityPass || basinShSeasonalityPass,
+    atlanticSeasonalityPass: warmSeasonPass(atlanticWarm, atlanticCool),
+    eastPacificSeasonalityPass: warmSeasonPass(eastPacificWarm, eastPacificCool),
+    westPacificSeasonalityPass: warmSeasonPass(westPacificWarm, westPacificCool, 0.0005, 1.06),
+    northIndianSeasonalityPass: warmSeasonPass(northIndianWarm, northIndianCool),
+    southernHemisphereSeasonalityPass: warmSeasonPass(southernHemisphereWarm, southernHemisphereCool),
+    tornadoNorthAmericaSeasonalityPass: warmSeasonPass(tornadoNorthAmericaWarm, tornadoNorthAmericaCool, 0.0001, 1.1),
+    tornadoSouthAmericaSeasonalityPass: warmSeasonPass(tornadoSouthAmericaWarm, tornadoSouthAmericaCool, 0.0001, 1.1)
   };
 };
 
@@ -5851,10 +6057,26 @@ export const evaluateHorizons = (samples, horizonDays) => {
   if (metrics.numericalIntegrityPass === false) warnings.push('numerical_integrity_score_low');
 
   const seasonality = horizonDays >= 180 ? computeSeasonalityScore(samples) : null;
+  const severeFalsePositivePass = optionalPass(metrics.tcColdWaterFalsePositiveMean, (value) => value <= 0.01)
+    && optionalPass(metrics.tcDrySubtropicalFalsePositiveMean, (value) => value <= 0.02);
+  categories.severeWeather = severeFalsePositivePass;
+  if (!optionalPass(metrics.tcColdWaterFalsePositiveMean, (value) => value <= 0.01)) warnings.push('tc_cold_water_false_positive');
+  if (!optionalPass(metrics.tcDrySubtropicalFalsePositiveMean, (value) => value <= 0.02)) warnings.push('tc_dry_subtropical_false_positive');
   if (seasonality) {
     categories.seasonality = seasonality.nhSeasonalityPass && seasonality.shSeasonalityPass;
     if (!seasonality.nhSeasonalityPass) warnings.push('north_tropical_cyclone_seasonality_weak');
     if (!seasonality.shSeasonalityPass) warnings.push('south_tropical_cyclone_seasonality_weak');
+    categories.severeWeather = categories.severeWeather
+      && seasonality.atlanticSeasonalityPass
+      && seasonality.eastPacificSeasonalityPass
+      && seasonality.westPacificSeasonalityPass
+      && seasonality.southernHemisphereSeasonalityPass
+      && seasonality.tornadoNorthAmericaSeasonalityPass;
+    if (!seasonality.atlanticSeasonalityPass) warnings.push('atlantic_tropical_cyclone_seasonality_weak');
+    if (!seasonality.eastPacificSeasonalityPass) warnings.push('east_pacific_tropical_cyclone_seasonality_weak');
+    if (!seasonality.westPacificSeasonalityPass) warnings.push('west_pacific_tropical_cyclone_seasonality_weak');
+    if (!seasonality.southernHemisphereSeasonalityPass) warnings.push('southern_hemisphere_tropical_cyclone_seasonality_weak');
+    if (!seasonality.tornadoNorthAmericaSeasonalityPass) warnings.push('north_america_tornado_seasonality_weak');
   }
 
   return {
@@ -5910,6 +6132,9 @@ const renderMarkdown = (summary) => {
       lines.push(`- Annual-mean dry-belt ratios (N/S): ${fmt(a.subtropicalDryNorthRatio)} / ${fmt(a.subtropicalDrySouthRatio)}  ← gate-used`);
     }
     lines.push(`- Tropical cyclone environment counts (N/S): ${latest.metrics.tropicalCycloneEnvironmentCountNh} / ${latest.metrics.tropicalCycloneEnvironmentCountSh}`);
+    lines.push(`- TC genesis potential (Atl/E Pac/W Pac/N Indian/SH): ${latest.metrics.tcAtlanticGenesisPotentialMean} / ${latest.metrics.tcEastPacificGenesisPotentialMean} / ${latest.metrics.tcWestPacificGenesisPotentialMean} / ${latest.metrics.tcNorthIndianGenesisPotentialMean} / ${latest.metrics.tcSouthernHemisphereGenesisPotentialMean}`);
+    lines.push(`- TC false positives cold/dry-subtropics: ${latest.metrics.tcColdWaterFalsePositiveMean} / ${latest.metrics.tcDrySubtropicalFalsePositiveMean}`);
+    lines.push(`- Tornado risk (NA/SA/EU): ${latest.metrics.tornadoRiskNorthAmericaMean} / ${latest.metrics.tornadoRiskSouthAmericaMean} / ${latest.metrics.tornadoRiskEuropeMean}`);
     lines.push(`- Global precip/cloud/tcw/max wind: ${latest.metrics.globalPrecipMeanMmHr} mm/hr / ${latest.metrics.globalCloudMeanFrac} / ${latest.metrics.globalTcwMeanKgM2} kg/m² / ${latest.metrics.maxWind10mMs} m/s`);
     lines.push(`- Numerical integrity score/pass: ${latest.metrics.numericalIntegrityScore} / ${latest.metrics.numericalIntegrityPass}`);
     if (summary.waterCycleBudget) {
@@ -5926,6 +6151,8 @@ const renderMarkdown = (summary) => {
     if (horizon.seasonality) {
       lines.push(`- NH warm/cool tropical cyclone environment: ${horizon.seasonality.nhWarmSeasonMean} / ${horizon.seasonality.nhCoolSeasonMean}`);
       lines.push(`- SH warm/cool tropical cyclone environment: ${horizon.seasonality.shWarmSeasonMean} / ${horizon.seasonality.shCoolSeasonMean}`);
+      lines.push(`- Basin warm/cool TC genesis (Atl/E Pac/W Pac/SH): ${horizon.seasonality.atlanticWarmSeasonMean}/${horizon.seasonality.atlanticCoolSeasonMean} / ${horizon.seasonality.eastPacificWarmSeasonMean}/${horizon.seasonality.eastPacificCoolSeasonMean} / ${horizon.seasonality.westPacificWarmSeasonMean}/${horizon.seasonality.westPacificCoolSeasonMean} / ${horizon.seasonality.southernHemisphereWarmSeasonMean}/${horizon.seasonality.southernHemisphereCoolSeasonMean}`);
+      lines.push(`- Tornado warm/cool risk (NA/SA): ${horizon.seasonality.tornadoNorthAmericaWarmSeasonMean}/${horizon.seasonality.tornadoNorthAmericaCoolSeasonMean} / ${horizon.seasonality.tornadoSouthAmericaWarmSeasonMean}/${horizon.seasonality.tornadoSouthAmericaCoolSeasonMean}`);
     }
     lines.push('');
   }

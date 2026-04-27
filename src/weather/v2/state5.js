@@ -82,6 +82,17 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
   const stormPrecipShieldDiag = makeArray(N);
   const stormWarmSectorDiag = makeArray(N);
   const stormColdSectorDiag = makeArray(N);
+  const tropicalCycloneGenesisPotentialDiag = makeArray(N);
+  const tropicalCycloneEmbeddedVortexDiag = makeArray(N);
+  const tropicalCycloneShearSupportDiag = makeArray(N);
+  const tropicalCycloneHumiditySupportDiag = makeArray(N);
+  const tropicalCycloneVorticitySupportDiag = makeArray(N);
+  const tropicalCycloneBasinSeasonSupportDiag = makeArray(N);
+  const tornadoRiskPotentialDiag = makeArray(N);
+  const tornadoInstabilitySupportDiag = makeArray(N);
+  const tornadoShearSupportDiag = makeArray(N);
+  const tornadoLiftSupportDiag = makeArray(N);
+  const tornadoStormModeSupportDiag = makeArray(N);
   const subtropicalSubsidenceDrying = makeArray(N);
   const freshPotentialTargetDiag = makeArray(N);
   const freshOrganizedSupportDiag = makeArray(N);
@@ -417,6 +428,17 @@ export function createState5({ grid, nz = 26, sigmaHalf, instrumentationMode = '
     stormPrecipShieldDiag,
     stormWarmSectorDiag,
     stormColdSectorDiag,
+    tropicalCycloneGenesisPotentialDiag,
+    tropicalCycloneEmbeddedVortexDiag,
+    tropicalCycloneShearSupportDiag,
+    tropicalCycloneHumiditySupportDiag,
+    tropicalCycloneVorticitySupportDiag,
+    tropicalCycloneBasinSeasonSupportDiag,
+    tornadoRiskPotentialDiag,
+    tornadoInstabilitySupportDiag,
+    tornadoShearSupportDiag,
+    tornadoLiftSupportDiag,
+    tornadoStormModeSupportDiag,
     subtropicalSubsidenceDrying,
     freshPotentialTargetDiag,
     freshOrganizedSupportDiag,

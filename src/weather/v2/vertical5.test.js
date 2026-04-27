@@ -20,6 +20,9 @@ import {
   computeWeakHemiCrossHemiFloorTaperFrac,
   computeTransitionReturnFlowCouplingFrac,
   computeHadleyReturnFlowWindTendencyMs,
+  computeTropicalCycloneGenesisPotential,
+  computeTornadoRiskPotential,
+  tropicalCycloneBasinSeasonSupport,
   stepVertical5
 } from './vertical5.js';
 
@@ -31,6 +34,108 @@ const columnVaporMass = (state) => {
   }
   return total;
 };
+
+test('tropical cyclone genesis potential requires warm moist low-shear ocean and cyclonic spin', () => {
+  const favorable = computeTropicalCycloneGenesisPotential({
+    latDeg: 16,
+    isLand: false,
+    seaIceFrac: 0,
+    sstK: 301.5,
+    boundaryQv: 0.019,
+    midQv: 0.010,
+    shearMs: 6,
+    signedVorticityS_1: 1.2e-5,
+    convectionSupport: 0.75,
+    lowLevelConvergenceS_1: 8e-6,
+    seasonSupport: 1
+  });
+  const coldWater = computeTropicalCycloneGenesisPotential({
+    latDeg: 16,
+    sstK: 294,
+    boundaryQv: 0.019,
+    midQv: 0.010,
+    shearMs: 6,
+    signedVorticityS_1: 1.2e-5,
+    convectionSupport: 0.75,
+    seasonSupport: 1
+  });
+  const land = computeTropicalCycloneGenesisPotential({
+    latDeg: 16,
+    isLand: true,
+    sstK: 301.5,
+    boundaryQv: 0.019,
+    midQv: 0.010,
+    shearMs: 6,
+    signedVorticityS_1: 1.2e-5,
+    convectionSupport: 0.75,
+    seasonSupport: 1
+  });
+  const sheared = computeTropicalCycloneGenesisPotential({
+    latDeg: 16,
+    sstK: 301.5,
+    boundaryQv: 0.019,
+    midQv: 0.010,
+    shearMs: 35,
+    signedVorticityS_1: 1.2e-5,
+    convectionSupport: 0.75,
+    seasonSupport: 1
+  });
+
+  assert.ok(favorable > 0.35);
+  assert.equal(land, 0);
+  assert.ok(coldWater < favorable * 0.1);
+  assert.ok(sheared < favorable);
+});
+
+test('tropical cyclone basin season support follows Atlantic and Southern Hemisphere seasons', () => {
+  const atlanticPeak = tropicalCycloneBasinSeasonSupport({ latDeg: 18, lonDeg: -55, dayOfYear: 255 });
+  const atlanticWinter = tropicalCycloneBasinSeasonSupport({ latDeg: 18, lonDeg: -55, dayOfYear: 20 });
+  const southernPeak = tropicalCycloneBasinSeasonSupport({ latDeg: -18, lonDeg: 80, dayOfYear: 45 });
+  const southernWinter = tropicalCycloneBasinSeasonSupport({ latDeg: -18, lonDeg: 80, dayOfYear: 200 });
+
+  assert.ok(atlanticPeak > atlanticWinter * 2);
+  assert.ok(southernPeak > southernWinter * 2);
+});
+
+test('tornado risk potential requires continental warm-season instability, moisture, shear, lift, and storm mode', () => {
+  const favorable = computeTornadoRiskPotential({
+    latDeg: 36,
+    isLand: true,
+    surfaceTempK: 303,
+    boundaryQv: 0.018,
+    instabilityK: 16,
+    shearMs: 30,
+    liftSupport: 0.8,
+    stormModeSupport: 0.7,
+    seasonSupport: 1
+  });
+  const ocean = computeTornadoRiskPotential({
+    latDeg: 36,
+    isLand: false,
+    surfaceTempK: 303,
+    boundaryQv: 0.018,
+    instabilityK: 16,
+    shearMs: 30,
+    liftSupport: 0.8,
+    stormModeSupport: 0.7,
+    seasonSupport: 1
+  });
+  const coolStable = computeTornadoRiskPotential({
+    latDeg: 36,
+    isLand: true,
+    surfaceTempK: 281,
+    boundaryQv: 0.006,
+    instabilityK: 0,
+    shearMs: 30,
+    liftSupport: 0.8,
+    stormModeSupport: 0.7,
+    seasonSupport: 1
+  });
+
+  assert.ok(favorable > 0.35);
+  assert.equal(ocean, 0);
+  assert.ok(coolStable < favorable * 0.1);
+});
 
 test('stepVertical5 keeps thin upper layers bounded during strong ascent-driven transport', () => {
   const sigmaHalf = new Float32Array([0, 0.5, 1]);

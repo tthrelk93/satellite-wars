@@ -86,13 +86,25 @@ test('computeSeasonalityScore detects stronger tropical environment support in w
       monthIndex,
       metrics: {
         tropicalCycloneEnvironmentCountNh: [0.2, 0.2, 0.3, 0.4, 0.5, 1.2, 1.6, 1.8, 1.4, 0.8, 0.4, 0.2][monthIndex],
-        tropicalCycloneEnvironmentCountSh: [1.4, 1.2, 0.8, 0.5, 0.3, 0.2, 0.2, 0.2, 0.3, 0.6, 1.0, 1.3][monthIndex]
+        tropicalCycloneEnvironmentCountSh: [1.4, 1.2, 0.8, 0.5, 0.3, 0.2, 0.2, 0.2, 0.3, 0.6, 1.0, 1.3][monthIndex],
+        tcAtlanticGenesisPotentialMean: [0.001, 0.001, 0.001, 0.002, 0.004, 0.015, 0.022, 0.03, 0.028, 0.016, 0.006, 0.002][monthIndex],
+        tcEastPacificGenesisPotentialMean: [0.002, 0.002, 0.003, 0.006, 0.012, 0.026, 0.03, 0.031, 0.024, 0.012, 0.004, 0.002][monthIndex],
+        tcWestPacificGenesisPotentialMean: [0.006, 0.006, 0.008, 0.012, 0.018, 0.024, 0.03, 0.034, 0.033, 0.028, 0.018, 0.009][monthIndex],
+        tcSouthernHemisphereGenesisPotentialMean: [0.032, 0.03, 0.024, 0.014, 0.007, 0.003, 0.002, 0.002, 0.005, 0.012, 0.022, 0.031][monthIndex],
+        tornadoRiskNorthAmericaMean: [0.001, 0.001, 0.004, 0.015, 0.028, 0.032, 0.026, 0.016, 0.008, 0.003, 0.001, 0.001][monthIndex],
+        tornadoRiskSouthAmericaMean: [0.022, 0.016, 0.008, 0.004, 0.001, 0.001, 0.001, 0.002, 0.006, 0.015, 0.024, 0.028][monthIndex]
       }
     });
   }
   const score = planetaryAuditTest.computeSeasonalityScore(samples);
   assert.equal(score.nhSeasonalityPass, true);
   assert.equal(score.shSeasonalityPass, true);
+  assert.equal(score.atlanticSeasonalityPass, true);
+  assert.equal(score.eastPacificSeasonalityPass, true);
+  assert.equal(score.westPacificSeasonalityPass, true);
+  assert.equal(score.southernHemisphereSeasonalityPass, true);
+  assert.equal(score.tornadoNorthAmericaSeasonalityPass, true);
+  assert.equal(score.tornadoSouthAmericaSeasonalityPass, true);
 });
 
 test('evaluateHorizons flags missing trades and storm tracks', () => {

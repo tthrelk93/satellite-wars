@@ -20,6 +20,115 @@ const smoothstep = (edge0, edge1, x) => {
   const t = clamp((x - edge0) / Math.max(1e-6, edge1 - edge0), 0, 1);
   return t * t * (3 - 2 * t);
 };
+export const circularDayDistance = (dayA, dayB) => {
+  const wrapped = Math.abs((((dayA - dayB) % 365) + 365) % 365);
+  return Math.min(wrapped, 365 - wrapped);
+};
+export const seasonalWindowSupport = (dayOfYear, peakDay, halfWidthDays) => {
+  const distance = circularDayDistance(dayOfYear, peakDay);
+  const width = Math.max(1, halfWidthDays);
+  return 1 - smoothstep(width * 0.45, width, distance);
+};
+export const normalizeLonDeg = (lonDeg) => {
+  let lon = Number.isFinite(lonDeg) ? lonDeg : 0;
+  while (lon < -180) lon += 360;
+  while (lon >= 180) lon -= 360;
+  return lon;
+};
+export const tropicalCycloneBasinSeasonSupport = ({ latDeg = 0, lonDeg = 0, dayOfYear = 0 } = {}) => {
+  const lat = Number.isFinite(latDeg) ? latDeg : 0;
+  const lon = normalizeLonDeg(lonDeg);
+  const day = ((Number(dayOfYear) || 0) % 365 + 365) % 365;
+  if (lat < 0) {
+    return 0.08 + 0.92 * seasonalWindowSupport(day, 45, 115);
+  }
+  if (lon >= -100 && lon <= -10) {
+    return 0.08 + 0.92 * seasonalWindowSupport(day, 255, 95);
+  }
+  if (lon >= -170 && lon < -100) {
+    return 0.1 + 0.9 * seasonalWindowSupport(day, 235, 105);
+  }
+  if (lon >= 105 || lon <= -145) {
+    return 0.22 + 0.78 * seasonalWindowSupport(day, 240, 150);
+  }
+  if (lon >= 40 && lon <= 110) {
+    return 0.08 + 0.92 * Math.max(
+      seasonalWindowSupport(day, 135, 55),
+      seasonalWindowSupport(day, 310, 60)
+    );
+  }
+  return 0.12 + 0.88 * seasonalWindowSupport(day, 245, 105);
+};
+export const computeTropicalCycloneGenesisPotential = ({
+  latDeg = 0,
+  isLand = false,
+  seaIceFrac = 0,
+  sstK = 0,
+  boundaryQv = 0,
+  midQv = 0,
+  shearMs = 0,
+  signedVorticityS_1 = 0,
+  convectionSupport = 0,
+  lowLevelConvergenceS_1 = 0,
+  seasonSupport = 1,
+  scale = 1
+} = {}) => {
+  const latAbs = Math.abs(Number.isFinite(latDeg) ? latDeg : 0);
+  if (isLand || seaIceFrac > 0.15) return 0;
+  const latitudeSupport = smoothstep(5, 9, latAbs) * (1 - smoothstep(30, 36, latAbs));
+  const sstSupport = smoothstep(298.2, 301.5, sstK);
+  const humiditySupport = clamp01(
+    0.62 * smoothstep(0.011, 0.019, boundaryQv)
+      + 0.38 * smoothstep(0.004, 0.010, midQv)
+  );
+  const shearSupport = 1 - smoothstep(9, 24, shearMs);
+  const vorticitySupport = smoothstep(1e-6, 9e-6, signedVorticityS_1);
+  const organizedConvectionSupport = clamp01(
+    0.72 * clamp01(convectionSupport)
+      + 0.28 * smoothstep(0.000001, 0.000008, lowLevelConvergenceS_1)
+  );
+  return clamp01(
+    Math.max(0, scale)
+      * latitudeSupport
+      * clamp01(seasonSupport)
+      * sstSupport
+      * humiditySupport
+      * (0.35 + 0.65 * shearSupport)
+      * (0.32 + 0.68 * vorticitySupport)
+      * (0.35 + 0.65 * organizedConvectionSupport)
+  );
+};
+export const computeTornadoRiskPotential = ({
+  latDeg = 0,
+  isLand = false,
+  surfaceTempK = 0,
+  boundaryQv = 0,
+  instabilityK = 0,
+  shearMs = 0,
+  liftSupport = 0,
+  stormModeSupport = 0,
+  seasonSupport = 1,
+  scale = 1
+} = {}) => {
+  if (!isLand) return 0;
+  const latAbs = Math.abs(Number.isFinite(latDeg) ? latDeg : 0);
+  const latitudeSupport = smoothstep(18, 27, latAbs) * (1 - smoothstep(55, 63, latAbs));
+  const warmSupport = smoothstep(289, 302, surfaceTempK);
+  const moistureSupport = smoothstep(0.009, 0.0175, boundaryQv);
+  const instabilitySupport = smoothstep(2, 13, instabilityK);
+  const shearSupport = smoothstep(10, 28, shearMs);
+  return clamp01(
+    Math.max(0, scale)
+      * latitudeSupport
+      * clamp01(seasonSupport)
+      * warmSupport
+      * moistureSupport
+      * instabilitySupport
+      * shearSupport
+      * (0.35 + 0.65 * clamp01(liftSupport))
+      * (0.4 + 0.6 * clamp01(stormModeSupport))
+  );
+};
 const accumulateBandValue = (field, bandIndex, cell, cellCount, value, enabled = true) => {
   if (
     !enabled
@@ -700,6 +809,10 @@ const VERTICAL_ALLOWED_PARAMS = new Set([
   'frontalAscentDiffuseDampingFrac',
   'frontalAscentDiffuseDampingMaxStepPaS',
   'frontalAscentCoreGatherSupport',
+  'enableSevereWeatherEnvironments',
+  'tropicalCycloneGenesisScale',
+  'tropicalCycloneEmbeddedVortexThreshold',
+  'tornadoRiskScale',
   'enableEquatorialEdgeSubsidenceGuard',
   'equatorialEdgeSubsidenceGuardMaxPaS',
   'equatorialEdgeSubsidenceGuardSourceLat0',
@@ -934,6 +1047,10 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
     frontalAscentDiffuseDampingFrac = 0,
     frontalAscentDiffuseDampingMaxStepPaS = 0.045,
     frontalAscentCoreGatherSupport = 0.08,
+    enableSevereWeatherEnvironments = true,
+    tropicalCycloneGenesisScale = 1.0,
+    tropicalCycloneEmbeddedVortexThreshold = 0.24,
+    tornadoRiskScale = 1.0,
     enableEquatorialEdgeSubsidenceGuard = false,
     equatorialEdgeSubsidenceGuardMaxPaS = 0.007,
     equatorialEdgeSubsidenceGuardSourceLat0 = 8,
@@ -1058,6 +1175,17 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   if (!state.stormPrecipShieldDiag || state.stormPrecipShieldDiag.length !== N) state.stormPrecipShieldDiag = new Float32Array(N);
   if (!state.stormWarmSectorDiag || state.stormWarmSectorDiag.length !== N) state.stormWarmSectorDiag = new Float32Array(N);
   if (!state.stormColdSectorDiag || state.stormColdSectorDiag.length !== N) state.stormColdSectorDiag = new Float32Array(N);
+  if (!state.tropicalCycloneGenesisPotentialDiag || state.tropicalCycloneGenesisPotentialDiag.length !== N) state.tropicalCycloneGenesisPotentialDiag = new Float32Array(N);
+  if (!state.tropicalCycloneEmbeddedVortexDiag || state.tropicalCycloneEmbeddedVortexDiag.length !== N) state.tropicalCycloneEmbeddedVortexDiag = new Float32Array(N);
+  if (!state.tropicalCycloneShearSupportDiag || state.tropicalCycloneShearSupportDiag.length !== N) state.tropicalCycloneShearSupportDiag = new Float32Array(N);
+  if (!state.tropicalCycloneHumiditySupportDiag || state.tropicalCycloneHumiditySupportDiag.length !== N) state.tropicalCycloneHumiditySupportDiag = new Float32Array(N);
+  if (!state.tropicalCycloneVorticitySupportDiag || state.tropicalCycloneVorticitySupportDiag.length !== N) state.tropicalCycloneVorticitySupportDiag = new Float32Array(N);
+  if (!state.tropicalCycloneBasinSeasonSupportDiag || state.tropicalCycloneBasinSeasonSupportDiag.length !== N) state.tropicalCycloneBasinSeasonSupportDiag = new Float32Array(N);
+  if (!state.tornadoRiskPotentialDiag || state.tornadoRiskPotentialDiag.length !== N) state.tornadoRiskPotentialDiag = new Float32Array(N);
+  if (!state.tornadoInstabilitySupportDiag || state.tornadoInstabilitySupportDiag.length !== N) state.tornadoInstabilitySupportDiag = new Float32Array(N);
+  if (!state.tornadoShearSupportDiag || state.tornadoShearSupportDiag.length !== N) state.tornadoShearSupportDiag = new Float32Array(N);
+  if (!state.tornadoLiftSupportDiag || state.tornadoLiftSupportDiag.length !== N) state.tornadoLiftSupportDiag = new Float32Array(N);
+  if (!state.tornadoStormModeSupportDiag || state.tornadoStormModeSupportDiag.length !== N) state.tornadoStormModeSupportDiag = new Float32Array(N);
   if (!state._frontalAscentOmegaDelta || state._frontalAscentOmegaDelta.length !== N) state._frontalAscentOmegaDelta = new Float32Array(N);
   if (!state.equatorialEdgeSubsidenceGuardSourceSupportDiag || state.equatorialEdgeSubsidenceGuardSourceSupportDiag.length !== N) state.equatorialEdgeSubsidenceGuardSourceSupportDiag = new Float32Array(N);
   if (!state.equatorialEdgeSubsidenceGuardTargetWeightDiag || state.equatorialEdgeSubsidenceGuardTargetWeightDiag.length !== N) state.equatorialEdgeSubsidenceGuardTargetWeightDiag = new Float32Array(N);
@@ -1218,6 +1346,17 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   const stormPrecipShieldDiag = state.stormPrecipShieldDiag;
   const stormWarmSectorDiag = state.stormWarmSectorDiag;
   const stormColdSectorDiag = state.stormColdSectorDiag;
+  const tropicalCycloneGenesisPotentialDiag = state.tropicalCycloneGenesisPotentialDiag;
+  const tropicalCycloneEmbeddedVortexDiag = state.tropicalCycloneEmbeddedVortexDiag;
+  const tropicalCycloneShearSupportDiag = state.tropicalCycloneShearSupportDiag;
+  const tropicalCycloneHumiditySupportDiag = state.tropicalCycloneHumiditySupportDiag;
+  const tropicalCycloneVorticitySupportDiag = state.tropicalCycloneVorticitySupportDiag;
+  const tropicalCycloneBasinSeasonSupportDiag = state.tropicalCycloneBasinSeasonSupportDiag;
+  const tornadoRiskPotentialDiag = state.tornadoRiskPotentialDiag;
+  const tornadoInstabilitySupportDiag = state.tornadoInstabilitySupportDiag;
+  const tornadoShearSupportDiag = state.tornadoShearSupportDiag;
+  const tornadoLiftSupportDiag = state.tornadoLiftSupportDiag;
+  const tornadoStormModeSupportDiag = state.tornadoStormModeSupportDiag;
   const frontalAscentOmegaDelta = state._frontalAscentOmegaDelta;
   const equatorialEdgeSubsidenceGuardSourceSupportDiag = state.equatorialEdgeSubsidenceGuardSourceSupportDiag;
   const equatorialEdgeSubsidenceGuardTargetWeightDiag = state.equatorialEdgeSubsidenceGuardTargetWeightDiag;
@@ -1351,6 +1490,17 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
   stormPrecipShieldDiag.fill(0);
   stormWarmSectorDiag.fill(0);
   stormColdSectorDiag.fill(0);
+  tropicalCycloneGenesisPotentialDiag.fill(0);
+  tropicalCycloneEmbeddedVortexDiag.fill(0);
+  tropicalCycloneShearSupportDiag.fill(0);
+  tropicalCycloneHumiditySupportDiag.fill(0);
+  tropicalCycloneVorticitySupportDiag.fill(0);
+  tropicalCycloneBasinSeasonSupportDiag.fill(0);
+  tornadoRiskPotentialDiag.fill(0);
+  tornadoInstabilitySupportDiag.fill(0);
+  tornadoShearSupportDiag.fill(0);
+  tornadoLiftSupportDiag.fill(0);
+  tornadoStormModeSupportDiag.fill(0);
   frontalAscentOmegaDelta.fill(0);
   equatorialEdgeSubsidenceGuardSourceSupportDiag.fill(0);
   equatorialEdgeSubsidenceGuardTargetWeightDiag.fill(0);
@@ -3244,6 +3394,131 @@ export function stepVertical5({ dt, grid, state, geo, params = {} }) {
       lowLevelMoistureConvergenceMeanS_1: totalWeightAll > 0 ? lowLevelConvergenceWeightedSum / totalWeightAll : 0,
       subtropicalSubsidenceDryingMean: totalWeightAll > 0 ? subsidenceDryingWeightedSum / totalWeightAll : 0
     };
+  }
+
+  if (enableSevereWeatherEnvironments && grid.latDeg && grid.latDeg.length >= ny) {
+    const levS = nz - 1;
+    const levM = Math.max(1, Math.floor(nz * 0.5));
+    const levU = Math.max(0, Math.floor(nz * 0.24));
+    const lowBase = levS * N;
+    const midBase = levM * N;
+    const upperBase = levU * N;
+    const dayOfYear = ((Number(state.timeUTC) || 0) / 86400) % 365;
+    const sstField = state.sstNow && state.sstNow.length === N ? state.sstNow : null;
+    const seaIceField = state.seaIceFrac && state.seaIceFrac.length === N ? state.seaIceFrac : null;
+    const surfaceTempField = state.Ts && state.Ts.length === N ? state.Ts : null;
+    const embeddedThreshold = Math.max(0.02, tropicalCycloneEmbeddedVortexThreshold);
+
+    for (let j = 0; j < ny; j += 1) {
+      const row = j * nx;
+      const rowN = Math.max(0, j - 1) * nx;
+      const rowS = Math.min(ny - 1, j + 1) * nx;
+      const lat = grid.latDeg[j] || 0;
+      const invDxRow = invDx[j];
+      const invDyRow = invDy[j];
+      for (let i = 0; i < nx; i += 1) {
+        const iE = (i + 1) % nx;
+        const iW = (i - 1 + nx) % nx;
+        const k = row + i;
+        const kE = row + iE;
+        const kW = row + iW;
+        const kN = rowN + i;
+        const kS = rowS + i;
+        const idxS = lowBase + k;
+        const idxM = midBase + k;
+        const idxU = upperBase + k;
+        const shearMs = Math.hypot(
+          (u[idxU] || 0) - (u[idxS] || 0),
+          (v[idxU] || 0) - (v[idxS] || 0)
+        );
+        const relativeVorticityS_1 = (
+          ((v[lowBase + kE] || 0) - (v[lowBase + kW] || 0)) * 0.5 * invDxRow
+        ) - (
+          ((u[lowBase + kN] || 0) - (u[lowBase + kS] || 0)) * 0.5 * invDyRow
+        );
+        const signedVorticityS_1 = (lat >= 0 ? 1 : -1) * relativeVorticityS_1;
+        const boundaryQv = qv[idxS] || 0;
+        const midQv = qv[idxM] || 0;
+        const humiditySupport = clamp01(
+          0.62 * smoothstep(0.011, 0.019, boundaryQv)
+            + 0.38 * smoothstep(0.004, 0.010, midQv)
+        );
+        const shearSupport = 1 - smoothstep(9, 24, shearMs);
+        const vorticitySupport = smoothstep(1e-6, 9e-6, signedVorticityS_1);
+        const convectivePrecipSupport = smoothstep(0.015, 0.12, state.precipConvectiveRate?.[k] || 0);
+        const convectionSupport = Math.max(
+          convectiveOrganization[k] || 0,
+          smoothstep(5e-4, 0.02, convectiveMassFlux[k] || 0),
+          convectivePrecipSupport,
+          convectiveAnvilSource[k] || 0
+        );
+        const basinSeasonSupport = tropicalCycloneBasinSeasonSupport({
+          latDeg: lat,
+          lonDeg: lonDeg?.[i] ?? -180 + ((i + 0.5) * 360) / Math.max(1, nx),
+          dayOfYear
+        });
+        const tcGenesisPotential = computeTropicalCycloneGenesisPotential({
+          latDeg: lat,
+          isLand: landMask?.[k] === 1,
+          seaIceFrac: seaIceField?.[k] || 0,
+          sstK: sstField?.[k] || surfaceTempField?.[k] || T[idxS] || 0,
+          boundaryQv,
+          midQv,
+          shearMs,
+          signedVorticityS_1,
+          convectionSupport,
+          lowLevelConvergenceS_1: lowLevelMoistureConvergence[k] || 0,
+          seasonSupport: basinSeasonSupport,
+          scale: tropicalCycloneGenesisScale
+        });
+        tropicalCycloneGenesisPotentialDiag[k] = tcGenesisPotential;
+        tropicalCycloneShearSupportDiag[k] = shearSupport;
+        tropicalCycloneHumiditySupportDiag[k] = humiditySupport;
+        tropicalCycloneVorticitySupportDiag[k] = vorticitySupport;
+        tropicalCycloneBasinSeasonSupportDiag[k] = basinSeasonSupport;
+        tropicalCycloneEmbeddedVortexDiag[k] = clamp01(
+          tcGenesisPotential
+            * smoothstep(embeddedThreshold * 0.65, embeddedThreshold * 1.35, tcGenesisPotential)
+            * (0.55 + 0.45 * vorticitySupport)
+            * (0.65 + 0.35 * clamp01(convectionSupport))
+        );
+
+        const seasonSupport = (lat >= 0 ? 0.08 : 0.1) + (lat >= 0 ? 0.92 : 0.9) * seasonalWindowSupport(
+          dayOfYear,
+          lat >= 0 ? 145 : 330,
+          120
+        );
+        const instabilityK = state._instabScratch?.[k] || 0;
+        const instabilitySupport = smoothstep(2, 13, instabilityK);
+        const liftSupport = Math.max(
+          frontalAscentSupportDiag[k] || 0,
+          smoothstep(0.000001, 0.000008, lowLevelMoistureConvergence[k] || 0),
+          smoothstep(0.02, 0.15, -(lowLevelOmegaEffective[k] || 0))
+        );
+        const stormModeSupport = Math.max(
+          stormGenesisPotentialDiag[k] || 0,
+          stormWarmSectorDiag[k] || 0,
+          (frontalAscentSupportDiag[k] || 0) * (convectiveOrganization[k] || 0)
+        );
+        const tornadoRiskPotential = computeTornadoRiskPotential({
+          latDeg: lat,
+          isLand: landMask?.[k] === 1,
+          surfaceTempK: surfaceTempField?.[k] || T[idxS] || 0,
+          boundaryQv,
+          instabilityK,
+          shearMs,
+          liftSupport,
+          stormModeSupport,
+          seasonSupport,
+          scale: tornadoRiskScale
+        });
+        tornadoRiskPotentialDiag[k] = tornadoRiskPotential;
+        tornadoInstabilitySupportDiag[k] = instabilitySupport;
+        tornadoShearSupportDiag[k] = smoothstep(10, 28, shearMs);
+        tornadoLiftSupportDiag[k] = liftSupport;
+        tornadoStormModeSupportDiag[k] = stormModeSupport;
+      }
+    }
   }
 
   // R9-β4: Tropical ascent seed.  Gaussian ω injection in the deep tropics
