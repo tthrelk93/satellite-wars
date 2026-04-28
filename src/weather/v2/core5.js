@@ -529,32 +529,34 @@ export class WeatherCore5 {
     this._conservationBudget = createConservationBudgetAccumulator();
     this.windNudgeParams = {
       enable: true,
-      tauSurfaceSeconds: 8 * 3600,
+      tauSurfaceSeconds: 3 * 3600,
       tauUpperSeconds: 1 * 3600,
-      tauVSeconds: 2 * 3600,
+      tauVSeconds: 1 * 3600,
       upperWindCapFactor: 1.35,
       upperWindCapOffset: 0,
       upperWindCapMin: 0,
       upperWindCapJetBoost: 20,
       upperJetScale: 2.2,
       upperJetLatDeg: 35,
-      upperJetWidthDeg: 12
+      upperJetWidthDeg: 12,
+      surfaceTargetSpeedScale: 2.0
     };
     this.windEddyParams = {
       enable: true,
-      tauSeconds: 10 * 86400,
+      tauSeconds: 1 * 3600,
       scaleClampMin: 0.5,
-      scaleClampMax: 2.0,
-      eps: 1e-6
+      scaleClampMax: 5.0,
+      eps: 1e-6,
+      allowWithSpatialTargets: true
     };
     this._windNudgeMaxAbsCorrection = 0;
     this._windNudgeSpinupSeconds = 0;
     this.windNudgeSpinupParams = {
       enable: true,
       durationSeconds: 24 * 3600,
-      tauSurfaceStartSeconds: 6 * 3600,
+      tauSurfaceStartSeconds: 3 * 3600,
       tauUpperStartSeconds: 1 * 3600,
-      tauVStartSeconds: 2 * 3600
+      tauVStartSeconds: 1 * 3600
     };
     this.radParams = {
       enable: true,
@@ -1712,6 +1714,9 @@ export class WeatherCore5 {
   }
 
   _shouldSampleClimateProcessBudget() {
+    if (this.instrumentationMode === 'disabled' || this.state?.instrumentationEnabled === false) {
+      return false;
+    }
     if (!this._climateProcessBudget) {
       this.resetClimateProcessDiagnostics();
     }

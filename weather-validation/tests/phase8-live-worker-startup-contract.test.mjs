@@ -25,6 +25,42 @@ test('Phase 8 live weather worker startup does not fall back to main-thread trut
   );
 });
 
+test('Phase 8 live worker catch-up uses bounded chunks, in-flight accounting, and stall recovery', () => {
+  const earthPath = path.join(repoRoot, 'src', 'Earth.js');
+  const text = fs.readFileSync(earthPath, 'utf8');
+
+  assert.match(text, /const WEATHER_WORKER_MAX_STEP_SECONDS = 60 \* 60;/);
+  assert.match(text, /const WEATHER_WORKER_STALL_MS = 30000;/);
+  assert.match(text, /this\._weatherWorkerInFlightSeconds = 0;/);
+  assert.match(text, /this\._weatherWorkerInFlightStartMs = 0;/);
+  assert.match(text, /_recoverStalledWeatherWorker\(nowMs = performance\.now\(\)\)/);
+  assert.match(text, /this\._weatherWorkerInFlightSeconds = stepSeconds;/);
+  assert.match(text, /workerInFlightSeconds/);
+  assert.match(text, /effectiveVisibleLeadSeconds/);
+  assert.match(text, /instrumentationMode: 'disabled'/);
+  assert.match(text, /weatherWorkerSync: this\.getWeatherWorkerSyncStatus\(simTimeSeconds\)/);
+});
+
+test('Phase 8 live weather worker disables audit-only instrumentation', () => {
+  const workerPath = path.join(repoRoot, 'src', 'workers', 'weatherCore.worker.js');
+  const corePath = path.join(repoRoot, 'src', 'weather', 'v2', 'core5.js');
+  const workerText = fs.readFileSync(workerPath, 'utf8');
+  const coreText = fs.readFileSync(corePath, 'utf8');
+
+  assert.match(workerText, /instrumentationMode: payload\.instrumentationMode === 'disabled' \? 'disabled' : 'full'/);
+  assert.match(coreText, /this\.instrumentationMode === 'disabled' \|\| this\.state\?\.instrumentationEnabled === false/);
+});
+
+test('Phase 8 live app clock uses epsilon-safe fixed-step budgeting', () => {
+  const appPath = path.join(repoRoot, 'src', 'App.js');
+  const text = fs.readFileSync(appPath, 'utf8');
+
+  assert.match(text, /computeFixedStepBudget/);
+  assert.match(text, /const FIXED_SIM_STEP_EPSILON_SECONDS = 1e-4;/);
+  assert.match(text, /const stepBudget = computeFixedStepBudget\(/);
+  assert.match(text, /simAccumSeconds = stepBudget\.remainingSeconds;/);
+});
+
 test('Phase 8 live auto logging keeps broad climate diagnostics out of the render loop by default', () => {
   const loggerPath = path.join(repoRoot, 'src', 'weather', 'WeatherLogger.js');
   const text = fs.readFileSync(loggerPath, 'utf8');
@@ -46,6 +82,10 @@ test('Phase 8 live cloud paint uses cached noise and exports paint timing', () =
 
   assert.match(text, /this\._cloudNoiseLow = this\._buildCloudNoise/);
   assert.match(text, /this\._cloudNoiseHigh = this\._buildCloudNoise/);
+  assert.match(text, /_blendScalarLongitudeSeam/);
+  assert.match(text, /_blendTextureLongitudeSeam/);
+  assert.match(text, /_softenLayerCanvas/);
+  assert.match(text, /CLOUD_TEXTURE_SOFTEN_BLUR_PX/);
   assert.match(text, /const n = this\._sampleCloudNoise\(noiseField, advLon, advLat, grid\);/);
   assert.match(text, /getPerfStats\(\) \{/);
   assert.match(text, /paintCloudsMs/);
@@ -56,30 +96,62 @@ test('Phase 8 live weather textures use native model resolution and Earth phase 
   const earthPath = path.join(repoRoot, 'src', 'Earth.js');
   const text = fs.readFileSync(earthPath, 'utf8');
 
+  assert.match(text, /const LIVE_WEATHER_GRID_NX = 96;/);
+  assert.match(text, /const LIVE_WEATHER_GRID_NY = 48;/);
+  assert.match(text, /const LIVE_WEATHER_RENDER_SCALE = 3;/);
   assert.match(
     text,
-    /this\.weatherField = new WeatherField\(\{\s*renderScale: 1\.5,\s*tickSeconds: 0\.35,/s
+    /this\.weatherField = new WeatherField\(\{\s*nx: LIVE_WEATHER_GRID_NX,\s*ny: LIVE_WEATHER_GRID_NY,\s*renderScale: LIVE_WEATHER_RENDER_SCALE,\s*tickSeconds: 0\.35,/s
   );
   assert.match(
     text,
-    /this\.analysisWeatherField = new WeatherField\(\{\s*renderScale: 1\.5,\s*tickSeconds: 0\.35,/s
+    /this\.analysisWeatherField = new WeatherField\(\{\s*nx: LIVE_WEATHER_GRID_NX,\s*ny: LIVE_WEATHER_GRID_NY,\s*renderScale: LIVE_WEATHER_RENDER_SCALE,\s*tickSeconds: 0\.35,\s*seed: this\.weatherSeed,\s*autoLogEnabled: false/s
+  );
+  assert.match(
+    text,
+    /this\.forecastWeatherField = new WeatherField\(\{\s*nx: LIVE_WEATHER_GRID_NX,\s*ny: LIVE_WEATHER_GRID_NY,\s*renderScale: LIVE_WEATHER_RENDER_SCALE,\s*tickSeconds: 9999,\s*seed: this\.weatherSeed,\s*autoLogEnabled: false/s
   );
   assert.match(text, /phaseBreakdown = \{/);
   assert.match(text, /weatherFieldsMs/);
   assert.match(text, /windStreamlinesMs/);
 });
 
+test('Phase 8 live default view shows real weather without fog or debug overlays', () => {
+  const appPath = path.join(repoRoot, 'src', 'App.js');
+  const text = fs.readFileSync(appPath, 'utf8');
+
+  assert.match(text, /earth\.setWeatherVisible\(showWeatherLayerRef\.current\);/);
+  assert.match(text, /const \[showFogLayer, setShowFogLayer\] = useState\(false\);/);
+  assert.match(text, /const \[showWindStreamlines, setShowWindStreamlines\] = useState\(false\);/);
+  assert.match(text, /const \[showDebugPanel, setShowDebugPanel\] = useState\(false\);/);
+  assert.match(text, /setShowDebugPanel\(false\);/);
+});
+
 test('Phase 8 live wind overlay is bounded for browser smoothness', () => {
   const windPath = path.join(repoRoot, 'src', 'WindStreamlineRenderer.js');
   const text = fs.readFileSync(windPath, 'utf8');
 
-  assert.match(text, /const DEFAULT_WIDTH = 200;/);
-  assert.match(text, /const DEFAULT_HEIGHT = 100;/);
+  assert.match(text, /const DEFAULT_WIDTH = 160;/);
+  assert.match(text, /const DEFAULT_HEIGHT = 80;/);
   assert.match(text, /const PARTICLE_MULTIPLIER = 10;/);
-  assert.match(text, /const DEFAULT_STEP_SECONDS = 800;/);
+  assert.match(text, /const DEFAULT_STEP_SECONDS = 900;/);
   assert.match(text, /const RENDER_FRAME_INTERVAL_SECONDS = 0\.15;/);
   assert.match(text, /const MAX_RENDER_SUBSTEPS = 1;/);
   assert.match(text, /this\.fieldUpdateCadenceSeconds = 1800;/);
+  const earthPath = path.join(repoRoot, 'src', 'Earth.js');
+  const earthText = fs.readFileSync(earthPath, 'utf8');
+  assert.match(earthText, /this\.windStreamlineMaterial = new THREE\.MeshBasicMaterial\(\{\s*map: this\.windStreamlineRenderer\.texture,\s*transparent: true,\s*opacity: 0\.38,/s);
+  assert.match(earthText, /this\.windStreamlineDiagnosticsEnabled = true;/);
+  assert.match(earthText, /this\.windStreamlinesVisible \|\| this\.windStreamlineDiagnosticsEnabled/);
+});
+
+test('Phase 8 live wind model diagnostics are area-weighted on the lat-lon grid', () => {
+  const earthPath = path.join(repoRoot, 'src', 'Earth.js');
+  const text = fs.readFileSync(earthPath, 'utf8');
+
+  assert.match(text, /const computeWeightedPercentiles = \(samples, percentiles\) => \{/);
+  assert.match(text, /Number\.isFinite\(grid\.cosLat\?\.\[j\]\) \? grid\.cosLat\[j\]/);
+  assert.match(text, /meanSpeed: sumWeight > 0 \? sumSpeed \/ sumWeight : null/);
 });
 
 test('Phase 8 runtime summary separates smoothness warnings from visual wind target warnings', () => {

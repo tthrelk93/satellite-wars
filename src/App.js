@@ -11,7 +11,7 @@ import Player from './Player';
 import { UPKEEP_PER_SAT, INCOME_PER_COMM_IN_LINK, INCOME_PER_IMAGING_IN_LINK, BASE_INCOME_PER_TURN, MU_EARTH, RE_M, OMEGA_EARTH, LOSSES_MPS, DV_REF_MPS, DV_EXPONENT, COMM_RANGE_KM, SPACE_LOS_EPS, GROUND_LOS_EPS, CLOUD_WATCH_GRID_LON_OFFSET_RAD } from './constants';
 import SimClock from './SimClock';
 import { solarDeclination } from './weather/solar';
-import { clampSimAdvanceByTruthBudget } from './weather/simAdvanceBudget';
+import { clampSimAdvanceByTruthBudget, computeFixedStepBudget } from './weather/simAdvanceBudget';
 import { loadNullschoolWind } from './weather/reference/loadNullschoolWind';
 import { showMinimapOverlayForGameMode } from './gameModeUi';
 
@@ -122,6 +122,7 @@ const WEATHER_DEBUG_SCALE = {
 const SIM_SPEED_DEFAULT = 600;
 const SIM_SPEED_MAX = 14400;
 const FIXED_SIM_STEP_SECONDS = 120;
+const FIXED_SIM_STEP_EPSILON_SECONDS = 1e-4;
 const MAX_SIM_SUBSTEPS = 4;
 const MAX_SIM_SUBSTEPS_BURST = 20;
 const TRUTH_WORKER_DESYNC_BUDGET_SECONDS = 12 * 3600;
@@ -318,9 +319,9 @@ const App = () => {
     const [showSatListPanel, setShowSatListPanel] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
     const [showForecastPanel, setShowForecastPanel] = useState(true);
-    const [showFogLayer, setShowFogLayer] = useState(true);
+    const [showFogLayer, setShowFogLayer] = useState(false);
     const [showWeatherLayer, setShowWeatherLayer] = useState(true);
-    const [showWindStreamlines, setShowWindStreamlines] = useState(true);
+    const [showWindStreamlines, setShowWindStreamlines] = useState(false);
     const [windStreamlineSource, setWindStreamlineSource] = useState('analysis');
     const [windRefStatus, setWindRefStatus] = useState({ loading: false, loaded: false, error: null });
     const [weatherViewSource, setWeatherViewSource] = useState('truth');
@@ -356,13 +357,13 @@ const App = () => {
 	const [showAlertsPanel, setShowAlertsPanel] = useState(false);
 	const [showObservingNetwork, setShowObservingNetwork] = useState(false);
     const [showForecastReport, setShowForecastReport] = useState(false);
-	const [showDebugPanel, setShowDebugPanel] = useState(true);
+	const [showDebugPanel, setShowDebugPanel] = useState(false);
     const [cloudWatchDebugEnabled, setCloudWatchDebugEnabled] = useState(false);
     const [cloudWatchDebugInfo, setCloudWatchDebugInfo] = useState([]);
     const [windTargetsStatus, setWindTargetsStatus] = useState(null);
     const [windReferenceDiagnostics, setWindReferenceDiagnostics] = useState(null);
     const [windReferenceComparison, setWindReferenceComparison] = useState(null);
-    const showFogLayerRef = useRef(true);
+    const showFogLayerRef = useRef(false);
     const showWeatherLayerRef = useRef(true);
     const [weatherDebugMode, setWeatherDebugMode] = useState('clouds');
     const weatherDebugModeRef = useRef('clouds');
@@ -584,7 +585,7 @@ const App = () => {
         setShowMenu(false);
         setShowSatPanel(false);
         setShowSatListPanel(false);
-        setShowDebugPanel(true);
+        setShowDebugPanel(false);
         setShowStrikePad(false);
         setWarningDrawMode(false);
         setWarningDraft({
@@ -751,7 +752,7 @@ const App = () => {
         earth.setCloudWatchDebugEnabled?.(cloudWatchDebug);
         cloudWatchDebugRef.current = cloudWatchDebug;
         setCloudWatchDebugEnabled(cloudWatchDebug);
-        earth.setWeatherVisible(false);
+        earth.setWeatherVisible(showWeatherLayerRef.current);
         earth.setCloudObsVisible(false);
         if (process.env.NODE_ENV !== 'production') {
             window.__sw = window.__sw || {};
@@ -954,7 +955,7 @@ const App = () => {
             };
         }
         earth.setWeatherDebugMode(weatherDebugModeRef.current);
-        earth.setWeatherVisible(false);
+        earth.setWeatherVisible(showWeatherLayerRef.current);
         earth.setFogVisible(sensorOnlyWeather ? false : showFogLayerRef.current);
         earth.setCloudObsVisible(false);
 
@@ -2714,7 +2715,7 @@ const App = () => {
             earth.setWeatherVisible(false);
             earth.setFogVisible(false);
         } else {
-            earth.setWeatherVisible(false);
+            earth.setWeatherVisible(showWeatherLayerRef.current);
             earth.setFogVisible(showFogLayerRef.current);
         }
         earth.setCloudObsVisible(showCloudIntel);
@@ -5893,24 +5894,27 @@ const App = () => {
                 simBurstActiveRef.current = true;
             }
 
-            const stepsAvailable = Math.floor(simAccumSeconds / FIXED_SIM_STEP_SECONDS);
             const useBurst = simBurstActiveRef.current && simAccumSeconds >= FIXED_SIM_STEP_SECONDS;
             const maxSteps = useBurst ? MAX_SIM_SUBSTEPS_BURST : MAX_SIM_SUBSTEPS;
-            const stepsToRun = Math.min(stepsAvailable, maxSteps);
-            const stepsSkipped = Math.max(0, stepsAvailable - stepsToRun);
+            const stepBudget = computeFixedStepBudget(
+                simAccumSeconds,
+                FIXED_SIM_STEP_SECONDS,
+                maxSteps,
+                FIXED_SIM_STEP_EPSILON_SECONDS
+            );
+            const { stepsToRun, stepsSkipped, deltaSimSeconds } = stepBudget;
+            simAccumSeconds = stepBudget.remainingSeconds;
             simAccumSecondsRef.current = simAccumSeconds;
             if (simAccumSeconds < FIXED_SIM_STEP_SECONDS * 0.5) {
                 simBurstActiveRef.current = false;
             }
             let simLagSeconds = simAccumSeconds;
 
-            const deltaSimSeconds = stepsToRun * FIXED_SIM_STEP_SECONDS;
             let detectedSpheres = [];
             let lastSensorGating = null;
             let lastSimTimeSeconds = simClock.simTimeSeconds;
 
             if (deltaSimSeconds > 0) {
-                simAccumSeconds -= deltaSimSeconds;
                 simAccumSecondsRef.current = simAccumSeconds;
                 simLagSeconds = simAccumSeconds;
                 simClock.stepSeconds(deltaSimSeconds);

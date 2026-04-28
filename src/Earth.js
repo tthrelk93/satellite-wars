@@ -26,6 +26,11 @@ import earthmap from './8081_earthmap10k.jpg';
 import earthbump from './8081_earthbump10k.jpg';
 import fogTexture from './fog.png'; // Add your fog texture map here
 
+const WEATHER_WORKER_MAX_STEP_SECONDS = 60 * 60;
+const WEATHER_WORKER_STALL_MS = 30000;
+const LIVE_WEATHER_GRID_NX = 96;
+const LIVE_WEATHER_GRID_NY = 48;
+const LIVE_WEATHER_RENDER_SCALE = 3;
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const smoothstep = (edge0, edge1, x) => {
   const t = clamp01((x - edge0) / Math.max(1e-6, edge1 - edge0));
@@ -113,6 +118,30 @@ const computePercentiles = (values, percentiles) => {
   return out;
 };
 
+const computeWeightedPercentiles = (samples, percentiles) => {
+  if (!samples || samples.length === 0) return {};
+  const valid = samples
+    .filter((sample) => Number.isFinite(sample?.value) && Number.isFinite(sample?.weight) && sample.weight > 0)
+    .sort((a, b) => a.value - b.value);
+  if (!valid.length) return {};
+  const totalWeight = valid.reduce((sum, sample) => sum + sample.weight, 0);
+  const out = {};
+  percentiles.forEach((p) => {
+    const targetWeight = Math.max(0, Math.min(1, p)) * totalWeight;
+    let accum = 0;
+    let selected = valid[valid.length - 1].value;
+    for (const sample of valid) {
+      accum += sample.weight;
+      if (accum >= targetWeight) {
+        selected = sample.value;
+        break;
+      }
+    }
+    out[`p${Math.round(p * 100)}`] = selected;
+  });
+  return out;
+};
+
 const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 }) => {
   if (!grid || !u || !v) return null;
   const nx = grid.nx;
@@ -126,17 +155,19 @@ const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 })
   const vortSamples = [];
   const bandSamples = { tropics: [], mid: [], polar: [] };
   const bandSums = { tropics: 0, mid: 0, polar: 0 };
+  const bandWeights = { tropics: 0, mid: 0, polar: 0 };
   const bandCounts = { tropics: 0, mid: 0, polar: 0 };
   const bandEkeSums = { tropics: 0, mid: 0, polar: 0 };
-  const bandEkeCounts = { tropics: 0, mid: 0, polar: 0 };
+  const bandEkeWeights = { tropics: 0, mid: 0, polar: 0 };
   let sumSpeed = 0;
+  let sumWeight = 0;
   let maxSpeed = 0;
   let sampleCount = 0;
   let roughUSum = 0;
   let roughVSum = 0;
   let roughCount = 0;
   let sumEke = 0;
-  let ekeCount = 0;
+  let ekeWeight = 0;
 
   const kmPerDegLat = grid.kmPerDegLat ?? 111.0;
   const cellLonDeg = grid.cellLonDeg ?? (360 / nx);
@@ -187,20 +218,26 @@ const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 })
     const v0 = v[k];
     if (!Number.isFinite(u0) || !Number.isFinite(v0)) continue;
     const speed = Math.hypot(u0, v0);
-    speedSamples.push(speed);
-    sumSpeed += speed;
     if (speed > maxSpeed) maxSpeed = speed;
     const j = Math.floor(k / nx);
     const i = k - j * nx;
     const latDeg = Number.isFinite(latDegArr?.[j])
       ? latDegArr[j]
       : 90 - ((j + 0.5) / ny) * 180;
+    const weight = Math.max(
+      1e-6,
+      Number.isFinite(grid.cosLat?.[j]) ? grid.cosLat[j] : Math.cos(latDeg * Math.PI / 180)
+    );
     const latAbs = Math.abs(latDeg);
     let band = 'polar';
     if (latAbs < 20) band = 'tropics';
     else if (latAbs <= 60) band = 'mid';
-    bandSamples[band].push(speed);
-    bandSums[band] += speed;
+    speedSamples.push({ value: speed, weight });
+    bandSamples[band].push({ value: speed, weight });
+    sumSpeed += speed * weight;
+    sumWeight += weight;
+    bandSums[band] += speed * weight;
+    bandWeights[band] += weight;
     bandCounts[band] += 1;
 
     const uBar = rowMeanU[j];
@@ -208,16 +245,16 @@ const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 })
     const du = u0 - uBar;
     const dv = v0 - vBar;
     const eke = du * du + dv * dv;
-    sumEke += eke;
-    ekeCount += 1;
-    bandEkeSums[band] += eke;
-    bandEkeCounts[band] += 1;
+    sumEke += eke * weight;
+    ekeWeight += weight;
+    bandEkeSums[band] += eke * weight;
+    bandEkeWeights[band] += weight;
 
     if (hasDiv) {
-      divSamples.push(Math.abs(div[k]));
+      divSamples.push({ value: Math.abs(div[k]), weight });
     }
     if (hasVort) {
-      vortSamples.push(Math.abs(vort[k]));
+      vortSamples.push({ value: Math.abs(vort[k]), weight });
     }
     if (!hasDiv || !hasVort) {
       const iE = (i + 1) % nx;
@@ -233,8 +270,8 @@ const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 })
       const dvDy = (v[rowS + i] - v[rowN + i]) * 0.5 * invDy;
       const dvDx = (v[row + iE] - v[row + iW]) * 0.5 * invDx;
       const duDy = (u[rowS + i] - u[rowN + i]) * 0.5 * invDy;
-      if (!hasDiv) divSamples.push(Math.abs(duDx + dvDy));
-      if (!hasVort) vortSamples.push(Math.abs(dvDx - duDy));
+      if (!hasDiv) divSamples.push({ value: Math.abs(duDx + dvDy), weight });
+      if (!hasVort) vortSamples.push({ value: Math.abs(dvDx - duDy), weight });
     }
 
     let sumU = 0;
@@ -264,19 +301,20 @@ const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 })
   }
 
   if (!sampleCount) return null;
-  const speedPct = computePercentiles(speedSamples, [0.5, 0.9, 0.99]);
-  const divPct = computePercentiles(divSamples, [0.9, 0.99]);
-  const vortPct = computePercentiles(vortSamples, [0.9, 0.99]);
+  const speedPct = computeWeightedPercentiles(speedSamples, [0.5, 0.9, 0.99]);
+  const divPct = computeWeightedPercentiles(divSamples, [0.9, 0.99]);
+  const vortPct = computeWeightedPercentiles(vortSamples, [0.9, 0.99]);
   const latBands = {};
   ['tropics', 'mid', 'polar'].forEach((band) => {
     const count = bandCounts[band];
-    if (count > 0) {
-      const pct = computePercentiles(bandSamples[band], [0.9, 0.99]);
+    const weight = bandWeights[band];
+    if (count > 0 && weight > 0) {
+      const pct = computeWeightedPercentiles(bandSamples[band], [0.9, 0.99]);
       latBands[band] = {
-        meanSpeed: bandSums[band] / count,
+        meanSpeed: bandSums[band] / weight,
         p90: pct.p90 ?? null,
         p99: pct.p99 ?? null,
-        ekeMean: bandEkeCounts[band] > 0 ? bandEkeSums[band] / bandEkeCounts[band] : null,
+        ekeMean: bandEkeWeights[band] > 0 ? bandEkeSums[band] / bandEkeWeights[band] : null,
         sampleCount: count
       };
     } else {
@@ -293,14 +331,14 @@ const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 })
   const roughness = roughCount > 0
     ? (roughUSum / roughCount) + (roughVSum / roughCount)
     : null;
-  const ekeMean = ekeCount > 0 ? sumEke / ekeCount : null;
+  const ekeMean = ekeWeight > 0 ? sumEke / ekeWeight : null;
 
   return {
     nx,
     ny,
     sampleStride,
     sampleCount,
-    meanSpeed: sumSpeed / sampleCount,
+    meanSpeed: sumWeight > 0 ? sumSpeed / sumWeight : null,
     maxSpeed,
     speedPercentiles: speedPct,
     divAbsPercentiles: divPct,
@@ -428,12 +466,15 @@ class Earth {
     this._weatherWorkerReady = false;
     this._weatherWorkerBusy = false;
     this._weatherWorkerAccumSeconds = 0;
+    this._weatherWorkerInFlightSeconds = 0;
+    this._weatherWorkerInFlightStartMs = 0;
     this._weatherWorkerLastSimTimeSeconds = null;
     this._weatherWorkerLatestState = null;
     this._weatherWorkerPendingEnable = false;
     this._weatherWorkerLastRequestRealMs = 0;
     this._weatherWorkerMinIntervalMs = 80;
-    this._weatherWorkerMaxStepSeconds = 6 * 3600;
+    this._weatherWorkerMaxStepSeconds = WEATHER_WORKER_MAX_STEP_SECONDS;
+    this._weatherWorkerStallMs = WEATHER_WORKER_STALL_MS;
     this._weatherWorkerSnapshotMode = 'compact';
     this.latestForecastByPlayerId = new Map();
     this.forecastHistoryByPlayerId = new Map();
@@ -541,13 +582,14 @@ class Earth {
     this.windStreamlineMaterial = new THREE.MeshBasicMaterial({
       map: this.windStreamlineRenderer.texture,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.38,
       depthWrite: false
     });
     this.windStreamlineMesh = new THREE.Mesh(this.windStreamlineGeometry, this.windStreamlineMaterial);
     this.windStreamlineMesh.visible = this.windStreamlinesVisible;
     this.windStreamlineMesh.rotation.y = WIND_STREAMLINE_LON_OFFSET_RAD;
     this.parentObject.add(this.windStreamlineMesh);
+    this.windStreamlineDiagnosticsEnabled = true;
     this._lastWindModelDiagSimTimeSeconds = null;
     this._lastWindVizDiagSimTimeSeconds = null;
     this._lastWindReferenceDiagSimTimeSeconds = null;
@@ -632,19 +674,27 @@ class Earth {
     }
     this.weatherVolumeGpu = null;
     this.weatherField = new WeatherField({
-      renderScale: 1.5,
+      nx: LIVE_WEATHER_GRID_NX,
+      ny: LIVE_WEATHER_GRID_NY,
+      renderScale: LIVE_WEATHER_RENDER_SCALE,
       tickSeconds: 0.35,
       seed: this.weatherSeed
     });
     this.analysisWeatherField = new WeatherField({
-      renderScale: 1.5,
+      nx: LIVE_WEATHER_GRID_NX,
+      ny: LIVE_WEATHER_GRID_NY,
+      renderScale: LIVE_WEATHER_RENDER_SCALE,
       tickSeconds: 0.35,
-      seed: this.weatherSeed
+      seed: this.weatherSeed,
+      autoLogEnabled: false
     });
     this.forecastWeatherField = new WeatherField({
-      renderScale: 1,
+      nx: LIVE_WEATHER_GRID_NX,
+      ny: LIVE_WEATHER_GRID_NY,
+      renderScale: LIVE_WEATHER_RENDER_SCALE,
       tickSeconds: 9999,
-      seed: this.weatherSeed
+      seed: this.weatherSeed,
+      autoLogEnabled: false
     });
     this._analysisSyncedFromTruth = false;
     this._analysisNoiseSeed = (this.weatherSeed ?? 0) + 1337;
@@ -717,6 +767,8 @@ class Earth {
           this.weatherField?.setUseExternalCore?.(true);
         } else if (data.type === 'state') {
           this._weatherWorkerBusy = false;
+          this._weatherWorkerInFlightSeconds = 0;
+          this._weatherWorkerInFlightStartMs = 0;
           if (data.payload) {
             this._applyWeatherWorkerState(data.payload);
           }
@@ -727,12 +779,16 @@ class Earth {
         } else if (data.type === 'error') {
           console.warn('[Earth] Weather worker error', data.payload);
           this._weatherWorkerBusy = false;
+          this._weatherWorkerInFlightSeconds = 0;
+          this._weatherWorkerInFlightStartMs = 0;
         }
       };
     }
     this._weatherWorkerReady = false;
     this._weatherWorkerBusy = false;
     this._weatherWorkerAccumSeconds = 0;
+    this._weatherWorkerInFlightSeconds = 0;
+    this._weatherWorkerInFlightStartMs = 0;
     this._weatherWorkerLastSimTimeSeconds = null;
     this._weatherWorkerLatestState = null;
     this._weatherWorkerPendingEnable = false;
@@ -746,6 +802,7 @@ class Earth {
         dt: core.modelDt,
         seed: this.weatherSeed,
         startTimeSeconds: core.timeUTC,
+        instrumentationMode: 'disabled',
         snapshotMode: this._weatherWorkerSnapshotMode
       }
     });
@@ -759,6 +816,8 @@ class Earth {
     this._weatherWorkerReady = false;
     this._weatherWorkerBusy = false;
     this._weatherWorkerAccumSeconds = 0;
+    this._weatherWorkerInFlightSeconds = 0;
+    this._weatherWorkerInFlightStartMs = 0;
     this._weatherWorkerLastSimTimeSeconds = null;
     this._weatherWorkerLatestState = null;
     this._weatherWorkerPendingEnable = false;
@@ -798,11 +857,46 @@ class Earth {
     core.ready = true;
   }
 
+  _recoverStalledWeatherWorker(nowMs = performance.now()) {
+    if (!this._weatherWorkerBusy) return false;
+    if (!(this._weatherWorkerInFlightSeconds > 0)) return false;
+    const startedAt = Number.isFinite(this._weatherWorkerInFlightStartMs)
+      ? this._weatherWorkerInFlightStartMs
+      : 0;
+    if (!(startedAt > 0) || nowMs - startedAt < this._weatherWorkerStallMs) return false;
+
+    this.logWeatherEvent?.(
+      'weatherWorkerRestart',
+      {
+        reason: 'stalledStep',
+        inFlightSeconds: this._weatherWorkerInFlightSeconds,
+        busyMs: nowMs - startedAt,
+        maxStepSeconds: this._weatherWorkerMaxStepSeconds,
+        workerAccumSeconds: this._weatherWorkerAccumSeconds
+      },
+      { simTimeSeconds: this._lastSimTimeSeconds }
+    );
+    if (this._weatherWorker) {
+      this._weatherWorker.terminate?.();
+      this._weatherWorker = null;
+    }
+    this._weatherWorkerReady = false;
+    this._weatherWorkerBusy = false;
+    this._weatherWorkerInFlightSeconds = 0;
+    this._weatherWorkerInFlightStartMs = 0;
+    this._weatherWorkerLastRequestRealMs = 0;
+    this._initWeatherWorker();
+    return true;
+  }
+
   _maybeStepWeatherWorker(simSpeed) {
     if (!this._weatherWorker || !this._weatherWorkerReady) return;
-    if (this._weatherWorkerBusy) return;
-    if (!(this._weatherWorkerAccumSeconds > 0)) return;
     const nowMs = performance.now();
+    if (this._weatherWorkerBusy) {
+      this._recoverStalledWeatherWorker(nowMs);
+      return;
+    }
+    if (!(this._weatherWorkerAccumSeconds > 0)) return;
     if (nowMs - this._weatherWorkerLastRequestRealMs < this._weatherWorkerMinIntervalMs) return;
     const { stepSeconds, remainingSeconds } = takeBoundedAccumulatedStep(
       this._weatherWorkerAccumSeconds,
@@ -811,6 +905,8 @@ class Earth {
     if (!(stepSeconds > 0)) return;
     this._weatherWorkerAccumSeconds = remainingSeconds;
     this._weatherWorkerBusy = true;
+    this._weatherWorkerInFlightSeconds = stepSeconds;
+    this._weatherWorkerInFlightStartMs = nowMs;
     this._weatherWorkerLastRequestRealMs = nowMs;
     this._weatherWorker.postMessage({
       type: 'step',
@@ -837,7 +933,20 @@ class Earth {
     const trackedSimLeadSeconds = Number.isFinite(workerLastSimTimeSeconds) && Number.isFinite(truthCoreTimeSeconds)
       ? Math.max(0, workerLastSimTimeSeconds - truthCoreTimeSeconds)
       : null;
-    const leadSeconds = [visibleSimLeadSeconds, trackedSimLeadSeconds, workerAccumSeconds]
+    const workerInFlightSeconds = Number.isFinite(this._weatherWorkerInFlightSeconds)
+      ? Math.max(0, this._weatherWorkerInFlightSeconds)
+      : 0;
+    const effectiveVisibleLeadSeconds = Number.isFinite(visibleSimLeadSeconds)
+      ? Math.max(0, visibleSimLeadSeconds - workerInFlightSeconds)
+      : null;
+    const effectiveTrackedLeadSeconds = Number.isFinite(trackedSimLeadSeconds)
+      ? Math.max(0, trackedSimLeadSeconds - workerInFlightSeconds)
+      : null;
+    const leadSeconds = [
+      effectiveVisibleLeadSeconds,
+      effectiveTrackedLeadSeconds,
+      workerAccumSeconds
+    ]
       .filter(Number.isFinite)
       .reduce((maxLead, value) => Math.max(maxLead, value), 0);
 
@@ -846,9 +955,12 @@ class Earth {
       busy: this._weatherWorkerBusy,
       truthCoreTimeSeconds: Number.isFinite(truthCoreTimeSeconds) ? truthCoreTimeSeconds : null,
       workerAccumSeconds,
+      workerInFlightSeconds,
       workerLastSimTimeSeconds,
       visibleSimLeadSeconds,
       trackedSimLeadSeconds,
+      effectiveVisibleLeadSeconds,
+      effectiveTrackedLeadSeconds,
       leadSeconds,
       maxStepSeconds: this._weatherWorkerMaxStepSeconds
     };
@@ -1667,7 +1779,8 @@ class Earth {
       modelDue,
       referenceDue,
       vizDue,
-      windStreamlinesVisible: this.windStreamlinesVisible
+      windStreamlinesVisible: this.windStreamlinesVisible,
+      windStreamlineDiagnosticsEnabled: this.windStreamlineDiagnosticsEnabled
     });
     let updated = false;
     let measured = false;
@@ -1685,7 +1798,7 @@ class Earth {
         updated = true;
       }
     }
-    if (vizDue && this.windStreamlinesVisible) {
+    if (vizDue && (this.windStreamlinesVisible || this.windStreamlineDiagnosticsEnabled)) {
       measured = true;
       if (measureWindDiagnosticsPhase(perfPayload, 'viz', () => this._logWindVizDiagnostics(simTimeSeconds))) {
         this._lastWindVizDiagSimTimeSeconds = simTimeSeconds;
@@ -3498,7 +3611,7 @@ class Earth {
     phaseStartMs = performance.now();
     this._tickCloudIntel(simTimeSeconds);
     phaseBreakdown.cloudIntelMs += performance.now() - phaseStartMs;
-    if (this.windStreamlinesVisible) {
+    if (this.windStreamlinesVisible || this.windStreamlineDiagnosticsEnabled) {
       phaseStartMs = performance.now();
       if (this.windStreamlineRenderer?.setParticleDensityScale) {
         this.windStreamlineRenderer.setParticleDensityScale(lodActive ? 0.6 : 1);
@@ -3522,6 +3635,7 @@ class Earth {
       simStepsThisFrame: simContext?.simStepsThisFrame ?? null,
       simStepsSkipped: simContext?.simStepsSkipped ?? null,
       simLagSeconds: simContext?.simLagSeconds ?? null,
+      weatherWorkerSync: this.getWeatherWorkerSyncStatus(simTimeSeconds),
       phaseBreakdown
     };
     if (perfEndMs - this._lastPerfLogRealMs > 1000) {

@@ -1,16 +1,16 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-28T01:52:30.948Z",
+  "updatedAt": "2026-04-28T07:43:36Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
-  "baselineCommit": "ad3683b",
+  "baselineCommit": "927cbc3",
   "latestCycle": {
-    "id": "cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion",
-    "goal": "make the live game weather model smooth, browser-verified, and trusted",
-    "verifiedImprovement": "Phase 8 live browser/runtime signoff passes with smooth Earth.update telemetry, active model-state cloud/wind layers, clean current-run browser console, benchmark and validation gates passing, and a fresh quick planetary regression pass.",
-    "checkpointPath": "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/checkpoint.md",
-    "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/evidence-summary.json"
+    "id": "cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix",
+    "goal": "remove the live globe seam, fix the Day 5 sim-clock stall, and clear the near-surface model-wind diagnostic without relaxing warning thresholds",
+    "verifiedImprovement": "The live app now advances past the reported Day 5 22:14 freeze point to Day 6, the hard half-globe visual seam is gone in the default view, runtime/visual/model-wind telemetry all pass, and the quick planetary repro audit passes with dt/grid gates enabled.",
+    "checkpointPath": "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/checkpoint.md",
+    "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/evidence-summary.json"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.json",
@@ -20,22 +20,22 @@
     "latestFullAnnualPath": "weather-validation/output/cycle-2026-04-27T02-12-02Z-phase7-tropical-cyclones-severe-weather-recovery/phase7-final-annual-r2.json",
     "latestFullAnnualOverallPass": true,
     "latestFullAnnualPreset": "annual",
-    "currentCycleQuickPath": "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/phase8-quick-audit.json",
+    "currentCycleQuickPath": "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/quick-live-fix-repro.json",
     "currentCycleQuickOverallPass": true,
     "currentCycleQuickPreset": "quick",
     "currentCycleQuickGrid": "48x24",
     "currentCycleQuickDtSeconds": 1800,
-    "currentCycleQuickGeneratedAt": "2026-04-28T01:43:05.685Z"
+    "currentCycleQuickGeneratedAt": "2026-04-28T07:42:40.956Z",
+    "currentCycleDtGridReproPass": true
   },
   "liveSignoff": {
     "url": "http://127.0.0.1:3000/?mode=solo",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/runtime-summary-final-live.json",
-    "hotspotProfilePath": "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/hotspot-profile.json",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/runtime-summary-live-day6.json",
+    "hotspotProfilePath": "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/hotspot-profile-live-day6.json",
     "screenshots": [
-      "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/live-watch-t0.png",
-      "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/live-watch-t60.png",
-      "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/live-watch-t120.png",
-      "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/live-watch-t180.png"
+      "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/live-reload.png",
+      "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/live-90s.png",
+      "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/live-day6-proof.png"
     ],
     "runtimeHealth": {
       "likelySmoothEnough": true,
@@ -46,33 +46,36 @@
       "warnings": []
     },
     "modelWindHealth": {
-      "likelyHealthy": false,
-      "warnings": [
-        "wind_model_targets_failing"
-      ],
-      "failingReasons": [
-        "model_mean_low",
-        "model_p90_low",
-        "model_p99_low"
-      ]
+      "likelyHealthy": true,
+      "warnings": [],
+      "failingReasons": []
     },
     "earthUpdateMs": {
-      "p50": 0.10000000055879354,
-      "p95": 8.100000000372528,
-      "max": 11.799999999813735
+      "p50": 0.10000000149011612,
+      "p95": 10.900000002235174,
+      "max": 19.800000000745058
     },
     "stepsSkippedTotal": 0,
-    "browserConsoleWarningsAfterRestart": []
+    "clockProof": {
+      "reportedFreeze": "Day 5, 22:14",
+      "observedSameRunPastFreeze": "Day 6, 06:30"
+    },
+    "windTargets": {
+      "modelMeanMs": 5.860502448950641,
+      "modelP90Ms": 9.747997843121928,
+      "modelP99Ms": 16.20498183619808,
+      "modelMaxMs": 19.860771732822176,
+      "thresholdsUnrelaxed": true
+    }
   },
   "blockingGaps": [
-    "A fresh annual audit at the final post-Phase-8 commit hash has not been run; the full annual evidence is still the Phase 7 annual baseline plus this Phase 8 quick regression.",
-    "Live near-surface model-wind targets remain low: model_mean_low, model_p90_low, model_p99_low.",
+    "A fresh annual audit at the final post-live-fix commit hash has not been run; the full annual evidence is still the Phase 7 annual baseline plus current-cycle quick dt/grid repro.",
     "The annual root-cause sidecars still rank imported cloud persistence/helper forcing as the dominant residual climate family, even though annual planetary gates pass.",
     "South America tornado seasonality is diagnostic-only in Phase 7 and remains cool-season biased; the hard tornado warm-season gate is North America and passes."
   ],
   "defaultNextPriorities": [
     "Run a current-hash annual repro audit before any final world-class claim.",
-    "If annual remains clean, address the residual near-surface model-wind target or imported cloud-persistence family only if they still block the claim.",
+    "If annual remains clean, update the verdict to world-class with annual, quick, benchmark, validation, and live Day 6 evidence all linked.",
     "Keep browser live signoff in the loop whenever runtime/render/weather visualization changes."
   ]
 }

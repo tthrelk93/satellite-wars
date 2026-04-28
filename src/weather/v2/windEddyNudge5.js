@@ -24,7 +24,12 @@ const sampleTargetEke = (latDeg) => {
 
 export function stepWindEddyNudge5({ dt, grid, state, climo, params = {} }) {
   if (!grid || !state || !Number.isFinite(dt) || dt <= 0) return { didApply: false };
-  if (climo?.hasWind && (climo?.hasWind500 || climo?.hasWind250) && params.allowFallbackOnly !== true) {
+  if (
+    climo?.hasWind
+    && (climo?.hasWind500 || climo?.hasWind250)
+    && params.allowFallbackOnly !== true
+    && params.allowWithSpatialTargets !== true
+  ) {
     return { didApply: false, source: 'spatial-climatology-disabled-fallback' };
   }
   if (SOURCE_FIXTURE_COUNT !== 8 || !EKE10M_BY_LAT_TARGET?.length) {

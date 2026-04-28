@@ -7,6 +7,7 @@ import { WeatherLogSink } from './weather/logSink';
 const AUTO_LOG_CADENCE_SECONDS = 6 * 3600;
 const AUTO_LOG_MAX_ENTRIES = 20000;
 const AUTO_LOG_INIT_RETRY_MS = 5000;
+const CLOUD_TEXTURE_SOFTEN_BLUR_PX = 2.0;
 
 const nowMs = () => (
     typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -30,7 +31,8 @@ class WeatherField {
         tickSeconds = 0.5,
         modelDt = 120,
         seed,
-        debugMode = 'clouds'
+        debugMode = 'clouds',
+        autoLogEnabled = true
     } = {}) {
         this.core = new WeatherCore5({ nx, ny, dt: modelDt, seed });
         this.renderScale = renderScale;
@@ -54,8 +56,8 @@ class WeatherField {
         this._autoLogInitInFlight = false;
         this._nextAutoLogInitAtMs = 0;
 
-        const autoLogEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_AUTO_LOG === '1';
-        if (autoLogEnabled && typeof fetch !== 'undefined') {
+        const shouldAutoLog = autoLogEnabled && (process.env.NODE_ENV !== 'production' || process.env.REACT_APP_AUTO_LOG === '1');
+        if (shouldAutoLog && typeof fetch !== 'undefined') {
             this._logSink = new WeatherLogSink({ baseUrl: '/__weatherlog', flushIntervalMs: 300 });
             this._maybeInitAutoLogging(true);
         }
@@ -119,6 +121,10 @@ class WeatherField {
         this.textureDebug.magFilter = THREE.LinearFilter;
         this.textureDebug.minFilter = THREE.LinearFilter;
         this.textureDebug.needsUpdate = true;
+        this._softenCanvas = document.createElement('canvas');
+        this._softenCanvas.width = texW;
+        this._softenCanvas.height = texH;
+        this._softenCtx = this._softenCanvas.getContext('2d');
     }
 
     _buildCloudNoise(width, height, seed) {
@@ -138,7 +144,77 @@ class WeatherField {
                 out[y * width + x] = Math.max(0, Math.min(255, Math.round(255 * (value / Math.max(1e-6, norm)))));
             }
         }
+        this._blendScalarLongitudeSeam(out, width, height);
         return out;
+    }
+
+    _blendScalarLongitudeSeam(data, width, height, seamColumns = 8) {
+        if (!data || width < 2 || height < 1) return;
+        const cols = Math.max(1, Math.min(Math.floor(width / 2), Math.floor(seamColumns)));
+        const left = new Array(cols);
+        const right = new Array(cols);
+        for (let y = 0; y < height; y++) {
+            const row = y * width;
+            for (let d = 0; d < cols; d++) {
+                left[d] = data[row + d];
+                right[d] = data[row + width - 1 - d];
+            }
+            for (let d = 0; d < cols; d++) {
+                const blend = 1 - d / cols;
+                const average = 0.5 * (left[d] + right[d]);
+                data[row + d] = Math.round(left[d] * (1 - blend) + average * blend);
+                data[row + width - 1 - d] = Math.round(right[d] * (1 - blend) + average * blend);
+            }
+        }
+    }
+
+    _blendTextureLongitudeSeam(data, width, height, seamColumns = 8) {
+        if (!data || width < 2 || height < 1) return;
+        const cols = Math.max(1, Math.min(Math.floor(width / 2), Math.floor(seamColumns)));
+        const left = new Array(cols * 4);
+        const right = new Array(cols * 4);
+        for (let y = 0; y < height; y++) {
+            const row = y * width * 4;
+            for (let d = 0; d < cols; d++) {
+                const leftIdx = row + d * 4;
+                const rightIdx = row + (width - 1 - d) * 4;
+                for (let c = 0; c < 4; c++) {
+                    left[d * 4 + c] = data[leftIdx + c];
+                    right[d * 4 + c] = data[rightIdx + c];
+                }
+            }
+            for (let d = 0; d < cols; d++) {
+                const blend = 1 - d / cols;
+                const leftIdx = row + d * 4;
+                const rightIdx = row + (width - 1 - d) * 4;
+                for (let c = 0; c < 4; c++) {
+                    const leftValue = left[d * 4 + c];
+                    const rightValue = right[d * 4 + c];
+                    const average = 0.5 * (leftValue + rightValue);
+                    data[leftIdx + c] = Math.round(leftValue * (1 - blend) + average * blend);
+                    data[rightIdx + c] = Math.round(rightValue * (1 - blend) + average * blend);
+                }
+            }
+        }
+    }
+
+    _softenLayerCanvas(ctx) {
+        if (!ctx || !this._softenCtx || CLOUD_TEXTURE_SOFTEN_BLUR_PX <= 0) return;
+        const canvas = ctx.canvas;
+        if (!canvas?.width || !canvas?.height) return;
+        if (this._softenCanvas.width !== canvas.width || this._softenCanvas.height !== canvas.height) {
+            this._softenCanvas.width = canvas.width;
+            this._softenCanvas.height = canvas.height;
+        }
+        this._softenCtx.clearRect(0, 0, canvas.width, canvas.height);
+        this._softenCtx.drawImage(canvas, 0, 0);
+        const prevFilter = ctx.filter;
+        const prevComposite = ctx.globalCompositeOperation;
+        ctx.filter = `blur(${CLOUD_TEXTURE_SOFTEN_BLUR_PX}px)`;
+        ctx.globalCompositeOperation = 'copy';
+        ctx.drawImage(this._softenCanvas, 0, 0);
+        ctx.filter = prevFilter;
+        ctx.globalCompositeOperation = prevComposite;
     }
 
     _sampleCloudNoise(noise, lon, lat, grid) {
@@ -605,7 +681,9 @@ class WeatherField {
                     data[idx + 3] = Math.floor(255 * alpha);
                 }
             }
+            this._blendTextureLongitudeSeam(data, w, h);
             ctx.putImageData(img, 0, 0);
+            this._softenLayerCanvas(ctx);
         };
 
         drawLayer({
@@ -683,6 +761,7 @@ class WeatherField {
             }
         }
 
+        this._blendTextureLongitudeSeam(data, w, h);
         this.ctxDebug.putImageData(img, 0, 0);
         if (this.debugMode === 'wind') {
             this._drawWindArrows();

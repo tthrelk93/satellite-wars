@@ -7,8 +7,14 @@ test('WeatherCore5 defaults keep the stronger broad-circulation surface wind res
   const core = new WeatherCore5({ nx: 16, ny: 8, seed: 12345 });
   await core._initPromise;
 
-  assert.equal(core.windNudgeParams.tauSurfaceSeconds, 8 * 3600);
-  assert.equal(core.windNudgeSpinupParams.tauSurfaceStartSeconds, 6 * 3600);
+  assert.equal(core.windNudgeParams.tauSurfaceSeconds, 3 * 3600);
+  assert.equal(core.windNudgeParams.tauVSeconds, 1 * 3600);
+  assert.equal(core.windNudgeParams.surfaceTargetSpeedScale, 2.0);
+  assert.equal(core.windEddyParams.tauSeconds, 1 * 3600);
+  assert.equal(core.windEddyParams.scaleClampMax, 5.0);
+  assert.equal(core.windEddyParams.allowWithSpatialTargets, true);
+  assert.equal(core.windNudgeSpinupParams.tauSurfaceStartSeconds, 3 * 3600);
+  assert.equal(core.windNudgeSpinupParams.tauVStartSeconds, 1 * 3600);
   assert.equal(core.vertParams.rhTrig, 0.72);
   assert.equal(core.vertParams.rhMidMin, 0.22);
   assert.equal(core.vertParams.omegaTrig, 0.2);
@@ -139,6 +145,20 @@ test('WeatherCore5 records module timings and conservation summaries during step
   assert.ok(Number.isFinite(conservation.waterCycle.verticalUnaccountedDeltaKgM2));
   assert.ok(Number.isFinite(conservation.waterCycle.verticalSubtropicalDryingDemandKgM2));
   assert.ok(Number.isFinite(conservation.waterCycle.verticalCloudErosionToVaporKgM2));
+});
+
+test('WeatherCore5 disabled instrumentation skips climate process budget sampling for live workers', async () => {
+  const core = new WeatherCore5({ nx: 12, ny: 6, seed: 12345, instrumentationMode: 'disabled' });
+  await core._initPromise;
+  core.resetClimateProcessDiagnostics();
+  core.resetConservationDiagnostics();
+  core.advanceModelSeconds(core.modelDt * 2);
+
+  const processSummary = core.getClimateProcessBudgetSummary();
+  const conservationSummary = core.getConservationSummary();
+  assert.equal(core.getInstrumentationMode(), 'disabled');
+  assert.equal(processSummary.sampleCount, 0);
+  assert.equal(conservationSummary.sampleCount, 0);
 });
 
 test('WeatherCore5 keeps terrain-fixture surface theta bounded during early stepping', async () => {

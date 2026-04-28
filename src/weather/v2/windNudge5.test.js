@@ -49,6 +49,46 @@ test('stepWindNudge5 uses spatial climatology targets when available', () => {
   assert.equal(state.v[levU * state.N + 0], 2);
 });
 
+test('stepWindNudge5 applies surface target speed scale to spatial 10m winds', () => {
+  const sigmaHalf = createSigmaHalfLevels({ nz: 6 });
+  const state = createState5({ grid: { count: 4 }, nz: 6, sigmaHalf });
+  const grid = {
+    nx: 2,
+    ny: 2,
+    latDeg: new Float32Array([30, -30]),
+    cosLat: new Float32Array([Math.cos(Math.PI / 6), Math.cos(Math.PI / 6)])
+  };
+  state.u.fill(0);
+  state.v.fill(0);
+  const levS = state.nz - 1;
+  const climo = {
+    hasWind: true,
+    hasWind500: true,
+    hasWind250: false,
+    windNowU: new Float32Array([5, 6, 7, 8]),
+    windNowV: new Float32Array([1, 1, 1, 1]),
+    wind500NowU: new Float32Array([15, 16, 17, 18]),
+    wind500NowV: new Float32Array([2, 2, 2, 2])
+  };
+
+  const result = stepWindNudge5({
+    dt: 86400,
+    grid,
+    state,
+    climo,
+    params: {
+      tauSurfaceSeconds: 86400,
+      tauUpperSeconds: 86400,
+      tauVSeconds: 86400,
+      surfaceTargetSpeedScale: 2.0
+    }
+  });
+
+  assert.equal(result.source, 'spatial-climatology');
+  assert.ok(Math.abs(state.u[levS * state.N + 0] - 10) < 1e-6);
+  assert.ok(Math.abs(state.v[levS * state.N + 0] - 2) < 1e-6);
+});
+
 test('stepWindNudge5 blends 500 hPa and 250 hPa targets for upper-level nudging', () => {
   const sigmaHalf = createSigmaHalfLevels({ nz: 6 });
   const state = createState5({ grid: { count: 4 }, nz: 6, sigmaHalf });

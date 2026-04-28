@@ -7,14 +7,14 @@ import {
 } from './windParticlePerf.js';
 import { bilinear } from './weather/shared/bilinear.js';
 
-const DEFAULT_WIDTH = 200;
-const DEFAULT_HEIGHT = 100;
+const DEFAULT_WIDTH = 160;
+const DEFAULT_HEIGHT = 80;
 const PARTICLE_MULTIPLIER = 10;
 const MAX_PARTICLE_AGE = 320;
 const MIN_PARTICLE_AGE = Math.round(MAX_PARTICLE_AGE * 0.5);
 const INTENSITY_SCALE_STEP = 10;
 const DEFAULT_MAX_INTENSITY = 25;
-const DEFAULT_STEP_SECONDS = 800;
+const DEFAULT_STEP_SECONDS = 900;
 const DEFAULT_MAX_STEP_PX = 2.5;
 const FADE_ALPHA = 0.992;
 const LINE_WIDTH = 1.0;

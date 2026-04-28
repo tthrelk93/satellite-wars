@@ -45,7 +45,8 @@ self.onmessage = async (event) => {
         nx: payload.nx,
         ny: payload.ny,
         dt: payload.dt,
-        seed: payload.seed
+        seed: payload.seed,
+        instrumentationMode: payload.instrumentationMode === 'disabled' ? 'disabled' : 'full'
       });
       await core._initPromise;
       if (Number.isFinite(payload.startTimeSeconds)) {

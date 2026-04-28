@@ -90,6 +90,9 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
   const relaxS = clamp(dt / tauSurfaceSeconds, 0, 1);
   const relaxU = clamp(dt / tauUpperSeconds, 0, 1);
   const relaxV = clamp(dt / tauVSeconds, 0, 1);
+  const surfaceTargetSpeedScale = Number.isFinite(params.surfaceTargetSpeedScale)
+    ? clamp(params.surfaceTargetSpeedScale, 0.5, 2.4)
+    : 1;
   const upperJetScale = Number.isFinite(params.upperJetScale) ? params.upperJetScale : 2.2;
   const upperJetLatDeg = Number.isFinite(params.upperJetLatDeg) ? params.upperJetLatDeg : 35;
   const upperJetWidthDeg = Number.isFinite(params.upperJetWidthDeg) ? params.upperJetWidthDeg : 12;
@@ -134,14 +137,16 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       for (let i = 0; i < nx; i += 1) {
         const k = row + i;
         const idxS = levS * N + k;
+        const targetSurfaceUk = targetSurfaceU[k] * surfaceTargetSpeedScale;
+        const targetSurfaceVk = targetSurfaceV[k] * surfaceTargetSpeedScale;
         const dryingSupport = computeDryingSupport({
           latAbsDeg: absLat,
           lowLevelOmegaEffectivePaS: state.lowLevelOmegaEffective?.[k] || 0,
           subtropicalSubsidenceDryingFrac: state.subtropicalSubsidenceDrying?.[k] || 0
         });
-        const duS = (targetSurfaceU[k] - u[idxS]) * relaxS;
-        const dvS = (targetSurfaceV[k] - v[idxS]) * relaxV;
-        const surfaceMismatch = Math.hypot(targetSurfaceU[k] - u[idxS], targetSurfaceV[k] - v[idxS]);
+        const duS = (targetSurfaceUk - u[idxS]) * relaxS;
+        const dvS = (targetSurfaceVk - v[idxS]) * relaxV;
+        const surfaceMismatch = Math.hypot(targetSurfaceUk - u[idxS], targetSurfaceVk - v[idxS]);
         state.windTargetMismatchAccum[k] += surfaceMismatch;
         state.windTargetSampleCount[k] += 1;
         accumulateBandValue(
@@ -153,7 +158,7 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
         );
         u[idxS] += duS;
         v[idxS] += dvS;
-        sumErrS += ((u[idxS] - targetSurfaceU[k]) ** 2 + (v[idxS] - targetSurfaceV[k]) ** 2) * weight;
+        sumErrS += ((u[idxS] - targetSurfaceUk) ** 2 + (v[idxS] - targetSurfaceVk) ** 2) * weight;
         sumWSurface += weight;
         maxAbsCorrection = Math.max(maxAbsCorrection, Math.abs(duS), Math.abs(dvS));
 
@@ -293,7 +298,7 @@ export function stepWindNudge5({ dt, grid, state, climo, params = {} }) {
       ? grid.latDeg[j]
       : 90 - ((j + 0.5) / ny) * 180;
     const absLat = Math.abs(latDeg);
-    const targetS = sampleTargetU(latDeg);
+    const targetS = sampleTargetU(latDeg) * surfaceTargetSpeedScale;
     const jet = Math.exp(-Math.pow((absLat - upperJetLatDeg) / upperJetWidthDeg, 2));
     const targetU = jet * upperJetScale * Math.max(0, targetS);
     const jetCapFloor = (Number.isFinite(params.upperWindCapMin) ? params.upperWindCapMin : 0)
