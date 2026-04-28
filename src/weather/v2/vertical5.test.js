@@ -35,6 +35,76 @@ const columnVaporMass = (state) => {
   return total;
 };
 
+test('stepVertical5 accepts live upper-cloud containment controls without unknown-param warnings', () => {
+  const sigmaHalf = new Float32Array([0, 0.5, 1]);
+  const state = createState5({
+    grid: { count: 1 },
+    nz: 2,
+    sigmaHalf
+  });
+  const grid = {
+    nx: 1,
+    ny: 1,
+    latDeg: new Float32Array([20]),
+    lonDeg: new Float32Array([-40]),
+    invDx: new Float32Array([1]),
+    invDy: new Float32Array([1]),
+    cosLat: new Float32Array([1])
+  };
+
+  state.ps[0] = 100000;
+  state.pHalf[0] = 20000;
+  state.pHalf[1] = 50000;
+  state.pHalf[2] = 100000;
+  state.pMid[0] = 35000;
+  state.pMid[1] = 75000;
+  state.theta[0] = 275;
+  state.theta[1] = 300;
+  state.T[0] = 245;
+  state.T[1] = 294;
+  state.qv[0] = 0.002;
+  state.qv[1] = 0.014;
+
+  const warned = [];
+  const originalWarn = console.warn;
+  console.warn = (message, ...rest) => {
+    warned.push(String(message));
+    if (rest.length) warned.push(rest.map(String).join(' '));
+  };
+  try {
+    stepVertical5({
+      dt: 60,
+      grid,
+      state,
+      params: {
+        enableMixing: false,
+        enableConvection: false,
+        enableLargeScaleVerticalAdvection: false,
+        enableOmegaMassFix: false,
+        enableSevereWeatherEnvironments: false,
+        enableAtlanticTransitionCarryoverContainment: true,
+        atlanticTransitionCarryoverContainmentSignal0: 0.04,
+        atlanticTransitionCarryoverContainmentSignal1: 0.075,
+        atlanticTransitionCarryoverContainmentLat0: 18,
+        atlanticTransitionCarryoverContainmentLat1: 22.5,
+        atlanticTransitionCarryoverContainmentOverlap0: 0.08,
+        atlanticTransitionCarryoverContainmentOverlap1: 0.18,
+        atlanticTransitionCarryoverContainmentDry0: 0.12,
+        atlanticTransitionCarryoverContainmentDry1: 0.24,
+        atlanticTransitionCarryoverContainmentOmega0: 0.12,
+        atlanticTransitionCarryoverContainmentOmega1: 0.26,
+        atlanticTransitionCarryoverContainmentMaxFrac: 0.18,
+        upperCloudWeakErosionSupportScale: 0.68,
+        upperCloudPersistenceSupportScale: 0.72
+      }
+    });
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.deepEqual(warned.filter((line) => line.includes('[V2 vertical] Unknown params')), []);
+});
+
 test('tropical cyclone genesis potential requires warm moist low-shear ocean and cyclonic spin', () => {
   const favorable = computeTropicalCycloneGenesisPotential({
     latDeg: 16,

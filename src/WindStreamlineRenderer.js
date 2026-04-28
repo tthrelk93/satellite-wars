@@ -7,14 +7,14 @@ import {
 } from './windParticlePerf.js';
 import { bilinear } from './weather/shared/bilinear.js';
 
-const DEFAULT_WIDTH = 1024;
-const DEFAULT_HEIGHT = 512;
-const PARTICLE_MULTIPLIER = 6;
+const DEFAULT_WIDTH = 200;
+const DEFAULT_HEIGHT = 100;
+const PARTICLE_MULTIPLIER = 10;
 const MAX_PARTICLE_AGE = 320;
 const MIN_PARTICLE_AGE = Math.round(MAX_PARTICLE_AGE * 0.5);
 const INTENSITY_SCALE_STEP = 10;
 const DEFAULT_MAX_INTENSITY = 25;
-const DEFAULT_STEP_SECONDS = 120;
+const DEFAULT_STEP_SECONDS = 800;
 const DEFAULT_MAX_STEP_PX = 2.5;
 const FADE_ALPHA = 0.992;
 const LINE_WIDTH = 1.0;
@@ -22,7 +22,8 @@ const DEFAULT_DIAG_SAMPLE_TARGET = 20000;
 const DESIRED_MEAN_STEP_PX = 0.9;
 const ADAPT_STEP_CLAMP_MIN = 0.3;
 const ADAPT_STEP_CLAMP_MAX = 1.2;
-const RENDER_FRAME_INTERVAL_SECONDS = 0.1;
+const RENDER_FRAME_INTERVAL_SECONDS = 0.15;
+const MAX_RENDER_SUBSTEPS = 1;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const nowMs = () => (typeof performance !== 'undefined' && typeof performance.now === 'function'
   ? performance.now()
@@ -260,7 +261,7 @@ class WindStreamlineRenderer {
 
     this._lastFieldSimTimeSeconds = null;
     this._lastGridKey = null;
-    this.fieldUpdateCadenceSeconds = 600;
+    this.fieldUpdateCadenceSeconds = 1800;
     this._fieldReady = false;
     this._lastFieldDiagnostics = null;
     this._lastFrameDiagnostics = null;
@@ -666,8 +667,7 @@ class WindStreamlineRenderer {
       return;
     }
     this._frameAccumSeconds += realDtSeconds;
-    const maxSubsteps = 3;
-    const steps = Math.min(maxSubsteps, Math.floor(this._frameAccumSeconds / this._frameIntervalSeconds));
+    const steps = Math.min(MAX_RENDER_SUBSTEPS, Math.floor(this._frameAccumSeconds / this._frameIntervalSeconds));
     if (steps <= 0) {
       finalizePerf(0, 0, null, 0, null);
       return;

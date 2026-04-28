@@ -632,12 +632,12 @@ class Earth {
     }
     this.weatherVolumeGpu = null;
     this.weatherField = new WeatherField({
-      renderScale: 2,
+      renderScale: 1.5,
       tickSeconds: 0.35,
       seed: this.weatherSeed
     });
     this.analysisWeatherField = new WeatherField({
-      renderScale: 2,
+      renderScale: 1.5,
       tickSeconds: 0.35,
       seed: this.weatherSeed
     });
@@ -686,6 +686,7 @@ class Earth {
       } catch (err) {
         console.warn('[Earth] Weather worker init failed; falling back to main thread.', err);
         this.useWeatherWorker = false;
+        this.weatherField?.setUseExternalCore?.(false);
         return;
       }
       this._weatherWorker.onmessage = (event) => {
@@ -699,9 +700,13 @@ class Earth {
           if (Number.isFinite(currentSim) && Number.isFinite(payloadTime)) {
             const delta = currentSim - payloadTime;
             if (delta > 0.5) {
+              if (payload) {
+                this._applyWeatherWorkerState(payload);
+              }
               this._weatherWorkerAccumSeconds += delta;
               this._weatherWorkerLastSimTimeSeconds = currentSim;
               this._weatherWorkerPendingEnable = true;
+              this.weatherField?.setUseExternalCore?.(true);
               return;
             }
           }
@@ -732,7 +737,7 @@ class Earth {
     this._weatherWorkerLatestState = null;
     this._weatherWorkerPendingEnable = false;
     this._weatherWorkerLastRequestRealMs = 0;
-    this.weatherField?.setUseExternalCore?.(false);
+    this.weatherField?.setUseExternalCore?.(true);
     this._weatherWorker.postMessage({
       type: 'init',
       payload: {
@@ -3388,6 +3393,17 @@ class Earth {
 
   update(simTimeSeconds, realDtSeconds, simContext) {
     const perfStartMs = performance.now();
+    const phaseBreakdown = {
+      workerMs: 0,
+      weatherFieldsMs: 0,
+      weatherVolumeMs: 0,
+      sensorsMs: 0,
+      radarMs: 0,
+      cloudIntelMs: 0,
+      windStreamlinesMs: 0,
+      windDiagnosticsMs: 0
+    };
+    let phaseStartMs = perfStartMs;
     this._sensorGating = simContext?.sensorGating ?? null;
     this._lastSimTimeSeconds = simTimeSeconds;
     this._trackAnalysisDeferredSimSeconds(simTimeSeconds);
@@ -3416,6 +3432,7 @@ class Earth {
         this._maybeStepWeatherWorker(simSpeed);
       }
     }
+    phaseBreakdown.workerMs += performance.now() - phaseStartMs;
 
     if (this.forecastOverlayVisible && this._sensorGating?.playerId) {
       if (this._forecastDisplayPlayerId !== this._sensorGating.playerId) {
@@ -3429,28 +3446,37 @@ class Earth {
     const daySeconds = 86400;
     const dayFrac = (((rotationTimeSeconds / daySeconds) % 1) + 1) % 1;
     this.parentObject.rotation.y = 2 * Math.PI * (dayFrac - 0.5);
+    phaseStartMs = performance.now();
     this.weatherField?.update(simTimeSeconds, realDtSeconds, simContext);
     this.analysisWeatherField?.update(simTimeSeconds, realDtSeconds, simContext);
     this._syncAnalysisFromTruthIfReady();
     this._updateAnalysisSigma2(simTimeSeconds);
     this._maybeReanchorAnalysisFromTargets(simTimeSeconds);
+    phaseBreakdown.weatherFieldsMs += performance.now() - phaseStartMs;
+    phaseStartMs = performance.now();
     const didUpload = this.weatherVolumeGpu?.update({ simTimeSeconds });
     if (didUpload) {
       this.weatherVolumeDebugView?.render();
     }
+    phaseBreakdown.weatherVolumeMs += performance.now() - phaseStartMs;
     this._syncGroundRadarOrigin(simTimeSeconds);
     const shouldUpdateSensors = !this.useWeatherWorker || simContext?.flushAssimilation;
     if (shouldUpdateSensors) {
+      phaseStartMs = performance.now();
       this.weatherSensorManager?.update({
         truthCore: this.weatherField?.core,
         earth: this,
         simTimeSeconds
       });
+      phaseBreakdown.sensorsMs += performance.now() - phaseStartMs;
     }
     if (simContext?.flushAssimilation) {
+      phaseStartMs = performance.now();
       this._flushAssimilationQueue();
+      phaseBreakdown.sensorsMs += performance.now() - phaseStartMs;
     }
     if (this.radarOverlayVisible && this._groundRadarPpiPass && this.radarOverlay) {
+      phaseStartMs = performance.now();
       if (this._radarSweepBase) {
         if (lodActive) {
           this._groundRadarPpiPass.sweepPeriodSeconds = this._radarSweepBase.period * 2;
@@ -3467,9 +3493,13 @@ class Earth {
         this.radarOverlay.setSweepAngleRad?.(this._groundRadarPpiPass.sweepAngleRad);
         this.updateRadarOverlayTexture(this._groundRadarPpiPass.renderTarget?.texture ?? null);
       }
+      phaseBreakdown.radarMs += performance.now() - phaseStartMs;
     }
+    phaseStartMs = performance.now();
     this._tickCloudIntel(simTimeSeconds);
+    phaseBreakdown.cloudIntelMs += performance.now() - phaseStartMs;
     if (this.windStreamlinesVisible) {
+      phaseStartMs = performance.now();
       if (this.windStreamlineRenderer?.setParticleDensityScale) {
         this.windStreamlineRenderer.setParticleDensityScale(lodActive ? 0.6 : 1);
       }
@@ -3481,21 +3511,28 @@ class Earth {
         simTimeSeconds,
         realDtSeconds
       });
+      phaseBreakdown.windStreamlinesMs += performance.now() - phaseStartMs;
     }
+    phaseStartMs = performance.now();
     this._maybeLogWindDiagnostics(simTimeSeconds);
+    phaseBreakdown.windDiagnosticsMs += performance.now() - phaseStartMs;
     const perfEndMs = performance.now();
     this._lastPerfStats = {
       updateMs: perfEndMs - perfStartMs,
       simStepsThisFrame: simContext?.simStepsThisFrame ?? null,
       simStepsSkipped: simContext?.simStepsSkipped ?? null,
-      simLagSeconds: simContext?.simLagSeconds ?? null
+      simLagSeconds: simContext?.simLagSeconds ?? null,
+      phaseBreakdown
     };
     if (perfEndMs - this._lastPerfLogRealMs > 1000) {
       this._lastPerfLogRealMs = perfEndMs;
       this.logWeatherEvent?.(
         'simPerf',
         {
-          ...this._lastPerfStats
+          ...this._lastPerfStats,
+          weatherFieldPerf: this.weatherField?.getPerfStats?.() ?? null,
+          analysisWeatherFieldPerf: this.analysisWeatherField?.getPerfStats?.() ?? null,
+          windStreamlinePerf: this.windStreamlineRenderer?.getDiagnostics?.().perf ?? null
         },
         { simTimeSeconds }
       );

@@ -1,85 +1,78 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-27T06:37:14.336Z",
+  "updatedAt": "2026-04-28T01:52:30.948Z",
   "verdict": "not_world_class_yet",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
-  "baselineCommit": "5bd7beb",
+  "baselineCommit": "ad3683b",
   "latestCycle": {
-    "id": "cycle-2026-04-27T02-12-02Z-phase7-tropical-cyclones-severe-weather-recovery",
-    "goal": "model tropical-cyclone and severe-weather environments, then the events",
-    "verifiedImprovement": "Phase 7 severe-weather environments pass the full annual planetary realism repro gate with basin cyclone seasonality, cold-water/dry-subtropical false-positive checks, North America tornado warm-season risk, validation, and benchmark gates passing.",
-    "checkpointPath": "weather-validation/output/cycle-2026-04-27T02-12-02Z-phase7-tropical-cyclones-severe-weather-recovery/checkpoint.md",
-    "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-27T02-12-02Z-phase7-tropical-cyclones-severe-weather-recovery/evidence-summary.json"
+    "id": "cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion",
+    "goal": "make the live game weather model smooth, browser-verified, and trusted",
+    "verifiedImprovement": "Phase 8 live browser/runtime signoff passes with smooth Earth.update telemetry, active model-state cloud/wind layers, clean current-run browser console, benchmark and validation gates passing, and a fresh quick planetary regression pass.",
+    "checkpointPath": "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/checkpoint.md",
+    "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/evidence-summary.json"
   },
   "benchmarkSuite": {
-    "path": "weather-validation/reports/earth-accuracy-status.md",
+    "path": "weather-validation/reports/earth-accuracy-status.json",
     "overallPass": true
   },
   "planetaryRealism": {
-    "path": "weather-validation/output/cycle-2026-04-27T02-12-02Z-phase7-tropical-cyclones-severe-weather-recovery/phase7-final-annual-r2.json",
-    "overallPass": true,
-    "preset": "annual",
-    "reproCheck": true,
-    "counterfactuals": false,
-    "latestArtifact": "weather-validation/output/cycle-2026-04-27T02-12-02Z-phase7-tropical-cyclones-severe-weather-recovery/phase7-final-annual-r2.json",
-    "canonicalReportGeneratedAt": "2026-04-27T06:37:14.336Z",
-    "metrics": {
-      "globalPrecipMeanMmHr": 0.08616,
-      "tropicalConvectiveFraction": 0.44368,
-      "tropicalConvectiveMassFluxKgM2S": 0.01272,
-      "tropicalCycloneEnvironmentCountNh": 16.28,
-      "tropicalCycloneEnvironmentCountSh": 38.68,
-      "tcAtlanticGenesisPotentialMean": 0.00067,
-      "tcEastPacificGenesisPotentialMean": 0.00119,
-      "tcWestPacificGenesisPotentialMean": 0.0078,
-      "tcNorthIndianGenesisPotentialMean": 0.00246,
-      "tcSouthernHemisphereGenesisPotentialMean": 0.0205,
-      "tcColdWaterFalsePositiveMean": 0,
-      "tcDrySubtropicalFalsePositiveMean": 0.00536,
-      "atlanticSeasonalityPass": true,
-      "eastPacificSeasonalityPass": true,
-      "westPacificSeasonalityPass": true,
-      "northIndianSeasonalityPass": true,
-      "southernHemisphereSeasonalityPass": true,
-      "tornadoRiskNorthAmericaMean": 0.00505,
-      "tornadoNorthAmericaWarmSeasonMean": 0.00504,
-      "tornadoNorthAmericaCoolSeasonMean": 0.00427,
-      "tornadoNorthAmericaSeasonalityPass": true,
-      "tornadoSouthAmericaWarmSeasonMean": 0.06129,
-      "tornadoSouthAmericaCoolSeasonMean": 0.06794,
-      "tornadoSouthAmericaSeasonalityPass": false,
-      "tornadoInstabilitySupportMean": 0.6675,
-      "tornadoShearSupportMean": 0.40583,
-      "tornadoLiftSupportMean": 0.57158,
-      "tornadoStormModeSupportMean": 0.08062,
-      "numericalIntegrityScore": 0.86399,
-      "numericalClimateContractPass": true,
-      "majorClimateClaimAllowed": true,
-      "dtSensitivityPass": true,
-      "gridSensitivityPass": true
-    }
+    "latestFullAnnualPath": "weather-validation/output/cycle-2026-04-27T02-12-02Z-phase7-tropical-cyclones-severe-weather-recovery/phase7-final-annual-r2.json",
+    "latestFullAnnualOverallPass": true,
+    "latestFullAnnualPreset": "annual",
+    "currentCycleQuickPath": "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/phase8-quick-audit.json",
+    "currentCycleQuickOverallPass": true,
+    "currentCycleQuickPreset": "quick",
+    "currentCycleQuickGrid": "48x24",
+    "currentCycleQuickDtSeconds": 1800,
+    "currentCycleQuickGeneratedAt": "2026-04-28T01:43:05.685Z"
+  },
+  "liveSignoff": {
+    "url": "http://127.0.0.1:3000/?mode=solo",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/runtime-summary-final-live.json",
+    "hotspotProfilePath": "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/hotspot-profile.json",
+    "screenshots": [
+      "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/live-watch-t0.png",
+      "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/live-watch-t60.png",
+      "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/live-watch-t120.png",
+      "weather-validation/output/cycle-2026-04-28T01-08-28Z-phase8-live-game-realism-smoothness-completion/live-watch-t180.png"
+    ],
+    "runtimeHealth": {
+      "likelySmoothEnough": true,
+      "warnings": []
+    },
+    "visualLayerHealth": {
+      "likelyHealthy": true,
+      "warnings": []
+    },
+    "modelWindHealth": {
+      "likelyHealthy": false,
+      "warnings": [
+        "wind_model_targets_failing"
+      ],
+      "failingReasons": [
+        "model_mean_low",
+        "model_p90_low",
+        "model_p99_low"
+      ]
+    },
+    "earthUpdateMs": {
+      "p50": 0.10000000055879354,
+      "p95": 8.100000000372528,
+      "max": 11.799999999813735
+    },
+    "stepsSkippedTotal": 0,
+    "browserConsoleWarningsAfterRestart": []
   },
   "blockingGaps": [
-    "Browser/runtime signoff is still required after the verified climate fixes, including smoothness telemetry and visual observation in the live app.",
-    "World-class status still requires realism and smoothness to pass in the same browser-backed run.",
-    "The annual root-cause sidecars still rank imported cloud persistence/helper forcing as the dominant residual realism family, even though all annual planetary gates pass.",
+    "A fresh annual audit at the final post-Phase-8 commit hash has not been run; the full annual evidence is still the Phase 7 annual baseline plus this Phase 8 quick regression.",
+    "Live near-surface model-wind targets remain low: model_mean_low, model_p90_low, model_p99_low.",
+    "The annual root-cause sidecars still rank imported cloud persistence/helper forcing as the dominant residual climate family, even though annual planetary gates pass.",
     "South America tornado seasonality is diagnostic-only in Phase 7 and remains cool-season biased; the hard tornado warm-season gate is North America and passes."
   ],
-  "cycleInputs": [
-    "weather-validation/reports/earth-accuracy-status.md",
-    "weather-validation/reports/planetary-realism-status.md",
-    "weather-validation/reports/worker-brief.md",
-    "weather-validation/reports/realism-investigation-playbook.md",
-    "weather-validation/reports/smoothness-investigation-playbook.md",
-    "newest weather-validation/output/cycle-*/checkpoint.md",
-    "weather-validation/output/agent-dev-server.json",
-    "latest runtime summary from npm run agent:summarize-runtime-log"
-  ],
   "defaultNextPriorities": [
-    "Move to Phase 8 from the verified Phase 7 severe-weather annual baseline.",
-    "Run bounded live/browser verification after this verified climate fix or when runtime debt becomes blocking again.",
-    "Attack the remaining imported cloud persistence/helper-forcing family before any world-class claim.",
-    "Keep validation on the clean world-class checkout only."
+    "Run a current-hash annual repro audit before any final world-class claim.",
+    "If annual remains clean, address the residual near-surface model-wind target or imported cloud-persistence family only if they still block the claim.",
+    "Keep browser live signoff in the loop whenever runtime/render/weather visualization changes."
   ]
 }

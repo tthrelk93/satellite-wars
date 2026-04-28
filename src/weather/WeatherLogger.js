@@ -158,11 +158,16 @@ const buildBroadClimateStats = (diagnostics) => {
 };
 
 class WeatherLogger {
-  constructor({ maxEntries = DEFAULT_MAX_ENTRIES, cadenceSeconds = DEFAULT_CADENCE_SECONDS } = {}) {
+  constructor({
+    maxEntries = DEFAULT_MAX_ENTRIES,
+    cadenceSeconds = DEFAULT_CADENCE_SECONDS,
+    includeBroadClimateStats = false
+  } = {}) {
     this.enabled = false;
     this.entries = [];
     this.maxEntries = maxEntries;
     this.cadenceSeconds = cadenceSeconds;
+    this.includeBroadClimateStats = Boolean(includeBroadClimateStats);
     this.nextLogSimTimeSeconds = 0;
     this.runId = null;
     this.onLine = null;
@@ -971,9 +976,11 @@ class WeatherLogger {
       }
     }
 
-    try {
-      out.broadClimate = buildBroadClimateStats(buildValidationDiagnostics(core));
-    } catch (_) {}
+    if (this.includeBroadClimateStats) {
+      try {
+        out.broadClimate = buildBroadClimateStats(buildValidationDiagnostics(core));
+      } catch (_) {}
+    }
 
     return out;
   }

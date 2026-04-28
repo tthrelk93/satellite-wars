@@ -121,13 +121,27 @@ const updateMsP95 = quantile(simPerfUpdateMs, 0.95);
 const updateMsMax = simPerfUpdateMs.length ? Math.max(...simPerfUpdateMs) : null;
 const lagP95 = quantile(simPerfLagSeconds, 0.95);
 const lagMax = simPerfLagSeconds.length ? Math.max(...simPerfLagSeconds) : null;
+const runtimeWarnings = [];
+const visualWarnings = [];
+const modelWindWarnings = [];
 
-if (updateMsP95 != null && updateMsP95 > 12) warnings.push('earth_update_p95_high');
-if (updateMsMax != null && updateMsMax > 25) warnings.push('earth_update_max_high');
-if (lagP95 != null && lagP95 > 240) warnings.push('sim_lag_p95_high');
-if (lagMax != null && lagMax > 600) warnings.push('sim_lag_max_high');
-if (stepsSkippedTotal > 0) warnings.push('sim_steps_skipped');
-if (latestWindTargets?.pass?.overall === false) warnings.push('wind_targets_failing');
+if (updateMsP95 != null && updateMsP95 > 12) runtimeWarnings.push('earth_update_p95_high');
+if (updateMsMax != null && updateMsMax > 25) runtimeWarnings.push('earth_update_max_high');
+if (lagP95 != null && lagP95 > 240) runtimeWarnings.push('sim_lag_p95_high');
+if (lagMax != null && lagMax > 600) runtimeWarnings.push('sim_lag_max_high');
+if (stepsSkippedTotal > 0) runtimeWarnings.push('sim_steps_skipped');
+if (latestWindTargets?.pass) {
+  const modelPass = latestWindTargets.pass.model ?? null;
+  const vizPass = latestWindTargets.pass.viz ?? null;
+  const modelFailing = modelPass && Object.values(modelPass).some((value) => value === false);
+  const vizFailing = vizPass && Object.values(vizPass).some((value) => value === false);
+  if (modelFailing) modelWindWarnings.push('wind_model_targets_failing');
+  if (vizFailing) visualWarnings.push('wind_viz_targets_failing');
+  if (!modelPass && !vizPass && latestWindTargets.pass.overall === false) {
+    visualWarnings.push('wind_targets_failing');
+  }
+}
+warnings.push(...runtimeWarnings, ...visualWarnings, ...modelWindWarnings);
 
 const summary = {
   schema: 'satellite-wars.runtime-summary.v1',
@@ -136,9 +150,18 @@ const summary = {
   lineCount,
   validationSnapshotCount,
   runtimeHealth: {
-    likelySmoothEnough: warnings.length === 0,
-    warnings
+    likelySmoothEnough: runtimeWarnings.length === 0,
+    warnings: runtimeWarnings
   },
+  visualLayerHealth: {
+    likelyHealthy: visualWarnings.length === 0,
+    warnings: visualWarnings
+  },
+  modelWindHealth: {
+    likelyHealthy: modelWindWarnings.length === 0,
+    warnings: modelWindWarnings
+  },
+  overallWarnings: warnings,
   simPerf: {
     samples: simPerfUpdateMs.length,
     updateMs: {

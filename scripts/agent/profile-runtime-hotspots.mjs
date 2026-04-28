@@ -104,6 +104,29 @@ const dominantPerfStage = (perf) => {
   return candidates[0][0];
 };
 
+const dominantWeatherFieldStage = (perf) => {
+  if (!perf) return null;
+  const candidates = [
+    ['weather_field_paint_clouds', perf.paintCloudsMs],
+    ['weather_field_paint_debug', perf.paintDebugMs],
+    ['weather_field_physics', perf.physicsMs],
+    ['weather_field_logger', perf.loggerMs],
+    ['weather_field_auto_log', perf.autoLogMs]
+  ].filter(([, value]) => Number.isFinite(value) && value > 0);
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => b[1] - a[1]);
+  return candidates[0][0];
+};
+
+const dominantEarthStage = (breakdown) => {
+  if (!breakdown) return null;
+  const candidates = Object.entries(breakdown)
+    .filter(([, value]) => Number.isFinite(value) && value > 0);
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => b[1] - a[1]);
+  return `earth_${candidates[0][0]}`;
+};
+
 const summarizePhaseBreakdowns = (phaseBreakdowns) => Object.fromEntries(
   PARTICLE_EVOLVE_PHASE_KEYS.map((phaseKey) => [
     phaseKey,
@@ -123,6 +146,15 @@ const functionHintsFor = (area) => {
   }
   if (area === 'Earth wind/model diagnostics cadence') {
     return ['src/Earth.js:_maybeLogWindDiagnostics', 'src/Earth.js:_logWindModelDiagnostics'];
+  }
+  if (area === 'WeatherField._paintClouds') {
+    return ['src/WeatherField.js:_paintClouds', 'src/WeatherField.js:_sampleCloudNoise'];
+  }
+  if (area === 'WeatherField.update logger/physics') {
+    return ['src/WeatherField.js:update', 'src/weather/WeatherLogger.js:_buildV2Stats'];
+  }
+  if (area === 'Earth.update phase breakdown') {
+    return ['src/Earth.js:update'];
   }
   return [];
 };
@@ -160,7 +192,11 @@ for await (const line of reader) {
       ...eventMeta,
       updateMs: Number.isFinite(payload.updateMs) ? payload.updateMs : null,
       simLagSeconds: Number.isFinite(payload.simLagSeconds) ? payload.simLagSeconds : null,
-      simStepsSkipped: Number.isFinite(payload.simStepsSkipped) ? payload.simStepsSkipped : null
+      simStepsSkipped: Number.isFinite(payload.simStepsSkipped) ? payload.simStepsSkipped : null,
+      phaseBreakdown: payload.phaseBreakdown ?? null,
+      weatherFieldPerf: payload.weatherFieldPerf ?? null,
+      analysisWeatherFieldPerf: payload.analysisWeatherFieldPerf ?? null,
+      windStreamlinePerf: payload.windStreamlinePerf ?? null
     });
   } else if (event === 'windVizDiagnostics' && payload) {
     windVizEvents.push(eventMeta);
@@ -178,10 +214,13 @@ const topSpikes = [...simPerfEvents]
   .map((event) => {
     const nearestViz = nearestEvent(windVizEvents, event.simTimeSeconds, HOTSPOT_WINDOW_SECONDS);
     const nearestModel = nearestEvent(windModelEvents, event.simTimeSeconds, HOTSPOT_WINDOW_SECONDS);
-    const perf = nearestViz?.payload?.perf ?? null;
+    const perf = event.windStreamlinePerf ?? nearestViz?.payload?.perf ?? null;
     const framePhases = nearestViz?.payload?.frame?.perfPhases ?? null;
     const evolvePhases = perf?.evolveParticlesPhases ?? framePhases;
-    const dominantStage = dominantPerfStage(perf);
+    const earthStage = dominantEarthStage(event.phaseBreakdown);
+    const weatherFieldStage = dominantWeatherFieldStage(event.weatherFieldPerf);
+    const analysisWeatherFieldStage = dominantWeatherFieldStage(event.analysisWeatherFieldPerf);
+    const dominantStage = weatherFieldStage || analysisWeatherFieldStage || earthStage || dominantPerfStage(perf);
     const dominantEvolvePhase = dominantParticleEvolvePhase(evolvePhases);
     return {
       updateMs: event.updateMs,
@@ -190,9 +229,44 @@ const topSpikes = [...simPerfEvents]
       simDay: event.simDay,
       todHours: event.todHours,
       likelyCause: dominantStage,
+      phaseBreakdown: event.phaseBreakdown ?? null,
+      weatherFieldPerf: event.weatherFieldPerf
+        ? {
+          updateMs: event.weatherFieldPerf.updateMs ?? null,
+          paintCloudsMs: event.weatherFieldPerf.paintCloudsMs ?? null,
+          paintDebugMs: event.weatherFieldPerf.paintDebugMs ?? null,
+          physicsMs: event.weatherFieldPerf.physicsMs ?? null,
+          loggerMs: event.weatherFieldPerf.loggerMs ?? null,
+          autoLogMs: event.weatherFieldPerf.autoLogMs ?? null,
+          painted: event.weatherFieldPerf.painted ?? null,
+          useExternalCore: event.weatherFieldPerf.useExternalCore ?? null
+        }
+        : null,
+      analysisWeatherFieldPerf: event.analysisWeatherFieldPerf
+        ? {
+          updateMs: event.analysisWeatherFieldPerf.updateMs ?? null,
+          paintCloudsMs: event.analysisWeatherFieldPerf.paintCloudsMs ?? null,
+          paintDebugMs: event.analysisWeatherFieldPerf.paintDebugMs ?? null,
+          physicsMs: event.analysisWeatherFieldPerf.physicsMs ?? null,
+          loggerMs: event.analysisWeatherFieldPerf.loggerMs ?? null,
+          autoLogMs: event.analysisWeatherFieldPerf.autoLogMs ?? null,
+          painted: event.analysisWeatherFieldPerf.painted ?? null,
+          useExternalCore: event.analysisWeatherFieldPerf.useExternalCore ?? null
+        }
+        : null,
       windVizDeltaSeconds: nearestViz?.deltaSeconds ?? null,
       modelDiagDeltaSeconds: nearestModel?.deltaSeconds ?? null,
       fieldRebuilt: perf?.fieldRebuilt ?? null,
+      directWindStreamlinePerf: event.windStreamlinePerf
+        ? {
+          totalMs: event.windStreamlinePerf.totalMs ?? null,
+          buildFieldMs: event.windStreamlinePerf.buildFieldMs ?? null,
+          evolveParticlesMs: event.windStreamlinePerf.evolveParticlesMs ?? null,
+          drawMs: event.windStreamlinePerf.drawMs ?? null,
+          renderSteps: event.windStreamlinePerf.renderSteps ?? null,
+          fieldRebuilt: event.windStreamlinePerf.fieldRebuilt ?? null
+        }
+        : null,
       windVizPerf: perf
         ? {
           totalMs: perf.totalMs ?? null,
@@ -223,8 +297,19 @@ const topSpikes = [...simPerfEvents]
     };
   });
 
-const perfBreakdowns = windVizEvents
-  .map((event) => event.payload?.perf ?? null)
+const perfBreakdowns = [
+  ...windVizEvents.map((event) => event.payload?.perf ?? null),
+  ...simPerfEvents.map((event) => event.windStreamlinePerf ?? null)
+]
+  .filter(Boolean);
+const weatherFieldBreakdowns = simPerfEvents
+  .map((event) => event.weatherFieldPerf ?? null)
+  .filter(Boolean);
+const analysisWeatherFieldBreakdowns = simPerfEvents
+  .map((event) => event.analysisWeatherFieldPerf ?? null)
+  .filter(Boolean);
+const earthPhaseBreakdowns = simPerfEvents
+  .map((event) => event.phaseBreakdown ?? null)
   .filter(Boolean);
 const evolvePhaseBreakdowns = windVizEvents
   .map((event) => event.payload?.perf?.evolveParticlesPhases ?? event.payload?.frame?.perfPhases ?? null)
@@ -264,6 +349,17 @@ if (!perfBreakdowns.length) {
 } else if (topSpikeNearModelDiagCount >= Math.max(3, Math.ceil(topSpikes.length / 2))) {
   recommendedArea = 'Earth wind/model diagnostics cadence';
   rationale = 'A large share of the worst spikes land near wind-model diagnostic ticks, so cadence and diagnostic payload work still matter.';
+} else if ((causeCounts.weather_field_paint_clouds || 0) >= Math.max(3, Math.ceil(topSpikes.length / 2))) {
+  recommendedArea = 'WeatherField._paintClouds';
+  rationale = 'Most of the worst Earth.update spikes are dominated by live cloud texture painting.';
+} else if (
+  (causeCounts.weather_field_logger || 0) + (causeCounts.weather_field_auto_log || 0) + (causeCounts.weather_field_physics || 0) >= Math.max(3, Math.ceil(topSpikes.length / 2))
+) {
+  recommendedArea = 'WeatherField.update logger/physics';
+  rationale = 'Most of the worst Earth.update spikes are inside WeatherField live update work rather than the wind renderer.';
+} else if (Object.keys(causeCounts).some((key) => key.startsWith('earth_'))) {
+  recommendedArea = 'Earth.update phase breakdown';
+  rationale = 'The Earth.update phase breakdown is now present but does not yet point to a narrower helper category.';
 }
 
 const report = {
@@ -287,6 +383,37 @@ const report = {
     drawMs: summarizeSeries(perfBreakdowns.map((perf) => perf.drawMs)),
     renderSteps: summarizeSeries(perfBreakdowns.map((perf) => perf.renderSteps)),
     rebuildFrames: perfBreakdowns.filter((perf) => perf.fieldRebuilt === true).length
+  },
+  earthPhasePerf: {
+    samples: earthPhaseBreakdowns.length,
+    workerMs: summarizeSeries(earthPhaseBreakdowns.map((perf) => perf.workerMs)),
+    weatherFieldsMs: summarizeSeries(earthPhaseBreakdowns.map((perf) => perf.weatherFieldsMs)),
+    weatherVolumeMs: summarizeSeries(earthPhaseBreakdowns.map((perf) => perf.weatherVolumeMs)),
+    sensorsMs: summarizeSeries(earthPhaseBreakdowns.map((perf) => perf.sensorsMs)),
+    radarMs: summarizeSeries(earthPhaseBreakdowns.map((perf) => perf.radarMs)),
+    cloudIntelMs: summarizeSeries(earthPhaseBreakdowns.map((perf) => perf.cloudIntelMs)),
+    windStreamlinesMs: summarizeSeries(earthPhaseBreakdowns.map((perf) => perf.windStreamlinesMs)),
+    windDiagnosticsMs: summarizeSeries(earthPhaseBreakdowns.map((perf) => perf.windDiagnosticsMs))
+  },
+  weatherFieldPerf: {
+    samples: weatherFieldBreakdowns.length,
+    updateMs: summarizeSeries(weatherFieldBreakdowns.map((perf) => perf.updateMs)),
+    paintCloudsMs: summarizeSeries(weatherFieldBreakdowns.map((perf) => perf.paintCloudsMs)),
+    paintDebugMs: summarizeSeries(weatherFieldBreakdowns.map((perf) => perf.paintDebugMs)),
+    physicsMs: summarizeSeries(weatherFieldBreakdowns.map((perf) => perf.physicsMs)),
+    loggerMs: summarizeSeries(weatherFieldBreakdowns.map((perf) => perf.loggerMs)),
+    autoLogMs: summarizeSeries(weatherFieldBreakdowns.map((perf) => perf.autoLogMs)),
+    paintedFrames: weatherFieldBreakdowns.filter((perf) => perf.painted === true).length
+  },
+  analysisWeatherFieldPerf: {
+    samples: analysisWeatherFieldBreakdowns.length,
+    updateMs: summarizeSeries(analysisWeatherFieldBreakdowns.map((perf) => perf.updateMs)),
+    paintCloudsMs: summarizeSeries(analysisWeatherFieldBreakdowns.map((perf) => perf.paintCloudsMs)),
+    paintDebugMs: summarizeSeries(analysisWeatherFieldBreakdowns.map((perf) => perf.paintDebugMs)),
+    physicsMs: summarizeSeries(analysisWeatherFieldBreakdowns.map((perf) => perf.physicsMs)),
+    loggerMs: summarizeSeries(analysisWeatherFieldBreakdowns.map((perf) => perf.loggerMs)),
+    autoLogMs: summarizeSeries(analysisWeatherFieldBreakdowns.map((perf) => perf.autoLogMs)),
+    paintedFrames: analysisWeatherFieldBreakdowns.filter((perf) => perf.painted === true).length
   },
   topSpikes,
   spikeCauseSummary: {
