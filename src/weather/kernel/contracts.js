@@ -2,6 +2,7 @@ export const WEATHER_KERNEL_CONTRACT_VERSION = 'weather-kernel.v1';
 export const WEATHER_KERNEL_GRID_FIELDS_SCHEMA = 'satellite-wars.weather-kernel.grid-fields.v1';
 export const WEATHER_KERNEL_DIAGNOSTICS_SCHEMA = 'satellite-wars.weather-kernel.diagnostics.v1';
 export const WEATHER_KERNEL_EVENT_SEED_SCHEMA = 'satellite-wars.weather-kernel.event-seed.v1';
+export const WEATHER_KERNEL_EVENT_PRODUCT_SCHEMA = 'satellite-wars.weather-events.v1';
 export const WEATHER_KERNEL_SNAPSHOT_SCHEMA = 'satellite-wars.weather-kernel.snapshot.v1';
 export const WEATHER_KERNEL_REPLAY_SCHEMA = 'satellite-wars.weather-kernel.replay.v1';
 

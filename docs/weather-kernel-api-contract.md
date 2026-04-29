@@ -43,12 +43,14 @@ Required methods:
 
 - `whenReady()`
 - `advanceModelSeconds(modelSeconds)`
+- `setSeed(seed)`
 - `setSimSpeed(simSpeed)`
 - `setTimeUTC(seconds)`
 - `setV2ConvectionEnabled(enabled)`
 - `getSnapshot({ mode })`
 - `getGridFields({ mode })`
 - `getDiagnostics({ mode })`
+- `getEventProduct({ force })`
 - `loadSnapshot(snapshot)`
 - `getWorkerPayload({ mode })`
 - `getTransferBuffers(payload)`
@@ -123,6 +125,21 @@ Event seeds are deterministic handoff records between the global model and futur
 - optional `basin`, `region`, `parentEventId`, and normalized `environment`
 
 Given the same kernel snapshot digest, event type, event id, seed, and environment fields, the event layer and local downscaler must produce the same event lifecycle and local detail.
+
+## Event Product Contract
+
+Event product schema: `satellite-wars.weather-events.v1`
+
+Kernel worker payloads may include a deterministic event product. It may include:
+
+- persistent active events
+- recently retired history
+- deterministic event seeds
+- counts by type, basin, and region
+- physical environment fields used to justify each event
+- hurricane system signatures: center, radius, pressure proxy, wind field, rain shield, eye/eyewall, track, intensity, satellite signature, radar signature, and forecast signature
+
+The event product must not mutate global climate state. Renderers, forecast systems, gameplay warnings, and future local downscalers may consume it, but they must not reach into `WeatherCore5` internals to recreate the same objects.
 
 ## Deterministic Replay Contract
 

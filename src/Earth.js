@@ -854,6 +854,7 @@ class Earth {
         }
       }
     }
+    this.weatherField?.setEventProduct?.(payload.events || null);
     core.ready = true;
   }
 
@@ -964,6 +965,15 @@ class Earth {
       leadSeconds,
       maxStepSeconds: this._weatherWorkerMaxStepSeconds
     };
+  }
+
+  getWeatherEventProduct() {
+    return this.weatherField?.getEventProduct?.() || null;
+  }
+
+  getActiveWeatherEvents() {
+    const product = this.getWeatherEventProduct();
+    return Array.isArray(product?.activeEvents) ? product.activeEvents : [];
   }
 
   _getActiveWeatherField() {

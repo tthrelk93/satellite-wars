@@ -47,6 +47,7 @@ class WeatherField {
         this._simContext = { simSpeed: null, paused: null };
         this.useExternalCore = false;
         this.renderEnabled = true;
+        this.eventProduct = null;
         this._lastStepsRan = 0;
         this._lastPaintSimTime = null;
         this._needsCoreTimeSync = true;
@@ -352,6 +353,7 @@ class WeatherField {
                 const stepsRan = this.core.advanceModelSeconds(deltaSim) || 0;
                 perfStats.physicsMs += nowMs() - phaseStartMs;
                 this._lastStepsRan = stepsRan;
+                if (stepsRan > 0) this._refreshEventProduct();
             }
         } else {
             this._lastStepsRan = 0;
@@ -424,6 +426,7 @@ class WeatherField {
         let stepsRan = 0;
         if (Number.isFinite(modelSeconds) && modelSeconds > 0) {
             stepsRan = this.core.advanceModelSeconds(modelSeconds) || 0;
+            if (stepsRan > 0) this._refreshEventProduct();
         }
         this._lastStepsRan = stepsRan;
         if (Number.isFinite(simTimeSeconds)) {
@@ -456,9 +459,10 @@ class WeatherField {
     }
 
     setSeed(seed) {
-        this.core.setSeed(seed);
+        this.kernel?.setSeed?.(seed);
         this._cloudNoiseLow = this._buildCloudNoise(this._texW, this._texH, (seed ?? 0) + 101);
         this._cloudNoiseHigh = this._buildCloudNoise(this._texW, this._texH, (seed ?? 0) + 509);
+        this.eventProduct = null;
         this._paintAccumSeconds = 0;
         this._lastSimTimeSeconds = null;
         this._lastStepsRan = 0;
@@ -472,6 +476,7 @@ class WeatherField {
 
     _resyncCoreTime(simTimeSeconds) {
         this.core.setTimeUTC(simTimeSeconds);
+        this._refreshEventProduct({ force: true });
         this._lastSimTimeSeconds = simTimeSeconds;
         this._paintAccumSeconds = 0;
         this._lastStepsRan = 0;
@@ -539,6 +544,27 @@ class WeatherField {
 
     getCoreSnapshot(options = {}) {
         return this.kernel?.getSnapshot?.(options) || null;
+    }
+
+    getEventProduct() {
+        return this.eventProduct || this.kernel?.getEventProduct?.() || null;
+    }
+
+    setEventProduct(product) {
+        this.eventProduct = product && typeof product === 'object' ? product : null;
+    }
+
+    _refreshEventProduct(options = {}) {
+        if (!this.kernel?.getEventProduct) return null;
+        try {
+            this.eventProduct = this.kernel.getEventProduct(options);
+            return this.eventProduct;
+        } catch (err) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('[WeatherField] event product update failed', err);
+            }
+            return this.eventProduct;
+        }
     }
 
     setV2ConvectionEnabled(enabled) {
@@ -630,7 +656,6 @@ class WeatherField {
             for (let y = 0; y < h; y++) {
                 const lat = (y / h) * grid.ny;
                 const j = Math.max(0, Math.min(grid.ny - 1, Math.floor(lat)));
-                const latDeg = grid.latDeg[j];
                 const kmPerDegLat = 111.0;
                 const kmPerDegLon = Math.max(1.0, kmPerDegLat * grid.cosLat[j]);
                 for (let x = 0; x < w; x++) {
@@ -719,8 +744,80 @@ class WeatherField {
             isHigh: true
         });
 
+        this._paintEventCloudSignatures(simTime);
+
         this.textureLow.needsUpdate = true;
         this.textureHigh.needsUpdate = true;
+    }
+
+    _paintEventCloudSignatures(simTimeSeconds) {
+        const events = this.eventProduct?.activeEvents;
+        if (!Array.isArray(events) || events.length === 0) return;
+        const drawEvents = events
+            .filter((event) => event?.type === 'hurricane' || event?.type === 'tropical-disturbance')
+            .slice(0, 8);
+        if (drawEvents.length === 0) return;
+        const w = this.canvasCloudHigh.width;
+        const h = this.canvasCloudHigh.height;
+        const kmPerPixelLat = (180 * 111) / Math.max(1, h);
+        const drawOnContext = (ctx, event, wrapOffsetX = 0) => {
+            const center = event.hurricane?.center || event.center;
+            if (!center) return;
+            const lat = Number(center.latDeg);
+            const lon = Number(center.lonDeg);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+            const intensity = Math.max(0.1, Math.min(1, event.hurricane?.intensity01 ?? event.intensity01 ?? 0.2));
+            const radiusKm = Math.max(120, event.hurricane?.rainShieldRadiusKm ?? event.radiusKm ?? 260);
+            const cx = ((lon + 180) / 360) * w + wrapOffsetX;
+            const cy = ((90 - lat) / 180) * h;
+            const radiusY = Math.max(5, radiusKm / kmPerPixelLat);
+            const radiusX = radiusY / Math.max(0.35, Math.cos((lat * Math.PI) / 180));
+            const spiralCount = Math.max(2, Math.min(6, event.hurricane?.rainShield?.spiralBandCount ?? Math.round(2 + intensity * 4)));
+            const spinSign = lat >= 0 ? 1 : -1;
+            const phase = ((simTimeSeconds || 0) / 5400) * spinSign;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            for (let arm = 0; arm < spiralCount; arm++) {
+                const armPhase = phase + (arm / spiralCount) * Math.PI * 2;
+                ctx.beginPath();
+                for (let n = 0; n <= 42; n++) {
+                    const t = n / 42;
+                    const r = radiusY * (0.18 + 0.82 * t);
+                    const angle = armPhase + spinSign * (0.9 + 4.2 * t);
+                    const px = cx + Math.cos(angle) * r * (radiusX / radiusY);
+                    const py = cy + Math.sin(angle) * r;
+                    if (n === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                const alpha = event.type === 'hurricane' ? 0.18 + 0.38 * intensity : 0.08 + 0.18 * intensity;
+                ctx.strokeStyle = `rgba(245, 250, 255, ${alpha})`;
+                ctx.lineWidth = Math.max(1, Math.min(5, radiusY * 0.055 * intensity));
+                ctx.stroke();
+            }
+            if (event.type === 'hurricane' && intensity >= 0.45) {
+                const eyeRadiusPx = Math.max(1.5, (event.hurricane?.eyeRadiusKm ?? 24) / kmPerPixelLat);
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, eyeRadiusPx / Math.max(0.45, Math.cos((lat * Math.PI) / 180)), eyeRadiusPx, 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(0.8, 0.25 + intensity * 0.55)})`;
+                ctx.fill();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, eyeRadiusPx * 1.7, eyeRadiusPx * 1.25, 0, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${0.28 + intensity * 0.34})`;
+                ctx.lineWidth = Math.max(1, eyeRadiusPx * 0.35);
+                ctx.stroke();
+            }
+            ctx.restore();
+        };
+        for (const event of drawEvents) {
+            for (const offset of [-w, 0, w]) {
+                drawOnContext(this.ctxCloudLow, event, offset);
+                drawOnContext(this.ctxCloudHigh, event, offset);
+            }
+        }
     }
 
     _paintDebug() {

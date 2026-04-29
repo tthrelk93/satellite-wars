@@ -1,4 +1,5 @@
 import { WeatherCore5 } from '../v2/core5.js';
+import { WeatherEventLedger } from '../events/index.js';
 import {
   WEATHER_KERNEL_CONTRACT_VERSION,
   WEATHER_KERNEL_SNAPSHOT_SCHEMA,
@@ -13,6 +14,7 @@ import {
 export {
   WEATHER_KERNEL_CONTRACT_VERSION,
   WEATHER_KERNEL_DIAGNOSTICS_SCHEMA,
+  WEATHER_KERNEL_EVENT_PRODUCT_SCHEMA,
   WEATHER_KERNEL_EVENT_SEED_SCHEMA,
   WEATHER_KERNEL_GRID_FIELDS_SCHEMA,
   WEATHER_KERNEL_PUBLIC_FIELD_KEYS,
@@ -34,6 +36,9 @@ export class WeatherKernelRuntime {
     this.manifest = createWeatherKernelManifest(this.config);
     this.contractVersion = WEATHER_KERNEL_CONTRACT_VERSION;
     this.core = new WeatherCore5(this.config);
+    this.eventLedger = new WeatherEventLedger({ seed: this.config.seed ?? 0 });
+    this._lastEventProduct = null;
+    this._lastEventProductTimeUTC = null;
     this.ready = this.core._initPromise;
   }
 
@@ -56,6 +61,17 @@ export class WeatherKernelRuntime {
 
   setTimeUTC(seconds) {
     this.core.setTimeUTC?.(seconds);
+  }
+
+  setSeed(seed) {
+    this.core.setSeed?.(seed);
+    if (Number.isFinite(seed)) {
+      this.config = { ...this.config, seed: Number(seed) };
+      this.manifest = createWeatherKernelManifest(this.config);
+      this.eventLedger.reset({ seed: Number(seed) });
+      this._lastEventProduct = null;
+      this._lastEventProductTimeUTC = null;
+    }
   }
 
   setV2ConvectionEnabled(enabled) {
@@ -86,20 +102,41 @@ export class WeatherKernelRuntime {
     return createWeatherKernelDiagnostics(snapshot);
   }
 
+  getEventProduct({ force = false } = {}) {
+    const timeUTC = Number.isFinite(this.core?.timeUTC) ? this.core.timeUTC : 0;
+    if (!force && this._lastEventProduct && this._lastEventProductTimeUTC === timeUTC) {
+      return this._lastEventProduct;
+    }
+    this._lastEventProduct = this.eventLedger.updateFromCore({
+      grid: this.core.grid,
+      fields: this.core.fields,
+      state: this.core.state,
+      timeUTC,
+      manifest: this.manifest
+    });
+    this._lastEventProductTimeUTC = timeUTC;
+    return this._lastEventProduct;
+  }
+
   loadSnapshot(snapshot) {
     assertWeatherKernelSnapshot(snapshot, { requireFullState: true });
     this.core.loadStateSnapshot(snapshot);
+    this.eventLedger.reset({ seed: this.config.seed ?? 0 });
+    this._lastEventProduct = null;
+    this._lastEventProductTimeUTC = null;
   }
 
   getWorkerPayload({ mode = 'compact' } = {}) {
     const snapshot = this.getSnapshot({ mode });
+    const events = this.getEventProduct({ force: true });
     return {
       schema: WEATHER_KERNEL_SNAPSHOT_SCHEMA,
       contractVersion: WEATHER_KERNEL_CONTRACT_VERSION,
       manifest: this.manifest,
       timeUTC: snapshot.timeUTC,
       fields: snapshot.fields,
-      state: snapshot.state || null
+      state: snapshot.state || null,
+      events
     };
   }
 

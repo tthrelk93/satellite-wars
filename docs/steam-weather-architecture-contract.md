@@ -35,7 +35,7 @@ The versioned boundary is `src/weather/kernel`.
 
 ### Event Layer
 
-The event layer consumes kernel snapshots and diagnostics. It owns persistent high-level weather events:
+The event layer consumes kernel snapshots and diagnostics. The first implementation lives in `src/weather/events` and emits a deterministic `satellite-wars.weather-events.v1` product through the weather-kernel boundary. It owns persistent high-level weather events:
 
 - tropical disturbances and hurricanes
 - extratropical cyclones and frontal systems
@@ -45,6 +45,8 @@ The event layer consumes kernel snapshots and diagnostics. It owns persistent hi
 - blizzards, dust events, monsoon bursts, and heat/cold waves
 
 The event layer may feed lightweight influence fields back to visuals and gameplay. It must not rewrite global climate state unless a future contract explicitly allows two-way coupling.
+
+Current event objects include deterministic lifecycle, history, physical environment justification, and hurricane-specific forecast/satellite/radar signatures. Hurricanes are parameterized systems with center, radius, pressure proxy, wind field, rain shield, eye/eyewall, track, and intensity; they are rendered as lightweight cloud signatures tied to active event products.
 
 ### Local Downscaler
 
