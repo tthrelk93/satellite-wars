@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { WeatherCore5 } from './weather/v2/core5';
+import { createWeatherKernel } from './weather/kernel';
 import WeatherLogger from './weather/WeatherLogger';
 import { bilinear } from './weather/shared/bilinear';
 import { WeatherLogSink } from './weather/logSink';
@@ -34,7 +34,8 @@ class WeatherField {
         debugMode = 'clouds',
         autoLogEnabled = true
     } = {}) {
-        this.core = new WeatherCore5({ nx, ny, dt: modelDt, seed });
+        this.kernel = createWeatherKernel({ nx, ny, dt: modelDt, seed });
+        this.core = this.kernel.core;
         this.renderScale = renderScale;
         this.tickSeconds = tickSeconds;
         this._paintAccumSeconds = 0;
@@ -537,11 +538,11 @@ class WeatherField {
     }
 
     getCoreSnapshot(options = {}) {
-        return this.core?.getStateSnapshot?.(options) || null;
+        return this.kernel?.getSnapshot?.(options) || null;
     }
 
     setV2ConvectionEnabled(enabled) {
-        this.core.setV2ConvectionEnabled?.(enabled);
+        this.kernel?.setV2ConvectionEnabled?.(enabled);
     }
 
     logNow(simTimeSeconds, simContext = {}, reason) {

@@ -1,36 +1,15 @@
 /* eslint-env worker */
 /* eslint-disable no-restricted-globals */
-import { WeatherCore5 } from '../weather/v2/core5';
+import { createWeatherKernel, collectWeatherKernelTransferBuffers } from '../weather/kernel';
 
-let core = null;
+let kernel = null;
 let snapshotMode = 'compact';
 
-const isTypedArray = (value) => ArrayBuffer.isView(value) && !(value instanceof DataView);
-
-const collectTransferBuffers = (value, buffers = []) => {
-  if (!value || typeof value !== 'object') return buffers;
-  if (isTypedArray(value)) {
-    buffers.push(value.buffer);
-    return buffers;
-  }
-  if (Array.isArray(value)) {
-    value.forEach((item) => collectTransferBuffers(item, buffers));
-    return buffers;
-  }
-  Object.values(value).forEach((item) => collectTransferBuffers(item, buffers));
-  return buffers;
-};
-
 const postSnapshot = (type) => {
-  if (!core) return;
-  const snapshot = core.getStateSnapshot({ mode: snapshotMode });
-  const payload = {
-    timeUTC: snapshot.timeUTC,
-    fields: snapshot.fields,
-    state: snapshot.state || null
-  };
+  if (!kernel) return;
+  const payload = kernel.getWorkerPayload({ mode: snapshotMode });
   const message = { type, payload };
-  self.postMessage(message, collectTransferBuffers(payload));
+  self.postMessage(message, collectWeatherKernelTransferBuffers(payload));
 };
 
 self.onmessage = async (event) => {
@@ -41,22 +20,22 @@ self.onmessage = async (event) => {
   try {
     if (type === 'init') {
       snapshotMode = payload.snapshotMode === 'full' ? 'full' : 'compact';
-      core = new WeatherCore5({
+      kernel = createWeatherKernel({
         nx: payload.nx,
         ny: payload.ny,
         dt: payload.dt,
         seed: payload.seed,
         instrumentationMode: payload.instrumentationMode === 'disabled' ? 'disabled' : 'full'
       });
-      await core._initPromise;
+      await kernel.whenReady();
       if (Number.isFinite(payload.startTimeSeconds)) {
-        core.setTimeUTC(payload.startTimeSeconds);
+        kernel.setTimeUTC(payload.startTimeSeconds);
       }
       postSnapshot('ready');
       return;
     }
 
-    if (!core) {
+    if (!kernel) {
       self.postMessage({ type: 'error', payload: { message: 'worker-not-initialized' } });
       return;
     }
@@ -64,17 +43,17 @@ self.onmessage = async (event) => {
     if (type === 'step') {
       snapshotMode = payload.snapshotMode === 'full' ? 'full' : 'compact';
       if (Number.isFinite(payload.simSpeed)) {
-        core.setSimSpeed(payload.simSpeed);
+        kernel.setSimSpeed(payload.simSpeed);
       }
       if (Number.isFinite(payload.deltaSeconds) && payload.deltaSeconds > 0) {
-        core.advanceModelSeconds(payload.deltaSeconds);
+        kernel.advanceModelSeconds(payload.deltaSeconds);
       }
       postSnapshot('state');
       return;
     }
 
     if (type === 'setV2ConvectionEnabled') {
-      core.setV2ConvectionEnabled(Boolean(payload.enabled));
+      kernel.setV2ConvectionEnabled(Boolean(payload.enabled));
       postSnapshot('state');
       return;
     }
