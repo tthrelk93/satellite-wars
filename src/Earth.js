@@ -476,6 +476,12 @@ class Earth {
     this._weatherWorkerMaxStepSeconds = WEATHER_WORKER_MAX_STEP_SECONDS;
     this._weatherWorkerStallMs = WEATHER_WORKER_STALL_MS;
     this._weatherWorkerSnapshotMode = 'compact';
+    this._localDownscaleFocusRegions = [];
+    this._localDownscaleFocusKey = '';
+    this._localDownscaleFocusLastSentKey = '';
+    this._localDownscaleFocusLastUpdateMs = -Infinity;
+    this._localDownscaleFocusUpdateIntervalMs = 1500;
+    this._localDownscaleCameraWorld = new THREE.Vector3();
     this.latestForecastByPlayerId = new Map();
     this.forecastHistoryByPlayerId = new Map();
     this.forecastOverlayMesh = null;
@@ -678,7 +684,8 @@ class Earth {
       ny: LIVE_WEATHER_GRID_NY,
       renderScale: LIVE_WEATHER_RENDER_SCALE,
       tickSeconds: 0.35,
-      seed: this.weatherSeed
+      seed: this.weatherSeed,
+      autoStateLogEnabled: false
     });
     this.analysisWeatherField = new WeatherField({
       nx: LIVE_WEATHER_GRID_NX,
@@ -803,7 +810,8 @@ class Earth {
         seed: this.weatherSeed,
         startTimeSeconds: core.timeUTC,
         instrumentationMode: 'disabled',
-        snapshotMode: this._weatherWorkerSnapshotMode
+        snapshotMode: this._weatherWorkerSnapshotMode,
+        focusRegions: this._getLocalDownscaleFocusRegions()
       }
     });
   }
@@ -855,6 +863,7 @@ class Earth {
       }
     }
     this.weatherField?.setEventProduct?.(payload.events || null);
+    this.weatherField?.setLocalDownscaleProduct?.(payload.localDownscale || null);
     core.ready = true;
   }
 
@@ -974,6 +983,72 @@ class Earth {
   getActiveWeatherEvents() {
     const product = this.getWeatherEventProduct();
     return Array.isArray(product?.activeEvents) ? product.activeEvents : [];
+  }
+
+  _getCameraLocalFocusRegion() {
+    if (!this.camera || !this.parentObject) return null;
+    this.parentObject.updateMatrixWorld(true);
+    this.camera.updateMatrixWorld?.(true);
+    const local = this._localDownscaleCameraWorld;
+    this.camera.getWorldPosition(local);
+    this.parentObject.worldToLocal(local);
+    const distanceKm = local.length();
+    if (!(distanceKm > 1)) return null;
+    local.multiplyScalar(1 / distanceKm);
+    const latDeg = THREE.MathUtils.radToDeg(Math.asin(Math.max(-1, Math.min(1, local.y))));
+    const lonDeg = THREE.MathUtils.radToDeg(wrapRadToPi(Math.atan2(local.x, local.z)));
+    const altitudeKm = Math.max(0, distanceKm - this.earthRadiusKm);
+    const radiusKm = Math.max(240, Math.min(820, 260 + altitudeKm * 0.035));
+    return {
+      id: 'camera-primary',
+      kind: 'camera',
+      center: { latDeg, lonDeg },
+      radiusKm,
+      gridSize: altitudeKm < 3500 ? 27 : 23,
+      intensity01: 0.45
+    };
+  }
+
+  _getLocalDownscaleFocusRegions() {
+    const cameraRegion = this._getCameraLocalFocusRegion();
+    return cameraRegion ? [cameraRegion] : [];
+  }
+
+  _syncLocalDownscaleFocusRegions(nowMs = performance.now()) {
+    if (nowMs - this._localDownscaleFocusLastUpdateMs < this._localDownscaleFocusUpdateIntervalMs) {
+      return;
+    }
+    const regions = this._getLocalDownscaleFocusRegions();
+    const key = regions
+      .map((region) => {
+        const center = region.center || {};
+        const lat = Number.isFinite(center.latDeg) ? center.latDeg.toFixed(1) : 'na';
+        const lon = Number.isFinite(center.lonDeg) ? center.lonDeg.toFixed(1) : 'na';
+        const radius = Number.isFinite(region.radiusKm) ? Math.round(region.radiusKm) : 0;
+        return `${region.id}:${lat}:${lon}:${radius}:${region.gridSize}`;
+      })
+      .join('|');
+    this._localDownscaleFocusLastUpdateMs = nowMs;
+    if (key === this._localDownscaleFocusKey) {
+      if (key !== this._localDownscaleFocusLastSentKey && this._weatherWorkerReady && !this._weatherWorkerBusy) {
+        this._weatherWorker?.postMessage({
+          type: 'setLocalFocusRegions',
+          payload: { focusRegions: regions }
+        });
+        this._localDownscaleFocusLastSentKey = key;
+      }
+      return;
+    }
+    this._localDownscaleFocusKey = key;
+    this._localDownscaleFocusRegions = regions;
+    this.weatherField?.setLocalFocusRegions?.(regions);
+    if (this._weatherWorkerReady && !this._weatherWorkerBusy && key !== this._localDownscaleFocusLastSentKey) {
+      this._weatherWorker?.postMessage({
+        type: 'setLocalFocusRegions',
+        payload: { focusRegions: regions }
+      });
+      this._localDownscaleFocusLastSentKey = key;
+    }
   }
 
   _getActiveWeatherField() {
@@ -3569,8 +3644,22 @@ class Earth {
     const daySeconds = 86400;
     const dayFrac = (((rotationTimeSeconds / daySeconds) % 1) + 1) % 1;
     this.parentObject.rotation.y = 2 * Math.PI * (dayFrac - 0.5);
+    this._syncLocalDownscaleFocusRegions(perfStartMs);
     phaseStartMs = performance.now();
-    this.weatherField?.update(simTimeSeconds, realDtSeconds, simContext);
+    const windSourceCoreForPaintBudget = this.windStreamlineSource === 'reference' && this.windReferenceCore?.ready
+      ? this.windReferenceCore
+      : this.weatherField?.core;
+    const deferWeatherPaint = Boolean(
+      (this.windStreamlinesVisible || this.windStreamlineDiagnosticsEnabled)
+      && this.windStreamlineRenderer?.shouldRebuildField?.({
+        core: windSourceCoreForPaintBudget,
+        simTimeSeconds
+      })
+    );
+    const weatherSimContext = deferWeatherPaint
+      ? { ...simContext, deferWeatherPaint: true }
+      : simContext;
+    this.weatherField?.update(simTimeSeconds, realDtSeconds, weatherSimContext);
     this.analysisWeatherField?.update(simTimeSeconds, realDtSeconds, simContext);
     this._syncAnalysisFromTruthIfReady();
     this._updateAnalysisSigma2(simTimeSeconds);

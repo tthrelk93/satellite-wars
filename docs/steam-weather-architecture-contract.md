@@ -46,7 +46,7 @@ The event layer consumes kernel snapshots and diagnostics. The first implementat
 
 The event layer may feed lightweight influence fields back to visuals and gameplay. It must not rewrite global climate state unless a future contract explicitly allows two-way coupling.
 
-Current event objects include deterministic lifecycle, history, physical environment justification, and storm-specific forecast/satellite/radar signatures. Hurricanes are parameterized systems with center, radius, pressure proxy, wind field, rain shield, eye/eyewall, track, and intensity; they are rendered as lightweight cloud signatures tied to active event products. Severe-weather systems include an explicit ingredient index, supercell/outbreak/touchdown objects, hook-echo and velocity-couplet radar signatures, satellite anvil signatures, warning polygons, and damage swaths.
+Current event objects include deterministic lifecycle, history, physical environment justification, and storm-specific forecast/satellite/radar signatures. Hurricanes are parameterized systems with center, radius, pressure proxy, wind field, rain shield, eye/eyewall, track, and intensity; they are rendered as lightweight cloud signatures tied to active event products. Severe-weather systems include an explicit ingredient index, supercell/outbreak/touchdown objects, hook-echo and velocity-couplet radar signatures, satellite anvil signatures, warning polygons, and damage swaths. The local downscaling layer consumes these same event products to create deterministic high-resolution nested fields around active events and camera/gameplay focus regions without mutating or contradicting the global model.
 
 ### Local Downscaler
 
@@ -59,6 +59,8 @@ The downscaler consumes global fields plus event objects and emits local high-de
 - tornado touchdown tracks and damage swaths
 
 Downscaled output must be deterministic from the parent state, event id, seed, and local tile id.
+
+Current local downscale regions include bounded wind, rain, cloud, visibility, pressure, lightning, hail, terrain-lift, and tornado-track fields. They fade to the parent global grid at their region edge and are clipped by parent/event truth so detail can sharpen an eyewall, rain band, front, squall line, or tornadic supercell without inventing weather in a physically quiet parent scene.
 
 ### Renderer
 

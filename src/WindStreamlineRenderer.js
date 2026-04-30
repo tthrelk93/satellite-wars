@@ -623,6 +623,10 @@ class WindStreamlineRenderer {
     return (simTimeSeconds - this._lastFieldSimTimeSeconds) >= this.fieldUpdateCadenceSeconds;
   }
 
+  shouldRebuildField({ core, simTimeSeconds } = {}) {
+    return this._shouldRebuildField(core, simTimeSeconds);
+  }
+
   update({ core, simTimeSeconds, realDtSeconds } = {}) {
     if (!core?.ready) return;
     const updateStartMs = nowMs();

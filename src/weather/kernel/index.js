@@ -1,5 +1,6 @@
 import { WeatherCore5 } from '../v2/core5.js';
 import { WeatherEventLedger } from '../events/index.js';
+import { buildLocalDownscaleProduct } from '../downscale/localDownscaling.js';
 import {
   WEATHER_KERNEL_CONTRACT_VERSION,
   WEATHER_KERNEL_SNAPSHOT_SCHEMA,
@@ -17,6 +18,7 @@ export {
   WEATHER_KERNEL_EVENT_PRODUCT_SCHEMA,
   WEATHER_KERNEL_EVENT_SEED_SCHEMA,
   WEATHER_KERNEL_GRID_FIELDS_SCHEMA,
+  WEATHER_KERNEL_LOCAL_DOWNSCALE_SCHEMA,
   WEATHER_KERNEL_PUBLIC_FIELD_KEYS,
   WEATHER_KERNEL_REPLAY_SCHEMA,
   WEATHER_KERNEL_SNAPSHOT_SCHEMA,
@@ -39,6 +41,9 @@ export class WeatherKernelRuntime {
     this.eventLedger = new WeatherEventLedger({ seed: this.config.seed ?? 0 });
     this._lastEventProduct = null;
     this._lastEventProductTimeUTC = null;
+    this._lastLocalDownscaleProduct = null;
+    this._lastLocalDownscaleTimeUTC = null;
+    this.focusRegions = [];
     this.ready = this.core._initPromise;
   }
 
@@ -71,11 +76,19 @@ export class WeatherKernelRuntime {
       this.eventLedger.reset({ seed: Number(seed) });
       this._lastEventProduct = null;
       this._lastEventProductTimeUTC = null;
+      this._lastLocalDownscaleProduct = null;
+      this._lastLocalDownscaleTimeUTC = null;
     }
   }
 
   setV2ConvectionEnabled(enabled) {
     this.core.setV2ConvectionEnabled?.(Boolean(enabled));
+  }
+
+  setLocalFocusRegions(focusRegions = []) {
+    this.focusRegions = Array.isArray(focusRegions) ? focusRegions : [];
+    this._lastLocalDownscaleProduct = null;
+    this._lastLocalDownscaleTimeUTC = null;
   }
 
   advanceModelSeconds(modelSeconds) {
@@ -118,17 +131,49 @@ export class WeatherKernelRuntime {
     return this._lastEventProduct;
   }
 
+  getLocalDownscaleProduct({ force = false, eventProduct = null, focusRegions = null } = {}) {
+    const timeUTC = Number.isFinite(this.core?.timeUTC) ? this.core.timeUTC : 0;
+    const resolvedFocusRegions = Array.isArray(focusRegions) ? focusRegions : this.focusRegions;
+    const hasFocusRegions = Array.isArray(resolvedFocusRegions) && resolvedFocusRegions.length > 0;
+    if (!force && !hasFocusRegions && this._lastLocalDownscaleProduct && this._lastLocalDownscaleTimeUTC === timeUTC) {
+      return this._lastLocalDownscaleProduct;
+    }
+    const events = eventProduct || this.getEventProduct({ force });
+    const product = buildLocalDownscaleProduct({
+      grid: this.core.grid,
+      fields: this.core.fields,
+      state: this.core.state,
+      geo: this.core.geo,
+      eventProduct: events,
+      focusRegions: resolvedFocusRegions,
+      seed: this.config.seed ?? this.core.seed ?? 0,
+      timeUTC
+    });
+    if (!hasFocusRegions) {
+      this._lastLocalDownscaleProduct = product;
+      this._lastLocalDownscaleTimeUTC = timeUTC;
+    }
+    return product;
+  }
+
   loadSnapshot(snapshot) {
     assertWeatherKernelSnapshot(snapshot, { requireFullState: true });
     this.core.loadStateSnapshot(snapshot);
     this.eventLedger.reset({ seed: this.config.seed ?? 0 });
     this._lastEventProduct = null;
     this._lastEventProductTimeUTC = null;
+    this._lastLocalDownscaleProduct = null;
+    this._lastLocalDownscaleTimeUTC = null;
   }
 
   getWorkerPayload({ mode = 'compact' } = {}) {
     const snapshot = this.getSnapshot({ mode });
     const events = this.getEventProduct({ force: true });
+    const localDownscale = this.getLocalDownscaleProduct({
+      force: true,
+      eventProduct: events,
+      focusRegions: this.focusRegions
+    });
     return {
       schema: WEATHER_KERNEL_SNAPSHOT_SCHEMA,
       contractVersion: WEATHER_KERNEL_CONTRACT_VERSION,
@@ -136,7 +181,8 @@ export class WeatherKernelRuntime {
       timeUTC: snapshot.timeUTC,
       fields: snapshot.fields,
       state: snapshot.state || null,
-      events
+      events,
+      localDownscale
     };
   }
 

@@ -7,7 +7,8 @@ import { WeatherLogSink } from './weather/logSink';
 const AUTO_LOG_CADENCE_SECONDS = 6 * 3600;
 const AUTO_LOG_MAX_ENTRIES = 20000;
 const AUTO_LOG_INIT_RETRY_MS = 5000;
-const CLOUD_TEXTURE_SOFTEN_BLUR_PX = 2.0;
+const CLOUD_TEXTURE_SOFTEN_BLUR_PX = 0.0;
+const EXTERNAL_CORE_CLOUD_PAINT_CADENCE_SECONDS = 2.0;
 
 const nowMs = () => (
     typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -32,7 +33,8 @@ class WeatherField {
         modelDt = 120,
         seed,
         debugMode = 'clouds',
-        autoLogEnabled = true
+        autoLogEnabled = true,
+        autoStateLogEnabled = true
     } = {}) {
         this.kernel = createWeatherKernel({ nx, ny, dt: modelDt, seed });
         this.core = this.kernel.core;
@@ -48,8 +50,10 @@ class WeatherField {
         this.useExternalCore = false;
         this.renderEnabled = true;
         this.eventProduct = null;
+        this.localDownscaleProduct = null;
         this._lastStepsRan = 0;
         this._lastPaintSimTime = null;
+        this._nextExternalPaintLayer = 'low';
         this._needsCoreTimeSync = true;
         this.logger = new WeatherLogger();
         this.core.setLogger?.(this.logger);
@@ -57,6 +61,7 @@ class WeatherField {
         this._autoLogReady = false;
         this._autoLogInitInFlight = false;
         this._nextAutoLogInitAtMs = 0;
+        this._autoStateLogEnabled = Boolean(autoStateLogEnabled);
 
         const shouldAutoLog = autoLogEnabled && (process.env.NODE_ENV !== 'production' || process.env.REACT_APP_AUTO_LOG === '1');
         if (shouldAutoLog && typeof fetch !== 'undefined') {
@@ -367,7 +372,9 @@ class WeatherField {
             return;
         }
         phaseStartMs = nowMs();
-        this.logger?.recordIfDue({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan }, this.core);
+        if (this._autoStateLogEnabled) {
+            this.logger?.recordIfDue({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan }, this.core);
+        }
         perfStats.loggerMs += nowMs() - phaseStartMs;
         if (!this.renderEnabled) {
             this._paintAccumSeconds = 0;
@@ -375,14 +382,31 @@ class WeatherField {
             return;
         }
         const realDt = Number.isFinite(realDtSeconds) ? Math.max(0, realDtSeconds) : 0;
+        const paintCadenceSeconds = useExternalCore
+            ? Math.max(this.tickSeconds, EXTERNAL_CORE_CLOUD_PAINT_CADENCE_SECONDS)
+            : this.tickSeconds;
         this._paintAccumSeconds += realDt;
-        if (this._paintAccumSeconds < this.tickSeconds) {
+        if (this._paintAccumSeconds < paintCadenceSeconds) {
             finishPerf();
             return;
         }
-        this._paintAccumSeconds -= this.tickSeconds;
+        if (useExternalCore && simContext?.deferWeatherPaint) {
+            this._paintAccumSeconds = Math.min(this._paintAccumSeconds, paintCadenceSeconds);
+            finishPerf();
+            return;
+        }
+        this._paintAccumSeconds -= paintCadenceSeconds;
+        const paintOptions = useExternalCore
+            ? {
+                paintLow: this._nextExternalPaintLayer !== 'high',
+                paintHigh: this._nextExternalPaintLayer === 'high'
+            }
+            : null;
+        if (useExternalCore) {
+            this._nextExternalPaintLayer = this._nextExternalPaintLayer === 'high' ? 'low' : 'high';
+        }
         phaseStartMs = nowMs();
-        this._paintClouds(simTimeSeconds);
+        this._paintClouds(simTimeSeconds, paintOptions);
         perfStats.paintCloudsMs += nowMs() - phaseStartMs;
         phaseStartMs = nowMs();
         this._paintDebug();
@@ -463,6 +487,7 @@ class WeatherField {
         this._cloudNoiseLow = this._buildCloudNoise(this._texW, this._texH, (seed ?? 0) + 101);
         this._cloudNoiseHigh = this._buildCloudNoise(this._texW, this._texH, (seed ?? 0) + 509);
         this.eventProduct = null;
+        this.localDownscaleProduct = null;
         this._paintAccumSeconds = 0;
         this._lastSimTimeSeconds = null;
         this._lastStepsRan = 0;
@@ -552,18 +577,51 @@ class WeatherField {
 
     setEventProduct(product) {
         this.eventProduct = product && typeof product === 'object' ? product : null;
+        if (!this.localDownscaleProduct) {
+            this._refreshLocalDownscaleProduct({ force: true, eventProduct: this.eventProduct });
+        }
+    }
+
+    getLocalDownscaleProduct() {
+        return this.localDownscaleProduct || this.kernel?.getLocalDownscaleProduct?.({ eventProduct: this.eventProduct }) || null;
+    }
+
+    setLocalDownscaleProduct(product) {
+        this.localDownscaleProduct = product && typeof product === 'object' ? product : null;
+    }
+
+    setLocalFocusRegions(focusRegions = []) {
+        this.kernel?.setLocalFocusRegions?.(Array.isArray(focusRegions) ? focusRegions : []);
+        this._refreshLocalDownscaleProduct({ force: true, eventProduct: this.eventProduct });
     }
 
     _refreshEventProduct(options = {}) {
         if (!this.kernel?.getEventProduct) return null;
         try {
             this.eventProduct = this.kernel.getEventProduct(options);
+            this._refreshLocalDownscaleProduct({ force: options.force === true, eventProduct: this.eventProduct });
             return this.eventProduct;
         } catch (err) {
             if (process.env.NODE_ENV !== 'production') {
                 console.warn('[WeatherField] event product update failed', err);
             }
             return this.eventProduct;
+        }
+    }
+
+    _refreshLocalDownscaleProduct(options = {}) {
+        if (!this.kernel?.getLocalDownscaleProduct) return this.localDownscaleProduct;
+        try {
+            this.localDownscaleProduct = this.kernel.getLocalDownscaleProduct({
+                force: options.force === true,
+                eventProduct: options.eventProduct || this.eventProduct
+            });
+            return this.localDownscaleProduct;
+        } catch (err) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('[WeatherField] local downscale update failed', err);
+            }
+            return this.localDownscaleProduct;
         }
     }
 
@@ -613,8 +671,9 @@ class WeatherField {
         return out;
     }
 
-    _paintClouds(simTimeSeconds) {
+    _paintClouds(simTimeSeconds, { paintLow = true, paintHigh = true } = {}) {
         if (!this.core.ready) return;
+        if (!paintLow && !paintHigh) return;
         const { grid, fields } = this.core;
 
         const simTime = Number.isFinite(simTimeSeconds) ? simTimeSeconds : this.core.timeUTC || 0;
@@ -712,47 +771,157 @@ class WeatherField {
             this._softenLayerCanvas(ctx);
         };
 
-        drawLayer({
-            ctx: this.ctxCloudLow,
-            img: this.imgCloudLow,
-            data: this.dataCloudLow,
-            cloudField: fields.cloudLow,
-            tauField: fields.tauLow,
-            uField: fields.u,
-            vField: fields.v,
-            advectSeconds,
-            noiseField: this._cloudNoiseLow,
-            shadeBase: 230,
-            shadeVar: 24,
-            renderParams: this.renderParams,
-            isHigh: false
-        });
+        if (paintLow) {
+            drawLayer({
+                ctx: this.ctxCloudLow,
+                img: this.imgCloudLow,
+                data: this.dataCloudLow,
+                cloudField: fields.cloudLow,
+                tauField: fields.tauLow,
+                uField: fields.u,
+                vField: fields.v,
+                advectSeconds,
+                noiseField: this._cloudNoiseLow,
+                shadeBase: 230,
+                shadeVar: 24,
+                renderParams: this.renderParams,
+                isHigh: false
+            });
+        }
 
-        drawLayer({
-            ctx: this.ctxCloudHigh,
-            img: this.imgCloudHigh,
-            data: this.dataCloudHigh,
-            cloudField: fields.cloudHigh,
-            tauField: fields.tauHigh,
-            uField: fields.uU,
-            vField: fields.vU,
-            advectSeconds,
-            noiseField: this._cloudNoiseHigh,
-            shadeBase: 240,
-            shadeVar: 20,
-            renderParams: this.renderParams,
-            isHigh: true
-        });
+        if (paintHigh) {
+            drawLayer({
+                ctx: this.ctxCloudHigh,
+                img: this.imgCloudHigh,
+                data: this.dataCloudHigh,
+                cloudField: fields.cloudHigh,
+                tauField: fields.tauHigh,
+                uField: fields.uU,
+                vField: fields.vU,
+                advectSeconds,
+                noiseField: this._cloudNoiseHigh,
+                shadeBase: 240,
+                shadeVar: 20,
+                renderParams: this.renderParams,
+                isHigh: true
+            });
+        }
 
-        this._paintEventCloudSignatures(simTime);
+        this._paintEventCloudSignatures(simTime, { paintLow, paintHigh });
+        this._paintLocalDownscaleSignatures(simTime, { paintLow, paintHigh });
 
-        this.textureLow.needsUpdate = true;
-        this.textureHigh.needsUpdate = true;
+        if (paintLow) this.textureLow.needsUpdate = true;
+        if (paintHigh) this.textureHigh.needsUpdate = true;
     }
 
-    _paintEventCloudSignatures(simTimeSeconds) {
+    _paintLocalDownscaleSignatures(simTimeSeconds, { paintLow = true, paintHigh = true } = {}) {
+        const regions = this.localDownscaleProduct?.regions;
+        if (!Array.isArray(regions) || regions.length === 0) return;
+        if (!paintLow && !paintHigh) return;
+        const w = this.canvasCloudLow.width;
+        const h = this.canvasCloudLow.height;
+        const kmPerPixelLat = (180 * 111) / Math.max(1, h);
+        const projectLatLon = (lat, lon, wrapOffsetX = 0) => ({
+            x: ((lon + 180) / 360) * w + wrapOffsetX,
+            y: ((90 - lat) / 180) * h
+        });
+        const drawCell = (ctx, lat, lon, radiusPx, fillStyle, wrapOffsetX = 0) => {
+            const { x, y } = projectLatLon(lat, lon, wrapOffsetX);
+            ctx.beginPath();
+            ctx.ellipse(x, y, radiusPx / Math.max(0.35, Math.cos((lat * Math.PI) / 180)), radiusPx, 0, 0, Math.PI * 2);
+            ctx.fillStyle = fillStyle;
+            ctx.fill();
+        };
+        const drawFastCell = (ctx, lat, lon, radiusPx, fillStyle, wrapOffsetX = 0) => {
+            const { x, y } = projectLatLon(lat, lon, wrapOffsetX);
+            const rx = radiusPx / Math.max(0.35, Math.cos((lat * Math.PI) / 180));
+            ctx.fillStyle = fillStyle;
+            ctx.fillRect(x - rx, y - radiusPx, rx * 2, radiusPx * 2);
+        };
+        for (const region of regions.slice(0, 8)) {
+            const fields = region.fields || {};
+            const nx = region.grid?.nx || 0;
+            const ny = region.grid?.ny || 0;
+            if (!nx || !ny || !fields.latDeg || !fields.lonDeg) continue;
+            const isFocusRegion = region.source === 'focus';
+            const stride = isFocusRegion ? (nx > 21 ? 3 : 2) : (nx > 27 ? 2 : 1);
+            const cellRadius = Math.max(0.8, Math.min(isFocusRegion ? 2.2 : 3.5, (region.spacingKm || 20) / kmPerPixelLat * 0.48));
+            const paintCell = isFocusRegion ? drawFastCell : drawCell;
+            const phase = (Number.isFinite(simTimeSeconds) ? simTimeSeconds : 0) / 1800;
+            if (paintLow) {
+                this.ctxCloudLow.save();
+                this.ctxCloudLow.globalCompositeOperation = 'lighter';
+            }
+            if (paintHigh) {
+                this.ctxCloudHigh.save();
+                this.ctxCloudHigh.globalCompositeOperation = 'lighter';
+            }
+            for (let y = 0; y < ny; y += stride) {
+                for (let x = 0; x < nx; x += stride) {
+                    const p = y * nx + x;
+                    const weight = fields.detailWeight?.[p] || 0;
+                    if (weight < 0.06) continue;
+                    const lat = fields.latDeg[p];
+                    const lon = fields.lonDeg[p];
+                    const rain = fields.rainRateMmHr?.[p] || 0;
+                    const low = fields.cloudLow?.[p] || 0;
+                    const high = fields.cloudHigh?.[p] || 0;
+                    const lightning = fields.lightningRate?.[p] || 0;
+                    const hail = fields.hailRisk?.[p] || 0;
+                    const tornado = fields.tornadoTrackMask?.[p] || 0;
+                    const parentRain = fields.parentRainRateMmHr?.[p] || 0;
+                    const focusMateriality = isFocusRegion
+                        ? Math.min(1, Math.max(0, rain - parentRain) * 5 + Math.max(0, low - 0.36) * 0.7 + Math.max(0, high - 0.34) * 0.45)
+                        : 1;
+                    if (focusMateriality < 0.04) continue;
+                    const pulse = 0.82 + 0.18 * Math.sin(phase + p * 0.37);
+                    const lowAlpha = Math.min(0.38, weight * focusMateriality * (0.02 + rain * 0.075 + low * 0.12 + hail * 0.16 + tornado * 0.28)) * pulse;
+                    const highAlpha = Math.min(0.34, weight * focusMateriality * (0.018 + high * 0.13 + rain * 0.036 + lightning * 0.08));
+                    if (paintLow && lowAlpha > 0.012) {
+                        const warmTint = Math.min(255, 218 + hail * 32 + tornado * 20);
+                        for (const offset of [-w, 0, w]) {
+                            paintCell(this.ctxCloudLow, lat, lon, cellRadius * (1.0 + rain * 0.09), `rgba(${warmTint}, ${232 - hail * 40}, ${246 - tornado * 70}, ${lowAlpha})`, offset);
+                        }
+                    }
+                    if (paintHigh && highAlpha > 0.012) {
+                        for (const offset of [-w, 0, w]) {
+                            paintCell(this.ctxCloudHigh, lat, lon, cellRadius * 1.45, `rgba(248, 252, 255, ${highAlpha})`, offset);
+                        }
+                    }
+                    if (paintHigh && lightning > 0.22 && ((p + Math.floor(phase * 7)) % 17 === 0)) {
+                        for (const offset of [-w, 0, w]) {
+                            paintCell(this.ctxCloudHigh, lat, lon, cellRadius * 0.8, `rgba(255, 244, 180, ${Math.min(0.34, lightning * weight)})`, offset);
+                        }
+                    }
+                }
+            }
+            if (paintLow && Array.isArray(region.tornadoTracks) && region.tornadoTracks.length > 0) {
+                this.ctxCloudLow.lineCap = 'round';
+                for (const track of region.tornadoTracks) {
+                    const start = track.start;
+                    const end = track.end;
+                    if (!start || !end) continue;
+                    for (const offset of [-w, 0, w]) {
+                        const a = projectLatLon(start.latDeg, start.lonDeg, offset);
+                        const b = projectLatLon(end.latDeg, end.lonDeg, offset);
+                        this.ctxCloudLow.beginPath();
+                        this.ctxCloudLow.moveTo(a.x, a.y);
+                        this.ctxCloudLow.lineTo(b.x, b.y);
+                        this.ctxCloudLow.strokeStyle = 'rgba(255, 110, 110, 0.34)';
+                        this.ctxCloudLow.lineWidth = Math.max(1, cellRadius * 0.85);
+                        this.ctxCloudLow.stroke();
+                    }
+                }
+            }
+            if (paintLow) this.ctxCloudLow.restore();
+            if (paintHigh) this.ctxCloudHigh.restore();
+        }
+    }
+
+    _paintEventCloudSignatures(simTimeSeconds, { paintLow = true, paintHigh = true } = {}) {
         const events = this.eventProduct?.activeEvents;
         if (!Array.isArray(events) || events.length === 0) return;
+        if (!paintLow && !paintHigh) return;
         const tropicalEvents = events
             .filter((event) => event?.type === 'hurricane' || event?.type === 'tropical-disturbance')
             .slice(0, 8);
@@ -862,67 +1031,71 @@ class WeatherField {
             const anvilX = anvilY / Math.max(0.45, Math.cos((lat * Math.PI) / 180));
             const anvilCx = cx + eastUnit * anvilX * 0.35;
             const anvilCy = cy - northUnit * anvilY * 0.35;
-            this.ctxCloudHigh.save();
-            this.ctxCloudHigh.globalCompositeOperation = 'lighter';
-            this.ctxCloudHigh.beginPath();
-            this.ctxCloudHigh.ellipse(anvilCx, anvilCy, anvilX * 1.25, anvilY * 0.72, Math.atan2(northUnit, eastUnit), 0, Math.PI * 2);
-            this.ctxCloudHigh.fillStyle = `rgba(245, 250, 255, ${0.10 + 0.22 * intensity})`;
-            this.ctxCloudHigh.fill();
-            if (severe.satelliteSignature?.overshootingTop) {
+            if (paintHigh) {
+                this.ctxCloudHigh.save();
+                this.ctxCloudHigh.globalCompositeOperation = 'lighter';
                 this.ctxCloudHigh.beginPath();
-                this.ctxCloudHigh.arc(cx, cy, Math.max(1.5, anvilY * 0.13), 0, Math.PI * 2);
-                this.ctxCloudHigh.fillStyle = `rgba(255, 255, 255, ${0.35 + 0.28 * intensity})`;
+                this.ctxCloudHigh.ellipse(anvilCx, anvilCy, anvilX * 1.25, anvilY * 0.72, Math.atan2(northUnit, eastUnit), 0, Math.PI * 2);
+                this.ctxCloudHigh.fillStyle = `rgba(245, 250, 255, ${0.10 + 0.22 * intensity})`;
                 this.ctxCloudHigh.fill();
+                if (severe.satelliteSignature?.overshootingTop) {
+                    this.ctxCloudHigh.beginPath();
+                    this.ctxCloudHigh.arc(cx, cy, Math.max(1.5, anvilY * 0.13), 0, Math.PI * 2);
+                    this.ctxCloudHigh.fillStyle = `rgba(255, 255, 255, ${0.35 + 0.28 * intensity})`;
+                    this.ctxCloudHigh.fill();
+                }
+                this.ctxCloudHigh.restore();
             }
-            this.ctxCloudHigh.restore();
 
-            this.ctxCloudLow.save();
-            this.ctxCloudLow.globalCompositeOperation = 'lighter';
-            drawPolygon(this.ctxCloudLow, severe.warningPolygon, wrapOffsetX, {
-                strokeStyle: `rgba(250, 204, 21, ${0.24 + 0.24 * intensity})`,
-                fillStyle: `rgba(250, 204, 21, ${0.025 + 0.035 * intensity})`,
-                lineWidth: Math.max(1, intensity * 2.2)
-            });
-            for (const swath of severe.damageSwaths || []) {
-                drawPolygon(this.ctxCloudLow, swath.polygon, wrapOffsetX, {
-                    strokeStyle: `rgba(248, 113, 113, ${0.16 + 0.22 * intensity})`,
-                    fillStyle: `rgba(127, 29, 29, ${0.05 + 0.08 * intensity})`,
-                    lineWidth: Math.max(1, intensity * 1.6)
+            if (paintLow) {
+                this.ctxCloudLow.save();
+                this.ctxCloudLow.globalCompositeOperation = 'lighter';
+                drawPolygon(this.ctxCloudLow, severe.warningPolygon, wrapOffsetX, {
+                    strokeStyle: `rgba(250, 204, 21, ${0.24 + 0.24 * intensity})`,
+                    fillStyle: `rgba(250, 204, 21, ${0.025 + 0.035 * intensity})`,
+                    lineWidth: Math.max(1, intensity * 2.2)
                 });
-            }
-            const hookRadius = Math.max(3, (25 + 70 * intensity) / kmPerPixelLat);
-            const hookSign = lat >= 0 ? 1 : -1;
-            this.ctxCloudLow.beginPath();
-            for (let n = 0; n <= 28; n++) {
-                const t = n / 28;
-                const angle = hookSign * (0.4 + 3.7 * t);
-                const r = hookRadius * (0.35 + 0.75 * t);
-                const px = cx - eastUnit * hookRadius * 0.45 + Math.cos(angle) * r;
-                const py = cy + northUnit * hookRadius * 0.35 + Math.sin(angle) * r;
-                if (n === 0) this.ctxCloudLow.moveTo(px, py);
-                else this.ctxCloudLow.lineTo(px, py);
-            }
-            this.ctxCloudLow.strokeStyle = `rgba(255, 255, 255, ${0.18 + 0.42 * intensity})`;
-            this.ctxCloudLow.lineWidth = Math.max(1.2, hookRadius * 0.14);
-            this.ctxCloudLow.lineCap = 'round';
-            this.ctxCloudLow.stroke();
-            if (severe.radarSignature?.velocityCouplet) {
-                const coupletOffset = Math.max(2.2, hookRadius * 0.38);
+                for (const swath of severe.damageSwaths || []) {
+                    drawPolygon(this.ctxCloudLow, swath.polygon, wrapOffsetX, {
+                        strokeStyle: `rgba(248, 113, 113, ${0.16 + 0.22 * intensity})`,
+                        fillStyle: `rgba(127, 29, 29, ${0.05 + 0.08 * intensity})`,
+                        lineWidth: Math.max(1, intensity * 1.6)
+                    });
+                }
+                const hookRadius = Math.max(3, (25 + 70 * intensity) / kmPerPixelLat);
+                const hookSign = lat >= 0 ? 1 : -1;
                 this.ctxCloudLow.beginPath();
-                this.ctxCloudLow.arc(cx - coupletOffset, cy, Math.max(1.5, hookRadius * 0.16), 0, Math.PI * 2);
-                this.ctxCloudLow.fillStyle = `rgba(56, 189, 248, ${0.18 + 0.25 * intensity})`;
-                this.ctxCloudLow.fill();
-                this.ctxCloudLow.beginPath();
-                this.ctxCloudLow.arc(cx + coupletOffset, cy, Math.max(1.5, hookRadius * 0.16), 0, Math.PI * 2);
-                this.ctxCloudLow.fillStyle = `rgba(248, 113, 113, ${0.18 + 0.25 * intensity})`;
-                this.ctxCloudLow.fill();
+                for (let n = 0; n <= 28; n++) {
+                    const t = n / 28;
+                    const angle = hookSign * (0.4 + 3.7 * t);
+                    const r = hookRadius * (0.35 + 0.75 * t);
+                    const px = cx - eastUnit * hookRadius * 0.45 + Math.cos(angle) * r;
+                    const py = cy + northUnit * hookRadius * 0.35 + Math.sin(angle) * r;
+                    if (n === 0) this.ctxCloudLow.moveTo(px, py);
+                    else this.ctxCloudLow.lineTo(px, py);
+                }
+                this.ctxCloudLow.strokeStyle = `rgba(255, 255, 255, ${0.18 + 0.42 * intensity})`;
+                this.ctxCloudLow.lineWidth = Math.max(1.2, hookRadius * 0.14);
+                this.ctxCloudLow.lineCap = 'round';
+                this.ctxCloudLow.stroke();
+                if (severe.radarSignature?.velocityCouplet) {
+                    const coupletOffset = Math.max(2.2, hookRadius * 0.38);
+                    this.ctxCloudLow.beginPath();
+                    this.ctxCloudLow.arc(cx - coupletOffset, cy, Math.max(1.5, hookRadius * 0.16), 0, Math.PI * 2);
+                    this.ctxCloudLow.fillStyle = `rgba(56, 189, 248, ${0.18 + 0.25 * intensity})`;
+                    this.ctxCloudLow.fill();
+                    this.ctxCloudLow.beginPath();
+                    this.ctxCloudLow.arc(cx + coupletOffset, cy, Math.max(1.5, hookRadius * 0.16), 0, Math.PI * 2);
+                    this.ctxCloudLow.fillStyle = `rgba(248, 113, 113, ${0.18 + 0.25 * intensity})`;
+                    this.ctxCloudLow.fill();
+                }
+                this.ctxCloudLow.restore();
             }
-            this.ctxCloudLow.restore();
         };
         for (const event of tropicalEvents) {
             for (const offset of [-w, 0, w]) {
-                drawTropicalOnContext(this.ctxCloudLow, event, offset);
-                drawTropicalOnContext(this.ctxCloudHigh, event, offset);
+                if (paintLow) drawTropicalOnContext(this.ctxCloudLow, event, offset);
+                if (paintHigh) drawTropicalOnContext(this.ctxCloudHigh, event, offset);
             }
         }
         for (const event of severeEvents) {

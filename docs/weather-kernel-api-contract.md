@@ -139,6 +139,7 @@ Kernel worker payloads may include a deterministic event product. It may include
 - physical environment fields used to justify each event
 - hurricane system signatures: center, radius, pressure proxy, wind field, rain shield, eye/eyewall, track, intensity, satellite signature, radar signature, and forecast signature
 - severe-weather system signatures: environment index, ingredient breakdown, storm mode, radar hook/couplet, satellite anvil, warning polygon, tornado touchdown tracks, and damage swaths
+- local downscaling product: bounded nested regions around active events or camera/gameplay focus points, with high-detail wind, rain, cloud, visibility, pressure, lightning, hail, terrain-lift, and tornado-track fields constrained by parent grid/event truth
 
 The event product must not mutate global climate state. Renderers, forecast systems, gameplay warnings, and future local downscalers may consume it, but they must not reach into `WeatherCore5` internals to recreate the same objects.
 

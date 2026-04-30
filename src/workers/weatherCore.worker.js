@@ -31,6 +31,9 @@ self.onmessage = async (event) => {
       if (Number.isFinite(payload.startTimeSeconds)) {
         kernel.setTimeUTC(payload.startTimeSeconds);
       }
+      if (Array.isArray(payload.focusRegions)) {
+        kernel.setLocalFocusRegions(payload.focusRegions);
+      }
       postSnapshot('ready');
       return;
     }
@@ -61,6 +64,13 @@ self.onmessage = async (event) => {
     if (type === 'setSnapshotMode') {
       snapshotMode = payload.mode === 'full' ? 'full' : 'compact';
       postSnapshot('state');
+      return;
+    }
+
+    if (type === 'setLocalFocusRegions') {
+      kernel.setLocalFocusRegions(Array.isArray(payload.focusRegions) ? payload.focusRegions : []);
+      postSnapshot('state');
+      return;
     }
   } catch (error) {
     self.postMessage({
