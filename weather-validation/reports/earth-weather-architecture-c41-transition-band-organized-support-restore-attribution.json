@@ -1,0 +1,93 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c41-transition-band-organized-support-restore-attribution.v1",
+  "generatedAt": "2026-04-16T11:14:35.566Z",
+  "decision": {
+    "verdict": "transition_band_restore_shifts_override_equatorward_and_slightly_relieves_sign_defect_but_reloads_26p25_receiver_lane",
+    "nextMove": "Architecture C42: equatorward-transition organized-support restore experiment"
+  },
+  "quickComparison": {
+    "c32CrossEq": -356.96839,
+    "c40CrossEq": -355.94778,
+    "c32ItczWidth": 23.374,
+    "c40ItczWidth": 23.386,
+    "c32DryNorth": 1.122,
+    "c40DryNorth": 1.128,
+    "c32DrySouth": 0.493,
+    "c40DrySouth": 0.49,
+    "c32Westerlies": 1.219,
+    "c40Westerlies": 1.225,
+    "c32OceanCond": 0.10807,
+    "c40OceanCond": 0.11898
+  },
+  "transportComparison": {
+    "c32EqLower": -18.3439,
+    "c40EqLower": -18.50334,
+    "c32EqMid": -16.74764,
+    "c40EqMid": -16.63613,
+    "c32EqUpper": -12.82647,
+    "c40EqUpper": -12.71408,
+    "c32EqLowerZonal": -14.37359,
+    "c40EqLowerZonal": -14.4051,
+    "c32EqLowerEddy": -3.97031,
+    "c40EqLowerEddy": -4.09824,
+    "c32EqMidZonal": -13.06211,
+    "c40EqMidZonal": -13.01697,
+    "c32EqMidEddy": -3.68553,
+    "c40EqMidEddy": -3.61915,
+    "c32EqUpperZonal": -7.78225,
+    "c40EqUpperZonal": -7.77471,
+    "c32EqUpperEddy": -5.04422,
+    "c40EqUpperEddy": -4.93937,
+    "c32DryLower35": -23.19317,
+    "c40DryLower35": -22.74287,
+    "c32DryMid35": -17.28133,
+    "c40DryMid35": -17.04799,
+    "c32DryUpper35": -6.28724,
+    "c40DryUpper35": -6.25064
+  },
+  "dryBeltComparison": {
+    "c32Carryover": 0.17351,
+    "c40Carryover": 0.17677,
+    "c32Persistence": 0.17183,
+    "c40Persistence": 0.17511,
+    "c32WeakErosion": 0.16844,
+    "c40WeakErosion": 0.17145,
+    "c32UpperCloudPath": 0.19258,
+    "c40UpperCloudPath": 0.19571,
+    "c32DominantVaporImport": -23.37997,
+    "c40DominantVaporImport": -22.94616,
+    "c32CloudRecirc": 0.44108,
+    "c40CloudRecirc": 0.49162,
+    "c32NorthReturn": 3554.21558,
+    "c40NorthReturn": 3407.08074
+  },
+  "latitudeShiftComparison": {
+    "c3226Hits": 18.625,
+    "c4026Hits": 18.667,
+    "c3233Hits": 5.698,
+    "c4033Hits": 5.51,
+    "c3226Removed": 14.891,
+    "c4026Removed": 14.901,
+    "c3233Removed": 4.531,
+    "c4033Removed": 4.309,
+    "c3226Carryover": 0.05,
+    "c4026Carryover": 0.06,
+    "c3233Carryover": 0.429,
+    "c4033Carryover": 0.424
+  },
+  "thermodynamicComparison": {
+    "c32PrimaryRegime": "dynamicsSupported",
+    "c40PrimaryRegime": "mixed",
+    "c32DynamicsSupport": 0.69295,
+    "c40DynamicsSupport": 0.65542,
+    "c32MoistureSupport": 0.58914,
+    "c40MoistureSupport": 0.59672
+  },
+  "nextContract": {
+    "focusTargets": [
+      "keep the strict C32 organized-support / potential carveout in the equatorial core",
+      "restore organized-support only in the equatorward transition shoulder around 18°–24°",
+      "avoid reopening the 26.25° receiver lane while preserving a live transition-band geometry"
+    ]
+  }
+}

@@ -1,5 +1,5 @@
-import { createLatLonGrid } from '../grid';
-import { Omega } from '../constants';
+import { createLatLonGrid } from '../grid.js';
+import { Omega } from '../constants.js';
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 

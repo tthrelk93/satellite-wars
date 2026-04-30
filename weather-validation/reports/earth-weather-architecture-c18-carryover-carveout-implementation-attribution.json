@@ -1,0 +1,60 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c18-carryover-carveout-implementation-attribution.v1",
+  "generatedAt": "2026-04-16T07:40:30.038Z",
+  "decision": {
+    "verdict": "carryover_carveout_relief_preserves_zonal_mean_but_eddy_export_remains_primary_blocker",
+    "nextMove": "Architecture C19: zonal-mean-preserving eddy export attribution"
+  },
+  "quickComparison": {
+    "c15CrossEq": -364.55266,
+    "c17CrossEq": -353.31687,
+    "c15ItczWidth": 24.094,
+    "c17ItczWidth": 23.454,
+    "c15DryNorth": 1.404,
+    "c17DryNorth": 1.121,
+    "c15DrySouth": 0.589,
+    "c17DrySouth": 0.511,
+    "c15Westerlies": 1.209,
+    "c17Westerlies": 1.202,
+    "c15OceanCond": 0.15331,
+    "c17OceanCond": 0.14144
+  },
+  "transportComparison": {
+    "c15EquatorZonal": -274.13377,
+    "c17EquatorZonal": -249.95949,
+    "c15EquatorEddy": -96.97265,
+    "c17EquatorEddy": -109.90385,
+    "c15EquatorMidUpper": -239.13535,
+    "c17EquatorMidUpper": -226.72426,
+    "c15EquatorVelocity": -20.23835,
+    "c17EquatorVelocity": -20.79729,
+    "c15North35Vapor": -360.61691,
+    "c17North35Vapor": -373.49016
+  },
+  "carryoverComparison": {
+    "c15Carryover": 0.39867,
+    "c17Carryover": 0.22666,
+    "c15Persistence": 0.39786,
+    "c17Persistence": 0.22501,
+    "c15WeakErosion": 0.38477,
+    "c17WeakErosion": 0.21732,
+    "c15CloudRecirc": 2.22467,
+    "c17CloudRecirc": 0.39988
+  },
+  "thermodynamicComparison": {
+    "c15PrimaryRegime": "dynamicsSupported",
+    "c17PrimaryRegime": "dynamicsSupported",
+    "c15DynamicsSupport": 0.72656,
+    "c17DynamicsSupport": 0.68867,
+    "c15MoistureSupport": 0.55332,
+    "c17MoistureSupport": 0.59061
+  },
+  "nextContract": {
+    "focusTargets": [
+      "equatorial eddy vapor-flux branch in the transport-interface budget",
+      "equatorial low-level velocity / preserved low-level momentum layer",
+      "35° northward vapor interface burden after the carryover carveout",
+      "windEddyNudge5.js and nudging5.js preserve-layer interaction with the donor scaffold"
+    ]
+  }
+}

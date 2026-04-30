@@ -1,0 +1,112 @@
+{
+  "schema": "satellite-wars.phase1zd-suppressed-mass-fate-design.v1",
+  "generatedAt": "2026-04-14T08:13:24.204Z",
+  "paths": {
+    "reintegrationJsonPath": "weather-validation/reports/phase1zc-shoulder-guard-reintegration-audit.json",
+    "reportPath": "weather-validation/reports/phase1zd-suppressed-mass-fate-design.md",
+    "jsonPath": "weather-validation/reports/phase1zd-suppressed-mass-fate-design.json"
+  },
+  "verdict": "in_place_vapor_retention",
+  "nextPhase": "Phase 1ZE: Suppressed-Mass Fate Counterfactuals",
+  "recommendation": "The next phase should compare a capped local sink/export path against a delayed-rainout path, because the current shoulder guard is leaving suppressed mass in-place as vapor and recharging the same lane.",
+  "reintegrationReference": {
+    "verdict": "same_lane_vapor_recharge",
+    "nextPhase": "Phase 1ZD: Suppressed-Mass Fate Design"
+  },
+  "liveBandEvidence": {
+    "tropicalShoulderCoreNetCondensationDeltaKgM2": 0.01603,
+    "tropicalShoulderCoreReconstructedRawCondensationDeltaKgM2": 0.03461,
+    "tropicalShoulderCoreAppliedSuppressionOnKgM2": 0.01858,
+    "tropicalShoulderCoreTcwDeltaKgM2": 0.1055,
+    "tropicalShoulderCoreMidRhDeltaFrac": 0.003,
+    "adjacentShoulderSpilloverDeltaKgM2": 0.00635,
+    "adjacentShoulderSpilloverTcwDeltaKgM2": 0.168,
+    "adjacentShoulderSpilloverMidRhDeltaFrac": 0.007,
+    "targetEntryAppliedSuppressionOnKgM2": 0
+  },
+  "witness": {
+    "qvSumOff": 0.01663912,
+    "qvSumOn": 0.0167113,
+    "qvSumDelta": 0.00007218,
+    "qcSumOff": 0.00036088,
+    "qcSumOn": 0.0002887,
+    "qcSumDelta": -0.00007218,
+    "level1QvOff": 0.01063912,
+    "level1QvOn": 0.0107113,
+    "level1QvDelta": 0.00007218,
+    "level1QcOff": 0.00036088,
+    "level1QcOn": 0.0002887,
+    "level1QcDelta": -0.00007218,
+    "condensationOffKgM2": 0.7022239,
+    "condensationOnKgM2": 0.56177908,
+    "condensationDeltaKgM2": -0.14044482,
+    "shoulderSuppressedMassKgM2": 0.14044477
+  },
+  "ranking": [
+    {
+      "key": "in_place_vapor_retention",
+      "label": "Suppressed shoulder mass is being retained locally as vapor in the current implementation.",
+      "score": 1,
+      "evidence": {
+        "qvSumDelta": 0.00007218,
+        "qcSumDelta": -0.00007218,
+        "level1QvDelta": 0.00007218,
+        "shoulderSuppressedMassKgM2": 0.14044477,
+        "tropicalShoulderCoreTcwDeltaKgM2": 0.1055,
+        "tropicalShoulderCoreMidRhDeltaFrac": 0.003
+      }
+    },
+    {
+      "key": "adjacent_spillover_requires_fate_aware_solution",
+      "label": "A smaller secondary rebound still leaks into the adjacent 12–22.5°N shoulder lane.",
+      "score": 1,
+      "evidence": {
+        "adjacentShoulderSpilloverDeltaKgM2": 0.00635,
+        "adjacentShoulderSpilloverTcwDeltaKgM2": 0.168,
+        "adjacentShoulderSpilloverMidRhDeltaFrac": 0.007
+      }
+    },
+    {
+      "key": "selector_geometry_is_no_longer_primary",
+      "label": "Selector geometry is not the main blocker anymore.",
+      "score": 1,
+      "evidence": {
+        "targetEntryCandidateOnKgM2": 0,
+        "targetEntryAppliedOnKgM2": 0,
+        "targetEntryExclusionOnFrac": 1
+      }
+    }
+  ],
+  "designOptions": [
+    {
+      "key": "local_sink_or_export_path",
+      "label": "Route suppressed shoulder mass into a capped local sink/export path instead of leaving it in-place as vapor.",
+      "score": 1,
+      "rationale": "Best fit to the live 3–12°N recharge and the one-column witness that shows more qv and less qc after suppression."
+    },
+    {
+      "key": "delayed_rainout_or_buffered_removal",
+      "label": "Convert suppressed shoulder mass into a delayed rainout / buffered removal lane rather than immediate in-place retention.",
+      "score": 0.95,
+      "rationale": "Could reduce same-step recharge while keeping the patch conservative, but still needs proof it will not simply move the rebound by one step."
+    },
+    {
+      "key": "selector_only_retune",
+      "label": "Retune selector shape or amplitude again without changing suppressed-mass fate.",
+      "score": 0,
+      "rationale": "Not recommended. 1ZB/1ZC already proved the geometry is basically right and the target-entry false positive is resolved."
+    }
+  ],
+  "rootCauseAssessment": {
+    "ruledIn": [
+      "The current shoulder guard leaves more qv and less qc behind in the same column when it suppresses condensation.",
+      "That in-place vapor retention matches the 30-day increase in tropical-shoulder TCW and RH."
+    ],
+    "ruledOut": [
+      "Another selector-geometry retune is not the primary next move."
+    ],
+    "ambiguous": [
+      "Whether the best fix is a local sink/export path or a delayed-rainout/buffered-removal path still needs counterfactual testing."
+    ]
+  }
+}

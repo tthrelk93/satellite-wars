@@ -1,0 +1,33 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c1-hybrid-seam-contract.v1",
+  "generatedAt": "2026-04-16T02:27:03.188Z",
+  "designJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/earth-weather-architecture-c-design.json",
+  "contract": {
+    "verdict": "rollback_vertical_core_current_partition_adapter_contract",
+    "donorBaseBranch": "codex/world-class-weather-loop-archive-20260407-0745",
+    "donorFiles": [
+      "src/weather/v2/core5.js",
+      "src/weather/v2/vertical5.js"
+    ],
+    "preserveFiles": [
+      "src/weather/v2/microphysics5.js"
+    ],
+    "adapterFiles": [
+      "src/weather/v2/state5.js",
+      "src/weather/validation/diagnostics.js",
+      "scripts/agent/planetary-realism-audit.mjs"
+    ],
+    "excludedCurrentFiles": [
+      "src/weather/v2/core5.js",
+      "src/weather/v2/vertical5.js"
+    ],
+    "implementationOrder": [
+      "Create a donor worktree from the rollback archive branch.",
+      "Keep rollback donor files as the initial circulation scaffold.",
+      "Forward-port current partition-preserving files onto the donor base.",
+      "Forward-port current adapter/audit files needed to run the modern scorecard.",
+      "Run a bounded hybrid benchmark before any new parameter tuning."
+    ],
+    "nextMove": "Architecture C2: donor-base hybrid worktree benchmark"
+  }
+}

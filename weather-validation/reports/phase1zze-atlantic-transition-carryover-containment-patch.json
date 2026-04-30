@@ -1,0 +1,38 @@
+{
+  "schema": "satellite-wars.phase1zze-atlantic-transition-carryover-containment-patch.v1",
+  "generatedAt": "2026-04-15T02:22:55.720Z",
+  "paths": {
+    "offPath": "/tmp/phase1zze-off.json",
+    "onPath": "/tmp/phase1zze-on.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zze-atlantic-transition-carryover-containment-patch.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zze-atlantic-transition-carryover-containment-patch.json"
+  },
+  "verdict": "atlantic_transition_carryover_containment_with_residual_redistribution",
+  "keepPatch": false,
+  "nextPhase": "Phase 1ZZF: Transition Carryover Admission Attribution",
+  "recommendation": "Do not enable the Atlantic transition carryover containment bundle by default yet. The live 18.75N transition lane never actually admits the containment taper, so the next step is admission attribution rather than stronger amplitude tuning.",
+  "metrics": {
+    "itczWidthDeg": 0.004,
+    "subtropicalDryNorthRatio": 0,
+    "subtropicalDrySouthRatio": 0.001,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.00129,
+    "midlatitudeWesterliesNorthU10Ms": 0
+  },
+  "laneDeltas": {
+    "receiver26N": 0.00032,
+    "spillover18N": 0.00166,
+    "source11N": -0.0051,
+    "edge3N": -0.00869,
+    "southMirror11S": 0.0002
+  },
+  "liveState": {
+    "transitionContainment18N": 0,
+    "transitionContainmentApplied18N": 0,
+    "importedPersistence18NDelta": -0.00018,
+    "carryover18NDelta": -0.00018,
+    "weakErosion18NDelta": -0.0002,
+    "upperCloudPath18NDelta": 0.00076,
+    "receiverTaper26N": 0.00516,
+    "receiverApplied26N": 0.00141
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c45-26p25-centered-organized-support-restore-attribution.v1",
+  "generatedAt": "2026-04-16T16:33:32.665Z",
+  "decision": {
+    "verdict": "isolated_26p25_restore_insufficient_c40_signal_requires_poleward_shoulder_coupling",
+    "nextMove": "Architecture C46: 26p25-33p75 coupled organized-support restore experiment"
+  },
+  "quickComparison": {
+    "c32CrossEq": -356.96839,
+    "c44CrossEq": -356.96839,
+    "c32ItczWidth": 23.374,
+    "c44ItczWidth": 23.374,
+    "c32DryNorth": 1.122,
+    "c44DryNorth": 1.122,
+    "c32DrySouth": 0.493,
+    "c44DrySouth": 0.493,
+    "c32Westerlies": 1.219,
+    "c44Westerlies": 1.219,
+    "c32OceanCond": 0.10807,
+    "c44OceanCond": 0.10807
+  },
+  "latitudeShiftComparison": {
+    "c4026Hits": 18.667,
+    "c4426Hits": 18.625,
+    "c4026Carryover": 0.06,
+    "c4426Carryover": 0.05,
+    "c4033Hits": 5.51,
+    "c4433Hits": 5.698,
+    "c4033Carryover": 0.424,
+    "c4433Carryover": 0.429
+  },
+  "nextContract": {
+    "focusTargets": [
+      "restore organized-support only across the 26.25°–33.75° poleward shoulder",
+      "leave 18.75° and the equatorial core outside the active restore geometry",
+      "test whether coupled poleward-shoulder geometry is sufficient to recreate the live C40 signal"
+    ]
+  }
+}

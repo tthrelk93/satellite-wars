@@ -1,0 +1,104 @@
+{
+  "schema": "satellite-wars.phase1zb-latitude-aware-shoulder-guard-redesign.v1",
+  "generatedAt": "2026-04-14T07:54:41.823Z",
+  "paths": {
+    "offPath": "/tmp/phase1zb-off.json",
+    "onPath": "/tmp/phase1zb-on.json",
+    "reportPath": "weather-validation/reports/phase1zb-latitude-aware-shoulder-guard-redesign.md",
+    "jsonPath": "weather-validation/reports/phase1zb-latitude-aware-shoulder-guard-redesign.json"
+  },
+  "verdict": "needs_follow_up",
+  "nextPhase": "Phase 1ZC: Shoulder Guard Reintegration Audit",
+  "recommendation": "The selector geometry is improved but still needs a follow-up reintegration audit before we treat the shoulder lane as solved.",
+  "offOnCompare": {
+    "itczWidthDeg": {
+      "off": 25.834,
+      "on": 25.89,
+      "delta": 0.056
+    },
+    "subtropicalDryNorthRatio": {
+      "off": 1.515,
+      "on": 1.527,
+      "delta": 0.012
+    },
+    "subtropicalDrySouthRatio": {
+      "off": 1.192,
+      "on": 1.197,
+      "delta": 0.005
+    }
+  },
+  "bandDiagnostics": {
+    "tropicalShoulderCoreCondensationDeltaKgM2": 0.01603,
+    "tropicalShoulderCoreAppliedSuppressionOnKgM2": 0.01858,
+    "targetEntryAppliedSuppressionOnKgM2": 0
+  },
+  "referenceSlices": {
+    "shoulder3p75": {
+      "off": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.07641,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.04151,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0.04151,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0.01235,
+        "freshShoulderLatitudeWindowDiagFrac": 1,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0
+      },
+      "on": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.09188,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.06893,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.0122,
+        "shoulderAbsorptionGuardBandWindowFrac": 0.06893,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0.02404,
+        "freshShoulderLatitudeWindowDiagFrac": 1,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0
+      }
+    },
+    "shoulder11p25": {
+      "on": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.14437,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.12488,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.02496,
+        "shoulderAbsorptionGuardBandWindowFrac": 0.12488,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0.05073,
+        "freshShoulderLatitudeWindowDiagFrac": 1,
+        "freshShoulderTargetEntryExclusionDiagFrac": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0
+      }
+    },
+    "targetEntry33p75": {
+      "off": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.18497,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 1,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0
+      },
+      "on": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.17971,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0,
+        "freshShoulderLatitudeWindowDiagFrac": 0,
+        "freshShoulderTargetEntryExclusionDiagFrac": 1,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0
+      }
+    }
+  },
+  "exitCriteria": {
+    "strongestShoulderAdmittedPass": true,
+    "targetEntryExcludedPass": true,
+    "guardrailPass": false,
+    "shoulderCoreCondensationPass": false
+  }
+}

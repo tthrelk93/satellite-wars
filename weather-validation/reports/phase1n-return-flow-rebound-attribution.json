@@ -1,0 +1,118 @@
+{
+  "schema": "satellite-wars.phase1n-return-flow-rebound-attribution.v1",
+  "generatedAt": "2026-04-14T04:24:56.871Z",
+  "paths": {
+    "baselinePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-hadley-second-pass-restore-v4.json",
+    "offPath": "/tmp/phase1n-circulation-off.json",
+    "onPath": "/tmp/phase1n-circulation-on.json"
+  },
+  "verdict": "transition_lane_only_response",
+  "baselineGap": {
+    "itczWidthDeg": {
+      "baseline": 23.646,
+      "current": 25.834,
+      "delta": 2.188
+    },
+    "subtropicalDryNorthRatio": {
+      "baseline": 1.1,
+      "current": 1.515,
+      "delta": 0.415
+    },
+    "subtropicalDrySouthRatio": {
+      "baseline": 0.519,
+      "current": 1.192,
+      "delta": 0.673
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "baseline": 1.192,
+      "current": 0.531,
+      "delta": -0.661
+    }
+  },
+  "offOnCompare": {
+    "itczWidthDeg": {
+      "off": 25.874,
+      "on": 25.834,
+      "delta": -0.04
+    },
+    "subtropicalDryNorthRatio": {
+      "off": 1.524,
+      "on": 1.515,
+      "delta": -0.009
+    },
+    "subtropicalDrySouthRatio": {
+      "off": 1.194,
+      "on": 1.192,
+      "delta": -0.002
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "off": 0.531,
+      "on": 0.531,
+      "delta": 0
+    },
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": {
+      "off": 0.1526,
+      "on": 0.14647,
+      "delta": -0.00613
+    }
+  },
+  "returnFlowSignals": {
+    "northTransitionContainmentMeanFrac": 0.81272,
+    "southTransitionContainmentMeanFrac": 0.70617,
+    "northTransitionSourceSuppressionMeanFrac": 0.612,
+    "southTransitionSourceSuppressionMeanFrac": 0.51949,
+    "northTransitionSubtropicalSourceDriverMeanFrac": 0.16716,
+    "southTransitionSubtropicalSourceDriverMeanFrac": 0.07608,
+    "northDryBeltSubtropicalSourceDriverMeanFrac": 0.16716,
+    "southDryBeltSubtropicalSourceDriverMeanFrac": 0.07608,
+    "northTransitionSubtropicalCrossHemiFloorShareMeanFrac": 0,
+    "southTransitionSubtropicalCrossHemiFloorShareMeanFrac": 0.12935,
+    "northTransitionSubtropicalWeakHemiFracMean": 0,
+    "southTransitionSubtropicalWeakHemiFracMean": 0.49503
+  },
+  "ranking": [
+    {
+      "key": "transition_response_without_return_flow",
+      "label": "Transition containment is active but return flow stays flat",
+      "score": 0.6626,
+      "evidence": {
+        "transitionContainmentMeanFrac": 0.75944,
+        "transitionSourceSuppressionMeanFrac": 0.56574,
+        "nhWesterlyDeltaMs": 0
+      }
+    },
+    {
+      "key": "hemispheric_source_symmetry",
+      "label": "NH return-flow source remains too symmetric with SH",
+      "score": 0.43875,
+      "evidence": {
+        "northTransitionSourceDriverMeanFrac": 0.16716,
+        "southTransitionSourceDriverMeanFrac": 0.07608,
+        "northSouthDriverSimilarityFrac": 0.45513,
+        "northTransitionSourceDriverDeltaFrac": -0.0032,
+        "southTransitionSourceDriverDeltaFrac": -0.0014
+      }
+    },
+    {
+      "key": "cross_hemi_floor_dominance",
+      "label": "Subtropical return-flow driver is still floor-dominated",
+      "score": 0.0599,
+      "evidence": {
+        "northCrossHemiFloorShareMeanFrac": 0,
+        "southCrossHemiFloorShareMeanFrac": 0.12935,
+        "northFloorDominanceFrac": 1,
+        "southFloorDominanceFrac": 0.85239
+      }
+    },
+    {
+      "key": "local_hemi_source_underweights_mean_tropical_source",
+      "label": "Local hemispheric source is still underweighted relative to the mean tropical source",
+      "score": 0,
+      "evidence": {
+        "northLocalVsMeanTropicalSourceFrac": 1.49504,
+        "southLocalVsMeanTropicalSourceFrac": 0.50496
+      }
+    }
+  ],
+  "recommendation": "The next patch lane should stay focused on transition suppression, but only if a stronger circulation response can be coupled to it."
+}

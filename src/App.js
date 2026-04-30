@@ -17,7 +17,9 @@ import {
     getRenderSimTimeSeconds
 } from './sim/simStepPlanner';
 import { solarDeclination } from './weather/solar';
+import { clampSimAdvanceByTruthBudget, computeFixedStepBudget } from './weather/simAdvanceBudget';
 import { loadNullschoolWind } from './weather/reference/loadNullschoolWind';
+import { showMinimapOverlayForGameMode } from './gameModeUi';
 
 import { EventBus } from './EventBus';
 import { TurnManager, AP_MAX } from './TurnManager';
@@ -126,8 +128,10 @@ const WEATHER_DEBUG_SCALE = {
 const SIM_SPEED_DEFAULT = 600;
 const SIM_SPEED_MAX = 14400;
 const FIXED_SIM_STEP_SECONDS = 120;
+const FIXED_SIM_STEP_EPSILON_SECONDS = 1e-4;
 const MAX_SIM_SUBSTEPS = 4;
 const MAX_SIM_SUBSTEPS_BURST = 20;
+const TRUTH_WORKER_DESYNC_BUDGET_SECONDS = 12 * 3600;
 const MONTH_SECONDS = (365 * 86400) / 12;
 const SELECTION_DOUBLE_CLICK_MS = 250;
 const SELECTION_DOUBLE_CLICK_PX = 8;
@@ -302,9 +306,14 @@ const DEFAULT_TUNING = {
     }
 };
 
+const resolveInitialGameMode = () => {
+    const mode = new URLSearchParams(window.location.search).get('mode');
+    return mode === 'solo' || mode === 'pvp' ? mode : null;
+};
+
 const App = () => {
     const mountRef = useRef(null);
-    const [gameMode, setGameMode] = useState(null); // 'solo' or 'pvp'
+    const [gameMode, setGameMode] = useState(() => resolveInitialGameMode()); // 'solo' or 'pvp'
     const params = new URLSearchParams(window.location.search);
     const initialSeedParam = params.get('weatherSeed');
     const envSeedParam = process.env.REACT_APP_WEATHER_SEED;
@@ -316,9 +325,9 @@ const App = () => {
     const [showSatListPanel, setShowSatListPanel] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
     const [showForecastPanel, setShowForecastPanel] = useState(true);
-    const [showFogLayer, setShowFogLayer] = useState(true);
+    const [showFogLayer, setShowFogLayer] = useState(false);
     const [showWeatherLayer, setShowWeatherLayer] = useState(true);
-    const [showWindStreamlines, setShowWindStreamlines] = useState(true);
+    const [showWindStreamlines, setShowWindStreamlines] = useState(false);
     const [windStreamlineSource, setWindStreamlineSource] = useState('analysis');
     const [windRefStatus, setWindRefStatus] = useState({ loading: false, loaded: false, error: null });
     const [weatherViewSource, setWeatherViewSource] = useState('truth');
@@ -354,13 +363,13 @@ const App = () => {
 	const [showAlertsPanel, setShowAlertsPanel] = useState(false);
 	const [showObservingNetwork, setShowObservingNetwork] = useState(false);
     const [showForecastReport, setShowForecastReport] = useState(false);
-	const [showDebugPanel, setShowDebugPanel] = useState(true);
+	const [showDebugPanel, setShowDebugPanel] = useState(false);
     const [cloudWatchDebugEnabled, setCloudWatchDebugEnabled] = useState(false);
     const [cloudWatchDebugInfo, setCloudWatchDebugInfo] = useState([]);
     const [windTargetsStatus, setWindTargetsStatus] = useState(null);
     const [windReferenceDiagnostics, setWindReferenceDiagnostics] = useState(null);
     const [windReferenceComparison, setWindReferenceComparison] = useState(null);
-    const showFogLayerRef = useRef(true);
+    const showFogLayerRef = useRef(false);
     const showWeatherLayerRef = useRef(true);
     const [weatherDebugMode, setWeatherDebugMode] = useState('clouds');
     const weatherDebugModeRef = useRef('clouds');
@@ -582,7 +591,7 @@ const App = () => {
         setShowMenu(false);
         setShowSatPanel(false);
         setShowSatListPanel(false);
-        setShowDebugPanel(true);
+        setShowDebugPanel(false);
         setShowStrikePad(false);
         setWarningDrawMode(false);
         setWarningDraft({
@@ -749,11 +758,62 @@ const App = () => {
         earth.setCloudWatchDebugEnabled?.(cloudWatchDebug);
         cloudWatchDebugRef.current = cloudWatchDebug;
         setCloudWatchDebugEnabled(cloudWatchDebug);
-        earth.setWeatherVisible(false);
+        earth.setWeatherVisible(showWeatherLayerRef.current);
         earth.setCloudObsVisible(false);
         if (process.env.NODE_ENV !== 'production') {
             window.__sw = window.__sw || {};
             window.__sw.earth = earth;
+            window.__sw.getSimProbeState = () => {
+                const simClock = simClockRef.current;
+                const core = earthRef.current?.weatherField?.core;
+                const elev = core?.geo?.elev;
+                let terrainMax = 0;
+                if (elev?.length) {
+                    for (let i = 0; i < elev.length; i += 1) {
+                        terrainMax = Math.max(terrainMax, elev[i] || 0);
+                    }
+                }
+                const simTimeSeconds = simClock?.simTimeSeconds ?? 0;
+                return {
+                    simTimeSeconds,
+                    simTimeLabel: formatSimTime(simTimeSeconds),
+                    simTimeLabelSeconds: simTimeSeconds,
+                    simSpeed: simClock?.simSpeed ?? null,
+                    paused: simClock?.paused ?? null,
+                    queuedAdvanceSeconds: simAdvanceQueueSecondsRef.current ?? 0,
+                    simAccumSeconds: simAccumSecondsRef.current ?? 0,
+                    burstActive: simBurstActiveRef.current ?? false,
+                    coreTimeUTC: core?.timeUTC ?? null,
+                    weatherReady: Boolean(core?.ready),
+                    terrainReady: terrainMax > 0,
+                    terrainMax,
+                    workerSyncStatus: earthRef.current?.getWeatherWorkerSyncStatus?.(simTimeSeconds) ?? null
+                };
+            };
+            window.__sw.setSimProbePaused = (paused = true) => {
+                simClockRef.current?.setPaused(Boolean(paused));
+                return window.__sw.getSimProbeState?.() ?? null;
+            };
+            window.__sw.queueSimProbeAdvance = (deltaSeconds, options = {}) => {
+                const delta = Number(deltaSeconds);
+                if (Number.isFinite(delta) && delta > 0) {
+                    queueSimAdvanceSeconds(delta, { burst: options?.burst !== false });
+                }
+                return window.__sw.getSimProbeState?.() ?? null;
+            };
+            window.__sw.advanceSimProbeTo = (targetSeconds, options = {}) => {
+                const simClock = simClockRef.current;
+                const current = simClock?.simTimeSeconds ?? 0;
+                const target = Number(targetSeconds);
+                if (!Number.isFinite(target)) {
+                    return window.__sw.getSimProbeState?.() ?? null;
+                }
+                const delta = target - current;
+                if (delta > 0) {
+                    queueSimAdvanceSeconds(delta, { burst: options?.burst !== false });
+                }
+                return window.__sw.getSimProbeState?.() ?? null;
+            };
             window.__sw.sampleRadarV2 = (lat, lon, sigma = 0.95) => sampleV2AtLatLonSigma(
                 earth.weatherField?.core,
                 lat,
@@ -901,7 +961,7 @@ const App = () => {
             };
         }
         earth.setWeatherDebugMode(weatherDebugModeRef.current);
-        earth.setWeatherVisible(false);
+        earth.setWeatherVisible(showWeatherLayerRef.current);
         earth.setFogVisible(sensorOnlyWeather ? false : showFogLayerRef.current);
         earth.setCloudObsVisible(false);
 
@@ -2021,6 +2081,7 @@ const App = () => {
 
     // Minimap overlay: continuously draw fog-of-war canvas from Earth
     useEffect(() => {
+        if (!showMinimapOverlayForGameMode(gameMode)) return undefined;
         let frameId;
         const drawMini = () => {
             const mini = miniRef.current;
@@ -2034,7 +2095,7 @@ const App = () => {
         };
         drawMini();
         return () => cancelAnimationFrame(frameId);
-    }, []);
+    }, [gameMode]);
 
 
     const slerp = (start, end, t) => {
@@ -2678,7 +2739,7 @@ const App = () => {
             earth.setWeatherVisible(false);
             earth.setFogVisible(false);
         } else {
-            earth.setWeatherVisible(false);
+            earth.setWeatherVisible(showWeatherLayerRef.current);
             earth.setFogVisible(showFogLayerRef.current);
         }
         earth.setCloudObsVisible(showCloudIntel);
@@ -5830,13 +5891,30 @@ const App = () => {
 
             const simClock = simClockRef.current;
             let simAccumSeconds = simAccumSecondsRef.current;
+            const visibleSimTimeSeconds = simClock.simTimeSeconds + simAccumSeconds;
+            const workerSyncStatus = earthRef.current?.getWeatherWorkerSyncStatus?.(visibleSimTimeSeconds);
+            let workerLeadSeconds = Number.isFinite(workerSyncStatus?.leadSeconds)
+                ? workerSyncStatus.leadSeconds
+                : null;
+            const takeBudgetedAdvance = (requestedSeconds) => {
+                if (!Number.isFinite(requestedSeconds) || requestedSeconds <= 0) return 0;
+                if (!Number.isFinite(workerLeadSeconds)) return requestedSeconds;
+                const allowedSeconds = clampSimAdvanceByTruthBudget(
+                    requestedSeconds,
+                    workerLeadSeconds,
+                    TRUTH_WORKER_DESYNC_BUDGET_SECONDS
+                );
+                workerLeadSeconds += allowedSeconds;
+                return allowedSeconds;
+            };
             if (!simClock.paused) {
-                simAccumSeconds += realDtSeconds * simClock.simSpeed;
+                simAccumSeconds += takeBudgetedAdvance(realDtSeconds * simClock.simSpeed);
             }
             const queuedAdvance = simAdvanceQueueSecondsRef.current;
             if (queuedAdvance > 0) {
-                simAccumSeconds += queuedAdvance;
-                simAdvanceQueueSecondsRef.current = 0;
+                const allowedQueuedAdvance = takeBudgetedAdvance(queuedAdvance);
+                simAccumSeconds += allowedQueuedAdvance;
+                simAdvanceQueueSecondsRef.current = Math.max(0, queuedAdvance - allowedQueuedAdvance);
                 simBurstActiveRef.current = true;
             }
 
@@ -5865,13 +5943,11 @@ const App = () => {
             }
             let simLagSeconds = simAccumSeconds;
 
-            const deltaSimSeconds = stepsToRun * FIXED_SIM_STEP_SECONDS;
             let detectedSpheres = [];
             let lastSensorGating = null;
             let lastSimTimeSeconds = simClock.simTimeSeconds;
 
             if (deltaSimSeconds > 0) {
-                simAccumSeconds -= deltaSimSeconds;
                 simAccumSecondsRef.current = simAccumSeconds;
                 simLagSeconds = simAccumSeconds;
                 simClock.stepSeconds(deltaSimSeconds);
@@ -7574,6 +7650,7 @@ const App = () => {
 
 
     const isSinglePlayer = gameMode === 'solo';
+    const showMinimapOverlay = showMinimapOverlayForGameMode(gameMode);
     const panelSurfaceStyle = {
         backgroundColor: 'rgba(12,16,24,0.92)',
         border: '1px solid rgba(148,163,184,0.22)',
@@ -9920,19 +9997,21 @@ const App = () => {
             )}
 
             {/* Minimap overlay */}
-            <canvas
-                ref={miniRef}
-                width={200}
-                height={100}
-                style={{
-                    position: 'absolute',
-                    bottom: 10,
-                    right: 10,
-                    border: '1px solid white',
-                    zIndex: 1000,
-                    backgroundColor: 'black'
-                }}
-            />
+            {showMinimapOverlay && (
+                <canvas
+                    ref={miniRef}
+                    width={200}
+                    height={100}
+                    style={{
+                        position: 'absolute',
+                        bottom: 10,
+                        right: 10,
+                        border: '1px solid white',
+                        zIndex: 1000,
+                        backgroundColor: 'black'
+                    }}
+                />
+            )}
 
             {/* Toasts (player-facing notifications) */}
             {toasts.map((t, i) => (

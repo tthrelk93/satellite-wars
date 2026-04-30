@@ -1,0 +1,88 @@
+{
+  "schema": "satellite-wars.phase1-reset-triage.v1",
+  "generatedAt": "2026-04-14",
+  "frozenCommit": "8593bf5",
+  "activeBug": "north_subtropical_dry_belt_wet_bias",
+  "frozen30Day": {
+    "artifact": "/tmp/phase1-reset-current-quick.json",
+    "headlessTerrainParity": true,
+    "metrics": {
+      "itczWidthDeg": 25.91,
+      "subtropicalDryNorthRatio": 1.534,
+      "subtropicalDrySouthRatio": 1.199,
+      "midlatitudeWesterliesNorthU10Ms": 0.531,
+      "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.1413,
+      "crossEquatorialVaporFluxNorthKgM_1S": 143.95306
+    }
+  },
+  "frozen365Day": {
+    "artifact": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-reset-triage-annual.json",
+    "headlessTerrainParity": true,
+    "samples": {
+      "day30": {
+        "itczWidthDeg": 25.712,
+        "subtropicalDryNorthRatio": 1.765,
+        "subtropicalDrySouthRatio": 1.254,
+        "midlatitudeWesterliesNorthU10Ms": 0.524,
+        "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.23684,
+        "crossEquatorialVaporFluxNorthKgM_1S": 132.79614
+      },
+      "day180": {
+        "itczWidthDeg": 24.8,
+        "subtropicalDryNorthRatio": 1.218,
+        "subtropicalDrySouthRatio": 2.457,
+        "midlatitudeWesterliesNorthU10Ms": 0.529,
+        "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.15753,
+        "crossEquatorialVaporFluxNorthKgM_1S": 73.26705
+      },
+      "day365": {
+        "itczWidthDeg": 24.875,
+        "subtropicalDryNorthRatio": 1.343,
+        "subtropicalDrySouthRatio": 1.145,
+        "midlatitudeWesterliesNorthU10Ms": 0.524,
+        "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.2774,
+        "crossEquatorialVaporFluxNorthKgM_1S": 326.33822
+      }
+    }
+  },
+  "materialImprovementVsPhase1CBroken": {
+    "itczWidthDeg": -0.505,
+    "subtropicalDryNorthRatio": -0.17,
+    "subtropicalDrySouthRatio": -0.097,
+    "midlatitudeWesterliesNorthU10Ms": -0.001
+  },
+  "remainingFailureVsTrustedBaselineAt365": {
+    "itczWidthDeg": 1.229,
+    "subtropicalDryNorthRatio": 0.243,
+    "subtropicalDrySouthRatio": 0.626,
+    "midlatitudeWesterliesNorthU10Ms": -0.668
+  },
+  "liveCandidates": [
+    "radiativeThermodynamicSupport",
+    "importedCloudPersistence",
+    "numericalFragility",
+    "localLargeScaleMaintenance"
+  ],
+  "ruledOutAsPrimaryAnswers": [
+    "browser_runtime_artifact",
+    "nudging_primary_owner",
+    "storm_leakage_primary_owner",
+    "local_convection_primary_owner",
+    "pure_transport_tuning_main_solution",
+    "selector_geometry_alone",
+    "source_cap_alone",
+    "atlantic_receiver_geometry_alone",
+    "atlantic_transition_carryover_taper_alone"
+  ],
+  "boundedResetPlan": [
+    "Reset R1: freeze and triage 30-day plus 365-day branch state",
+    "Reset R2A: upper-cloud persistence collapse experiment",
+    "Reset R2B: annual numerical-fragility hardening experiment",
+    "Reset R2C: hydrology balance repartition experiment",
+    "Reset R3: choose winner or stop the patch spiral"
+  ],
+  "notes": [
+    "30-day headless screens are directionally useful but not sufficient to promote a fix.",
+    "365-day annual confirmation is required for any future promoted climate fix."
+  ]
+}

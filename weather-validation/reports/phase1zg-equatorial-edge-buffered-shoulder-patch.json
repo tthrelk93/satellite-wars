@@ -1,0 +1,127 @@
+{
+  "schema": "satellite-wars.phase1zg-equatorial-edge-buffered-shoulder-patch.v1",
+  "generatedAt": "2026-04-14T08:53:27.850Z",
+  "paths": {
+    "offPath": "/tmp/phase1zg-off.json",
+    "onPath": "/tmp/phase1zg-on.json",
+    "reportPath": "weather-validation/reports/phase1zg-equatorial-edge-buffered-shoulder-patch.md",
+    "jsonPath": "weather-validation/reports/phase1zg-equatorial-edge-buffered-shoulder-patch.json"
+  },
+  "verdict": "keep_with_equatorial_edge_residual",
+  "keepPatch": true,
+  "nextPhase": "Phase 1ZH: Equatorial-Edge Candidate Rebound Attribution",
+  "metrics": {
+    "itczWidthDeg": -0.263,
+    "subtropicalDryNorthRatio": -0.094,
+    "subtropicalDrySouthRatio": -0.038,
+    "midlatitudeWesterliesNorthU10Ms": 0,
+    "tropicalShoulderCoreLargeScaleCondensationMeanKgM2": 0.00431
+  },
+  "slices": {
+    "equatorialEdge": {
+      "latitudeDeg": 3.75,
+      "off": {
+        "largeScaleCondensationSourceKgM2": 0.07641,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.04151,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 1.14583,
+        "totalColumnWaterKgM2": 43.876
+      },
+      "on": {
+        "largeScaleCondensationSourceKgM2": 0.12278,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.11161,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.02352,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0.02352,
+        "shoulderAbsorptionGuardEventCount": 1.66667,
+        "totalColumnWaterKgM2": 43.347
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": 0.04637,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.0701,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.02352,
+        "shoulderAbsorptionGuardEventCount": 0.52084,
+        "totalColumnWaterKgM2": -0.529
+      }
+    },
+    "innerShoulder": {
+      "latitudeDeg": 11.25,
+      "off": {
+        "largeScaleCondensationSourceKgM2": 0.12779,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.08619,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 2,
+        "totalColumnWaterKgM2": 43.119
+      },
+      "on": {
+        "largeScaleCondensationSourceKgM2": 0.0893,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.06461,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.01615,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0.01615,
+        "shoulderAbsorptionGuardEventCount": 1.95833,
+        "totalColumnWaterKgM2": 42.445
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": -0.03849,
+        "shoulderAbsorptionGuardCandidateMassKgM2": -0.02158,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.01615,
+        "shoulderAbsorptionGuardEventCount": -0.04167,
+        "totalColumnWaterKgM2": -0.674
+      }
+    },
+    "spillover": {
+      "latitudeDeg": 18.75,
+      "off": {
+        "largeScaleCondensationSourceKgM2": 0.10309,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "totalColumnWaterKgM2": 38.233
+      },
+      "on": {
+        "largeScaleCondensationSourceKgM2": 0.08503,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "totalColumnWaterKgM2": 35.748
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": -0.01806,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "totalColumnWaterKgM2": -2.485
+      }
+    },
+    "targetEntry": {
+      "latitudeDeg": 33.75,
+      "off": {
+        "largeScaleCondensationSourceKgM2": 0.18497,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "totalColumnWaterKgM2": 30.909
+      },
+      "on": {
+        "largeScaleCondensationSourceKgM2": 0.17612,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardBufferedRainoutKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "totalColumnWaterKgM2": 30.498
+      },
+      "deltas": {
+        "largeScaleCondensationSourceKgM2": -0.00885,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "totalColumnWaterKgM2": -0.411
+      }
+    }
+  },
+  "recommendation": "Keep the buffered shoulder patch on by default: it improves ITCZ width and both dry-belt ratios while preserving the target-entry exclusion, then use the next phase to explain the remaining 3.75°N rebound."
+}

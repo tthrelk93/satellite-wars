@@ -1,0 +1,38 @@
+{
+  "schema": "satellite-wars.phase1zy-capped-north-source-concentration-penalty-patch.v1",
+  "generatedAt": "2026-04-15T01:06:06.360Z",
+  "paths": {
+    "offPath": "/tmp/phase1zy-off.json",
+    "onPath": "/tmp/phase1zy-on.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zy-capped-north-source-concentration-penalty-patch.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zy-capped-north-source-concentration-penalty-patch.json"
+  },
+  "verdict": "north_source_relief_with_dry_core_redistribution",
+  "keepPatch": false,
+  "nextPhase": "Phase 1ZZ: Source-Cap Redistribution Attribution",
+  "recommendation": "Do not enable this penalty by default. It improves the 11.25°N source row, but the improvement is redistributed into the dry-belt core and south mirror rather than closing the climate lane cleanly.",
+  "metrics": {
+    "itczWidthDeg": -0.028,
+    "subtropicalDryNorthRatio": -0.004,
+    "subtropicalDrySouthRatio": 0,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.00199,
+    "midlatitudeWesterliesNorthU10Ms": 0,
+    "crossEquatorialVaporFluxNorthKgM_1S": 0.33263
+  },
+  "sourceLaneDeltas": {
+    "dryCore26N": 0.0084,
+    "spillover18N": -0.00425,
+    "source11N": -0.0306,
+    "edge3N": 0.00749,
+    "edge3S": 0.00001,
+    "source11S": 0.02652
+  },
+  "liveState": {
+    "northSourcePenalty11N": 0.00583,
+    "northSourceApplied11N": 0.0022,
+    "northLeakPenalty11N": 0.06374,
+    "totalColumnWater11NDelta": -0.03,
+    "lowerOmega11NDelta": -0.00006,
+    "midOmega11NDelta": -0.00033
+  }
+}

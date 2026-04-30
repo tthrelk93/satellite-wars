@@ -1,0 +1,81 @@
+{
+  "schema": "satellite-wars.phase1zx-north-source-concentration-patch-design.v1",
+  "generatedAt": "2026-04-15T00:46:56.169Z",
+  "paths": {
+    "offPath": "/tmp/phase1zv-off.json",
+    "onPath": "/tmp/phase1zv-on.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zx-north-source-concentration-patch-design.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zx-north-source-concentration-patch-design.json"
+  },
+  "verdict": "live_leak_signal_driven_source_cap_preferred",
+  "nextPhase": "Phase 1ZY: Implement Capped North Source Concentration Penalty Patch",
+  "recommendation": "Keep the weak-hemi floor taper from Phase 1ZV. Do not add a local humidity or omega boost at 11.25N. The next patch should reuse the already-live northside leak signal as a direct capped source-row concentration penalty in vertical5.js/core5.js, applied only in the 9-13N source window.",
+  "keepWeakHemiFloorTaper": true,
+  "localRechargeSignal": 0,
+  "dryNeighborRelief": 0.03142,
+  "exportWeakeningSignal": 0.01602,
+  "concentrationSignal": 0.07225,
+  "northSource": {
+    "condensationDeltaKgM2": 0.02481,
+    "totalColumnWaterDeltaKgM2": -0.085,
+    "boundaryLayerRhDeltaFrac": -0.002,
+    "lowerTroposphericRhDeltaFrac": -0.003,
+    "midTroposphericRhDeltaFrac": -0.005,
+    "lowerTroposphericOmegaDeltaPaS": -0.00054,
+    "midTroposphericOmegaDeltaPaS": -0.00103,
+    "sourceSupportDeltaFrac": 0.00127,
+    "leakPenaltyDeltaFrac": 0.00114,
+    "leakPenaltyOnFrac": 0.06339,
+    "precipReevaporationDeltaKgM2": -0.00272,
+    "vaporFluxNorthDeltaKgM_1S": -0.64855,
+    "totalWaterFluxNorthDeltaKgM_1S": -1.00552
+  },
+  "lanes": {
+    "edge3NCondensationDeltaKgM2": -0.00238,
+    "spillover18NCondensationDeltaKgM2": -0.01008,
+    "dryCore26NCondensationDeltaKgM2": -0.01896,
+    "southSource11SCondensationDeltaKgM2": -0.0215
+  },
+  "candidateScores": {
+    "northSourceConcentrationPenalty": 0.13564,
+    "polewardExportPreservingBridge": 0.03487,
+    "localHumidityOmegaBoost": -0.02481,
+    "globalSourceAmplitudeReduction": -0.03142
+  },
+  "ranking": [
+    {
+      "name": "northSourceConcentrationPenalty",
+      "rank": 1,
+      "score": 0.13564
+    },
+    {
+      "name": "polewardExportPreservingBridge",
+      "rank": 2,
+      "score": 0.03487
+    },
+    {
+      "name": "localHumidityOmegaBoost",
+      "rank": 3,
+      "score": -0.02481
+    },
+    {
+      "name": "globalSourceAmplitudeReduction",
+      "rank": 4,
+      "score": -0.03142
+    }
+  ],
+  "guardrails": {
+    "itczWidthDeltaDeg": -0.072,
+    "subtropicalDryNorthRatioDelta": -0.024,
+    "subtropicalDrySouthRatioDelta": -0.004,
+    "northDryBeltOceanLargeScaleCondensationDeltaKgM2": -0.01518
+  },
+  "patchContract": [
+    "keep the Phase 1ZV weak-hemi cross-hemi floor taper active",
+    "patch the north 9-13N source loop in vertical5.js rather than the target lane or shoulder selector lane",
+    "drive the new cap directly from the already-live northside leak penalty signal and source support, not from another admission gate",
+    "apply the cap only in the NH source window and keep the south mirror untouched",
+    "cap the penalty below broad amplitude-retune territory so the 18.75N and 26.25N dry-lane wins are preserved",
+    "do not add a local humidity sink or omega boost at 11.25N"
+  ]
+}

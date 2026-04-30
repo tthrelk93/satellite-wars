@@ -1,0 +1,268 @@
+{
+  "schema": "satellite-wars.phase1zo-bilateral-edge-outcome-attribution.v1",
+  "generatedAt": "2026-04-14T16:28:46.871Z",
+  "paths": {
+    "offPath": "/tmp/phase1zn-off.json",
+    "onPath": "/tmp/phase1zn-on.json",
+    "phase1znPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zn-mirrored-bilateral-edge-source-window-patch.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zo-bilateral-edge-outcome-attribution.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zo-bilateral-edge-outcome-attribution.json"
+  },
+  "verdict": "northside_condensation_fanout_without_humidification",
+  "nextPhase": "Phase 1ZP: Northside Fanout Containment Design",
+  "recommendation": "Keep the mirrored bilateral geometry in principle, but do not enable the patch by default yet. The next patch should target northside fanout containment across 3.75°N, 18.75°N, and 26.25°N rather than revisiting geometry or amplitude.",
+  "phase1znContext": {
+    "verdict": "bilateral_activation_with_nh_edge_overresponse",
+    "keepPatch": false,
+    "bilateralActivation": true
+  },
+  "scores": {
+    "northFanoutScore": 1.22275,
+    "humidificationScore": 0.0775
+  },
+  "metrics": {
+    "itczWidthDeg": -0.005,
+    "subtropicalDryNorthRatio": -0.001,
+    "subtropicalDrySouthRatio": -0.002,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.0131,
+    "tropicalShoulderCoreLargeScaleCondensationMeanKgM2": 0.00306,
+    "northDryBeltOceanRhMeanFrac": -0.001,
+    "subtropicalRhNorthMeanFrac": 0
+  },
+  "slices": {
+    "southEdge": {
+      "off": {
+        "latitudeDeg": -3.75,
+        "largeScaleCondensationSourceKgM2": 0.05852,
+        "totalColumnWaterKgM2": 38.433,
+        "boundaryLayerRhFrac": 0.57,
+        "midTroposphericRhFrac": 0.41,
+        "lowerTroposphericOmegaPaS": 0.14679,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "on": {
+        "latitudeDeg": -3.75,
+        "largeScaleCondensationSourceKgM2": 0.05851,
+        "totalColumnWaterKgM2": 38.439,
+        "boundaryLayerRhFrac": 0.57,
+        "midTroposphericRhFrac": 0.41,
+        "lowerTroposphericOmegaPaS": 0.1468,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00054,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.47609,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": -0.00001,
+        "totalColumnWaterKgM2": 0.006,
+        "boundaryLayerRhFrac": 0,
+        "midTroposphericRhFrac": 0,
+        "lowerTroposphericOmegaPaS": 0.00001,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00054,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.47609,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      }
+    },
+    "northEdge": {
+      "off": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.09574,
+        "totalColumnWaterKgM2": 43.871,
+        "boundaryLayerRhFrac": 0.545,
+        "midTroposphericRhFrac": 0.441,
+        "lowerTroposphericOmegaPaS": 0.12463,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "on": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.1083,
+        "totalColumnWaterKgM2": 43.866,
+        "boundaryLayerRhFrac": 0.544,
+        "midTroposphericRhFrac": 0.442,
+        "lowerTroposphericOmegaPaS": 0.12466,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00072,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.41485,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0.01256,
+        "totalColumnWaterKgM2": -0.005,
+        "boundaryLayerRhFrac": -0.001,
+        "midTroposphericRhFrac": 0.001,
+        "lowerTroposphericOmegaPaS": 0.00003,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00072,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.41485,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      }
+    },
+    "northSource": {
+      "off": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.14212,
+        "totalColumnWaterKgM2": 43.205,
+        "boundaryLayerRhFrac": 0.546,
+        "midTroposphericRhFrac": 0.405,
+        "lowerTroposphericOmegaPaS": 0.17391,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.02437
+      },
+      "on": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.13552,
+        "totalColumnWaterKgM2": 43.212,
+        "boundaryLayerRhFrac": 0.547,
+        "midTroposphericRhFrac": 0.406,
+        "lowerTroposphericOmegaPaS": 0.17391,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0.13665,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.02272
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": -0.0066,
+        "totalColumnWaterKgM2": 0.007,
+        "boundaryLayerRhFrac": 0.001,
+        "midTroposphericRhFrac": 0.001,
+        "lowerTroposphericOmegaPaS": 0,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0.13665,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": -0.00165
+      }
+    },
+    "northSpillover": {
+      "off": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.10718,
+        "totalColumnWaterKgM2": 38.429,
+        "boundaryLayerRhFrac": 0.479,
+        "midTroposphericRhFrac": 0.386,
+        "lowerTroposphericOmegaPaS": 0.43981,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "on": {
+        "latitudeDeg": 18.75,
+        "largeScaleCondensationSourceKgM2": 0.11945,
+        "totalColumnWaterKgM2": 38.413,
+        "boundaryLayerRhFrac": 0.479,
+        "midTroposphericRhFrac": 0.386,
+        "lowerTroposphericOmegaPaS": 0.43987,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0.01227,
+        "totalColumnWaterKgM2": -0.016,
+        "boundaryLayerRhFrac": 0,
+        "midTroposphericRhFrac": 0,
+        "lowerTroposphericOmegaPaS": 0.00006,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      }
+    },
+    "northDryBeltCore": {
+      "off": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.11556,
+        "totalColumnWaterKgM2": 37.469,
+        "boundaryLayerRhFrac": 0.564,
+        "midTroposphericRhFrac": 0.414,
+        "lowerTroposphericOmegaPaS": 0.26984,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "on": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.12644,
+        "totalColumnWaterKgM2": 37.462,
+        "boundaryLayerRhFrac": 0.563,
+        "midTroposphericRhFrac": 0.414,
+        "lowerTroposphericOmegaPaS": 0.26979,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0.01088,
+        "totalColumnWaterKgM2": -0.007,
+        "boundaryLayerRhFrac": -0.001,
+        "midTroposphericRhFrac": 0,
+        "lowerTroposphericOmegaPaS": -0.00005,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      }
+    },
+    "targetEntry": {
+      "off": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.1794,
+        "totalColumnWaterKgM2": 31.057,
+        "boundaryLayerRhFrac": 0.794,
+        "midTroposphericRhFrac": 0.616,
+        "lowerTroposphericOmegaPaS": -0.32162,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "on": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.18333,
+        "totalColumnWaterKgM2": 31.053,
+        "boundaryLayerRhFrac": 0.794,
+        "midTroposphericRhFrac": 0.616,
+        "lowerTroposphericOmegaPaS": -0.32173,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      },
+      "delta": {
+        "largeScaleCondensationSourceKgM2": 0.00393,
+        "totalColumnWaterKgM2": -0.004,
+        "boundaryLayerRhFrac": 0,
+        "midTroposphericRhFrac": 0,
+        "lowerTroposphericOmegaPaS": -0.00011,
+        "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+        "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+        "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0
+      }
+    }
+  },
+  "designContract": {
+    "keep": [
+      "keep the mirrored bilateral abs-lat geometry from Phase 1ZN",
+      "keep the south-edge stabilization at -3.75°",
+      "keep the 33.75°N target-entry exclusion separate and untouched"
+    ],
+    "change": [
+      "design the next lane around northside fanout containment from 11.25°N into 3.75°N, 18.75°N, and 26.25°N",
+      "treat the residual as a same-hemisphere outcome redistribution problem, not a humidification recharge problem",
+      "prefer a capped northside redistribution/containment design over amplitude increases"
+    ]
+  }
+}

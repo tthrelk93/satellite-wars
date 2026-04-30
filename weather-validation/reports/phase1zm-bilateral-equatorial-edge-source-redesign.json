@@ -1,0 +1,149 @@
+{
+  "schema": "satellite-wars.phase1zm-bilateral-equatorial-edge-source-redesign.v1",
+  "generatedAt": "2026-04-14T16:15:37.744Z",
+  "paths": {
+    "phase1zlPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zl-equatorial-edge-subsidence-guard-patch.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zm-bilateral-equatorial-edge-source-redesign.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zm-bilateral-equatorial-edge-source-redesign.json"
+  },
+  "verdict": "signed_latitude_window_inheritance",
+  "nextPhase": "Phase 1ZN: Implement Mirrored Bilateral Edge-Source Window Patch",
+  "recommendation": "Do not retune amplitude. Replace the guard’s inherited NH-only shoulder source/target admission with bilateral abs-lat source and target windows, while preserving the NH target-entry exclusion as a separate lane.",
+  "inheritedFailure": {
+    "sourceMirrorGap": 0.1367,
+    "targetMirrorGap": 0.41491,
+    "appliedMirrorGap": 0.00072,
+    "signedLatitudeInheritanceScore": 1
+  },
+  "evidence": {
+    "southSource": {
+      "latitudeDeg": -11.25,
+      "largeScaleCondensationSourceKgM2": 0.10692,
+      "totalColumnWaterKgM2": 36.556,
+      "boundaryLayerRhFrac": 0.669,
+      "midTroposphericRhFrac": 0.554,
+      "lowerTroposphericOmegaPaS": -0.0928,
+      "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+      "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+      "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+      "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+      "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+      "freshShoulderInnerWindowDiagFrac": 0,
+      "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+      "freshShoulderTargetEntryExclusionDiagFrac": 0
+    },
+    "northSource": {
+      "latitudeDeg": 11.25,
+      "largeScaleCondensationSourceKgM2": 0.11129,
+      "totalColumnWaterKgM2": 43.205,
+      "boundaryLayerRhFrac": 0.547,
+      "midTroposphericRhFrac": 0.405,
+      "lowerTroposphericOmegaPaS": 0.17397,
+      "shoulderAbsorptionGuardCandidateMassKgM2": 0.08334,
+      "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.01666,
+      "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0.1367,
+      "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+      "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+      "freshShoulderInnerWindowDiagFrac": 1,
+      "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+      "freshShoulderTargetEntryExclusionDiagFrac": 0
+    },
+    "southEdge": {
+      "latitudeDeg": -3.75,
+      "largeScaleCondensationSourceKgM2": 0.05978,
+      "totalColumnWaterKgM2": 38.433,
+      "boundaryLayerRhFrac": 0.57,
+      "midTroposphericRhFrac": 0.41,
+      "lowerTroposphericOmegaPaS": 0.14684,
+      "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+      "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+      "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+      "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+      "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+      "freshShoulderInnerWindowDiagFrac": 0,
+      "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+      "freshShoulderTargetEntryExclusionDiagFrac": 0
+    },
+    "northEdge": {
+      "latitudeDeg": 3.75,
+      "largeScaleCondensationSourceKgM2": 0.10231,
+      "totalColumnWaterKgM2": 43.854,
+      "boundaryLayerRhFrac": 0.544,
+      "midTroposphericRhFrac": 0.441,
+      "lowerTroposphericOmegaPaS": 0.12475,
+      "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+      "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+      "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+      "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.41491,
+      "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00072,
+      "freshShoulderInnerWindowDiagFrac": 0,
+      "freshShoulderEquatorialEdgeWindowDiagFrac": 1,
+      "freshShoulderTargetEntryExclusionDiagFrac": 0
+    },
+    "southEdgeDelta": {
+      "largeScaleCondensationSourceKgM2": 0.00126,
+      "totalColumnWaterKgM2": 0,
+      "boundaryLayerRhFrac": 0,
+      "midTroposphericRhFrac": 0,
+      "lowerTroposphericOmegaPaS": 0.00005,
+      "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+      "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+      "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+      "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+      "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+      "freshShoulderInnerWindowDiagFrac": 0,
+      "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+      "freshShoulderTargetEntryExclusionDiagFrac": 0
+    },
+    "northEdgeDelta": {
+      "largeScaleCondensationSourceKgM2": 0.00657,
+      "totalColumnWaterKgM2": -0.017,
+      "boundaryLayerRhFrac": -0.001,
+      "midTroposphericRhFrac": 0,
+      "lowerTroposphericOmegaPaS": 0.00012,
+      "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+      "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+      "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+      "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0.41491,
+      "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0.00072,
+      "freshShoulderInnerWindowDiagFrac": 0,
+      "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+      "freshShoulderTargetEntryExclusionDiagFrac": 0
+    },
+    "targetEntry": {
+      "latitudeDeg": 33.75,
+      "largeScaleCondensationSourceKgM2": 0.18329,
+      "totalColumnWaterKgM2": 31.055,
+      "boundaryLayerRhFrac": 0.794,
+      "midTroposphericRhFrac": 0.615,
+      "lowerTroposphericOmegaPaS": -0.3216,
+      "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+      "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+      "equatorialEdgeSubsidenceGuardSourceSupportDiagFrac": 0,
+      "equatorialEdgeSubsidenceGuardTargetWeightDiagFrac": 0,
+      "equatorialEdgeSubsidenceGuardAppliedDiagPaS": 0,
+      "freshShoulderInnerWindowDiagFrac": 0,
+      "freshShoulderEquatorialEdgeWindowDiagFrac": 0,
+      "freshShoulderTargetEntryExclusionDiagFrac": 1
+    }
+  },
+  "redesignContract": {
+    "keep": [
+      "keep Phase 1ZJ split-lane shoulder gating",
+      "keep Phase 1ZL diagnostics and runtime toggle",
+      "keep the NH 30-45° target-entry exclusion as a separate non-mirrored lane"
+    ],
+    "change": [
+      "stop sourcing the equatorial-edge guard from freshShoulderInnerWindowDiagFrac",
+      "stop targeting the equatorial-edge guard from freshShoulderEquatorialEdgeWindowDiagFrac",
+      "build dedicated bilateral source windows from abs(lat) for 8-14° edge-source rows",
+      "build dedicated bilateral target windows from abs(lat) for 2-6° edge lanes",
+      "preserve hemisphere-local application instead of coupling through NH-only window geometry"
+    ],
+    "doNotDo": [
+      "do not increase equatorial-edge guard amplitude first",
+      "do not mirror the NH 30-45° target-entry exclusion into the south",
+      "do not push this back into the shoulder-selector lane in microphysics"
+    ]
+  }
+}

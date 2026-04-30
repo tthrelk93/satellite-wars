@@ -1,14 +1,20 @@
 import * as THREE from 'three';
-import { bilinear } from './weather/shared/bilinear';
+import {
+  addParticleEvolvePhase,
+  createParticleEvolvePhaseTotals,
+  hasParticleEvolvePhaseData,
+  mergeParticleEvolvePhaseTotals
+} from './windParticlePerf.js';
+import { bilinear } from './weather/shared/bilinear.js';
 
-const DEFAULT_WIDTH = 1024;
-const DEFAULT_HEIGHT = 512;
-const PARTICLE_MULTIPLIER = 6;
+const DEFAULT_WIDTH = 160;
+const DEFAULT_HEIGHT = 80;
+const PARTICLE_MULTIPLIER = 10;
 const MAX_PARTICLE_AGE = 320;
 const MIN_PARTICLE_AGE = Math.round(MAX_PARTICLE_AGE * 0.5);
 const INTENSITY_SCALE_STEP = 10;
 const DEFAULT_MAX_INTENSITY = 25;
-const DEFAULT_STEP_SECONDS = 120;
+const DEFAULT_STEP_SECONDS = 900;
 const DEFAULT_MAX_STEP_PX = 2.5;
 const FADE_ALPHA = 0.992;
 const LINE_WIDTH = 1.0;
@@ -16,8 +22,12 @@ const DEFAULT_DIAG_SAMPLE_TARGET = 20000;
 const DESIRED_MEAN_STEP_PX = 0.9;
 const ADAPT_STEP_CLAMP_MIN = 0.3;
 const ADAPT_STEP_CLAMP_MAX = 1.2;
-const RENDER_FRAME_INTERVAL_SECONDS = 0.1;
+const RENDER_FRAME_INTERVAL_SECONDS = 0.15;
+const MAX_RENDER_SUBSTEPS = 1;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const nowMs = () => (typeof performance !== 'undefined' && typeof performance.now === 'function'
+  ? performance.now()
+  : Date.now());
 
 const computePercentiles = (values, percentiles) => {
   if (!values || values.length === 0) return {};
@@ -31,7 +41,25 @@ const computePercentiles = (values, percentiles) => {
   return out;
 };
 
-const sampleFieldBilinear = ({
+const createSampleResult = () => ({ dx: 0, dy: 0, speed: 0, valid: false });
+
+const writeInvalidSampleResult = (out = createSampleResult()) => {
+  out.dx = 0;
+  out.dy = 0;
+  out.speed = 0;
+  out.valid = false;
+  return out;
+};
+
+const writeValidSampleResult = (out = createSampleResult(), dx = 0, dy = 0, speed = 0) => {
+  out.dx = dx;
+  out.dy = dy;
+  out.speed = speed;
+  out.valid = true;
+  return out;
+};
+
+export const sampleFieldBilinearInRange = (
   x,
   y,
   width,
@@ -39,67 +67,106 @@ const sampleFieldBilinear = ({
   fieldDx,
   fieldDy,
   fieldSpeed,
-  fieldValid
-}) => {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    return { dx: 0, dy: 0, speed: 0, valid: false };
-  }
-  if (y < 0 || y >= height) {
-    return { dx: 0, dy: 0, speed: 0, valid: false };
-  }
-  const xWrapped = ((x % width) + width) % width;
-  const x0 = Math.floor(xWrapped);
-  const y0 = Math.floor(y);
-  const x1 = (x0 + 1) % width;
-  const y1 = Math.min(height - 1, y0 + 1);
-  const tx = xWrapped - x0;
+  fieldValid,
+  out = createSampleResult()
+) => {
+  const x0 = x | 0;
+  const y0 = y | 0;
+  const x1 = x0 + 1 < width ? x0 + 1 : 0;
+  const y1 = y0 + 1 < height ? y0 + 1 : y0;
+  const row0 = y0 * width;
+  const row1 = y1 * width;
+  const idx00 = row0 + x0;
+  const idx10 = row0 + x1;
+  const idx01 = row1 + x0;
+  const idx11 = row1 + x1;
+  const tx = x - x0;
   const ty = y - y0;
-  const w00 = (1 - tx) * (1 - ty);
-  const w10 = tx * (1 - ty);
-  const w01 = (1 - tx) * ty;
+  const oneMinusTx = 1 - tx;
+  const oneMinusTy = 1 - ty;
+  const w00 = oneMinusTx * oneMinusTy;
+  const w10 = tx * oneMinusTy;
+  const w01 = oneMinusTx * ty;
   const w11 = tx * ty;
-  const idx00 = y0 * width + x0;
-  const idx10 = y0 * width + x1;
-  const idx01 = y1 * width + x0;
-  const idx11 = y1 * width + x1;
+
+  const valid00 = fieldValid[idx00] !== 0;
+  const valid10 = fieldValid[idx10] !== 0;
+  const valid01 = fieldValid[idx01] !== 0;
+  const valid11 = fieldValid[idx11] !== 0;
+
+  if (valid00 && valid10 && valid01 && valid11) {
+    return writeValidSampleResult(
+      out,
+      (fieldDx[idx00] * w00) + (fieldDx[idx10] * w10) + (fieldDx[idx01] * w01) + (fieldDx[idx11] * w11),
+      (fieldDy[idx00] * w00) + (fieldDy[idx10] * w10) + (fieldDy[idx01] * w01) + (fieldDy[idx11] * w11),
+      (fieldSpeed[idx00] * w00) + (fieldSpeed[idx10] * w10) + (fieldSpeed[idx01] * w01) + (fieldSpeed[idx11] * w11)
+    );
+  }
+
   let wSum = 0;
   let dxSum = 0;
   let dySum = 0;
   let speedSum = 0;
-  if (fieldValid[idx00]) {
+  if (valid00) {
     wSum += w00;
     dxSum += fieldDx[idx00] * w00;
     dySum += fieldDy[idx00] * w00;
     speedSum += fieldSpeed[idx00] * w00;
   }
-  if (fieldValid[idx10]) {
+  if (valid10) {
     wSum += w10;
     dxSum += fieldDx[idx10] * w10;
     dySum += fieldDy[idx10] * w10;
     speedSum += fieldSpeed[idx10] * w10;
   }
-  if (fieldValid[idx01]) {
+  if (valid01) {
     wSum += w01;
     dxSum += fieldDx[idx01] * w01;
     dySum += fieldDy[idx01] * w01;
     speedSum += fieldSpeed[idx01] * w01;
   }
-  if (fieldValid[idx11]) {
+  if (valid11) {
     wSum += w11;
     dxSum += fieldDx[idx11] * w11;
     dySum += fieldDy[idx11] * w11;
     speedSum += fieldSpeed[idx11] * w11;
   }
   if (wSum <= 0) {
-    return { dx: 0, dy: 0, speed: 0, valid: false };
+    return writeInvalidSampleResult(out);
   }
   const inv = 1 / wSum;
-  return {
-    dx: dxSum * inv,
-    dy: dySum * inv,
-    speed: speedSum * inv,
-    valid: true
-  };
+  return writeValidSampleResult(out, dxSum * inv, dySum * inv, speedSum * inv);
+};
+
+export const sampleFieldBilinear = (
+  x,
+  y,
+  width,
+  height,
+  fieldDx,
+  fieldDy,
+  fieldSpeed,
+  fieldValid,
+  out = createSampleResult()
+) => {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return writeInvalidSampleResult(out);
+  }
+  if (y < 0 || y >= height) {
+    return writeInvalidSampleResult(out);
+  }
+  const xWrapped = (x >= 0 && x < width) ? x : ((x % width) + width) % width;
+  return sampleFieldBilinearInRange(
+    xWrapped,
+    y,
+    width,
+    height,
+    fieldDx,
+    fieldDy,
+    fieldSpeed,
+    fieldValid,
+    out
+  );
 };
 
 const windIntensityColorScale = (step, maxWind) => {
@@ -194,10 +261,12 @@ class WindStreamlineRenderer {
 
     this._lastFieldSimTimeSeconds = null;
     this._lastGridKey = null;
-    this.fieldUpdateCadenceSeconds = 600;
+    this.fieldUpdateCadenceSeconds = 1800;
     this._fieldReady = false;
     this._lastFieldDiagnostics = null;
     this._lastFrameDiagnostics = null;
+    this._lastBuildPerfDiagnostics = null;
+    this._lastPerfDiagnostics = null;
     this._clearCanvas();
   }
 
@@ -221,7 +290,6 @@ class WindStreamlineRenderer {
   }
 
   _randomizeParticle(particle) {
-    const total = this.width * this.height;
     const maxSin = Math.sin(85 * Math.PI / 180);
     for (let attempt = 0; attempt < 30; attempt++) {
       const x = Math.random() * (this.width - 1);
@@ -262,6 +330,9 @@ class WindStreamlineRenderer {
 
   _buildField(core) {
     if (!core?.ready) return false;
+    const buildStartMs = nowMs();
+    let phaseStartMs = buildStartMs;
+    const buildPhases = {};
     const { grid, fields } = core;
     if (!grid?.nx || !grid?.ny || !fields?.u || !fields?.v) return false;
 
@@ -313,6 +384,8 @@ class WindStreamlineRenderer {
         }
       }
     }
+    buildPhases.smoothFieldMs = nowMs() - phaseStartMs;
+    phaseStartMs = nowMs();
 
     this.stepSeconds = this.baseStepSeconds;
     if (!this._fieldDxNext || this._fieldDxNext.length !== width * height) {
@@ -386,6 +459,8 @@ class WindStreamlineRenderer {
         nextStepRaw[idx] = magRaw;
       }
     }
+    buildPhases.rasterizeFieldMs = nowMs() - phaseStartMs;
+    phaseStartMs = nowMs();
 
     const blend = this._fieldReady && !gridChanged ? 0.25 : 1.0;
     let validCount = 0;
@@ -437,6 +512,8 @@ class WindStreamlineRenderer {
         stepSamplesRaw.push(magRaw);
       }
     }
+    buildPhases.blendFieldMs = nowMs() - phaseStartMs;
+    phaseStartMs = nowMs();
 
     const speedPct = computePercentiles(speedSamples, [0.5, 0.9, 0.99]);
     const stepPct = computePercentiles(stepSamples, [0.5, 0.9, 0.99]);
@@ -514,12 +591,25 @@ class WindStreamlineRenderer {
         stepSeconds: this.stepSeconds
       };
     }
+    buildPhases.adaptiveStepRetuneMs = nowMs() - phaseStartMs;
+    phaseStartMs = nowMs();
 
     const shouldClear = !this._fieldReady || gridChanged;
     this._fieldReady = true;
     if (shouldClear) {
       this._clearCanvas();
     }
+    buildPhases.clearCanvasMs = nowMs() - phaseStartMs;
+    this._lastBuildPerfDiagnostics = {
+      totalMs: nowMs() - buildStartMs,
+      phases: buildPhases,
+      gridChanged,
+      blendFactor: blend,
+      sampleStride,
+      validCount,
+      clippedFrac: this._lastFieldDiagnostics?.clippedFrac ?? null,
+      stepSeconds: this._lastFieldDiagnostics?.stepSeconds ?? null
+    };
     return true;
   }
 
@@ -535,36 +625,92 @@ class WindStreamlineRenderer {
 
   update({ core, simTimeSeconds, realDtSeconds } = {}) {
     if (!core?.ready) return;
-    if (this._shouldRebuildField(core, simTimeSeconds)) {
+    const updateStartMs = nowMs();
+    const shouldRebuild = this._shouldRebuildField(core, simTimeSeconds);
+    let rebuiltField = false;
+    let buildPerf = null;
+    const finalizePerf = (renderSteps, evolveParticlesMs, evolveParticlesPhases, drawMs, frameDiag) => {
+      const fieldAgeSimSeconds = Number.isFinite(simTimeSeconds) && Number.isFinite(this._lastFieldSimTimeSeconds)
+        ? simTimeSeconds - this._lastFieldSimTimeSeconds
+        : null;
+      this._lastPerfDiagnostics = {
+        totalMs: nowMs() - updateStartMs,
+        fieldRebuildRequested: shouldRebuild,
+        fieldRebuilt: rebuiltField,
+        buildFieldMs: buildPerf?.totalMs ?? 0,
+        buildFieldPhases: buildPerf?.phases ?? null,
+        renderSteps,
+        evolveParticlesMs,
+        evolveParticlesPhases: hasParticleEvolvePhaseData(evolveParticlesPhases)
+          ? evolveParticlesPhases
+          : null,
+        drawMs,
+        particleCount: frameDiag?.particleCount ?? this.particles.length,
+        fieldCadenceSeconds: this.fieldUpdateCadenceSeconds,
+        frameIntervalSeconds: this._frameIntervalSeconds,
+        fieldAgeSimSeconds
+      };
+    };
+    if (shouldRebuild) {
       if (this._buildField(core)) {
         this._lastFieldSimTimeSeconds = simTimeSeconds ?? null;
+        buildPerf = this._lastBuildPerfDiagnostics;
+        rebuiltField = true;
       }
     }
-    if (!this._fieldReady) return;
-    if (!(realDtSeconds > 0)) return;
+    if (!this._fieldReady) {
+      finalizePerf(0, 0, null, 0, null);
+      return;
+    }
+    if (!(realDtSeconds > 0)) {
+      finalizePerf(0, 0, null, 0, null);
+      return;
+    }
     this._frameAccumSeconds += realDtSeconds;
-    const maxSubsteps = 3;
-    const steps = Math.min(maxSubsteps, Math.floor(this._frameAccumSeconds / this._frameIntervalSeconds));
-    if (steps <= 0) return;
+    const steps = Math.min(MAX_RENDER_SUBSTEPS, Math.floor(this._frameAccumSeconds / this._frameIntervalSeconds));
+    if (steps <= 0) {
+      finalizePerf(0, 0, null, 0, null);
+      return;
+    }
     this._frameAccumSeconds -= steps * this._frameIntervalSeconds;
     let frameDiag = null;
+    let evolveParticlesMs = 0;
+    let evolveParticlesPhases = createParticleEvolvePhaseTotals();
+    let drawMs = 0;
     for (let i = 0; i < steps; i++) {
+      const evolveStartMs = nowMs();
       frameDiag = this._evolveParticles();
+      evolveParticlesMs += nowMs() - evolveStartMs;
+      evolveParticlesPhases = mergeParticleEvolvePhaseTotals(
+        evolveParticlesPhases,
+        frameDiag?.perfPhases
+      );
+      const drawStartMs = nowMs();
       this._draw();
+      drawMs += nowMs() - drawStartMs;
     }
     this._lastFrameDiagnostics = {
       ...frameDiag,
       simTimeSeconds: Number.isFinite(simTimeSeconds) ? simTimeSeconds : null
     };
+    finalizePerf(steps, evolveParticlesMs, evolveParticlesPhases, drawMs, frameDiag);
   }
 
   _evolveParticles() {
+    const perfPhases = createParticleEvolvePhaseTotals();
+    let phaseStartMs = nowMs();
     this.buckets.forEach((bucket) => {
       bucket.length = 0;
     });
+    addParticleEvolvePhase(perfPhases, 'clearBucketsMs', nowMs() - phaseStartMs);
     const width = this.width;
     const height = this.height;
-    const total = width * height;
+    const fieldDx = this.fieldDx;
+    const fieldDy = this.fieldDy;
+    const fieldSpeed = this.fieldSpeed;
+    const fieldValid = this.fieldValid;
+    const sample0Scratch = createSampleResult();
+    const sample1Scratch = createSampleResult();
     let movedCount = 0;
     let respawnedCount = 0;
     let invalidCount = 0;
@@ -572,20 +718,25 @@ class WindStreamlineRenderer {
 
     for (const particle of this.particles) {
       if (particle.age >= particle.maxAge) {
+        phaseStartMs = nowMs();
         this._randomizeParticle(particle);
+        addParticleEvolvePhase(perfPhases, 'respawnMs', nowMs() - phaseStartMs);
         respawnedCount += 1;
         continue;
       }
-      const sample0 = sampleFieldBilinear({
-        x: particle.x,
-        y: particle.y,
+      phaseStartMs = nowMs();
+      const sample0 = sampleFieldBilinearInRange(
+        particle.x,
+        particle.y,
         width,
         height,
-        fieldDx: this.fieldDx,
-        fieldDy: this.fieldDy,
-        fieldSpeed: this.fieldSpeed,
-        fieldValid: this.fieldValid
-      });
+        fieldDx,
+        fieldDy,
+        fieldSpeed,
+        fieldValid,
+        sample0Scratch
+      );
+      addParticleEvolvePhase(perfPhases, 'sample0Ms', nowMs() - phaseStartMs);
       if (!sample0.valid) {
         particle.age = particle.maxAge;
         invalidCount += 1;
@@ -593,46 +744,55 @@ class WindStreamlineRenderer {
       }
       const midX = particle.x + sample0.dx * 0.5;
       const midY = particle.y + sample0.dy * 0.5;
-      const sample1 = sampleFieldBilinear({
-        x: midX,
-        y: midY,
+      phaseStartMs = nowMs();
+      const sample1 = sampleFieldBilinear(
+        midX,
+        midY,
         width,
         height,
-        fieldDx: this.fieldDx,
-        fieldDy: this.fieldDy,
-        fieldSpeed: this.fieldSpeed,
-        fieldValid: this.fieldValid
-      });
+        fieldDx,
+        fieldDy,
+        fieldSpeed,
+        fieldValid,
+        sample1Scratch
+      );
+      addParticleEvolvePhase(perfPhases, 'sample1Ms', nowMs() - phaseStartMs);
       if (!sample1.valid) {
         particle.age = particle.maxAge;
         invalidCount += 1;
         continue;
       }
+      phaseStartMs = nowMs();
       let xt = particle.x + sample1.dx;
       let yt = particle.y + sample1.dy;
       if (!Number.isFinite(xt) || !Number.isFinite(yt)) {
+        addParticleEvolvePhase(perfPhases, 'projectValidateMs', nowMs() - phaseStartMs);
         particle.age = particle.maxAge;
         invalidCount += 1;
         continue;
       }
       if (yt < 0 || yt >= height) {
+        addParticleEvolvePhase(perfPhases, 'projectValidateMs', nowMs() - phaseStartMs);
         particle.age = particle.maxAge;
         outOfBoundsCount += 1;
         continue;
       }
-      xt = ((xt % width) + width) % width;
+      xt = (xt >= 0 && xt < width) ? xt : ((xt % width) + width) % width;
       const nextIdx = Math.floor(yt) * width + Math.floor(xt);
-      if (!this.fieldValid[nextIdx]) {
+      addParticleEvolvePhase(perfPhases, 'projectValidateMs', nowMs() - phaseStartMs);
+      if (!fieldValid[nextIdx]) {
         particle.age = particle.maxAge;
         invalidCount += 1;
         continue;
       }
+      phaseStartMs = nowMs();
       const dxScreen = xt - particle.x;
       if (Math.abs(dxScreen) > width / 2) {
         particle.x = xt;
         particle.y = yt;
         movedCount += 1;
         particle.age += 1;
+        addParticleEvolvePhase(perfPhases, 'bucketStageMs', nowMs() - phaseStartMs);
         continue;
       }
       particle.xt = xt;
@@ -640,6 +800,7 @@ class WindStreamlineRenderer {
       this.buckets[this.colorStyles.indexFor(sample1.speed)].push(particle);
       movedCount += 1;
       particle.age += 1;
+      addParticleEvolvePhase(perfPhases, 'bucketStageMs', nowMs() - phaseStartMs);
     }
 
     return {
@@ -650,7 +811,8 @@ class WindStreamlineRenderer {
       outOfBoundsCount,
       movedFrac: this.particles.length > 0 ? movedCount / this.particles.length : 0,
       respawnedFrac: this.particles.length > 0 ? respawnedCount / this.particles.length : 0,
-      outOfBoundsFrac: this.particles.length > 0 ? outOfBoundsCount / this.particles.length : 0
+      outOfBoundsFrac: this.particles.length > 0 ? outOfBoundsCount / this.particles.length : 0,
+      perfPhases
     };
   }
 
@@ -681,7 +843,8 @@ class WindStreamlineRenderer {
   getDiagnostics() {
     return {
       field: this._lastFieldDiagnostics,
-      frame: this._lastFrameDiagnostics
+      frame: this._lastFrameDiagnostics,
+      perf: this._lastPerfDiagnostics
     };
   }
 }

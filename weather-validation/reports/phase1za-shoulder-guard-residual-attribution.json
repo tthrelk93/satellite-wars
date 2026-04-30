@@ -1,0 +1,201 @@
+{
+  "schema": "satellite-wars.phase1za-shoulder-guard-residual-attribution.v1",
+  "generatedAt": "2026-04-14T07:30:07.476Z",
+  "paths": {
+    "offPath": "/tmp/phase1z-off.json",
+    "onPath": "/tmp/phase1z-on.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1za-shoulder-guard-residual-attribution.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1za-shoulder-guard-residual-attribution.json"
+  },
+  "verdict": "equatorial_edge_shoulder_miss",
+  "nextPhase": "Phase 1ZB: Latitude-Aware Shoulder Guard Redesign",
+  "recommendation": "The next patch should not retune amplitude. It needs a selector redesign that reaches the equatorial shoulder while explicitly excluding the target-entry lane.",
+  "offOnCompare": {
+    "itczWidthDeg": {
+      "off": 25.834,
+      "on": 25.792,
+      "delta": -0.042
+    },
+    "subtropicalDryNorthRatio": {
+      "off": 1.515,
+      "on": 1.508,
+      "delta": -0.007
+    },
+    "subtropicalDrySouthRatio": {
+      "off": 1.192,
+      "on": 1.193,
+      "delta": 0.001
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "off": 0.531,
+      "on": 0.531,
+      "delta": 0
+    }
+  },
+  "residualBands": {
+    "tropicalShoulderCoreCondensationDeltaKgM2": 0.02242,
+    "tropicalShoulderCoreAppliedSuppressionOnKgM2": 0.00265,
+    "targetEntryAppliedSuppressionOnKgM2": 0.00705,
+    "targetEntryCondensationDeltaKgM2": -0.02576
+  },
+  "referenceSlices": {
+    "shoulder3p75": {
+      "off": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.07641,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "shoulderAbsorptionGuardBridgeSilenceFrac": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": -0.677
+      },
+      "on": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.10207,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "shoulderAbsorptionGuardBridgeSilenceFrac": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": -0.677
+      }
+    },
+    "shoulder11p25": {
+      "off": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.12779,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.07336,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0.0031,
+        "shoulderAbsorptionGuardEventCount": 1.14583,
+        "shoulderAbsorptionGuardBridgeSilenceFrac": 0.07336,
+        "shoulderAbsorptionGuardBandWindowFrac": 0.01113,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0.00564,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": -1.14
+      },
+      "on": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.14696,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.09505,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0.00331,
+        "shoulderAbsorptionGuardEventCount": 1.35417,
+        "shoulderAbsorptionGuardBridgeSilenceFrac": 0.09505,
+        "shoulderAbsorptionGuardBandWindowFrac": 0.01442,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0.00602,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.0053,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": -1.14
+      }
+    },
+    "source26p25": {
+      "on": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.11529,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0,
+        "shoulderAbsorptionGuardEventCount": 0,
+        "shoulderAbsorptionGuardBridgeSilenceFrac": 0,
+        "shoulderAbsorptionGuardBandWindowFrac": 0,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": 1.357
+      }
+    },
+    "targetEntry33p75": {
+      "off": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.18497,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.12706,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0.02785,
+        "shoulderAbsorptionGuardEventCount": 2.60417,
+        "shoulderAbsorptionGuardBridgeSilenceFrac": 0.12706,
+        "shoulderAbsorptionGuardBandWindowFrac": 0.12703,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0.05063,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": -0.089
+      },
+      "on": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.13135,
+        "shoulderAbsorptionGuardCandidateMassKgM2": 0.07203,
+        "shoulderAbsorptionGuardPotentialSuppressedMassKgM2": 0.01584,
+        "shoulderAbsorptionGuardEventCount": 1.72917,
+        "shoulderAbsorptionGuardBridgeSilenceFrac": 0.07203,
+        "shoulderAbsorptionGuardBandWindowFrac": 0.07201,
+        "shoulderAbsorptionGuardSelectorSupportFrac": 0.0288,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.0141,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": -0.09
+      }
+    }
+  },
+  "ranking": [
+    {
+      "key": "equatorial_edge_shoulder_miss",
+      "label": "The selector never admits the strongest 3.75°N shoulder rebound at all.",
+      "score": 1,
+      "evidence": {
+        "latitudeDeg": 3.75,
+        "condensationDeltaKgM2": 0.02566,
+        "candidateMassOnKgM2": 0,
+        "appliedSuppressionOnKgM2": 0,
+        "bandWindowOnFrac": 0
+      }
+    },
+    {
+      "key": "target_entry_false_positive",
+      "label": "The selector is still active in the 30–45°N target-entry lane it was supposed to leave alone.",
+      "score": 1,
+      "evidence": {
+        "latitudeDeg": 33.75,
+        "condensationDeltaKgM2": -0.05362,
+        "appliedSuppressionOnKgM2": 0.0141,
+        "projectedBridgeOnPaS": 0,
+        "bandWindowOnFrac": 0.07201
+      }
+    },
+    {
+      "key": "shared_weak_engine_ambiguity",
+      "label": "Weak-engine bridge-silent marine columns still look too similar between the shoulder and target-entry lanes.",
+      "score": 1,
+      "evidence": {
+        "shoulder11CandidateOnKgM2": 0.09505,
+        "target33CandidateOnKgM2": 0.07203,
+        "shoulder11BridgeSilenceOnFrac": 0.09505,
+        "target33BridgeSilenceOnFrac": 0.07203,
+        "source26CandidateOnKgM2": 0
+      }
+    }
+  ],
+  "redesignContract": {
+    "primaryFinding": "equatorial_edge_shoulder_miss",
+    "keep": [
+      "keep Phase 1K marine-maintenance suppression",
+      "keep Phase 1M circulation rebound containment",
+      "keep Phase 1X projected-share repair instrumentation"
+    ],
+    "requiredChanges": [
+      "add an explicit equatorial-shoulder admission path for 3–6°N columns instead of relying on the current subtropical-band proxy alone",
+      "add an explicit target-entry exclusion for 30–45°N columns so the shoulder guard cannot fire in the transition lane",
+      "do not redesign the next selector as a pure weak-engine or bridge-silence gate; those signals are shared by both the desired and false-positive lanes"
+    ],
+    "likelyImplementationNeed": "microphysics5.js currently lacks a direct latitude-aware discriminator, so the next patch should either inject one into state or precompute a dedicated shoulder-window diagnostic upstream."
+  }
+}

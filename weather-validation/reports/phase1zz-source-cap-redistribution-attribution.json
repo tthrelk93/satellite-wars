@@ -1,0 +1,58 @@
+{
+  "schema": "satellite-wars.phase1zz-source-cap-redistribution-attribution.v1",
+  "generatedAt": "2026-04-15T01:11:24.692Z",
+  "paths": {
+    "offPath": "/tmp/phase1zy-off.json",
+    "onPath": "/tmp/phase1zy-on.json",
+    "offSectorPath": "/tmp/phase1zy-off-nh-dry-belt-source-sector-summary.json",
+    "onSectorPath": "/tmp/phase1zy-on-nh-dry-belt-source-sector-summary.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zz-source-cap-redistribution-attribution.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zz-source-cap-redistribution-attribution.json"
+  },
+  "verdict": "atlantic_dry_core_redistribution_with_secondary_south_mirror",
+  "keepPatch": false,
+  "nextPhase": "Phase 1ZZA: Atlantic Dry-Core Receiver Design",
+  "recommendation": "Do not strengthen the north-source cap itself. The next patch should target the dry-core receiver lane, especially the Atlantic-facing 20–30°N uptake branch, while keeping the 11.25°N relief that 1ZY already achieved.",
+  "guardrails": {
+    "itczWidthDeg": -0.028,
+    "subtropicalDryNorthRatio": -0.004,
+    "subtropicalDrySouthRatio": 0,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.00199,
+    "crossEquatorialVaporFluxNorthKgM_1S": 0.33263
+  },
+  "zonalDeltas": {
+    "source11NCondensation": -0.0306,
+    "source11NTotalColumnWater": -0.03,
+    "source11NLowerOmega": -0.00006,
+    "spillover18NCondensation": -0.00425,
+    "dryCore26NCondensation": 0.0084,
+    "dryCore26NTotalColumnWater": -0.122,
+    "dryCore26NLowerOmega": 0.00233,
+    "edge3NCondensation": 0.00749,
+    "southSource11SCondensation": 0.02652,
+    "southSource11STotalColumnWater": 0.017,
+    "southSource11SLowerOmega": -0.00049
+  },
+  "sectorDeltas": {
+    "continentalSubtropics": {
+      "totalLowLevelSourceMeanKgM2": -0.01898,
+      "largeScaleCondensationMeanKgM2": -0.00004
+    },
+    "eastPacific": {
+      "totalLowLevelSourceMeanKgM2": 0.02047,
+      "largeScaleCondensationMeanKgM2": 0.00034
+    },
+    "atlantic": {
+      "totalLowLevelSourceMeanKgM2": -0.11393,
+      "largeScaleCondensationMeanKgM2": 0.00966
+    },
+    "indoPacific": {
+      "totalLowLevelSourceMeanKgM2": 0.00226,
+      "largeScaleCondensationMeanKgM2": -0.00337
+    }
+  },
+  "dominantNorthReceiver": {
+    "key": "atlantic",
+    "condensationDelta": 0.00966
+  }
+}

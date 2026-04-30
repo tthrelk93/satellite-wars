@@ -1,0 +1,52 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c16-vertical-contract-implementation-attribution.v1",
+  "generatedAt": "2026-04-16T07:25:03.045Z",
+  "decision": {
+    "verdict": "zonal_mean_relief_offset_by_upper_cloud_carryover_recirculation",
+    "nextMove": "Architecture C17: zonal-mean-preserving upper-cloud carryover carveout experiment"
+  },
+  "quickComparison": {
+    "c13CrossEq": -330.9854,
+    "c15CrossEq": -364.55266,
+    "c13ItczWidth": 23.884,
+    "c15ItczWidth": 24.094,
+    "c13DryNorth": 1.152,
+    "c15DryNorth": 1.404,
+    "c13OceanCond": 0.12628,
+    "c15OceanCond": 0.15331
+  },
+  "transportComparison": {
+    "c13EquatorZonal": -301.63909,
+    "c15EquatorZonal": -274.13377,
+    "c13EquatorEddy": -34.29106,
+    "c15EquatorEddy": -96.97265,
+    "c13EquatorMidUpper": -203.65605,
+    "c15EquatorMidUpper": -239.13535,
+    "c13North35Vapor": -467.08734,
+    "c15North35Vapor": -360.61691
+  },
+  "carryoverComparison": {
+    "c13Carryover": 0,
+    "c15Carryover": 0.39867,
+    "c13Persistence": 0,
+    "c15Persistence": 0.39786,
+    "c13WeakErosion": 0,
+    "c15WeakErosion": 0.38477,
+    "c13CloudRecirc": 0,
+    "c15CloudRecirc": 2.22467
+  },
+  "thermodynamicComparison": {
+    "c13PrimaryRegime": "moistureSupported",
+    "c15PrimaryRegime": "dynamicsSupported",
+    "c13DynamicsSupport": 0.2,
+    "c15DynamicsSupport": 0.72656
+  },
+  "nextContract": {
+    "carveoutTargets": [
+      "carriedOverUpperCloudMass / importedAnvilPersistenceMass accumulation path",
+      "weakErosionCloudSurvivalMass support path",
+      "upper-cloud passive survival / blocked-erosion persistence lane",
+      "keep the subtropical subsidence contract pieces that relieved zonal-mean equatorial flow"
+    ]
+  }
+}

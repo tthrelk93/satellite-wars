@@ -1,0 +1,133 @@
+{
+  "schema": "satellite-wars.phase1r-omega-response-patch-design.v1",
+  "generatedAt": "2026-04-14T05:23:18.392Z",
+  "paths": {
+    "baselinePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-hadley-second-pass-restore-v4.json",
+    "offPath": "/tmp/phase1q-carrier-off.json",
+    "onPath": "/tmp/phase1q-carrier-on.json"
+  },
+  "verdict": "same_step_drying_to_omega_bridge_missing",
+  "baselineGap": {
+    "itczWidthDeg": {
+      "baseline": 23.646,
+      "current": 26.055,
+      "delta": 2.409
+    },
+    "subtropicalDryNorthRatio": {
+      "baseline": 1.1,
+      "current": 1.572,
+      "delta": 0.472
+    },
+    "subtropicalDrySouthRatio": {
+      "baseline": 0.519,
+      "current": 1.203,
+      "delta": 0.684
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "baseline": 1.192,
+      "current": 0.531,
+      "delta": -0.661
+    }
+  },
+  "offOnCompare": {
+    "itczWidthDeg": {
+      "off": 25.834,
+      "on": 26.055,
+      "delta": 0.221
+    },
+    "subtropicalDryNorthRatio": {
+      "off": 1.515,
+      "on": 1.572,
+      "delta": 0.057
+    },
+    "subtropicalDrySouthRatio": {
+      "off": 1.192,
+      "on": 1.203,
+      "delta": 0.011
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "off": 0.531,
+      "on": 0.531,
+      "delta": 0
+    },
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": {
+      "off": 0.14647,
+      "on": 0.14768,
+      "delta": 0.00121
+    }
+  },
+  "carrierBridgeSignals": {
+    "northDryBeltCirculationReturnFlowCouplingAppliedMeanFrac": 0.00975,
+    "sourceDriverDeltaMeanFrac": 0.00111,
+    "dryingDeltaMeanFrac": 0.01437,
+    "omegaDeltaMeanPaS": -0.0003,
+    "nhWesterlyDeltaMs": 0,
+    "dryingToOmegaTransferFrac": 0.02088,
+    "omegaToJetTransferFrac": 0
+  },
+  "ranking": [
+    {
+      "key": "same_step_drying_to_omega_bridge_missing",
+      "label": "Drying is moving, but omega is effectively frozen inside the current bridge",
+      "score": 0.95,
+      "evidence": {
+        "sourceDriverDeltaMeanFrac": 0.00111,
+        "dryingDeltaMeanFrac": 0.01437,
+        "omegaDeltaMeanPaS": -0.0003,
+        "nhWesterlyDeltaMs": 0
+      }
+    },
+    {
+      "key": "broad_core_retune_is_wrong_lane",
+      "label": "A broader core circulation retune would add risk before the local omega bridge is fixed",
+      "score": 0.95,
+      "evidence": {
+        "itczWidthDeltaDeg": 0.221,
+        "northDryRatioDelta": 0.057,
+        "southDryRatioDelta": 0.011,
+        "northDryBeltOceanLargeScaleCondensationDeltaKgM2": 0.00121
+      }
+    },
+    {
+      "key": "omega_to_jet_recovery_is_secondary_until_omega_moves",
+      "label": "Jet recovery still matters, but it is downstream of the unresolved omega bridge",
+      "score": 0.05,
+      "evidence": {
+        "omegaDeltaMeanPaS": -0.0003,
+        "nhWesterlyDeltaMs": 0
+      }
+    }
+  ],
+  "codeEvidence": {
+    "omegaDiagnosticStage": "vertical5.js computes omega and lowLevelOmegaEffective before the subtropical dryDriver loop.",
+    "dryDriverStage": "vertical5.js computes dryDriver later, then applies qv/theta drying and warming tendencies without feeding those tendencies back into omega for the same step.",
+    "implication": "The current bridge can improve drying diagnostics while leaving lowLevelOmegaEffective almost unchanged, which is exactly what the Phase 1Q off/on compare shows."
+  },
+  "patchDesign": {
+    "primaryFiles": [
+      "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js",
+      "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js"
+    ],
+    "mechanism": "Add a capped same-step omega-response bridge driven by the proven dryDriver lane, then expose its parameters through core5.js so the drying response can seed a small subtropical descent increase without broad circulation retuning.",
+    "insertionPoints": [
+      "vertical5.js: after dryDriver is computed and before the subtropical drying loop exits, derive a capped omega bridge term from dryDriver, latShape, weak-engine structure, and same-hemisphere transition suppression.",
+      "vertical5.js: apply the bridge to lowLevelOmegaEffective and the low-level omega interface for the same subtropical column so the response is visible to later same-step consumers.",
+      "core5.js: add guardrail-first parameters for enable/disable, dryDriver thresholds, and max omega bridge amplitude."
+    ],
+    "targetSignature": {
+      "northTransitionLowLevelOmegaEffectiveDeltaPaS": 0.01,
+      "northDryBeltLowLevelOmegaEffectiveDeltaPaS": 0.005,
+      "midlatitudeWesterliesNorthDeltaMs": 0.03,
+      "maxAllowedItczWidthDeltaDeg": 0.05,
+      "maxAllowedNorthDryRatioDelta": 0.02,
+      "maxAllowedNorthOceanCondensationDeltaKgM2": 0.002
+    },
+    "designRules": [
+      "Use the already-kept Phase 1K and Phase 1M selectors as the envelope; do not reintroduce broad source reinjection.",
+      "Make the bridge same-hemisphere and subtropical-band limited so it acts as a local descent seed, not a global omega retune.",
+      "Cap the bridge in Pa/s, not only in fractional terms, so it cannot silently escalate under a stronger dryDriver.",
+      "Treat midlatitude westerly recovery as a downstream guardrail target; the first proof of success is a real omega response."
+    ]
+  },
+  "nextPhase": "Phase 1S: Implement capped drying-to-omega bridge patch"
+}

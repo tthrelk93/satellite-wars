@@ -1,0 +1,71 @@
+{
+  "schema": "satellite-wars.phase1zzf-transition-carryover-admission-attribution.v1",
+  "generatedAt": "2026-04-15T02:34:29.712Z",
+  "paths": {
+    "offPath": "/tmp/phase1zzf-off.json",
+    "onPath": "/tmp/phase1zzf-on.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zzf-transition-carryover-admission-attribution.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zzf-transition-carryover-admission-attribution.json"
+  },
+  "verdict": "omega_support_below_transition_admission",
+  "keepPatch": false,
+  "nextPhase": "Phase 1ZZG: Transition Omega Admission Design",
+  "recommendation": "The next step should redesign the transition omega admission lane, not increase containment amplitude.",
+  "metrics": {
+    "itczWidthDeg": 0.004,
+    "subtropicalDryNorthRatio": 0,
+    "subtropicalDrySouthRatio": 0.001,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.00129,
+    "midlatitudeWesterliesNorthU10Ms": 0,
+    "northsideLeakCarrierSignalMean": 0.06059
+  },
+  "laneDeltas": {
+    "receiver26N": 0.00032,
+    "spillover18N": 0.00166,
+    "source11N": -0.0051,
+    "edge3N": -0.00869,
+    "southMirror11S": 0.0002
+  },
+  "gateInputs": {
+    "targetLat": 18.75,
+    "carrierSignal": 0.06059,
+    "overlapMass": 0.18727,
+    "dryDriver": 0.1267,
+    "existingOmegaPaS": 0.06678,
+    "subtropicalBand": 1,
+    "neutralSupport": 0.52261,
+    "containmentFrac": 0,
+    "containmentApplied": 0,
+    "receiverTaper26N": 0.00516,
+    "receiverApplied26N": 0.00141
+  },
+  "supports": {
+    "latSupport": 0.84375,
+    "carrierSignalSupport": 0.63105,
+    "overlapSupport": 1,
+    "drySupport": 0.009,
+    "omegaSupport": 0
+  },
+  "supportRanking": [
+    {
+      "key": "omegaSupport",
+      "value": 0
+    },
+    {
+      "key": "drySupport",
+      "value": 0.009
+    },
+    {
+      "key": "carrierSignalSupport",
+      "value": 0.63105
+    },
+    {
+      "key": "latSupport",
+      "value": 0.84375
+    },
+    {
+      "key": "overlapSupport",
+      "value": 1
+    }
+  ]
+}

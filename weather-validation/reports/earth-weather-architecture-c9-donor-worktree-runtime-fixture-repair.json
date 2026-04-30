@@ -1,0 +1,39 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c9-donor-worktree-runtime-fixture-repair.v1",
+  "generatedAt": "2026-04-16T05:58:38.560Z",
+  "archiveBranch": "codex/world-class-weather-loop-archive-20260407-0745",
+  "decision": {
+    "verdict": "runtime_fixture_contract_restored",
+    "nextMove": "Architecture C10: cycled hybrid benchmark rerun"
+  },
+  "bridgeSummary": {
+    "bridgedFiles": [
+      "src/weather/WeatherLogger.js",
+      "src/weather/v2/analysisIncrement5.test.js",
+      "src/weather/v2/climo2d.js",
+      "src/weather/v2/core5.js",
+      "src/weather/v2/grid.js",
+      "src/weather/v2/vertical5.test.js"
+    ],
+    "rewrittenImportCount": 27,
+    "missingCoreMethodsAfterBridge": []
+  },
+  "cycleContract": {
+    "schema": "satellite-wars.cycle-start.v1",
+    "cycleId": "cycle-2026-04-16T05-57-32Z-earth-weather-architecture-c9-bridged-hybrid",
+    "cycleDir": "/private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c9-bxZW3q/runtime-worktree/weather-validation/output/cycle-2026-04-16T05-57-32Z-earth-weather-architecture-c9-bridged-hybrid",
+    "planPath": "/private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c9-bxZW3q/runtime-worktree/weather-validation/output/cycle-2026-04-16T05-57-32Z-earth-weather-architecture-c9-bridged-hybrid/plan.md",
+    "cycleStatePath": "/private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c9-bxZW3q/runtime-worktree/weather-validation/output/cycle-2026-04-16T05-57-32Z-earth-weather-architecture-c9-bridged-hybrid/cycle-state.json",
+    "mode": "quick",
+    "horizonDays": 30,
+    "resumeAcrossHeartbeats": false
+  },
+  "quickArtifactPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c9-bridged-hybrid-quick.json",
+  "runContext": {
+    "exitCode": 0,
+    "signal": null,
+    "summaryExists": true,
+    "stdoutSnippet": "[V2] seed=12345 version=v2 nz=26",
+    "stderrSnippet": "(node:10933) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///private/var/folders/wq/k6l0z6354594td_g2b054vxc0000gn/T/earth-weather-c9-bxZW3q/runtime-worktree/src/weather/v2/core5.js is not specified and it doesn't parse as CommonJS.\nReparsing as ES module because module syntax was detected. This incurs a performance overhead.\nTo eliminate this warning, add \"type\": \"module\" to /priva"
+  }
+}

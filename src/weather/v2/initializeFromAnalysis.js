@@ -130,6 +130,9 @@ export function initializeV2FromAnalysis({
   qr.fill(0);
   state.precipAccum?.fill(0);
   state.precipRate?.fill(0);
+  state.surfaceEvapAccum?.fill(0);
+  state.verticalSubtropicalDryingDemandMass?.fill(0);
+  state.verticalCloudErosionToVaporMass?.fill(0);
 
   for (let cell = 0; cell < N; cell += 1) {
     const surfaceIdx = (nz - 1) * N + cell;

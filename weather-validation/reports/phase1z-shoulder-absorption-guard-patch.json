@@ -1,0 +1,183 @@
+{
+  "schema": "satellite-wars.phase1z-shoulder-absorption-guard-patch.v1",
+  "generatedAt": "2026-04-14T07:20:04.639Z",
+  "paths": {
+    "baselinePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-hadley-second-pass-restore-v4.json",
+    "offPath": "/tmp/phase1z-off.json",
+    "onPath": "/tmp/phase1z-on.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1z-shoulder-absorption-guard-patch.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1z-shoulder-absorption-guard-patch.json"
+  },
+  "verdict": "rejected_patch",
+  "nextPhase": "Phase 1ZA: Shoulder Guard Residual Attribution",
+  "recommendation": "Do not assume the shoulder guard is the final fix yet; use the same-branch compare to identify the residual mismatch before broadening tuning.",
+  "baselineGap": {
+    "itczWidthDeg": {
+      "baseline": 23.646,
+      "current": 25.792,
+      "delta": 2.146
+    },
+    "subtropicalDryNorthRatio": {
+      "baseline": 1.1,
+      "current": 1.508,
+      "delta": 0.408
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "baseline": 1.192,
+      "current": 0.531,
+      "delta": -0.661
+    }
+  },
+  "offOnCompare": {
+    "itczWidthDeg": {
+      "off": 25.834,
+      "on": 25.792,
+      "delta": -0.042
+    },
+    "subtropicalDryNorthRatio": {
+      "off": 1.515,
+      "on": 1.508,
+      "delta": -0.007
+    },
+    "subtropicalDrySouthRatio": {
+      "off": 1.192,
+      "on": 1.193,
+      "delta": 0.001
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "off": 0.531,
+      "on": 0.531,
+      "delta": 0
+    }
+  },
+  "shoulderPeak": {
+    "latitudeDeg": 3.75,
+    "condensationDeltaKgM2": 0.02566,
+    "guardAppliedOnKgM2": 0
+  },
+  "bandDiagnostics": {
+    "tropicalShoulderNorth": {
+      "label": "Tropical shoulder (3-18.75N)",
+      "condensationDeltaKgM2": 0.01089,
+      "guardAppliedOnKgM2": 0.00177,
+      "localBridgeOnPaS": 0,
+      "projectedBridgeOnPaS": 0,
+      "wind10mUOn": -0.71533
+    },
+    "tropicalShoulderCoreNorth": {
+      "label": "Tropical shoulder core (3-12N)",
+      "condensationDeltaKgM2": 0.02242,
+      "guardAppliedOnKgM2": 0.00265,
+      "localBridgeOnPaS": 0,
+      "projectedBridgeOnPaS": 0,
+      "wind10mUOn": -0.9085
+    },
+    "sourceCoreNorth": {
+      "label": "Source core (20-30N)",
+      "condensationDeltaKgM2": -0.0103,
+      "guardAppliedOnKgM2": 0,
+      "localBridgeOnPaS": 0,
+      "projectedBridgeOnPaS": 0,
+      "wind10mUOn": 1.357
+    },
+    "targetEntryNorth": {
+      "label": "Target entry (30-45N)",
+      "condensationDeltaKgM2": -0.02576,
+      "guardAppliedOnKgM2": 0.00705,
+      "localBridgeOnPaS": 0,
+      "projectedBridgeOnPaS": 0,
+      "wind10mUOn": 0.247
+    },
+    "jetBandNorth": {
+      "label": "Jet band (41.25-56.25N)",
+      "condensationDeltaKgM2": 0.00134,
+      "guardAppliedOnKgM2": 0,
+      "localBridgeOnPaS": 0,
+      "projectedBridgeOnPaS": 0,
+      "wind10mUOn": 0.781
+    }
+  },
+  "referenceSlices": {
+    "tropicalShoulder3p75": {
+      "off": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.07641,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": -0.677
+      },
+      "on": {
+        "latitudeDeg": 3.75,
+        "largeScaleCondensationSourceKgM2": 0.10207,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": -0.677
+      }
+    },
+    "tropicalShoulder11p25": {
+      "off": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.12779,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": -1.14
+      },
+      "on": {
+        "latitudeDeg": 11.25,
+        "largeScaleCondensationSourceKgM2": 0.14696,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.0053,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": -1.14
+      }
+    },
+    "sourceCore26p25": {
+      "off": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.12559,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": 1.357
+      },
+      "on": {
+        "latitudeDeg": 26.25,
+        "largeScaleCondensationSourceKgM2": 0.11529,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": 1.357
+      }
+    },
+    "targetEntry33p75": {
+      "off": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.18497,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": -0.089
+      },
+      "on": {
+        "latitudeDeg": 33.75,
+        "largeScaleCondensationSourceKgM2": 0.13135,
+        "shoulderAbsorptionGuardAppliedSuppressionKgM2": 0.0141,
+        "dryingOmegaBridgeLocalAppliedPaS": 0,
+        "dryingOmegaBridgeProjectedAppliedPaS": 0,
+        "wind10mU": -0.09
+      }
+    }
+  },
+  "exitCriteria": {
+    "shoulderCondensationPass": false,
+    "targetEntryProjectedBridgePass": false,
+    "itczWidthPass": true,
+    "northDryPass": true,
+    "southDryPass": false,
+    "jetNonDegradingPass": true,
+    "sourceLocalityPass": true
+  }
+}

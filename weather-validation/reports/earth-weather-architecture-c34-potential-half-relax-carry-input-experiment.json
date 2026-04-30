@@ -1,0 +1,148 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c34-potential-half-relax-carry-input-experiment.v1",
+  "generatedAt": "2026-04-16T10:21:55.328Z",
+  "archiveBranch": "codex/world-class-weather-loop-archive-20260407-0745",
+  "currentQuickPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c7-current-off-quick.json",
+  "hybridQuickPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c34-potential-half-relax-carry-input-quick.json",
+  "hybridAnnualPath": null,
+  "bridgeSummary": {
+    "bridgedFiles": [
+      "src/weather/WeatherLogger.js",
+      "src/weather/v2/analysisIncrement5.test.js",
+      "src/weather/v2/climo2d.js",
+      "src/weather/v2/core5.js",
+      "src/weather/v2/grid.js",
+      "src/weather/v2/vertical5.test.js"
+    ],
+    "rewrittenImportCount": 27,
+    "missingCoreMethodsAfterBridge": []
+  },
+  "patchSummary": {
+    "patchedPaths": [
+      "src/weather/v2/core5.js",
+      "src/weather/v2/vertical5.js",
+      "src/weather/v2/windEddyNudge5.js",
+      "src/weather/v2/vertical5.js",
+      "src/weather/v2/vertical5.js"
+    ],
+    "patchedParams": [
+      "nudgeParams.tauQvS",
+      "nudgeParams.tauQvColumn",
+      "nudgeParams organized/subsidence relief quartet",
+      "windNudgeParams.tauSurfaceSeconds",
+      "vertParams.rhTrig",
+      "vertParams.rhMidMin",
+      "vertParams.omegaTrig",
+      "vertParams.instabTrig",
+      "vertParams.qvTrig",
+      "vertParams.thetaeCoeff",
+      "vertParams convective potential/organization timing block",
+      "vertParams tropicalOrganizationBandDeg",
+      "vertParams subtropicalSubsidence contract",
+      "vertical5.carryInputSubtropicalSuppressionMin",
+      "vertical5.carryInputOrganizedSupportMax",
+      "vertical5.carryInputPotentialMax",
+      "vertical5.carryInputDominanceMin",
+      "vertical5.carryInputMinResidualMassKgM2",
+      "windEddyParams.enableEquatorialBandSoftening",
+      "windEddyParams.equatorialSofteningLat0Deg",
+      "windEddyParams.equatorialSofteningLat1Deg",
+      "windEddyParams.equatorialBlendToUnityFrac",
+      "windEddyNudge5 equatorial band softening branch",
+      "windEddyParams.innerCoreEquatorialSofteningLat0Deg",
+      "windEddyParams.innerCoreEquatorialSofteningLat1Deg",
+      "windEddyParams.innerCoreEquatorialBlendToUnityFrac",
+      "windEddyParams.weakPartialShoulderRestoreLat1Deg",
+      "windEddyParams.weakPartialShoulderRestoreBlendToUnityFrac",
+      "vertical5.weakRestoreCarryInputRecaptureSubtropicalSuppressionMin",
+      "vertical5.weakRestoreCarryInputRecaptureOrganizedSupportMax",
+      "vertical5.weakRestoreCarryInputRecapturePotentialMax",
+      "vertical5.weakRestoreCarryInputRecaptureDominanceMin",
+      "vertical5.weakRestoreCarryInputRecaptureMinResidualMassKgM2",
+      "vertical5.organizedSupportCarryInputProtectiveMax",
+      "vertical5.potentialHalfRelaxCarryInputPotentialMax"
+    ]
+  },
+  "supportingArtifacts": {
+    "monthlyClimatologyJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c34-potential-half-relax-carry-input-quick-monthly-climatology.json",
+    "moistureAttributionJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c34-potential-half-relax-carry-input-quick-moisture-attribution.json",
+    "transportInterfaceBudgetJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c34-potential-half-relax-carry-input-quick-transport-interface-budget.json",
+    "hadleyPartitionSummaryJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c34-potential-half-relax-carry-input-quick-hadley-partition-summary.json",
+    "thermodynamicSupportSummaryJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c34-potential-half-relax-carry-input-quick-thermodynamic-support-summary.json",
+    "nhDryBeltSourceSectorSummaryJsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-architecture-c34-potential-half-relax-carry-input-quick-nh-dry-belt-source-sector-summary.json"
+  },
+  "quickRows": [
+    {
+      "key": "itczWidthDeg",
+      "label": "ITCZ width",
+      "off": 25.91,
+      "on": 23.374,
+      "offDistance": 2.264,
+      "onDistance": 0.272,
+      "improved": true,
+      "severeRegression": false
+    },
+    {
+      "key": "subtropicalDryNorthRatio",
+      "label": "NH dry-belt ratio",
+      "off": 1.534,
+      "on": 1.122,
+      "offDistance": 0.434,
+      "onDistance": 0.022,
+      "improved": true,
+      "severeRegression": false
+    },
+    {
+      "key": "subtropicalDrySouthRatio",
+      "label": "SH dry-belt ratio",
+      "off": 1.199,
+      "on": 0.493,
+      "offDistance": 0.68,
+      "onDistance": 0.026,
+      "improved": true,
+      "severeRegression": false
+    },
+    {
+      "key": "midlatitudeWesterliesNorthU10Ms",
+      "label": "NH midlatitude westerlies",
+      "off": 0.531,
+      "on": 1.219,
+      "offDistance": 0.661,
+      "onDistance": 0.027,
+      "improved": true,
+      "severeRegression": false
+    },
+    {
+      "key": "northDryBeltOceanLargeScaleCondensationMeanKgM2",
+      "label": "NH dry-belt ocean condensation",
+      "off": 0.1413,
+      "on": 0.10807,
+      "offDistance": null,
+      "onDistance": null,
+      "improved": false,
+      "severeRegression": false
+    },
+    {
+      "key": "crossEquatorialVaporFluxNorthKgM_1S",
+      "label": "Cross-equatorial vapor flux north",
+      "off": 143.95306,
+      "on": -356.96839,
+      "offDistance": 0,
+      "onDistance": 431.96839,
+      "improved": false,
+      "severeRegression": true
+    }
+  ],
+  "quickGate": {
+    "improvedCount": 4,
+    "severeRegressions": [
+      "crossEquatorialVaporFluxNorthKgM_1S"
+    ],
+    "pass": false
+  },
+  "annualGate": null,
+  "decision": {
+    "verdict": "quick_reject",
+    "nextMove": "Architecture C35: potential-half-relax carry-input attribution"
+  }
+}

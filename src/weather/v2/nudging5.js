@@ -1,5 +1,11 @@
-import { Rd, Cp } from '../constants.js';
+import { g, Rd, Cp } from '../constants.js';
 import { interpolatePressureFieldAtCell } from './analysisData.js';
+import {
+  INSTRUMENTATION_LEVEL_BAND_COUNT,
+  findInstrumentationLevelBandIndex,
+  instrumentationBandOffset,
+  sigmaMidAtLevel
+} from './instrumentationBands5.js';
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const clamp01 = (v) => clamp(v, 0, 1);
@@ -46,6 +52,10 @@ const NUDGE_ALLOWED_PARAMS = new Set([
   'qvCap',
   'landQvNudgeScale',
   'oceanQvNudgeScale',
+  'organizedConvectionQvSurfaceRelief',
+  'organizedConvectionQvColumnRelief',
+  'organizedConvectionThetaColumnRelief',
+  'subtropicalSubsidenceQvRelief',
   'smoothLon',
   'smoothLat',
   'cadenceSeconds',
@@ -160,6 +170,22 @@ const selectTargetMap = (source, analysisMap, climoMap) => {
   return analysisMap || climoMap || null;
 };
 
+const computeDryingSupport = ({ latAbsDeg, lowLevelOmegaEffectivePaS = 0, subtropicalSubsidenceDryingFrac = 0 }) => {
+  const dryBeltRelief = smoothstep(14, 34, latAbsDeg) * smoothstep(-0.02, 0.25, lowLevelOmegaEffectivePaS);
+  const subtropicalDryingStrength = smoothstep(0.01, 0.08, subtropicalSubsidenceDryingFrac);
+  return clamp01(0.55 * dryBeltRelief + 0.95 * subtropicalDryingStrength);
+};
+
+const accumulateBandValue = (field, bandIndex, cell, cellCount, value) => {
+  if (
+    !(field instanceof Float32Array)
+    || field.length !== cellCount * INSTRUMENTATION_LEVEL_BAND_COUNT
+    || !Number.isFinite(value)
+    || value === 0
+  ) return;
+  field[instrumentationBandOffset(bandIndex, cell, cellCount)] += value;
+};
+
 export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
   if (!grid || !state || !climo || !scratch || !Number.isFinite(dt) || dt <= 0) return;
   warnUnknownNudgeParams(params);
@@ -188,6 +214,10 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
     qvCap = 0.03,
     landQvNudgeScale = 0.5,
     oceanQvNudgeScale = 1.0,
+    organizedConvectionQvSurfaceRelief = 0.65,
+    organizedConvectionQvColumnRelief = 0.8,
+    organizedConvectionThetaColumnRelief = 0.45,
+    subtropicalSubsidenceQvRelief = 0.85,
     smoothLon = 31,
     smoothLat = 9,
     psMin = 50000,
@@ -200,6 +230,9 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
 
   const { nx, ny, latDeg } = grid;
   const { N, nz, ps, theta, qv, landMask, pMid, sstNow, soilW, soilCap, u, v } = state;
+  const convectiveOrganization = state.convectiveOrganization;
+  const subtropicalSubsidenceDrying = state.subtropicalSubsidenceDrying;
+  const pHalf = state.pHalf;
   const climoTargets = buildClimoTargetMaps(climo);
   const analysisTargets = state.analysisTargets || null;
   const slpNow = climoTargets.surfacePressurePa;
@@ -265,7 +298,18 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
       const pS = Math.max(100, pMid[idxS]);
       const PiS = Math.pow(pS / P0, KAPPA);
       const thetaTarget = tmp2D[k] / PiS;
-      theta[idxS] += (thetaTarget - theta[idxS]) * coeff;
+      const beforeTheta = theta[idxS];
+      const appliedTheta = (thetaTarget - beforeTheta) * coeff;
+      state.nudgingTargetThetaMismatchAccum[k] += Math.abs(thetaTarget - beforeTheta);
+      state.nudgingTargetThetaSampleCount[k] += 1;
+      accumulateBandValue(
+        state.nudgingThetaTargetMismatchByBand,
+        findInstrumentationLevelBandIndex(sigmaMidAtLevel(state.sigmaHalf, levS, nz)),
+        k,
+        N,
+        Math.abs(thetaTarget - beforeTheta)
+      );
+      theta[idxS] += appliedTheta;
       theta[idxS] = clamp(theta[idxS], 200, 400);
     }
   }
@@ -280,7 +324,15 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
       for (let i = 0; i < nx; i++) {
         const k = row + i;
         const land = landMask[k] === 1;
-        const rhTarget = clamp(land ? rhLand : rhOcean, 0.1, 0.95);
+        const dryBeltRelief = smoothstep(14, 34, latAbs)
+          * smoothstep(-0.02, 0.25, state.lowLevelOmegaEffective?.[k] || 0);
+        const subtropicalDrying = state.subtropicalSubsidenceDrying?.[k] || 0;
+        const subtropicalDryingStrength = smoothstep(0.01, 0.08, subtropicalDrying);
+        const rhTarget = clamp(
+          (land ? rhLand : rhOcean) * (1 - 0.6 * dryBeltRelief - 0.52 * subtropicalDryingStrength),
+          0.08,
+          0.95
+        );
         const idxS = levS * N + k;
         const pS = Math.max(100, pMid[idxS]);
         const qs = saturationMixingRatio(tmp2D[k], pS);
@@ -301,13 +353,54 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
     for (let k = 0; k < N; k++) {
       const idxS = levS * N + k;
       const land = landMask[k] === 1;
+      const row = Math.floor(k / nx);
+      const latAbs = Math.abs(latDeg[row]);
       let scale = land ? landQvNudgeScale : oceanQvNudgeScale;
+      const dryBeltRelief = smoothstep(14, 34, latAbs)
+        * smoothstep(-0.02, 0.25, state.lowLevelOmegaEffective?.[k] || 0);
+      const subtropicalDrying = subtropicalSubsidenceDrying?.[k] || 0;
+      const subtropicalDryingStrength = smoothstep(0.01, 0.08, subtropicalDrying);
+      const organizedReliefSource = 0.75 * (convectiveOrganization?.[k] || 0)
+        + 0.25 * (state.convectivePotential?.[k] || 0);
+      const convRelief = 1 - clamp01(organizedReliefSource * organizedConvectionQvSurfaceRelief);
+      const subsidenceRelief = 1 - clamp01(
+        Math.max(subtropicalDryingStrength, dryBeltRelief * 1.4) * subtropicalSubsidenceQvRelief
+      );
       if (land) {
         const cap = soilCap ? soilCap[k] : 0;
         const avail = cap > 0 ? clamp01((soilW ? soilW[k] : 0) / cap) : 0;
         scale *= lerp(0.2, 1.0, avail);
       }
-      qv[idxS] += (tmp2D2[k] - qv[idxS]) * coeff * scale;
+      const dryBeltMoistureSuppression = 1 - clamp01(0.55 * dryBeltRelief + 0.95 * subtropicalDryingStrength);
+      scale *= Math.min(convRelief, subsidenceRelief) * dryBeltMoistureSuppression;
+      const beforeQv = qv[idxS];
+      const targetQv = tmp2D2[k];
+      const appliedQv = (targetQv - beforeQv) * coeff * scale;
+      const sigmaMid = sigmaMidAtLevel(state.sigmaHalf, levS, nz);
+      const bandIndex = findInstrumentationLevelBandIndex(sigmaMid);
+      const dp = pHalf?.[(levS + 1) * N + k] - pHalf?.[levS * N + k];
+      const massCell = dp > 0 ? dp / g : 0;
+      const dryingSupport = computeDryingSupport({
+        latAbsDeg: latAbs,
+        lowLevelOmegaEffectivePaS: state.lowLevelOmegaEffective?.[k] || 0,
+        subtropicalSubsidenceDryingFrac: subtropicalDrying
+      });
+      state.nudgingTargetQvMismatchAccum[k] += Math.abs(targetQv - beforeQv);
+      state.nudgingTargetQvSampleCount[k] += 1;
+      accumulateBandValue(state.nudgingQvTargetMismatchByBand, bandIndex, k, N, Math.abs(targetQv - beforeQv));
+      if (massCell > 0) {
+        const nativeDryingSupportMass = Math.max(0, beforeQv) * massCell * dryingSupport;
+        state.helperNativeDryingSupportMass[k] += nativeDryingSupportMass;
+        accumulateBandValue(state.helperNativeDryingSupportByBandMass, bandIndex, k, N, nativeDryingSupportMass);
+        if (appliedQv > 0) {
+          const moisteningMass = appliedQv * massCell;
+          state.nudgingMoisteningMass[k] += moisteningMass;
+          state.nudgingOpposedDryingMass[k] += moisteningMass * dryingSupport;
+          accumulateBandValue(state.nudgingMoisteningByBandMass, bandIndex, k, N, moisteningMass);
+          accumulateBandValue(state.nudgingOpposedDryingByBandMass, bandIndex, k, N, moisteningMass * dryingSupport);
+        }
+      }
+      qv[idxS] += appliedQv;
       qv[idxS] = clamp(qv[idxS], 0, qvCap);
     }
   }
@@ -327,7 +420,20 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
         const targetValue = interpolatePressureFieldAtCell(thetaTargetMap, pTarget, cell);
         if (!Number.isFinite(targetValue)) continue;
         const thetaTarget = useTemperature ? targetValue / Math.pow(pTarget / P0, KAPPA) : targetValue;
-        theta[idx] += (thetaTarget - theta[idx]) * coeff;
+        const organizedReliefSource = 0.7 * (convectiveOrganization?.[cell] || 0)
+          + 0.3 * (state.convectivePotential?.[cell] || 0);
+        const relief = 1 - clamp01(organizedReliefSource * organizedConvectionThetaColumnRelief);
+        const beforeTheta = theta[idx];
+        state.nudgingTargetThetaMismatchAccum[cell] += Math.abs(thetaTarget - beforeTheta);
+        state.nudgingTargetThetaSampleCount[cell] += 1;
+        accumulateBandValue(
+          state.nudgingThetaTargetMismatchByBand,
+          findInstrumentationLevelBandIndex(sigmaMidAtLevel(state.sigmaHalf, lev, nz)),
+          cell,
+          N,
+          Math.abs(thetaTarget - beforeTheta)
+        );
+        theta[idx] += (thetaTarget - beforeTheta) * coeff * relief;
       }
     }
   }
@@ -340,11 +446,50 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
   if (enableQvColumn && qvTargetMap && pMid) {
     const coeff = clamp(dt / tauQvColumn, 0, 1);
     for (let cell = 0; cell < N; cell += 1) {
+      const row = Math.floor(cell / nx);
+      const latAbs = Math.abs(latDeg[row]);
+      const dryBeltRelief = smoothstep(14, 34, latAbs)
+        * smoothstep(-0.02, 0.25, state.lowLevelOmegaEffective?.[cell] || 0);
+      const subtropicalDryingStrength = smoothstep(0.01, 0.08, subtropicalSubsidenceDrying?.[cell] || 0);
+      const dryingSupport = computeDryingSupport({
+        latAbsDeg: latAbs,
+        lowLevelOmegaEffectivePaS: state.lowLevelOmegaEffective?.[cell] || 0,
+        subtropicalSubsidenceDryingFrac: subtropicalSubsidenceDrying?.[cell] || 0
+      });
       for (let lev = 0; lev < nz; lev += 1) {
         const idx = lev * N + cell;
         const targetValue = interpolatePressureFieldAtCell(qvTargetMap, pMid[idx], cell);
         if (!Number.isFinite(targetValue)) continue;
-        qv[idx] += (clamp(targetValue, 0, qvCap) - qv[idx]) * coeff;
+        const organizedReliefSource = 0.75 * (convectiveOrganization?.[cell] || 0)
+          + 0.25 * (state.convectivePotential?.[cell] || 0);
+        const convRelief = 1 - clamp01(organizedReliefSource * organizedConvectionQvColumnRelief);
+        const subsidenceRelief = 1 - clamp01(
+          Math.max(subtropicalDryingStrength, dryBeltRelief * 1.4) * subtropicalSubsidenceQvRelief
+        );
+        const dryBeltMoistureSuppression = 1 - clamp01(0.45 * dryBeltRelief + 1.05 * subtropicalDryingStrength);
+        const qvTarget = clamp(targetValue, 0, qvCap);
+        const beforeQv = qv[idx];
+        const sigmaMid = sigmaMidAtLevel(state.sigmaHalf, lev, nz);
+        const bandIndex = findInstrumentationLevelBandIndex(sigmaMid);
+        const dp = pHalf?.[(lev + 1) * N + cell] - pHalf?.[lev * N + cell];
+        const massCell = dp > 0 ? dp / g : 0;
+        const appliedQv = (qvTarget - beforeQv) * coeff * Math.min(convRelief, subsidenceRelief) * dryBeltMoistureSuppression;
+        state.nudgingTargetQvMismatchAccum[cell] += Math.abs(qvTarget - beforeQv);
+        state.nudgingTargetQvSampleCount[cell] += 1;
+        accumulateBandValue(state.nudgingQvTargetMismatchByBand, bandIndex, cell, N, Math.abs(qvTarget - beforeQv));
+        if (massCell > 0) {
+          const nativeDryingSupportMass = Math.max(0, beforeQv) * massCell * dryingSupport;
+          state.helperNativeDryingSupportMass[cell] += nativeDryingSupportMass;
+          accumulateBandValue(state.helperNativeDryingSupportByBandMass, bandIndex, cell, N, nativeDryingSupportMass);
+          if (appliedQv > 0) {
+            const moisteningMass = appliedQv * massCell;
+            state.nudgingMoisteningMass[cell] += moisteningMass;
+            state.nudgingOpposedDryingMass[cell] += moisteningMass * dryingSupport;
+            accumulateBandValue(state.nudgingMoisteningByBandMass, bandIndex, cell, N, moisteningMass);
+            accumulateBandValue(state.nudgingOpposedDryingByBandMass, bandIndex, cell, N, moisteningMass * dryingSupport);
+          }
+        }
+        qv[idx] += appliedQv;
         qv[idx] = clamp(qv[idx], 0, qvCap);
       }
     }
@@ -355,14 +500,40 @@ export function stepNudging5({ dt, grid, state, climo, params = {}, scratch }) {
   if (enableWindColumn && windUTargetMap && windVTargetMap && pMid) {
     const coeff = clamp(dt / tauWindColumn, 0, 1);
     for (let cell = 0; cell < N; cell += 1) {
+      const row = Math.floor(cell / nx);
+      const lat = latDeg[row];
+      const latAbs = Math.abs(lat);
+      const dryingSupport = computeDryingSupport({
+        latAbsDeg: latAbs,
+        lowLevelOmegaEffectivePaS: state.lowLevelOmegaEffective?.[cell] || 0,
+        subtropicalSubsidenceDryingFrac: subtropicalSubsidenceDrying?.[cell] || 0
+      });
       for (let lev = 0; lev < nz; lev += 1) {
         const idx = lev * N + cell;
         const pTarget = pMid[idx];
         const uTarget = interpolatePressureFieldAtCell(windUTargetMap, pTarget, cell);
         const vTarget = interpolatePressureFieldAtCell(windVTargetMap, pTarget, cell);
         if (!Number.isFinite(uTarget) || !Number.isFinite(vTarget)) continue;
-        u[idx] += (uTarget - u[idx]) * coeff;
-        v[idx] += (vTarget - v[idx]) * coeff;
+        const beforeU = u[idx];
+        const beforeV = v[idx];
+        const du = (uTarget - beforeU) * coeff;
+        const dv = (vTarget - beforeV) * coeff;
+        const sigmaMid = sigmaMidAtLevel(state.sigmaHalf, lev, nz);
+        const bandIndex = findInstrumentationLevelBandIndex(sigmaMid);
+        const targetMismatch = Math.hypot(uTarget - beforeU, vTarget - beforeV);
+        state.nudgingTargetWindMismatchAccum[cell] += targetMismatch;
+        state.nudgingTargetWindSampleCount[cell] += 1;
+        accumulateBandValue(state.nudgingWindTargetMismatchByBand, bandIndex, cell, N, targetMismatch);
+        if (latAbs >= 15 && latAbs <= 35 && sigmaMid <= 0.55 && dryingSupport > 0) {
+          const polewardSign = lat >= 0 ? 1 : -1;
+          if (dv * polewardSign > 0) {
+            const oppositionMagnitude = Math.abs(dv) * dryingSupport;
+            state.windOpposedDryingCorrection[cell] += oppositionMagnitude;
+            accumulateBandValue(state.windOpposedDryingByBandCorrection, bandIndex, cell, N, oppositionMagnitude);
+          }
+        }
+        u[idx] += du;
+        v[idx] += dv;
       }
     }
   }

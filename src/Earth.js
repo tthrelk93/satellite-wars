@@ -14,8 +14,11 @@ import { RadarSensor } from './sensors/weather/RadarSensor';
 import { SoundingSensor } from './sensors/weather/SoundingSensor';
 import { AmvSensor } from './sensors/weather/AmvSensor';
 import { paintGridToTexture } from './sensors/weather/paintGridToTexture';
+import { applyTextureAnisotropy } from './textureUtils.js';
+import { createWindDiagnosticsPerfPayload, measureWindDiagnosticsPhase } from './windDiagnosticsPerf.js';
 import WindStreamlineRenderer from './WindStreamlineRenderer';
 import { CLOUD_WATCH_GRID_LON_OFFSET_RAD, WIND_REALISM_TARGETS } from './constants';
+import { takeBoundedAccumulatedStep } from './weather/workerStepBudget';
 import { findClosestLevelIndex } from './weather/v2/verticalGrid';
 import { interpolatePressureFieldAtCell } from './weather/v2/analysisData.js';
 import { armAnalysisIncrement5, clearAnalysisIncrement5 } from './weather/v2/analysisIncrement5.js';
@@ -23,6 +26,11 @@ import earthmap from './8081_earthmap10k.jpg';
 import earthbump from './8081_earthbump10k.jpg';
 import fogTexture from './fog.png'; // Add your fog texture map here
 
+const WEATHER_WORKER_MAX_STEP_SECONDS = 60 * 60;
+const WEATHER_WORKER_STALL_MS = 30000;
+const LIVE_WEATHER_GRID_NX = 96;
+const LIVE_WEATHER_GRID_NY = 48;
+const LIVE_WEATHER_RENDER_SCALE = 3;
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const smoothstep = (edge0, edge1, x) => {
   const t = clamp01((x - edge0) / Math.max(1e-6, edge1 - edge0));
@@ -96,6 +104,7 @@ const WIND_COLOR_MAP = makeColorMap([
 ]);
 const WIND_MODEL_DIAGNOSTICS_CADENCE_SECONDS = 1800;
 const WIND_VIZ_DIAGNOSTICS_CADENCE_SECONDS = 600;
+const WIND_DIAGNOSTICS_SAMPLE_TARGET = 5400;
 
 const computePercentiles = (values, percentiles) => {
   if (!values || values.length === 0) return {};
@@ -105,6 +114,30 @@ const computePercentiles = (values, percentiles) => {
   percentiles.forEach((p) => {
     const idx = Math.min(n - 1, Math.max(0, Math.round(p * (n - 1))));
     out[`p${Math.round(p * 100)}`] = sorted[idx];
+  });
+  return out;
+};
+
+const computeWeightedPercentiles = (samples, percentiles) => {
+  if (!samples || samples.length === 0) return {};
+  const valid = samples
+    .filter((sample) => Number.isFinite(sample?.value) && Number.isFinite(sample?.weight) && sample.weight > 0)
+    .sort((a, b) => a.value - b.value);
+  if (!valid.length) return {};
+  const totalWeight = valid.reduce((sum, sample) => sum + sample.weight, 0);
+  const out = {};
+  percentiles.forEach((p) => {
+    const targetWeight = Math.max(0, Math.min(1, p)) * totalWeight;
+    let accum = 0;
+    let selected = valid[valid.length - 1].value;
+    for (const sample of valid) {
+      accum += sample.weight;
+      if (accum >= targetWeight) {
+        selected = sample.value;
+        break;
+      }
+    }
+    out[`p${Math.round(p * 100)}`] = selected;
   });
   return out;
 };
@@ -122,17 +155,19 @@ const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 })
   const vortSamples = [];
   const bandSamples = { tropics: [], mid: [], polar: [] };
   const bandSums = { tropics: 0, mid: 0, polar: 0 };
+  const bandWeights = { tropics: 0, mid: 0, polar: 0 };
   const bandCounts = { tropics: 0, mid: 0, polar: 0 };
   const bandEkeSums = { tropics: 0, mid: 0, polar: 0 };
-  const bandEkeCounts = { tropics: 0, mid: 0, polar: 0 };
+  const bandEkeWeights = { tropics: 0, mid: 0, polar: 0 };
   let sumSpeed = 0;
+  let sumWeight = 0;
   let maxSpeed = 0;
   let sampleCount = 0;
   let roughUSum = 0;
   let roughVSum = 0;
   let roughCount = 0;
   let sumEke = 0;
-  let ekeCount = 0;
+  let ekeWeight = 0;
 
   const kmPerDegLat = grid.kmPerDegLat ?? 111.0;
   const cellLonDeg = grid.cellLonDeg ?? (360 / nx);
@@ -183,20 +218,26 @@ const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 })
     const v0 = v[k];
     if (!Number.isFinite(u0) || !Number.isFinite(v0)) continue;
     const speed = Math.hypot(u0, v0);
-    speedSamples.push(speed);
-    sumSpeed += speed;
     if (speed > maxSpeed) maxSpeed = speed;
     const j = Math.floor(k / nx);
     const i = k - j * nx;
     const latDeg = Number.isFinite(latDegArr?.[j])
       ? latDegArr[j]
       : 90 - ((j + 0.5) / ny) * 180;
+    const weight = Math.max(
+      1e-6,
+      Number.isFinite(grid.cosLat?.[j]) ? grid.cosLat[j] : Math.cos(latDeg * Math.PI / 180)
+    );
     const latAbs = Math.abs(latDeg);
     let band = 'polar';
     if (latAbs < 20) band = 'tropics';
     else if (latAbs <= 60) band = 'mid';
-    bandSamples[band].push(speed);
-    bandSums[band] += speed;
+    speedSamples.push({ value: speed, weight });
+    bandSamples[band].push({ value: speed, weight });
+    sumSpeed += speed * weight;
+    sumWeight += weight;
+    bandSums[band] += speed * weight;
+    bandWeights[band] += weight;
     bandCounts[band] += 1;
 
     const uBar = rowMeanU[j];
@@ -204,16 +245,16 @@ const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 })
     const du = u0 - uBar;
     const dv = v0 - vBar;
     const eke = du * du + dv * dv;
-    sumEke += eke;
-    ekeCount += 1;
-    bandEkeSums[band] += eke;
-    bandEkeCounts[band] += 1;
+    sumEke += eke * weight;
+    ekeWeight += weight;
+    bandEkeSums[band] += eke * weight;
+    bandEkeWeights[band] += weight;
 
     if (hasDiv) {
-      divSamples.push(Math.abs(div[k]));
+      divSamples.push({ value: Math.abs(div[k]), weight });
     }
     if (hasVort) {
-      vortSamples.push(Math.abs(vort[k]));
+      vortSamples.push({ value: Math.abs(vort[k]), weight });
     }
     if (!hasDiv || !hasVort) {
       const iE = (i + 1) % nx;
@@ -229,8 +270,8 @@ const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 })
       const dvDy = (v[rowS + i] - v[rowN + i]) * 0.5 * invDy;
       const dvDx = (v[row + iE] - v[row + iW]) * 0.5 * invDx;
       const duDy = (u[rowS + i] - u[rowN + i]) * 0.5 * invDy;
-      if (!hasDiv) divSamples.push(Math.abs(duDx + dvDy));
-      if (!hasVort) vortSamples.push(Math.abs(dvDx - duDy));
+      if (!hasDiv) divSamples.push({ value: Math.abs(duDx + dvDy), weight });
+      if (!hasVort) vortSamples.push({ value: Math.abs(dvDx - duDy), weight });
     }
 
     let sumU = 0;
@@ -260,19 +301,20 @@ const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 })
   }
 
   if (!sampleCount) return null;
-  const speedPct = computePercentiles(speedSamples, [0.5, 0.9, 0.99]);
-  const divPct = computePercentiles(divSamples, [0.9, 0.99]);
-  const vortPct = computePercentiles(vortSamples, [0.9, 0.99]);
+  const speedPct = computeWeightedPercentiles(speedSamples, [0.5, 0.9, 0.99]);
+  const divPct = computeWeightedPercentiles(divSamples, [0.9, 0.99]);
+  const vortPct = computeWeightedPercentiles(vortSamples, [0.9, 0.99]);
   const latBands = {};
   ['tropics', 'mid', 'polar'].forEach((band) => {
     const count = bandCounts[band];
-    if (count > 0) {
-      const pct = computePercentiles(bandSamples[band], [0.9, 0.99]);
+    const weight = bandWeights[band];
+    if (count > 0 && weight > 0) {
+      const pct = computeWeightedPercentiles(bandSamples[band], [0.9, 0.99]);
       latBands[band] = {
-        meanSpeed: bandSums[band] / count,
+        meanSpeed: bandSums[band] / weight,
         p90: pct.p90 ?? null,
         p99: pct.p99 ?? null,
-        ekeMean: bandEkeCounts[band] > 0 ? bandEkeSums[band] / bandEkeCounts[band] : null,
+        ekeMean: bandEkeWeights[band] > 0 ? bandEkeSums[band] / bandEkeWeights[band] : null,
         sampleCount: count
       };
     } else {
@@ -289,14 +331,14 @@ const computeWindDiagnostics = ({ grid, u, v, div, vort, sampleTarget = 20000 })
   const roughness = roughCount > 0
     ? (roughUSum / roughCount) + (roughVSum / roughCount)
     : null;
-  const ekeMean = ekeCount > 0 ? sumEke / ekeCount : null;
+  const ekeMean = ekeWeight > 0 ? sumEke / ekeWeight : null;
 
   return {
     nx,
     ny,
     sampleStride,
     sampleCount,
-    meanSpeed: sumSpeed / sampleCount,
+    meanSpeed: sumWeight > 0 ? sumSpeed / sumWeight : null,
     maxSpeed,
     speedPercentiles: speedPct,
     divAbsPercentiles: divPct,
@@ -424,11 +466,15 @@ class Earth {
     this._weatherWorkerReady = false;
     this._weatherWorkerBusy = false;
     this._weatherWorkerAccumSeconds = 0;
+    this._weatherWorkerInFlightSeconds = 0;
+    this._weatherWorkerInFlightStartMs = 0;
     this._weatherWorkerLastSimTimeSeconds = null;
     this._weatherWorkerLatestState = null;
     this._weatherWorkerPendingEnable = false;
     this._weatherWorkerLastRequestRealMs = 0;
     this._weatherWorkerMinIntervalMs = 80;
+    this._weatherWorkerMaxStepSeconds = WEATHER_WORKER_MAX_STEP_SECONDS;
+    this._weatherWorkerStallMs = WEATHER_WORKER_STALL_MS;
     this._weatherWorkerSnapshotMode = 'compact';
     this.latestForecastByPlayerId = new Map();
     this.forecastHistoryByPlayerId = new Map();
@@ -536,13 +582,14 @@ class Earth {
     this.windStreamlineMaterial = new THREE.MeshBasicMaterial({
       map: this.windStreamlineRenderer.texture,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.38,
       depthWrite: false
     });
     this.windStreamlineMesh = new THREE.Mesh(this.windStreamlineGeometry, this.windStreamlineMaterial);
     this.windStreamlineMesh.visible = this.windStreamlinesVisible;
     this.windStreamlineMesh.rotation.y = WIND_STREAMLINE_LON_OFFSET_RAD;
     this.parentObject.add(this.windStreamlineMesh);
+    this.windStreamlineDiagnosticsEnabled = true;
     this._lastWindModelDiagSimTimeSeconds = null;
     this._lastWindVizDiagSimTimeSeconds = null;
     this._lastWindReferenceDiagSimTimeSeconds = null;
@@ -627,19 +674,27 @@ class Earth {
     }
     this.weatherVolumeGpu = null;
     this.weatherField = new WeatherField({
-      renderScale: 2,
+      nx: LIVE_WEATHER_GRID_NX,
+      ny: LIVE_WEATHER_GRID_NY,
+      renderScale: LIVE_WEATHER_RENDER_SCALE,
       tickSeconds: 0.35,
       seed: this.weatherSeed
     });
     this.analysisWeatherField = new WeatherField({
-      renderScale: 2,
+      nx: LIVE_WEATHER_GRID_NX,
+      ny: LIVE_WEATHER_GRID_NY,
+      renderScale: LIVE_WEATHER_RENDER_SCALE,
       tickSeconds: 0.35,
-      seed: this.weatherSeed
+      seed: this.weatherSeed,
+      autoLogEnabled: false
     });
     this.forecastWeatherField = new WeatherField({
-      renderScale: 1,
+      nx: LIVE_WEATHER_GRID_NX,
+      ny: LIVE_WEATHER_GRID_NY,
+      renderScale: LIVE_WEATHER_RENDER_SCALE,
       tickSeconds: 9999,
-      seed: this.weatherSeed
+      seed: this.weatherSeed,
+      autoLogEnabled: false
     });
     this._analysisSyncedFromTruth = false;
     this._analysisNoiseSeed = (this.weatherSeed ?? 0) + 1337;
@@ -682,6 +737,7 @@ class Earth {
       } catch (err) {
         console.warn('[Earth] Weather worker init failed; falling back to main thread.', err);
         this.useWeatherWorker = false;
+        this.weatherField?.setUseExternalCore?.(false);
         return;
       }
       this._weatherWorker.onmessage = (event) => {
@@ -695,9 +751,13 @@ class Earth {
           if (Number.isFinite(currentSim) && Number.isFinite(payloadTime)) {
             const delta = currentSim - payloadTime;
             if (delta > 0.5) {
+              if (payload) {
+                this._applyWeatherWorkerState(payload);
+              }
               this._weatherWorkerAccumSeconds += delta;
               this._weatherWorkerLastSimTimeSeconds = currentSim;
               this._weatherWorkerPendingEnable = true;
+              this.weatherField?.setUseExternalCore?.(true);
               return;
             }
           }
@@ -708,6 +768,8 @@ class Earth {
           this.weatherField?.setUseExternalCore?.(true);
         } else if (data.type === 'state') {
           this._weatherWorkerBusy = false;
+          this._weatherWorkerInFlightSeconds = 0;
+          this._weatherWorkerInFlightStartMs = 0;
           if (data.payload) {
             this._applyWeatherWorkerState(data.payload);
           }
@@ -718,17 +780,21 @@ class Earth {
         } else if (data.type === 'error') {
           console.warn('[Earth] Weather worker error', data.payload);
           this._weatherWorkerBusy = false;
+          this._weatherWorkerInFlightSeconds = 0;
+          this._weatherWorkerInFlightStartMs = 0;
         }
       };
     }
     this._weatherWorkerReady = false;
     this._weatherWorkerBusy = false;
     this._weatherWorkerAccumSeconds = 0;
+    this._weatherWorkerInFlightSeconds = 0;
+    this._weatherWorkerInFlightStartMs = 0;
     this._weatherWorkerLastSimTimeSeconds = null;
     this._weatherWorkerLatestState = null;
     this._weatherWorkerPendingEnable = false;
     this._weatherWorkerLastRequestRealMs = 0;
-    this.weatherField?.setUseExternalCore?.(false);
+    this.weatherField?.setUseExternalCore?.(true);
     this._weatherWorker.postMessage({
       type: 'init',
       payload: {
@@ -751,6 +817,8 @@ class Earth {
     this._weatherWorkerReady = false;
     this._weatherWorkerBusy = false;
     this._weatherWorkerAccumSeconds = 0;
+    this._weatherWorkerInFlightSeconds = 0;
+    this._weatherWorkerInFlightStartMs = 0;
     this._weatherWorkerLastSimTimeSeconds = null;
     this._weatherWorkerLatestState = null;
     this._weatherWorkerPendingEnable = false;
@@ -792,27 +860,126 @@ class Earth {
         }
       }
     }
+    this.weatherField?.setEventProduct?.(payload.events || null);
     core.ready = true;
+  }
+
+  _recoverStalledWeatherWorker(nowMs = performance.now()) {
+    if (!this._weatherWorkerBusy) return false;
+    if (!(this._weatherWorkerInFlightSeconds > 0)) return false;
+    const startedAt = Number.isFinite(this._weatherWorkerInFlightStartMs)
+      ? this._weatherWorkerInFlightStartMs
+      : 0;
+    if (!(startedAt > 0) || nowMs - startedAt < this._weatherWorkerStallMs) return false;
+
+    this.logWeatherEvent?.(
+      'weatherWorkerRestart',
+      {
+        reason: 'stalledStep',
+        inFlightSeconds: this._weatherWorkerInFlightSeconds,
+        busyMs: nowMs - startedAt,
+        maxStepSeconds: this._weatherWorkerMaxStepSeconds,
+        workerAccumSeconds: this._weatherWorkerAccumSeconds
+      },
+      { simTimeSeconds: this._lastSimTimeSeconds }
+    );
+    if (this._weatherWorker) {
+      this._weatherWorker.terminate?.();
+      this._weatherWorker = null;
+    }
+    this._weatherWorkerReady = false;
+    this._weatherWorkerBusy = false;
+    this._weatherWorkerInFlightSeconds = 0;
+    this._weatherWorkerInFlightStartMs = 0;
+    this._weatherWorkerLastRequestRealMs = 0;
+    this._initWeatherWorker();
+    return true;
   }
 
   _maybeStepWeatherWorker(simSpeed) {
     if (!this._weatherWorker || !this._weatherWorkerReady) return;
-    if (this._weatherWorkerBusy) return;
-    if (!(this._weatherWorkerAccumSeconds > 0)) return;
     const nowMs = performance.now();
+    if (this._weatherWorkerBusy) {
+      this._recoverStalledWeatherWorker(nowMs);
+      return;
+    }
+    if (!(this._weatherWorkerAccumSeconds > 0)) return;
     if (nowMs - this._weatherWorkerLastRequestRealMs < this._weatherWorkerMinIntervalMs) return;
-    const deltaSeconds = this._weatherWorkerAccumSeconds;
-    this._weatherWorkerAccumSeconds = 0;
+    const { stepSeconds, remainingSeconds } = takeBoundedAccumulatedStep(
+      this._weatherWorkerAccumSeconds,
+      this._weatherWorkerMaxStepSeconds
+    );
+    if (!(stepSeconds > 0)) return;
+    this._weatherWorkerAccumSeconds = remainingSeconds;
     this._weatherWorkerBusy = true;
+    this._weatherWorkerInFlightSeconds = stepSeconds;
+    this._weatherWorkerInFlightStartMs = nowMs;
     this._weatherWorkerLastRequestRealMs = nowMs;
     this._weatherWorker.postMessage({
       type: 'step',
       payload: {
-        deltaSeconds,
+        deltaSeconds: stepSeconds,
         simSpeed,
         snapshotMode: this._weatherWorkerSnapshotMode
       }
     });
+  }
+
+  getWeatherWorkerSyncStatus(simTimeSeconds) {
+    if (!this.useWeatherWorker) return null;
+    const truthCoreTimeSeconds = this.weatherField?.core?.timeUTC;
+    const workerAccumSeconds = Number.isFinite(this._weatherWorkerAccumSeconds)
+      ? Math.max(0, this._weatherWorkerAccumSeconds)
+      : null;
+    const workerLastSimTimeSeconds = Number.isFinite(this._weatherWorkerLastSimTimeSeconds)
+      ? this._weatherWorkerLastSimTimeSeconds
+      : null;
+    const visibleSimLeadSeconds = Number.isFinite(simTimeSeconds) && Number.isFinite(truthCoreTimeSeconds)
+      ? Math.max(0, simTimeSeconds - truthCoreTimeSeconds)
+      : null;
+    const trackedSimLeadSeconds = Number.isFinite(workerLastSimTimeSeconds) && Number.isFinite(truthCoreTimeSeconds)
+      ? Math.max(0, workerLastSimTimeSeconds - truthCoreTimeSeconds)
+      : null;
+    const workerInFlightSeconds = Number.isFinite(this._weatherWorkerInFlightSeconds)
+      ? Math.max(0, this._weatherWorkerInFlightSeconds)
+      : 0;
+    const effectiveVisibleLeadSeconds = Number.isFinite(visibleSimLeadSeconds)
+      ? Math.max(0, visibleSimLeadSeconds - workerInFlightSeconds)
+      : null;
+    const effectiveTrackedLeadSeconds = Number.isFinite(trackedSimLeadSeconds)
+      ? Math.max(0, trackedSimLeadSeconds - workerInFlightSeconds)
+      : null;
+    const leadSeconds = [
+      effectiveVisibleLeadSeconds,
+      effectiveTrackedLeadSeconds,
+      workerAccumSeconds
+    ]
+      .filter(Number.isFinite)
+      .reduce((maxLead, value) => Math.max(maxLead, value), 0);
+
+    return {
+      ready: this._weatherWorkerReady,
+      busy: this._weatherWorkerBusy,
+      truthCoreTimeSeconds: Number.isFinite(truthCoreTimeSeconds) ? truthCoreTimeSeconds : null,
+      workerAccumSeconds,
+      workerInFlightSeconds,
+      workerLastSimTimeSeconds,
+      visibleSimLeadSeconds,
+      trackedSimLeadSeconds,
+      effectiveVisibleLeadSeconds,
+      effectiveTrackedLeadSeconds,
+      leadSeconds,
+      maxStepSeconds: this._weatherWorkerMaxStepSeconds
+    };
+  }
+
+  getWeatherEventProduct() {
+    return this.weatherField?.getEventProduct?.() || null;
+  }
+
+  getActiveWeatherEvents() {
+    const product = this.getWeatherEventProduct();
+    return Array.isArray(product?.activeEvents) ? product.activeEvents : [];
   }
 
   _getActiveWeatherField() {
@@ -1620,33 +1787,52 @@ class Earth {
     if (!Number.isFinite(simTimeSeconds)) return;
     const modelDue = this._lastWindModelDiagSimTimeSeconds == null
       || (simTimeSeconds - this._lastWindModelDiagSimTimeSeconds) >= WIND_MODEL_DIAGNOSTICS_CADENCE_SECONDS;
+    const referenceDue = this._lastWindReferenceDiagSimTimeSeconds == null
+      || (simTimeSeconds - this._lastWindReferenceDiagSimTimeSeconds) >= WIND_MODEL_DIAGNOSTICS_CADENCE_SECONDS;
+    const vizDue = this._lastWindVizDiagSimTimeSeconds == null
+      || (simTimeSeconds - this._lastWindVizDiagSimTimeSeconds) >= WIND_VIZ_DIAGNOSTICS_CADENCE_SECONDS;
+    const perfPayload = createWindDiagnosticsPerfPayload({
+      modelDue,
+      referenceDue,
+      vizDue,
+      windStreamlinesVisible: this.windStreamlinesVisible,
+      windStreamlineDiagnosticsEnabled: this.windStreamlineDiagnosticsEnabled
+    });
     let updated = false;
+    let measured = false;
     if (modelDue) {
-      if (this._logWindModelDiagnostics(simTimeSeconds)) {
+      measured = true;
+      if (measureWindDiagnosticsPhase(perfPayload, 'model', () => this._logWindModelDiagnostics(simTimeSeconds))) {
         this._lastWindModelDiagSimTimeSeconds = simTimeSeconds;
         updated = true;
       }
     }
-    const referenceDue = this._lastWindReferenceDiagSimTimeSeconds == null
-      || (simTimeSeconds - this._lastWindReferenceDiagSimTimeSeconds) >= WIND_MODEL_DIAGNOSTICS_CADENCE_SECONDS;
     if (referenceDue && this.windReferenceCore?.ready) {
-      if (this._logWindReferenceDiagnostics(simTimeSeconds)) {
+      measured = true;
+      if (measureWindDiagnosticsPhase(perfPayload, 'reference', () => this._logWindReferenceDiagnostics(simTimeSeconds))) {
         this._lastWindReferenceDiagSimTimeSeconds = simTimeSeconds;
         updated = true;
       }
     }
-
-    const vizDue = this._lastWindVizDiagSimTimeSeconds == null
-      || (simTimeSeconds - this._lastWindVizDiagSimTimeSeconds) >= WIND_VIZ_DIAGNOSTICS_CADENCE_SECONDS;
-    if (vizDue && this.windStreamlinesVisible) {
-      if (this._logWindVizDiagnostics(simTimeSeconds)) {
+    if (vizDue && (this.windStreamlinesVisible || this.windStreamlineDiagnosticsEnabled)) {
+      measured = true;
+      if (measureWindDiagnosticsPhase(perfPayload, 'viz', () => this._logWindVizDiagnostics(simTimeSeconds))) {
         this._lastWindVizDiagSimTimeSeconds = simTimeSeconds;
         updated = true;
       }
     }
     if (updated) {
-      this._logWindTargetsStatus(simTimeSeconds);
-      this._logWindReferenceComparison(simTimeSeconds);
+      measured = true;
+      measureWindDiagnosticsPhase(perfPayload, 'targets', () => this._logWindTargetsStatus(simTimeSeconds));
+      measureWindDiagnosticsPhase(perfPayload, 'referenceComparison', () => this._logWindReferenceComparison(simTimeSeconds));
+    }
+    if (measured) {
+      this._lastWindDiagnosticsPerfPayload = perfPayload;
+      this.logWeatherEvent?.(
+        'windDiagnosticsPerf',
+        perfPayload,
+        { simTimeSeconds, core: this.weatherField?.core ?? null }
+      );
     }
   }
 
@@ -1661,7 +1847,7 @@ class Earth {
       v: fields.v,
       div: fields.div,
       vort: fields.vort,
-      sampleTarget: 20000
+      sampleTarget: WIND_DIAGNOSTICS_SAMPLE_TARGET
     });
     if (!diag) return false;
     const speedPct = diag.speedPercentiles || {};
@@ -1674,7 +1860,7 @@ class Earth {
         grid,
         u: fields.uU,
         v: fields.vU,
-        sampleTarget: 20000
+        sampleTarget: WIND_DIAGNOSTICS_SAMPLE_TARGET
       })
       : null;
     const upperPct = upperDiag?.speedPercentiles || {};
@@ -1741,7 +1927,7 @@ class Earth {
       v: fields.v,
       div: fields.div,
       vort: fields.vort,
-      sampleTarget: 20000
+      sampleTarget: WIND_DIAGNOSTICS_SAMPLE_TARGET
     });
     if (!diag) return false;
     const payload = {
@@ -1829,7 +2015,8 @@ class Earth {
     if (!diag) return false;
     const field = diag.field;
     const frame = diag.frame;
-    if (!field && !frame) return false;
+    const perf = diag.perf;
+    if (!field && !frame && !perf) return false;
     const flags = [];
     const stepMeanPx = field?.meanStepPx ?? null;
     const stepP99Px = field?.stepPercentiles?.p99 ?? null;
@@ -1854,6 +2041,7 @@ class Earth {
     const payload = {
       field,
       frame,
+      perf,
       flags
     };
     this._lastWindVizDiagPayload = payload;
@@ -3334,6 +3522,17 @@ class Earth {
 
   update(simTimeSeconds, realDtSeconds, simContext) {
     const perfStartMs = performance.now();
+    const phaseBreakdown = {
+      workerMs: 0,
+      weatherFieldsMs: 0,
+      weatherVolumeMs: 0,
+      sensorsMs: 0,
+      radarMs: 0,
+      cloudIntelMs: 0,
+      windStreamlinesMs: 0,
+      windDiagnosticsMs: 0
+    };
+    let phaseStartMs = perfStartMs;
     this._sensorGating = simContext?.sensorGating ?? null;
     this._lastSimTimeSeconds = simTimeSeconds;
     this._trackAnalysisDeferredSimSeconds(simTimeSeconds);
@@ -3357,10 +3556,12 @@ class Earth {
           }
         }
       }
-      if (simContext?.flushAssimilation) {
+      const shouldDrainWeatherWorker = simContext?.flushAssimilation || this._weatherWorkerAccumSeconds > 0;
+      if (shouldDrainWeatherWorker) {
         this._maybeStepWeatherWorker(simSpeed);
       }
     }
+    phaseBreakdown.workerMs += performance.now() - phaseStartMs;
 
     if (this.forecastOverlayVisible && this._sensorGating?.playerId) {
       if (this._forecastDisplayPlayerId !== this._sensorGating.playerId) {
@@ -3374,28 +3575,37 @@ class Earth {
     const daySeconds = 86400;
     const dayFrac = (((rotationTimeSeconds / daySeconds) % 1) + 1) % 1;
     this.parentObject.rotation.y = 2 * Math.PI * (dayFrac - 0.5);
+    phaseStartMs = performance.now();
     this.weatherField?.update(simTimeSeconds, realDtSeconds, simContext);
     this.analysisWeatherField?.update(simTimeSeconds, realDtSeconds, simContext);
     this._syncAnalysisFromTruthIfReady();
     this._updateAnalysisSigma2(simTimeSeconds);
     this._maybeReanchorAnalysisFromTargets(simTimeSeconds);
+    phaseBreakdown.weatherFieldsMs += performance.now() - phaseStartMs;
+    phaseStartMs = performance.now();
     const didUpload = this.weatherVolumeGpu?.update({ simTimeSeconds });
     if (didUpload) {
       this.weatherVolumeDebugView?.render();
     }
+    phaseBreakdown.weatherVolumeMs += performance.now() - phaseStartMs;
     this._syncGroundRadarOrigin(simTimeSeconds);
     const shouldUpdateSensors = !this.useWeatherWorker || simContext?.flushAssimilation;
     if (shouldUpdateSensors) {
+      phaseStartMs = performance.now();
       this.weatherSensorManager?.update({
         truthCore: this.weatherField?.core,
         earth: this,
         simTimeSeconds
       });
+      phaseBreakdown.sensorsMs += performance.now() - phaseStartMs;
     }
     if (simContext?.flushAssimilation) {
+      phaseStartMs = performance.now();
       this._flushAssimilationQueue();
+      phaseBreakdown.sensorsMs += performance.now() - phaseStartMs;
     }
     if (this.radarOverlayVisible && this._groundRadarPpiPass && this.radarOverlay) {
+      phaseStartMs = performance.now();
       if (this._radarSweepBase) {
         if (lodActive) {
           this._groundRadarPpiPass.sweepPeriodSeconds = this._radarSweepBase.period * 2;
@@ -3412,9 +3622,13 @@ class Earth {
         this.radarOverlay.setSweepAngleRad?.(this._groundRadarPpiPass.sweepAngleRad);
         this.updateRadarOverlayTexture(this._groundRadarPpiPass.renderTarget?.texture ?? null);
       }
+      phaseBreakdown.radarMs += performance.now() - phaseStartMs;
     }
+    phaseStartMs = performance.now();
     this._tickCloudIntel(simTimeSeconds);
-    if (this.windStreamlinesVisible) {
+    phaseBreakdown.cloudIntelMs += performance.now() - phaseStartMs;
+    if (this.windStreamlinesVisible || this.windStreamlineDiagnosticsEnabled) {
+      phaseStartMs = performance.now();
       if (this.windStreamlineRenderer?.setParticleDensityScale) {
         this.windStreamlineRenderer.setParticleDensityScale(lodActive ? 0.6 : 1);
       }
@@ -3426,21 +3640,29 @@ class Earth {
         simTimeSeconds,
         realDtSeconds
       });
+      phaseBreakdown.windStreamlinesMs += performance.now() - phaseStartMs;
     }
+    phaseStartMs = performance.now();
     this._maybeLogWindDiagnostics(simTimeSeconds);
+    phaseBreakdown.windDiagnosticsMs += performance.now() - phaseStartMs;
     const perfEndMs = performance.now();
     this._lastPerfStats = {
       updateMs: perfEndMs - perfStartMs,
       simStepsThisFrame: simContext?.simStepsThisFrame ?? null,
       simStepsSkipped: simContext?.simStepsSkipped ?? null,
-      simLagSeconds: simContext?.simLagSeconds ?? null
+      simLagSeconds: simContext?.simLagSeconds ?? null,
+      weatherWorkerSync: this.getWeatherWorkerSyncStatus(simTimeSeconds),
+      phaseBreakdown
     };
     if (perfEndMs - this._lastPerfLogRealMs > 1000) {
       this._lastPerfLogRealMs = perfEndMs;
       this.logWeatherEvent?.(
         'simPerf',
         {
-          ...this._lastPerfStats
+          ...this._lastPerfStats,
+          weatherFieldPerf: this.weatherField?.getPerfStats?.() ?? null,
+          analysisWeatherFieldPerf: this.analysisWeatherField?.getPerfStats?.() ?? null,
+          windStreamlinePerf: this.windStreamlineRenderer?.getDiagnostics?.().perf ?? null
         },
         { simTimeSeconds }
       );
@@ -4299,9 +4521,7 @@ class Earth {
     const value = Number.isFinite(anisotropy) ? Math.max(1, Math.floor(anisotropy)) : 1;
     this._textureAnisotropy = value;
     const apply = (texture) => {
-      if (!texture) return;
-      texture.anisotropy = value;
-      texture.needsUpdate = true;
+      applyTextureAnisotropy(texture, value);
     };
     apply(this._baseMapTexture);
     apply(this._bumpTexture);

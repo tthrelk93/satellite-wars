@@ -1,0 +1,77 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c27-partial-equatorial-shoulder-restore-attribution.v1",
+  "generatedAt": "2026-04-16T08:47:55.463Z",
+  "decision": {
+    "verdict": "partial_shoulder_restore_recovers_upper_branch_and_return_flow_but_reloads_lower_import_and_cloud_recirculation",
+    "nextMove": "Architecture C28: weak partial equatorial shoulder restore experiment"
+  },
+  "quickComparison": {
+    "c24CrossEq": -358.07208,
+    "c26CrossEq": -353.85346,
+    "c24ItczWidth": 23.275,
+    "c26ItczWidth": 23.412,
+    "c24DryNorth": 1.091,
+    "c26DryNorth": 1.119,
+    "c24DrySouth": 0.506,
+    "c26DrySouth": 0.515,
+    "c24Westerlies": 1.214,
+    "c26Westerlies": 1.225,
+    "c24OceanCond": 0.12705,
+    "c26OceanCond": 0.11952
+  },
+  "transportComparison": {
+    "c24EqBoundary": -4.84216,
+    "c26EqBoundary": -4.79371,
+    "c24EqLower": -17.49403,
+    "c26EqLower": -18.00423,
+    "c24EqMid": -16.75772,
+    "c26EqMid": -16.6919,
+    "c24EqUpper": -13.59209,
+    "c26EqUpper": -13.23333,
+    "c24EqLowerZonal": -13.80457,
+    "c26EqLowerZonal": -14.14641,
+    "c24EqLowerEddy": -3.68946,
+    "c26EqLowerEddy": -3.85782,
+    "c24EqMidZonal": -12.99397,
+    "c26EqMidZonal": -12.96382,
+    "c24EqMidEddy": -3.76374,
+    "c26EqMidEddy": -3.72808,
+    "c24North35Lower": -22.69662,
+    "c26North35Lower": -22.99819,
+    "c24North35Mid": -17.16362,
+    "c26North35Mid": -17.27508
+  },
+  "dryBeltComparison": {
+    "c24Carryover": 0.23253,
+    "c26Carryover": 0.2348,
+    "c24Persistence": 0.23079,
+    "c26Persistence": 0.23307,
+    "c24WeakErosion": 0.22243,
+    "c26WeakErosion": 0.22509,
+    "c24UpperCloudPath": 0.24474,
+    "c26UpperCloudPath": 0.25387,
+    "c24CloudRecirc": 0.49385,
+    "c26CloudRecirc": 0.60796,
+    "c24NorthReturn": 3447.36194,
+    "c26NorthReturn": 3383.23239,
+    "c24TransitionFlux": -190.46264,
+    "c26TransitionFlux": -207.34044,
+    "c24DryBeltFlux": -414.35421,
+    "c26DryBeltFlux": -417.17261
+  },
+  "thermodynamicComparison": {
+    "c24PrimaryRegime": "dynamicsSupported",
+    "c26PrimaryRegime": "mixed",
+    "c24DynamicsSupport": 0.6811,
+    "c26DynamicsSupport": 0.63475,
+    "c24MoistureSupport": 0.57993,
+    "c26MoistureSupport": 0.57525
+  },
+  "nextContract": {
+    "focusTargets": [
+      "keep the C24 0–10° / 0.45 inner-core anchor",
+      "retain only a weaker shoulder restoration than C26, closer to a 0–11° / 0.47 or similarly reduced restore",
+      "preserve the C26 upper-branch and return-flow relief while trimming the lower-branch reload and cloud-recirculation rebound"
+    ]
+  }
+}

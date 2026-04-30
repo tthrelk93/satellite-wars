@@ -1,0 +1,147 @@
+{
+  "schema": "satellite-wars.earth-weather-phase0-branch-benchmark.v1",
+  "generatedAt": "2026-04-16T00:34:40.771Z",
+  "current": {
+    "name": "Current branch",
+    "branch": "codex/world-class-weather-loop",
+    "quickArtifactPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-reset-baseline-quick.json",
+    "annualArtifactPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-reset-triage-annual.json",
+    "quickMetrics": {
+      "itczWidthDeg": 25.91,
+      "subtropicalDryNorthRatio": 1.534,
+      "subtropicalDrySouthRatio": 1.199,
+      "midlatitudeWesterliesNorthU10Ms": 0.531,
+      "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.1413,
+      "crossEquatorialVaporFluxNorthKgM_1S": 143.95306,
+      "stormTrackNorthLatDeg": 63.75,
+      "stormTrackSouthLatDeg": -63.75,
+      "tropicalCycloneEnvironmentCountNh": 0,
+      "tropicalCycloneEnvironmentCountSh": 0
+    },
+    "annualMetrics": {
+      "itczWidthDeg": 24.875,
+      "subtropicalDryNorthRatio": 1.343,
+      "subtropicalDrySouthRatio": 1.145,
+      "midlatitudeWesterliesNorthU10Ms": 0.524,
+      "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0.2774,
+      "crossEquatorialVaporFluxNorthKgM_1S": 326.33822,
+      "stormTrackNorthLatDeg": 63.75,
+      "stormTrackSouthLatDeg": -63.75,
+      "tropicalCycloneEnvironmentCountNh": 0,
+      "tropicalCycloneEnvironmentCountSh": 0
+    }
+  },
+  "candidate": {
+    "name": "Rollback archive (2026-04-07)",
+    "branch": "codex/world-class-weather-loop-archive-20260407-0745",
+    "quickArtifactPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-phase0-archive-quick.json",
+    "annualArtifactPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/earth-weather-phase0-archive-annual.json",
+    "quickMetrics": {
+      "itczWidthDeg": 24.041,
+      "subtropicalDryNorthRatio": 1.283,
+      "subtropicalDrySouthRatio": 0.578,
+      "midlatitudeWesterliesNorthU10Ms": 1.073,
+      "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0,
+      "crossEquatorialVaporFluxNorthKgM_1S": -374.66362,
+      "stormTrackNorthLatDeg": 63.75,
+      "stormTrackSouthLatDeg": -63.75,
+      "tropicalCycloneEnvironmentCountNh": 1,
+      "tropicalCycloneEnvironmentCountSh": 0
+    },
+    "annualMetrics": {
+      "itczWidthDeg": 25.613,
+      "subtropicalDryNorthRatio": 1.561,
+      "subtropicalDrySouthRatio": 1.014,
+      "midlatitudeWesterliesNorthU10Ms": 1.139,
+      "northDryBeltOceanLargeScaleCondensationMeanKgM2": 0,
+      "crossEquatorialVaporFluxNorthKgM_1S": 176.87748,
+      "stormTrackNorthLatDeg": 63.75,
+      "stormTrackSouthLatDeg": -33.75,
+      "tropicalCycloneEnvironmentCountNh": 0,
+      "tropicalCycloneEnvironmentCountSh": 0
+    }
+  },
+  "trustedBaseline": {
+    "itczWidthDeg": 23.646,
+    "subtropicalDryNorthRatio": 1.1,
+    "subtropicalDrySouthRatio": 0.519,
+    "midlatitudeWesterliesNorthU10Ms": 1.192,
+    "stormTrackNorthLatDeg": 63.75,
+    "stormTrackSouthLatDeg": -63.75,
+    "tropicalCycloneEnvironmentCountNh": 1,
+    "tropicalCycloneEnvironmentCountSh": 0
+  },
+  "annualComparisons": [
+    {
+      "key": "itczWidthDeg",
+      "label": "ITCZ width",
+      "current": 24.875,
+      "candidate": 25.613,
+      "trustedBaseline": 23.646,
+      "comparable": true,
+      "winner": "current",
+      "severeRegression": false
+    },
+    {
+      "key": "subtropicalDryNorthRatio",
+      "label": "NH dry-belt ratio",
+      "current": 1.343,
+      "candidate": 1.561,
+      "trustedBaseline": 1.1,
+      "comparable": true,
+      "winner": "current",
+      "severeRegression": true
+    },
+    {
+      "key": "subtropicalDrySouthRatio",
+      "label": "SH dry-belt ratio",
+      "current": 1.145,
+      "candidate": 1.014,
+      "trustedBaseline": 0.519,
+      "comparable": true,
+      "winner": "candidate",
+      "severeRegression": false
+    },
+    {
+      "key": "midlatitudeWesterliesNorthU10Ms",
+      "label": "NH midlatitude westerlies",
+      "current": 0.524,
+      "candidate": 1.139,
+      "trustedBaseline": 1.192,
+      "comparable": true,
+      "winner": "candidate",
+      "severeRegression": false
+    },
+    {
+      "key": "northDryBeltOceanLargeScaleCondensationMeanKgM2",
+      "label": "NH dry-belt ocean condensation",
+      "current": 0.2774,
+      "candidate": 0,
+      "trustedBaseline": null,
+      "comparable": false,
+      "winner": null,
+      "severeRegression": false
+    },
+    {
+      "key": "crossEquatorialVaporFluxNorthKgM_1S",
+      "label": "Cross-equatorial vapor flux north",
+      "current": 326.33822,
+      "candidate": 176.87748,
+      "trustedBaseline": null,
+      "comparable": true,
+      "winner": "candidate",
+      "severeRegression": false
+    }
+  ],
+  "decision": {
+    "verdict": "no_clear_winner",
+    "candidateWins": 3,
+    "currentWins": 2,
+    "comparableMetricCount": 5,
+    "severeRegressions": [
+      "subtropicalDryNorthRatio"
+    ],
+    "canonicalBase": null,
+    "nextMove": "No branch cleared the Phase 0 gate cleanly. Do not continue local patching; escalate to architecture change."
+  }
+}

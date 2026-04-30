@@ -134,6 +134,68 @@ Run the focused helper tests:
 npm run weather:validate:test
 ```
 
+Run a 365-day planetary realism report that leaves behind tuning-grade artifacts:
+
+```bash
+npm run weather:planetary:audit:annual:report
+```
+
+That annual report now writes:
+- `weather-validation/output/annual-planetary-realism.json`
+- `weather-validation/output/annual-planetary-realism.md`
+- `weather-validation/output/annual-planetary-realism-monthly-climatology.json`
+- `weather-validation/output/annual-planetary-realism-monthly-attribution-climatology.json`
+- `weather-validation/output/annual-planetary-realism-seasonal-root-cause-ranking.json`
+- `weather-validation/output/annual-planetary-realism-attribution-lag-analysis.json`
+- `weather-validation/output/annual-planetary-realism-sample-profiles.json`
+- `weather-validation/output/annual-planetary-realism-realism-gaps.json`
+
+Those artifacts are meant for follow-on tuning, not just pass/fail:
+- monthly climatology means for ITCZ placement/width, dry-belt humidity, subsidence drying, convective organization, and wind-belt structure
+- monthly attribution climatology and seasonal root-cause rankings so long-horizon runs tell you which causal family actually stays dominant
+- lag-analysis sidecars that show which upstream source/persistence signals best predict later dry-belt wetness and upper-cloud buildup
+- zonal profile traces at every sampled checkpoint so you can see where the moisture belts, cloud belts, and convective mass flux are misplaced
+- a ranked realism-gap report that turns the failing warnings into prioritized tuning targets
+
+Run the quick audit with the Phase 11 controlled-ablation harness:
+
+```bash
+SATELLITE_WARS_ALLOW_REPORT_ONLY=1 npm run agent:planetary-realism-audit -- --preset quick --report-base /tmp/planetary-phase11-smoke --counterfactuals
+```
+
+That counterfactual pass adds:
+- `*-counterfactual-pathway-sensitivity.json`
+- `*-root-cause-candidate-ranking.json`
+
+Those artifacts are meant to answer a tighter causal question than the seasonal reports:
+- which single upstream pathway gives the best directional improvement when weakened in isolation
+- whether that directional improvement survives the carried Phase 9 `dt` / grid sensitivity reruns
+- whether the bug is dominated by one lever or behaves like a coupled multi-pathway failure
+
+Live weather logs also now include a `v2.broadClimate` object in every `state` entry so browser-backed runs expose the same ITCZ, subtropical drying, convective organization, and trade/westerly metrics as the headless planetary audit.
+
+Generate the automatic top-5 physics target report from those annual artifacts:
+
+```bash
+npm run weather:planetary:targets:annual
+```
+
+Or run the full overnight pack in one command:
+
+```bash
+npm run weather:planetary:audit:annual:tuning-pack
+```
+
+That post-run target extractor writes:
+- `weather-validation/output/annual-planetary-realism-physics-targets.json`
+- `weather-validation/output/annual-planetary-realism-physics-targets.md`
+
+It turns the annual realism artifacts into a ranked shortlist of physics campaigns, with:
+- the top 5 broad physics targets to attack next
+- why each target is ranked where it is
+- which weather-core files are the best first places to edit
+- the latest and monthly evidence that supports each recommendation
+
 ## How later phases should use this
 
 1. Generate model diagnostics in the same field schema or emit `validationSnapshot` log entries from the live model.

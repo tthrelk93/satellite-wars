@@ -1,3 +1,4 @@
+const path = require('path');
 const { spawn } = require('child_process');
 const { startWeatherLogServer } = require('./weather-log-server');
 
@@ -7,13 +8,16 @@ const { server } = startWeatherLogServer({ port });
 
 const env = {
   ...process.env,
+  BROWSER: process.env.BROWSER || 'none',
   WEATHER_LOG_PORT: String(port),
   REACT_APP_WEATHER_LOG_PORT: String(port),
   REACT_APP_AUTO_LOG: process.env.REACT_APP_AUTO_LOG || '1',
   REACT_APP_WEATHER_SEED: process.env.REACT_APP_WEATHER_SEED || process.env.WEATHER_SEED || '12345'
 };
 
-const cmd = process.platform === 'win32' ? 'react-scripts.cmd' : 'react-scripts';
+const cmd = process.platform === 'win32'
+  ? path.resolve(__dirname, '..', 'node_modules', '.bin', 'react-scripts.cmd')
+  : path.resolve(__dirname, '..', 'node_modules', '.bin', 'react-scripts');
 const child = spawn(cmd, ['start'], { stdio: 'inherit', env });
 
 const shutdown = (signal) => {

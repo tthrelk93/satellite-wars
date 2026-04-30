@@ -1,0 +1,125 @@
+{
+  "schema": "satellite-wars.world-class-status.v1",
+  "updatedAt": "2026-04-28T22:35:00Z",
+  "verdict": "world_class_certified",
+  "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
+  "branch": "codex/world-class-weather-loop",
+  "certifiedCommit": "b2d997ba0023ffd35a7e0c5f8e59907c65bb0852",
+  "certifiedCommitShort": "b2d997b",
+  "latestCycle": {
+    "id": "cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification",
+    "goal": "run a fresh current-hash 365-day annual planetary realism audit with dt/grid repro gates for final world-class certification",
+    "verifiedImprovement": "The final certification blocker is cleared: the current b2d997b annual audit passes overall, carries no planetary warnings, records no changed files, passes the numerical climate contract, passes dt/grid repro gates, and allows a major climate claim.",
+    "checkpointPath": "weather-validation/output/cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification/checkpoint.md",
+    "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification/evidence-summary.json"
+  },
+  "benchmarkSuite": {
+    "path": "weather-validation/reports/earth-accuracy-status.json",
+    "overallPass": true,
+    "generatedAt": "2026-04-28T22:29:29.959Z"
+  },
+  "validation": {
+    "weatherValidateTest": {
+      "command": "npm run weather:validate:test",
+      "pass": true,
+      "tests": 253,
+      "failures": 0
+    },
+    "weatherBenchmark": {
+      "command": "npm run weather:benchmark",
+      "pass": true
+    }
+  },
+  "planetaryRealism": {
+    "latestFullAnnualPath": "weather-validation/output/cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification/annual-current-hash-repro.json",
+    "latestFullAnnualOverallPass": true,
+    "latestFullAnnualPreset": "annual",
+    "latestFullAnnualGrid": "48x24",
+    "latestFullAnnualDtSeconds": 3600,
+    "latestFullAnnualSeed": 12345,
+    "latestFullAnnualGeneratedAt": "2026-04-28T22:28:26.118Z",
+    "latestFullAnnualGitHash": "b2d997ba0023ffd35a7e0c5f8e59907c65bb0852",
+    "latestFullAnnualChangedFiles": [],
+    "planetaryWarnings": [],
+    "currentCycleDtGridReproPass": true,
+    "numericalClimateContractPath": "weather-validation/output/cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification/annual-current-hash-repro-numerical-climate-contract.json",
+    "dtSensitivityPath": "weather-validation/output/cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification/annual-current-hash-repro-dt-sensitivity.json",
+    "gridSensitivityPath": "weather-validation/output/cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification/annual-current-hash-repro-grid-sensitivity.json",
+    "realismGapsPath": "weather-validation/output/cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification/annual-current-hash-repro-realism-gaps.json",
+    "majorClimateClaimAllowed": true,
+    "annualMetrics": {
+      "globalPrecipMeanMmHr": 0.107,
+      "globalTcwMeanKgM2": 13.78,
+      "itczLatDeg": -1.882,
+      "itczWidthDeg": 18.782,
+      "tropicalConvectiveFraction": 0.476,
+      "subtropicalDryNorthRatio": 0.234,
+      "subtropicalDrySouthRatio": 0.333,
+      "stormTrackNorthLatDeg": 41.25,
+      "stormTrackSouthLatDeg": -48.75,
+      "numericalIntegrityScore": 0.8083,
+      "numericalIntegrityPass": true,
+      "waterCycleEvapMm": 929.77757,
+      "waterCyclePrecipMm": 935.22305,
+      "waterCycleTcwDriftKgM2": 10.12599,
+      "advectionWaterDriftKgM2": 0.0000164,
+      "advectionWaterRepairKgM2": 0.00072,
+      "tropicalCycloneEnvironmentCountNh": 10,
+      "tropicalCycloneEnvironmentCountSh": 47,
+      "tornadoRiskNorthAmericaWarm": 0.00836,
+      "tornadoRiskNorthAmericaCool": 0.00678
+    }
+  },
+  "liveSignoff": {
+    "url": "http://127.0.0.1:3000/?mode=solo",
+    "cycleId": "cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/runtime-summary-live-day6.json",
+    "hotspotProfilePath": "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/hotspot-profile-live-day6.json",
+    "screenshots": [
+      "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/live-reload.png",
+      "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/live-90s.png",
+      "weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/live-day6-proof.png"
+    ],
+    "runtimeHealth": {
+      "likelySmoothEnough": true,
+      "warnings": []
+    },
+    "visualLayerHealth": {
+      "likelyHealthy": true,
+      "warnings": []
+    },
+    "modelWindHealth": {
+      "likelyHealthy": true,
+      "warnings": [],
+      "failingReasons": []
+    },
+    "earthUpdateMs": {
+      "p50": 0.10000000149011612,
+      "p95": 10.900000002235174,
+      "max": 19.800000000745058
+    },
+    "stepsSkippedTotal": 0,
+    "clockProof": {
+      "reportedFreeze": "Day 5, 22:14",
+      "observedSameRunPastFreeze": "Day 6, 06:30"
+    },
+    "windTargets": {
+      "modelMeanMs": 5.860502448950641,
+      "modelP90Ms": 9.747997843121928,
+      "modelP99Ms": 16.20498183619808,
+      "modelMaxMs": 19.860771732822176,
+      "thresholdsUnrelaxed": true
+    }
+  },
+  "blockingGaps": [],
+  "residualResearchNotes": [
+    "Annual sidecars still rank imported cloud persistence and cloud-moisture retention as the dominant residual diagnostic family.",
+    "Coupled counterfactual closure remains a future explanatory-model target even though planetary gates pass.",
+    "South America tornado seasonality remains diagnostic-only and cool-season biased; the hard tornado warm-season gate is North America and passes."
+  ],
+  "defaultNextPriorities": [
+    "Broaden live verification and polished-performance re-audits now that the offline planetary realism gates are healthy.",
+    "Keep browser live signoff in the loop whenever runtime/render/weather visualization changes.",
+    "Treat imported cloud persistence diagnostics as the next research frontier, not a current release blocker."
+  ]
+}

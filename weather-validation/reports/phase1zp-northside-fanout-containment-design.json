@@ -1,0 +1,56 @@
+{
+  "schema": "satellite-wars.phase1zp-northside-fanout-containment-design.v1",
+  "generatedAt": "2026-04-14T16:31:34.417Z",
+  "paths": {
+    "phase1zoPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zo-bilateral-edge-outcome-attribution.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zp-northside-fanout-containment-design.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zp-northside-fanout-containment-design.json"
+  },
+  "verdict": "northside_source_leak_penalty_preferred",
+  "nextPhase": "Phase 1ZQ: Implement Capped Northside Fanout Leak Penalty Patch",
+  "recommendation": "Keep the bilateral abs-lat geometry from Phase 1ZN, but add a capped northside source-leak penalty in the vertical lane so improved 11.25°N source drying does not fan out into 3.75°N, 18.75°N, and 26.25°N.",
+  "phase1zoContext": {
+    "verdict": "northside_condensation_fanout_without_humidification",
+    "northFanoutScore": 1.22275,
+    "humidificationScore": 0.0775
+  },
+  "ranking": [
+    {
+      "key": "northside_source_leak_penalty",
+      "score": 1,
+      "why": "Best matches the live signature: the 11.25°N source improves while 3.75°N, 18.75°N, and 26.25°N all brighten on the same hemisphere."
+    },
+    {
+      "key": "global_guard_amplitude_reduction",
+      "score": 0.143,
+      "why": "Would likely undo the south-edge stabilization and bilateral activation that Phase 1ZN finally achieved."
+    },
+    {
+      "key": "humidification_sink",
+      "score": -0.083,
+      "why": "Poor fit because TCW and RH stay nearly flat while condensation fans out northward."
+    },
+    {
+      "key": "north_target_only_cap",
+      "score": -0.1485,
+      "why": "Would only address 3.75°N directly and leaves the 18.75°N / 26.25°N fanout lane unexplained."
+    }
+  ],
+  "designContract": {
+    "keep": [
+      "keep the bilateral abs-lat equatorial-edge source and target geometry",
+      "keep the south-edge stabilization at -3.75°",
+      "keep the NH 30-45° target-entry exclusion untouched"
+    ],
+    "change": [
+      "add a capped northside source-leak penalty around the 11.25°N source lane",
+      "gate that penalty against fanout risk into 18.75°N and 26.25°N rather than simply shrinking all guard amplitude",
+      "keep the patch in vertical5.js / core5.js, not in the shoulder-selector microphysics lane"
+    ],
+    "doNotDo": [
+      "do not reduce global equatorial-edge guard amplitude first",
+      "do not re-open the shoulder-selector geometry work",
+      "do not treat this as a humidification recharge patch"
+    ]
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "satellite-wars.phase1zi-equatorial-edge-candidate-gate-design.v1",
+  "generatedAt": "2026-04-14T08:59:05.771Z",
+  "paths": {
+    "phase1zbPath": "weather-validation/reports/phase1zb-latitude-aware-shoulder-guard-redesign.md",
+    "phase1zgPath": "weather-validation/reports/phase1zg-equatorial-edge-buffered-shoulder-patch.json",
+    "phase1zhPath": "weather-validation/reports/phase1zh-equatorial-edge-candidate-rebound-attribution.json",
+    "reportPath": "weather-validation/reports/phase1zi-equatorial-edge-candidate-gate-design.md",
+    "jsonPath": "weather-validation/reports/phase1zi-equatorial-edge-candidate-gate-design.json"
+  },
+  "verdict": "single_lane_geometry_overadmits_equatorial_edge",
+  "nextPhase": "Phase 1ZJ: Implement Split-Lane Equatorial-Edge Candidate Gate Patch",
+  "designChoice": {
+    "key": "split_lane_subtropical_support_gate",
+    "label": "Split-lane equatorial-edge candidate gate",
+    "rationale": "The current single shoulder window admits both 3.75°N and 11.25°N as one lane, but only the equatorial edge rebounds. The next gate must split those lanes and apply a stricter edge-only admission rule tied to fresh subtropical support."
+  },
+  "evidence": {
+    "phase1zb": {
+      "note": "Phase 1ZB showed the latitude-aware guard still treated 3.75°N and 11.25°N as fully admitted shoulder cells.",
+      "edgeWindowAdmission": 0.04151,
+      "innerWindowAdmission": 0.12488
+    },
+    "phase1zg": {
+      "edgeCondensationDeltaKgM2": 0.04637,
+      "edgeCandidateDeltaKgM2": 0.0701,
+      "edgeEventCountDelta": 0.52084,
+      "edgeAppliedSuppressionDeltaKgM2": 0.02352,
+      "innerCondensationDeltaKgM2": -0.03849,
+      "spilloverCondensationDeltaKgM2": -0.01806,
+      "targetEntryAppliedSuppressionKgM2": 0
+    },
+    "phase1zh": {
+      "verdict": "raw_equatorial_edge_candidate_rebound",
+      "conclusion": "The remaining shoulder failure is no longer suppressed-mass fate or selector leakage. It is a raw candidate and event-count rebound concentrated at 3.75°N that outruns the stronger buffered application."
+    }
+  },
+  "designContract": {
+    "keep": [
+      "keep buffered_rainout as the suppressed-mass fate",
+      "keep the 30–45°N target-entry exclusion intact",
+      "keep the 11.25°N inner-shoulder improvement",
+      "keep the 18.75°N spillover improvement"
+    ],
+    "change": [
+      "split the current shoulder latitude window into an equatorial-edge lane and an inner-shoulder lane in vertical5.js",
+      "publish new fresh-state diagnostics for the equatorial-edge and inner-shoulder windows through state5.js and diagnostics.js",
+      "replace the single shoulder band-window support in microphysics5.js with split-lane support",
+      "apply an edge-only candidate-entry penalty or higher support threshold that scales with weak fresh subtropical suppression / weak fresh subtropical band support",
+      "avoid increasing total buffered removal first; reduce raw candidate/event generation at 3–6°N instead"
+    ]
+  },
+  "recommendation": "Do not tune amplitude first. Implement a split-lane candidate gate so the equatorial edge must earn admission with stronger fresh subtropical support than the inner shoulder."
+}

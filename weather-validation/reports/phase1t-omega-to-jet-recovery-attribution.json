@@ -1,0 +1,132 @@
+{
+  "schema": "satellite-wars.phase1t-omega-to-jet-recovery-attribution.v1",
+  "generatedAt": "2026-04-14T05:46:46.482Z",
+  "paths": {
+    "baselinePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-hadley-second-pass-restore-v4.json",
+    "offPath": "/tmp/phase1s-omega-bridge-off.json",
+    "onPath": "/tmp/phase1s-omega-bridge-on.json",
+    "offProfilesPath": "/tmp/phase1s-omega-bridge-off-sample-profiles.json",
+    "onProfilesPath": "/tmp/phase1s-omega-bridge-on-sample-profiles.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1t-omega-to-jet-recovery-attribution.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1t-omega-to-jet-recovery-attribution.json"
+  },
+  "verdict": "equatorward_absorption_before_jet_band",
+  "nextPhase": "Phase 1U: Jet-Band Placement Patch Design",
+  "baselineGap": {
+    "itczWidthDeg": {
+      "baseline": 23.646,
+      "current": 25.837,
+      "delta": 2.191
+    },
+    "subtropicalDryNorthRatio": {
+      "baseline": 1.1,
+      "current": 1.517,
+      "delta": 0.417
+    },
+    "subtropicalDrySouthRatio": {
+      "baseline": 0.519,
+      "current": 1.193,
+      "delta": 0.674
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "baseline": 1.192,
+      "current": 0.531,
+      "delta": -0.661
+    }
+  },
+  "offOnCompare": {
+    "itczWidthDeg": {
+      "off": 25.834,
+      "on": 25.837,
+      "delta": 0.003
+    },
+    "subtropicalDryNorthRatio": {
+      "off": 1.515,
+      "on": 1.517,
+      "delta": 0.002
+    },
+    "subtropicalDrySouthRatio": {
+      "off": 1.192,
+      "on": 1.193,
+      "delta": 0.001
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "off": 0.531,
+      "on": 0.531,
+      "delta": 0
+    }
+  },
+  "bridgeSignals": {
+    "northTransitionDryingOmegaBridgeAppliedMeanPaS": 0.00206,
+    "northDryBeltDryingOmegaBridgeAppliedMeanPaS": 0.00145,
+    "northTransitionLowLevelOmegaEffectiveDeltaPaS": 0.00208,
+    "northDryBeltLowLevelOmegaEffectiveDeltaPaS": 0.0014,
+    "omegaTargetHitFrac": 0.244,
+    "midlatitudeWesterliesNorthDeltaMs": 0
+  },
+  "bandDeltas": {
+    "tropicalShoulderNorth": {
+      "label": "Tropical shoulder (3-18.75N)",
+      "wind10mUDelta": -0.00033,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": 0.01778,
+      "subtropicalSubsidenceDryingDeltaFrac": 0.00001
+    },
+    "dryBeltCoreNorth": {
+      "label": "Dry-belt core (18.75-30N)",
+      "wind10mUDelta": -0.0005,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": -0.00425,
+      "subtropicalSubsidenceDryingDeltaFrac": -0.00002
+    },
+    "transitionBandNorth": {
+      "label": "Transition band (30-41.25N)",
+      "wind10mUDelta": 0,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": -0.00005,
+      "subtropicalSubsidenceDryingDeltaFrac": -0.00002
+    },
+    "jetBandNorth": {
+      "label": "Jet band (41.25-56.25N)",
+      "wind10mUDelta": 0,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": -0.00008,
+      "subtropicalSubsidenceDryingDeltaFrac": 0
+    }
+  },
+  "ranking": [
+    {
+      "key": "equatorward_absorption_before_jet_band",
+      "label": "Bridge response is absorbed too far equatorward before it reaches the jet band",
+      "score": 1,
+      "evidence": {
+        "tropicalShoulderCondensationDeltaKgM2": 0.01778,
+        "dryBeltCoreCondensationDeltaKgM2": -0.00425,
+        "jetBandWindDeltaMs": 0,
+        "jetBandStormTrackDelta": 0
+      }
+    },
+    {
+      "key": "omega_response_still_too_weak",
+      "label": "Bridge moves omega, but not strongly enough to seed the jet pathway",
+      "score": 0.87783,
+      "evidence": {
+        "northTransitionOmegaDeltaPaS": 0.00208,
+        "northDryBeltOmegaDeltaPaS": 0.0014,
+        "bridgeActivationMeanPaS": 0.00176
+      }
+    },
+    {
+      "key": "downstream_jet_recovery_failure",
+      "label": "A downstream jet-recovery gap remains after omega reaches the transition lane",
+      "score": 0.41467,
+      "evidence": {
+        "transitionBandWindDeltaMs": 0,
+        "jetBandWindDeltaMs": 0,
+        "jetBandStormTrackDelta": 0,
+        "midlatitudeWesterliesNorthDeltaMs": 0
+      }
+    }
+  ],
+  "recommendation": "The bridge response is being absorbed in the NH dry-belt and tropical-shoulder lane instead of reaching the 30-56N jet pathway. Keep the bridge disabled by default and redesign its placement/latitudinal weighting before changing amplitude."
+}

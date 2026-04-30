@@ -1,0 +1,93 @@
+{
+  "schema": "satellite-wars.phase1zzd-atlantic-transition-carryover-containment-design.v1",
+  "generatedAt": "2026-04-15T02:06:13.689Z",
+  "paths": {
+    "offPath": "/tmp/phase1zzb-off.json",
+    "onPath": "/tmp/phase1zzb-on.json",
+    "offSectorPath": "/tmp/phase1zzb-off-nh-dry-belt-source-sector-summary.json",
+    "onSectorPath": "/tmp/phase1zzb-on-nh-dry-belt-source-sector-summary.json",
+    "offBirthPath": "/tmp/phase1zzb-off-vertical-cloud-birth-attribution.json",
+    "onBirthPath": "/tmp/phase1zzb-on-vertical-cloud-birth-attribution.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zzd-atlantic-transition-carryover-containment-design.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zzd-atlantic-transition-carryover-containment-design.json"
+  },
+  "verdict": "atlantic_transition_overlap_survival_taper_preferred",
+  "nextPhase": "Phase 1ZZE: Implement Atlantic Transition Carryover Containment Patch",
+  "recommendation": "The next patch should live in vertical5.js/core5.js and taper Atlantic transition carryover survival around 18–22.5°N. The primary target is overlap-survival / persistence support, not fresh source recharge, resolved-ascent birth, or Atlantic receiver geometry.",
+  "metrics": {
+    "itczWidthDeg": 0.077,
+    "subtropicalDryNorthRatio": 0.017,
+    "subtropicalDrySouthRatio": 0.003,
+    "northDryBeltOceanLargeScaleCondensationMeanKgM2": -0.00039
+  },
+  "signals": {
+    "spilloverCondensationDelta": 0.00891,
+    "spilloverTcwDelta": 0.342,
+    "spilloverLowerOmegaDelta": 0.00268,
+    "spilloverMidRhDelta": 0.011,
+    "spilloverSurfaceEvapDelta": -0.001,
+    "spilloverNorthDryBeltSourceDelta": -0.00223,
+    "spilloverTropicalNorthSourceDelta": -0.00018,
+    "spilloverResolvedBirthDelta": 0.00015,
+    "spilloverImportedPersistenceDelta": 0.03092,
+    "spilloverCarryoverDelta": 0.03092,
+    "spilloverWeakErosionDelta": 0.03047,
+    "spilloverUpperCloudPathDelta": 0.03391,
+    "receiverCondensationDelta": -0.0097,
+    "receiverTaperDiagFrac": 0.00595,
+    "receiverTaperApplied": 0.00164,
+    "atlanticCondensationDelta": -0.00234,
+    "atlanticLowLevelSourceDelta": 0.23564,
+    "eastPacificCondensationDelta": 0.00387,
+    "atlanticResolvedBirthDelta": 0.1101,
+    "atlanticSaturationAdjustmentDelta": 1.51576,
+    "spilloverCarryEnteringDelta": 4.3246,
+    "spilloverCarrySurvivingDelta": 4.24108,
+    "atlanticCarrySurvivalFracDelta": 0.00006
+  },
+  "ranking": [
+    {
+      "key": "atlantic_transition_carryover_containment",
+      "label": "Atlantic transition carryover containment",
+      "score": 0.82396,
+      "rationale": "The spillover lane rises with imported persistence, carry-survival, weak-erosion survival, and upper-cloud path while fresh source and resolved-ascent terms stay near-flat.",
+      "rank": 1
+    },
+    {
+      "key": "atlantic_transition_saturation_adjustment_cap",
+      "label": "Atlantic transition saturation-adjustment cap",
+      "score": 0.56233,
+      "rationale": "Atlantic saturation-adjustment birth does rise, but it is secondary to the larger carry-entering and carry-surviving increases.",
+      "rank": 2
+    },
+    {
+      "key": "atlantic_transition_low_level_source_sink",
+      "label": "Atlantic transition low-level source sink",
+      "score": 0,
+      "rationale": "The spillover lane does not show fresh source recharge; source tracers and surface evaporation are flat-to-down.",
+      "rank": 3
+    },
+    {
+      "key": "atlantic_transition_resolved_ascent_cap",
+      "label": "Atlantic transition resolved-ascent cap",
+      "score": 0,
+      "rationale": "Resolved-ascent birth barely moves in the spillover lane, so a resolved-ascent cap would chase the wrong carrier.",
+      "rank": 4
+    }
+  ],
+  "preferredPatchContract": {
+    "files": [
+      "src/weather/v2/vertical5.js",
+      "src/weather/v2/core5.js"
+    ],
+    "geometry": "Atlantic ocean transition lane, centered on 18–22.5°N",
+    "activation": "Reuse the live Atlantic receiver-taper / northside leak carrier rather than creating a fresh source gate.",
+    "target": "Contain carryover overlap survival and persistence support in the Atlantic transition lane while preserving 26.25°N receiver relief.",
+    "antiPatterns": [
+      "Do not retune Atlantic receiver geometry again.",
+      "Do not add a fresh low-level humidity or evaporation sink.",
+      "Do not cap resolved-ascent birth as the primary lever.",
+      "Do not globally ablate Atlantic carryover or cloud birth."
+    ]
+  }
+}

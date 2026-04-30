@@ -1,11 +1,26 @@
 import * as THREE from 'three';
-import { WeatherCore5 } from './weather/v2/core5';
+import { createWeatherKernel } from './weather/kernel';
 import WeatherLogger from './weather/WeatherLogger';
 import { bilinear } from './weather/shared/bilinear';
 import { WeatherLogSink } from './weather/logSink';
 
 const AUTO_LOG_CADENCE_SECONDS = 6 * 3600;
 const AUTO_LOG_MAX_ENTRIES = 20000;
+const AUTO_LOG_INIT_RETRY_MS = 5000;
+const CLOUD_TEXTURE_SOFTEN_BLUR_PX = 2.0;
+
+const nowMs = () => (
+    typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now()
+);
+
+const hashUnit = (x, y, seed) => {
+    let n = (Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(seed | 0, 2246822519)) >>> 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177) >>> 0;
+    n = (n ^ (n >>> 16)) >>> 0;
+    return n / 4294967295;
+};
 
 // WeatherField: rendering wrapper around the physics core
 class WeatherField {
@@ -16,9 +31,11 @@ class WeatherField {
         tickSeconds = 0.5,
         modelDt = 120,
         seed,
-        debugMode = 'clouds'
+        debugMode = 'clouds',
+        autoLogEnabled = true
     } = {}) {
-        this.core = new WeatherCore5({ nx, ny, dt: modelDt, seed });
+        this.kernel = createWeatherKernel({ nx, ny, dt: modelDt, seed });
+        this.core = this.kernel.core;
         this.renderScale = renderScale;
         this.tickSeconds = tickSeconds;
         this._paintAccumSeconds = 0;
@@ -30,6 +47,7 @@ class WeatherField {
         this._simContext = { simSpeed: null, paused: null };
         this.useExternalCore = false;
         this.renderEnabled = true;
+        this.eventProduct = null;
         this._lastStepsRan = 0;
         this._lastPaintSimTime = null;
         this._needsCoreTimeSync = true;
@@ -37,15 +55,22 @@ class WeatherField {
         this.core.setLogger?.(this.logger);
         this._logSink = null;
         this._autoLogReady = false;
+        this._autoLogInitInFlight = false;
+        this._nextAutoLogInitAtMs = 0;
 
-        const autoLogEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_AUTO_LOG === '1';
-        if (autoLogEnabled && typeof fetch !== 'undefined') {
+        const shouldAutoLog = autoLogEnabled && (process.env.NODE_ENV !== 'production' || process.env.REACT_APP_AUTO_LOG === '1');
+        if (shouldAutoLog && typeof fetch !== 'undefined') {
             this._logSink = new WeatherLogSink({ baseUrl: '/__weatherlog', flushIntervalMs: 300 });
-            this._initAutoLogging();
+            this._maybeInitAutoLogging(true);
         }
 
         const texW = nx * renderScale;
         const texH = ny * renderScale;
+        this._texW = texW;
+        this._texH = texH;
+        this._cloudNoiseLow = this._buildCloudNoise(texW, texH, (seed ?? 0) + 101);
+        this._cloudNoiseHigh = this._buildCloudNoise(texW, texH, (seed ?? 0) + 509);
+        this._lastPerfStats = null;
         this.canvasCloudLow = document.createElement('canvas');
         this.canvasCloudLow.width = texW;
         this.canvasCloudLow.height = texH;
@@ -98,10 +123,121 @@ class WeatherField {
         this.textureDebug.magFilter = THREE.LinearFilter;
         this.textureDebug.minFilter = THREE.LinearFilter;
         this.textureDebug.needsUpdate = true;
+        this._softenCanvas = document.createElement('canvas');
+        this._softenCanvas.width = texW;
+        this._softenCanvas.height = texH;
+        this._softenCtx = this._softenCanvas.getContext('2d');
+    }
+
+    _buildCloudNoise(width, height, seed) {
+        const out = new Uint8Array(width * height);
+        const baseSeed = Math.trunc(seed || 0);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                let value = 0;
+                let amplitude = 0.5;
+                let norm = 0;
+                for (let octave = 0; octave < 4; octave++) {
+                    const stride = 1 << octave;
+                    value += amplitude * hashUnit(Math.floor(x / stride), Math.floor(y / stride), baseSeed + octave * 7919);
+                    norm += amplitude;
+                    amplitude *= 0.5;
+                }
+                out[y * width + x] = Math.max(0, Math.min(255, Math.round(255 * (value / Math.max(1e-6, norm)))));
+            }
+        }
+        this._blendScalarLongitudeSeam(out, width, height);
+        return out;
+    }
+
+    _blendScalarLongitudeSeam(data, width, height, seamColumns = 8) {
+        if (!data || width < 2 || height < 1) return;
+        const cols = Math.max(1, Math.min(Math.floor(width / 2), Math.floor(seamColumns)));
+        const left = new Array(cols);
+        const right = new Array(cols);
+        for (let y = 0; y < height; y++) {
+            const row = y * width;
+            for (let d = 0; d < cols; d++) {
+                left[d] = data[row + d];
+                right[d] = data[row + width - 1 - d];
+            }
+            for (let d = 0; d < cols; d++) {
+                const blend = 1 - d / cols;
+                const average = 0.5 * (left[d] + right[d]);
+                data[row + d] = Math.round(left[d] * (1 - blend) + average * blend);
+                data[row + width - 1 - d] = Math.round(right[d] * (1 - blend) + average * blend);
+            }
+        }
+    }
+
+    _blendTextureLongitudeSeam(data, width, height, seamColumns = 8) {
+        if (!data || width < 2 || height < 1) return;
+        const cols = Math.max(1, Math.min(Math.floor(width / 2), Math.floor(seamColumns)));
+        const left = new Array(cols * 4);
+        const right = new Array(cols * 4);
+        for (let y = 0; y < height; y++) {
+            const row = y * width * 4;
+            for (let d = 0; d < cols; d++) {
+                const leftIdx = row + d * 4;
+                const rightIdx = row + (width - 1 - d) * 4;
+                for (let c = 0; c < 4; c++) {
+                    left[d * 4 + c] = data[leftIdx + c];
+                    right[d * 4 + c] = data[rightIdx + c];
+                }
+            }
+            for (let d = 0; d < cols; d++) {
+                const blend = 1 - d / cols;
+                const leftIdx = row + d * 4;
+                const rightIdx = row + (width - 1 - d) * 4;
+                for (let c = 0; c < 4; c++) {
+                    const leftValue = left[d * 4 + c];
+                    const rightValue = right[d * 4 + c];
+                    const average = 0.5 * (leftValue + rightValue);
+                    data[leftIdx + c] = Math.round(leftValue * (1 - blend) + average * blend);
+                    data[rightIdx + c] = Math.round(rightValue * (1 - blend) + average * blend);
+                }
+            }
+        }
+    }
+
+    _softenLayerCanvas(ctx) {
+        if (!ctx || !this._softenCtx || CLOUD_TEXTURE_SOFTEN_BLUR_PX <= 0) return;
+        const canvas = ctx.canvas;
+        if (!canvas?.width || !canvas?.height) return;
+        if (this._softenCanvas.width !== canvas.width || this._softenCanvas.height !== canvas.height) {
+            this._softenCanvas.width = canvas.width;
+            this._softenCanvas.height = canvas.height;
+        }
+        this._softenCtx.clearRect(0, 0, canvas.width, canvas.height);
+        this._softenCtx.drawImage(canvas, 0, 0);
+        const prevFilter = ctx.filter;
+        const prevComposite = ctx.globalCompositeOperation;
+        ctx.filter = `blur(${CLOUD_TEXTURE_SOFTEN_BLUR_PX}px)`;
+        ctx.globalCompositeOperation = 'copy';
+        ctx.drawImage(this._softenCanvas, 0, 0);
+        ctx.filter = prevFilter;
+        ctx.globalCompositeOperation = prevComposite;
+    }
+
+    _sampleCloudNoise(noise, lon, lat, grid) {
+        if (!noise?.length || !grid) return 0.5;
+        const lonWrapped = ((lon % grid.nx) + grid.nx) % grid.nx;
+        const latClamped = Math.max(0, Math.min(grid.ny - 1, lat));
+        const x = Math.max(0, Math.min(this._texW - 1, Math.floor((lonWrapped / grid.nx) * this._texW)));
+        const y = Math.max(0, Math.min(this._texH - 1, Math.floor((latClamped / Math.max(1, grid.ny - 1)) * (this._texH - 1))));
+        return noise[y * this._texW + x] / 255;
+    }
+
+    _maybeInitAutoLogging(force = false) {
+        if (!this._logSink || this._autoLogReady || this._autoLogInitInFlight) return;
+        const nowMs = Date.now();
+        if (!force && nowMs < this._nextAutoLogInitAtMs) return;
+        void this._initAutoLogging();
     }
 
     async _initAutoLogging() {
-        if (!this._logSink || this._autoLogReady) return;
+        if (!this._logSink || this._autoLogReady || this._autoLogInitInFlight) return;
+        this._autoLogInitInFlight = true;
         try {
             if (this.core?._initPromise) {
                 await this.core._initPromise;
@@ -109,48 +245,86 @@ class WeatherField {
         } catch (_) {
             // proceed with whatever init data is available
         }
-        const session = await this._logSink.init();
-        if (!session) return;
+        try {
+            const session = await this._logSink.init();
+            if (!session) {
+                this._nextAutoLogInitAtMs = Date.now() + AUTO_LOG_INIT_RETRY_MS;
+                return;
+            }
 
-        this.logger.setOnLine((line) => this._logSink.enqueue(line));
-        this.logger.setRunInfo({
-            runId: session.runId,
-            seqStart: Number.isFinite(session.seqStart) ? session.seqStart : 0
-        });
-        this.logger.start(this.core.timeUTC, {
-            cadenceSeconds: AUTO_LOG_CADENCE_SECONDS,
-            maxEntries: AUTO_LOG_MAX_ENTRIES
-        });
-        this.logger.recordRunStart(this.core, {
-            session,
-            cadenceSeconds: AUTO_LOG_CADENCE_SECONDS,
-            modelKind: 'v2'
-        });
-        this.logger.recordNow(
-            {
-                simTimeSeconds: this.core.timeUTC,
-                simSpeed: this._simContext.simSpeed,
-                paused: this._simContext.paused,
-                stepsRanThisTick: this._lastStepsRan
-            },
-            this.core,
-            { reason: 'autoStart' }
-        );
-        this._autoLogReady = true;
+            this.logger.setOnLine((line) => this._logSink.enqueue(line));
+            this.logger.setRunInfo({
+                runId: session.runId,
+                seqStart: Number.isFinite(session.seqStart) ? session.seqStart : 0
+            });
+            this.logger.start(this.core.timeUTC, {
+                cadenceSeconds: AUTO_LOG_CADENCE_SECONDS,
+                maxEntries: AUTO_LOG_MAX_ENTRIES
+            });
+            this.logger.recordRunStart(this.core, {
+                session,
+                cadenceSeconds: AUTO_LOG_CADENCE_SECONDS,
+                modelKind: 'v2'
+            });
+            this.logger.recordNow(
+                {
+                    simTimeSeconds: this.core.timeUTC,
+                    simSpeed: this._simContext.simSpeed,
+                    paused: this._simContext.paused,
+                    stepsRanThisTick: this._lastStepsRan
+                },
+                this.core,
+                { reason: 'autoStart' }
+            );
+            this._autoLogReady = true;
+            this._nextAutoLogInitAtMs = 0;
+        } finally {
+            this._autoLogInitInFlight = false;
+        }
     }
 
     update(simTimeSeconds, realDtSeconds, simContext = {}) {
-        if (!Number.isFinite(simTimeSeconds)) return;
+        const perfStartMs = nowMs();
+        const perfStats = {
+            updateMs: 0,
+            autoLogMs: 0,
+            physicsMs: 0,
+            loggerMs: 0,
+            paintCloudsMs: 0,
+            paintDebugMs: 0,
+            painted: false,
+            renderEnabled: this.renderEnabled,
+            useExternalCore: this.useExternalCore === true,
+            stepsRan: this._lastStepsRan
+        };
+        const finishPerf = () => {
+            perfStats.updateMs = nowMs() - perfStartMs;
+            perfStats.stepsRan = this._lastStepsRan;
+            this._lastPerfStats = perfStats;
+        };
+        if (!Number.isFinite(simTimeSeconds)) {
+            finishPerf();
+            return;
+        }
+        let phaseStartMs = nowMs();
+        this._maybeInitAutoLogging();
+        perfStats.autoLogMs += nowMs() - phaseStartMs;
         if (!this.core.ready) {
             this._lastSimTimeSeconds = simTimeSeconds;
+            finishPerf();
             return;
         }
         const useExternalCore = this.useExternalCore === true;
+        perfStats.useExternalCore = useExternalCore;
         if (this._needsCoreTimeSync && !useExternalCore) {
             this._resyncCoreTime(simTimeSeconds);
+            finishPerf();
             return;
         }
-        if (this.paused) return;
+        if (this.paused) {
+            finishPerf();
+            return;
+        }
         const simSpeed = Number.isFinite(simContext.simSpeed)
             ? simContext.simSpeed
             : this._simContext.simSpeed;
@@ -162,6 +336,7 @@ class WeatherField {
         this.core.setLoggerContext?.({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan });
         if (this._lastSimTimeSeconds === null || simTimeSeconds < this._lastSimTimeSeconds) {
             this._lastSimTimeSeconds = simTimeSeconds;
+            finishPerf();
             return;
         }
         if (!useExternalCore) {
@@ -171,10 +346,14 @@ class WeatherField {
                 const maxCatchupSeconds = maxSteps * this.core.modelDt;
                 if (deltaSim > maxCatchupSeconds) {
                     this._resyncCoreTime(simTimeSeconds);
+                    finishPerf();
                     return;
                 }
+                phaseStartMs = nowMs();
                 const stepsRan = this.core.advanceModelSeconds(deltaSim) || 0;
+                perfStats.physicsMs += nowMs() - phaseStartMs;
                 this._lastStepsRan = stepsRan;
+                if (stepsRan > 0) this._refreshEventProduct();
             }
         } else {
             this._lastStepsRan = 0;
@@ -184,19 +363,32 @@ class WeatherField {
         const desyncThreshold = Math.max(6 * 3600, this.core.modelDt * 10);
         if (desyncSeconds > desyncThreshold && !useExternalCore) {
             this._resyncCoreTime(simTimeSeconds);
+            finishPerf();
             return;
         }
+        phaseStartMs = nowMs();
         this.logger?.recordIfDue({ simTimeSeconds, simSpeed, paused, stepsRanThisTick: this._lastStepsRan }, this.core);
+        perfStats.loggerMs += nowMs() - phaseStartMs;
         if (!this.renderEnabled) {
             this._paintAccumSeconds = 0;
+            finishPerf();
             return;
         }
         const realDt = Number.isFinite(realDtSeconds) ? Math.max(0, realDtSeconds) : 0;
         this._paintAccumSeconds += realDt;
-        if (this._paintAccumSeconds < this.tickSeconds) return;
+        if (this._paintAccumSeconds < this.tickSeconds) {
+            finishPerf();
+            return;
+        }
         this._paintAccumSeconds -= this.tickSeconds;
+        phaseStartMs = nowMs();
         this._paintClouds(simTimeSeconds);
+        perfStats.paintCloudsMs += nowMs() - phaseStartMs;
+        phaseStartMs = nowMs();
         this._paintDebug();
+        perfStats.paintDebugMs += nowMs() - phaseStartMs;
+        perfStats.painted = true;
+        finishPerf();
     }
 
     setPaused(paused) {
@@ -234,6 +426,7 @@ class WeatherField {
         let stepsRan = 0;
         if (Number.isFinite(modelSeconds) && modelSeconds > 0) {
             stepsRan = this.core.advanceModelSeconds(modelSeconds) || 0;
+            if (stepsRan > 0) this._refreshEventProduct();
         }
         this._lastStepsRan = stepsRan;
         if (Number.isFinite(simTimeSeconds)) {
@@ -266,7 +459,10 @@ class WeatherField {
     }
 
     setSeed(seed) {
-        this.core.setSeed(seed);
+        this.kernel?.setSeed?.(seed);
+        this._cloudNoiseLow = this._buildCloudNoise(this._texW, this._texH, (seed ?? 0) + 101);
+        this._cloudNoiseHigh = this._buildCloudNoise(this._texW, this._texH, (seed ?? 0) + 509);
+        this.eventProduct = null;
         this._paintAccumSeconds = 0;
         this._lastSimTimeSeconds = null;
         this._lastStepsRan = 0;
@@ -280,6 +476,7 @@ class WeatherField {
 
     _resyncCoreTime(simTimeSeconds) {
         this.core.setTimeUTC(simTimeSeconds);
+        this._refreshEventProduct({ force: true });
         this._lastSimTimeSeconds = simTimeSeconds;
         this._paintAccumSeconds = 0;
         this._lastStepsRan = 0;
@@ -341,12 +538,37 @@ class WeatherField {
         };
     }
 
+    getPerfStats() {
+        return this._lastPerfStats ? { ...this._lastPerfStats } : null;
+    }
+
     getCoreSnapshot(options = {}) {
-        return this.core?.getStateSnapshot?.(options) || null;
+        return this.kernel?.getSnapshot?.(options) || null;
+    }
+
+    getEventProduct() {
+        return this.eventProduct || this.kernel?.getEventProduct?.() || null;
+    }
+
+    setEventProduct(product) {
+        this.eventProduct = product && typeof product === 'object' ? product : null;
+    }
+
+    _refreshEventProduct(options = {}) {
+        if (!this.kernel?.getEventProduct) return null;
+        try {
+            this.eventProduct = this.kernel.getEventProduct(options);
+            return this.eventProduct;
+        } catch (err) {
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('[WeatherField] event product update failed', err);
+            }
+            return this.eventProduct;
+        }
     }
 
     setV2ConvectionEnabled(enabled) {
-        this.core.setV2ConvectionEnabled?.(enabled);
+        this.kernel?.setV2ConvectionEnabled?.(enabled);
     }
 
     logNow(simTimeSeconds, simContext = {}, reason) {
@@ -395,22 +617,7 @@ class WeatherField {
         if (!this.core.ready) return;
         const { grid, fields } = this.core;
 
-        const hash = (x, y, t) => {
-            const s = Math.sin(x * 127.1 + y * 311.7 + t * 0.1) * 43758.5453;
-            return s - Math.floor(s);
-        };
-        const fbm = (x, y, t) => {
-            let v = 0, a = 0.5, f = 1.0;
-            for (let o = 0; o < 4; o++) {
-                v += a * hash(x * f, y * f, t);
-                f *= 2.0;
-                a *= 0.5;
-            }
-            return v;
-        };
-
         const simTime = Number.isFinite(simTimeSeconds) ? simTimeSeconds : this.core.timeUTC || 0;
-        const t = simTime;
         const deltaSim = this._lastPaintSimTime === null ? 0 : Math.max(0, simTime - this._lastPaintSimTime);
         const advectSeconds = Math.min(deltaSim, 3 * 3600);
         this._lastPaintSimTime = simTime;
@@ -437,7 +644,7 @@ class WeatherField {
             uField,
             vField,
             advectSeconds,
-            noiseScale,
+            noiseField,
             shadeBase,
             shadeVar,
             renderParams,
@@ -449,7 +656,6 @@ class WeatherField {
             for (let y = 0; y < h; y++) {
                 const lat = (y / h) * grid.ny;
                 const j = Math.max(0, Math.min(grid.ny - 1, Math.floor(lat)));
-                const latDeg = grid.latDeg[j];
                 const kmPerDegLat = 111.0;
                 const kmPerDegLon = Math.max(1.0, kmPerDegLat * grid.cosLat[j]);
                 for (let x = 0; x < w; x++) {
@@ -463,7 +669,7 @@ class WeatherField {
                     const tau = bilinear(tauField, lon - dLonCells, lat - dLatCells, grid.nx, grid.ny);
                     const advLon = lon - dLonCells;
                     const advLat = lat - dLatCells;
-                    const n = fbm(advLon * noiseScale, advLat * noiseScale, t);
+                    const n = this._sampleCloudNoise(noiseField, advLon, advLat, grid);
                     const tauEff = Math.max(0, tau);
                     const aBase = Math.pow(cloud, isHigh ? renderParams.gammaHigh : renderParams.gammaLow) *
                         (isHigh ? renderParams.aHigh : renderParams.aLow);
@@ -501,7 +707,9 @@ class WeatherField {
                     data[idx + 3] = Math.floor(255 * alpha);
                 }
             }
+            this._blendTextureLongitudeSeam(data, w, h);
             ctx.putImageData(img, 0, 0);
+            this._softenLayerCanvas(ctx);
         };
 
         drawLayer({
@@ -513,7 +721,7 @@ class WeatherField {
             uField: fields.u,
             vField: fields.v,
             advectSeconds,
-            noiseScale: 0.015,
+            noiseField: this._cloudNoiseLow,
             shadeBase: 230,
             shadeVar: 24,
             renderParams: this.renderParams,
@@ -529,15 +737,87 @@ class WeatherField {
             uField: fields.uU,
             vField: fields.vU,
             advectSeconds,
-            noiseScale: 0.01,
+            noiseField: this._cloudNoiseHigh,
             shadeBase: 240,
             shadeVar: 20,
             renderParams: this.renderParams,
             isHigh: true
         });
 
+        this._paintEventCloudSignatures(simTime);
+
         this.textureLow.needsUpdate = true;
         this.textureHigh.needsUpdate = true;
+    }
+
+    _paintEventCloudSignatures(simTimeSeconds) {
+        const events = this.eventProduct?.activeEvents;
+        if (!Array.isArray(events) || events.length === 0) return;
+        const drawEvents = events
+            .filter((event) => event?.type === 'hurricane' || event?.type === 'tropical-disturbance')
+            .slice(0, 8);
+        if (drawEvents.length === 0) return;
+        const w = this.canvasCloudHigh.width;
+        const h = this.canvasCloudHigh.height;
+        const kmPerPixelLat = (180 * 111) / Math.max(1, h);
+        const drawOnContext = (ctx, event, wrapOffsetX = 0) => {
+            const center = event.hurricane?.center || event.center;
+            if (!center) return;
+            const lat = Number(center.latDeg);
+            const lon = Number(center.lonDeg);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+            const intensity = Math.max(0.1, Math.min(1, event.hurricane?.intensity01 ?? event.intensity01 ?? 0.2));
+            const radiusKm = Math.max(120, event.hurricane?.rainShieldRadiusKm ?? event.radiusKm ?? 260);
+            const cx = ((lon + 180) / 360) * w + wrapOffsetX;
+            const cy = ((90 - lat) / 180) * h;
+            const radiusY = Math.max(5, radiusKm / kmPerPixelLat);
+            const radiusX = radiusY / Math.max(0.35, Math.cos((lat * Math.PI) / 180));
+            const spiralCount = Math.max(2, Math.min(6, event.hurricane?.rainShield?.spiralBandCount ?? Math.round(2 + intensity * 4)));
+            const spinSign = lat >= 0 ? 1 : -1;
+            const phase = ((simTimeSeconds || 0) / 5400) * spinSign;
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            for (let arm = 0; arm < spiralCount; arm++) {
+                const armPhase = phase + (arm / spiralCount) * Math.PI * 2;
+                ctx.beginPath();
+                for (let n = 0; n <= 42; n++) {
+                    const t = n / 42;
+                    const r = radiusY * (0.18 + 0.82 * t);
+                    const angle = armPhase + spinSign * (0.9 + 4.2 * t);
+                    const px = cx + Math.cos(angle) * r * (radiusX / radiusY);
+                    const py = cy + Math.sin(angle) * r;
+                    if (n === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                const alpha = event.type === 'hurricane' ? 0.18 + 0.38 * intensity : 0.08 + 0.18 * intensity;
+                ctx.strokeStyle = `rgba(245, 250, 255, ${alpha})`;
+                ctx.lineWidth = Math.max(1, Math.min(5, radiusY * 0.055 * intensity));
+                ctx.stroke();
+            }
+            if (event.type === 'hurricane' && intensity >= 0.45) {
+                const eyeRadiusPx = Math.max(1.5, (event.hurricane?.eyeRadiusKm ?? 24) / kmPerPixelLat);
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, eyeRadiusPx / Math.max(0.45, Math.cos((lat * Math.PI) / 180)), eyeRadiusPx, 0, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(0.8, 0.25 + intensity * 0.55)})`;
+                ctx.fill();
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, eyeRadiusPx * 1.7, eyeRadiusPx * 1.25, 0, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${0.28 + intensity * 0.34})`;
+                ctx.lineWidth = Math.max(1, eyeRadiusPx * 0.35);
+                ctx.stroke();
+            }
+            ctx.restore();
+        };
+        for (const event of drawEvents) {
+            for (const offset of [-w, 0, w]) {
+                drawOnContext(this.ctxCloudLow, event, offset);
+                drawOnContext(this.ctxCloudHigh, event, offset);
+            }
+        }
     }
 
     _paintDebug() {
@@ -579,6 +859,7 @@ class WeatherField {
             }
         }
 
+        this._blendTextureLongitudeSeam(data, w, h);
         this.ctxDebug.putImageData(img, 0, 0);
         if (this.debugMode === 'wind') {
             this._drawWindArrows();

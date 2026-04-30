@@ -1,0 +1,148 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c-design.v1",
+  "generatedAt": "2026-04-16T02:27:03.112Z",
+  "archiveBranch": "codex/world-class-weather-loop-archive-20260407-0745",
+  "seams": [
+    {
+      "file": "src/weather/v2/core5.js",
+      "label": "Core circulation defaults",
+      "targetRole": "rollback_donor_candidate",
+      "tokens": [
+        "subtropicalSubsidenceCrossHemiFloorFrac",
+        "enableCirculationReboundContainment",
+        "enableTransitionReturnFlowCoupling",
+        "enableDryingOmegaBridge",
+        "enableWeakHemiCrossHemiFloorTaper"
+      ],
+      "diff": {
+        "added": 1193,
+        "deleted": 66
+      },
+      "currentTokenHits": 5,
+      "archiveTokenHits": 0,
+      "classification": "rollback_donor_candidate"
+    },
+    {
+      "file": "src/weather/v2/vertical5.js",
+      "label": "Vertical circulation scaffold",
+      "targetRole": "rollback_donor_candidate",
+      "tokens": [
+        "subtropicalSubsidenceCrossHemiFloorFrac",
+        "enableCirculationReboundContainment",
+        "enableTransitionReturnFlowCoupling",
+        "enableDryingOmegaBridge",
+        "enableWeakHemiCrossHemiFloorTaper"
+      ],
+      "diff": {
+        "added": 2380,
+        "deleted": 69
+      },
+      "currentTokenHits": 5,
+      "archiveTokenHits": 0,
+      "classification": "rollback_donor_candidate"
+    },
+    {
+      "file": "src/weather/v2/microphysics5.js",
+      "label": "Partition-preserving microphysics",
+      "targetRole": "current_preserve_candidate",
+      "tokens": [
+        "enableSoftLiveStateMaintenanceSuppression",
+        "enableExplicitSubtropicalBalanceContract",
+        "enableShoulderAbsorptionGuard",
+        "softLiveGateSupport",
+        "shoulderGuardSupport"
+      ],
+      "diff": {
+        "added": 889,
+        "deleted": 16
+      },
+      "currentTokenHits": 5,
+      "archiveTokenHits": 0,
+      "classification": "current_preserve_candidate"
+    },
+    {
+      "file": "src/weather/v2/state5.js",
+      "label": "State adapter surface",
+      "targetRole": "current_adapter_candidate",
+      "tokens": [
+        "SURFACE_MOISTURE_SOURCE_TRACERS",
+        "CLOUD_BIRTH_LEVEL_BAND_COUNT"
+      ],
+      "diff": {
+        "added": 505,
+        "deleted": 1
+      },
+      "currentTokenHits": 2,
+      "archiveTokenHits": 0,
+      "classification": "current_adapter_candidate"
+    },
+    {
+      "file": "src/weather/validation/diagnostics.js",
+      "label": "Diagnostics adapter surface",
+      "targetRole": "current_adapter_candidate",
+      "tokens": [
+        "cloudTransitionLedgerTracing",
+        "sourceTracing5",
+        "cloudBirthTracing5"
+      ],
+      "diff": {
+        "added": 2279,
+        "deleted": 9
+      },
+      "currentTokenHits": 3,
+      "archiveTokenHits": 0,
+      "classification": "current_adapter_candidate"
+    },
+    {
+      "file": "scripts/agent/planetary-realism-audit.mjs",
+      "label": "Audit harness adapter surface",
+      "targetRole": "current_adapter_candidate",
+      "tokens": [
+        "cloudTransitionLedger",
+        "upper-cloud",
+        "sourceTracing5",
+        "earth-weather-architecture"
+      ],
+      "diff": {
+        "added": 5934,
+        "deleted": 0
+      },
+      "currentTokenHits": 3,
+      "archiveTokenHits": null,
+      "classification": "current_adapter_candidate"
+    },
+    {
+      "file": "src/weather/v2/radiation2d.js",
+      "label": "Radiative support review lane",
+      "targetRole": "secondary_review_candidate",
+      "tokens": [
+        "upperCloud",
+        "cloudyLwCooling",
+        "enableFullColumnLW"
+      ],
+      "diff": {
+        "added": 92,
+        "deleted": 1
+      },
+      "currentTokenHits": 2,
+      "archiveTokenHits": 1,
+      "classification": "secondary_review_candidate"
+    }
+  ],
+  "decision": {
+    "verdict": "module_level_hybrid_required",
+    "donorFiles": [
+      "src/weather/v2/core5.js",
+      "src/weather/v2/vertical5.js"
+    ],
+    "preserveFiles": [
+      "src/weather/v2/microphysics5.js"
+    ],
+    "adapterFiles": [
+      "src/weather/v2/state5.js",
+      "src/weather/validation/diagnostics.js",
+      "scripts/agent/planetary-realism-audit.mjs"
+    ],
+    "nextMove": "Architecture C1: hybrid seam contract"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schema": "satellite-wars.phase1zw-north-source-rebound-attribution.v1",
+  "generatedAt": "2026-04-15T00:40:43.635Z",
+  "paths": {
+    "offPath": "/tmp/phase1zv-off.json",
+    "onPath": "/tmp/phase1zv-on.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zw-north-source-rebound-attribution.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1zw-north-source-rebound-attribution.json"
+  },
+  "verdict": "north_source_condensation_concentration_without_local_recharge",
+  "nextPhase": "Phase 1ZX: North Source Concentration Patch Design",
+  "recommendation": "Keep the Phase 1ZV weak-hemi floor taper. Do not chase the remaining 11.25N rebound with a local humidity or omega boost. The next patch should be a capped source-concentration containment lane in vertical5.js/core5.js around the 9-13N source row.",
+  "keepWeakHemiFloorTaper": true,
+  "localRechargeSignal": 0,
+  "concentrationSignal": 0.06599,
+  "northSource": {
+    "condensationDeltaKgM2": 0.02481,
+    "totalColumnWaterDeltaKgM2": -0.085,
+    "boundaryLayerRhDeltaFrac": -0.002,
+    "lowerTroposphericRhDeltaFrac": -0.003,
+    "midTroposphericRhDeltaFrac": -0.005,
+    "lowerTroposphericOmegaDeltaPaS": -0.00054,
+    "midTroposphericOmegaDeltaPaS": -0.00103,
+    "sourceSupportDeltaFrac": 0.00127,
+    "leakPenaltyDeltaFrac": 0.00114,
+    "precipReevaporationDeltaKgM2": -0.00272,
+    "vaporFluxNorthDeltaKgM_1S": -0.64855,
+    "totalWaterFluxNorthDeltaKgM_1S": -1.00552
+  },
+  "surroundingLane": {
+    "edge3NCondensationDeltaKgM2": -0.00238,
+    "spillover18NCondensationDeltaKgM2": -0.01008,
+    "dryCore26NCondensationDeltaKgM2": -0.01896,
+    "southMirror11SCondensationDeltaKgM2": -0.0215,
+    "crossEquatorialVaporFluxNorthDeltaKgM_1S": 1.21412
+  },
+  "guardrails": {
+    "itczWidthDeltaDeg": -0.072,
+    "subtropicalDryNorthRatioDelta": -0.024,
+    "subtropicalDrySouthRatioDelta": -0.004,
+    "northDryBeltOceanLargeScaleCondensationDeltaKgM2": -0.01518
+  }
+}

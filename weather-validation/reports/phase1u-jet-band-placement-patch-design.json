@@ -1,0 +1,144 @@
+{
+  "schema": "satellite-wars.phase1u-jet-band-placement-patch-design.v1",
+  "generatedAt": "2026-04-14T05:52:36.400Z",
+  "paths": {
+    "baselinePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1-hadley-second-pass-restore-v4.json",
+    "offPath": "/tmp/phase1s-omega-bridge-off.json",
+    "onPath": "/tmp/phase1s-omega-bridge-on.json",
+    "offProfilesPath": "/tmp/phase1s-omega-bridge-off-sample-profiles.json",
+    "onProfilesPath": "/tmp/phase1s-omega-bridge-on-sample-profiles.json",
+    "reportPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1u-jet-band-placement-patch-design.md",
+    "jsonPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/reports/phase1u-jet-band-placement-patch-design.json"
+  },
+  "verdict": "poleward_projected_transition_bridge_required",
+  "nextPhase": "Phase 1V: Implement Poleward Jet-Entry Bridge Patch",
+  "baselineGap": {
+    "itczWidthDeg": {
+      "baseline": 23.646,
+      "current": 25.837,
+      "delta": 2.191
+    },
+    "subtropicalDryNorthRatio": {
+      "baseline": 1.1,
+      "current": 1.517,
+      "delta": 0.417
+    },
+    "midlatitudeWesterliesNorthU10Ms": {
+      "baseline": 1.192,
+      "current": 0.531,
+      "delta": -0.661
+    }
+  },
+  "liveBridgeState": {
+    "northTransitionLowLevelOmegaEffectiveDeltaPaS": 0.00208,
+    "northDryBeltLowLevelOmegaEffectiveDeltaPaS": 0.0014,
+    "midlatitudeWesterliesNorthDeltaMs": 0,
+    "northTransitionDryingOmegaBridgeAppliedMeanPaS": 0.00206,
+    "northDryBeltDryingOmegaBridgeAppliedMeanPaS": 0.00145
+  },
+  "bandDeltas": {
+    "tropicalShoulderNorth": {
+      "label": "Tropical shoulder (3-18.75N)",
+      "wind10mUDelta": -0.00033,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": 0.01778
+    },
+    "dryBeltCoreNorth": {
+      "label": "Dry-belt core (18.75-30N)",
+      "wind10mUDelta": -0.0005,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": -0.00425
+    },
+    "transitionEntryNorth": {
+      "label": "Transition / jet entry (30-45N)",
+      "wind10mUDelta": 0,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": -0.00005
+    },
+    "jetBandNorth": {
+      "label": "Jet band (41.25-56.25N)",
+      "wind10mUDelta": 0,
+      "stormTrackIndexDelta": 0,
+      "largeScaleCondensationDeltaKgM2": -0.00008
+    }
+  },
+  "ranking": [
+    {
+      "key": "poleward_projected_transition_bridge_required",
+      "label": "Use a poleward-projected bridge from the dry-belt source lane into the 30-45N transition / jet-entry lane",
+      "score": 1,
+      "evidence": {
+        "tropicalShoulderCondensationDeltaKgM2": 0.01778,
+        "dryBeltCoreCondensationDeltaKgM2": -0.00425,
+        "transitionEntryWindDeltaMs": 0,
+        "jetBandWindDeltaMs": 0
+      }
+    },
+    {
+      "key": "same_column_amplitude_retune_wrong_lane",
+      "label": "Do not just strengthen the current same-column bridge amplitude",
+      "score": 0.963,
+      "evidence": {
+        "northTransitionOmegaDeltaPaS": 0.00208,
+        "northDryBeltOmegaDeltaPaS": 0.0014,
+        "tropicalShoulderCondensationDeltaKgM2": 0.01778,
+        "midlatitudeWesterliesNorthDeltaMs": 0
+      }
+    },
+    {
+      "key": "within_loop_lat_reweight_still_insufficient",
+      "label": "Reweighting only inside the current 15-35N loop is still too narrow",
+      "score": 0.91667,
+      "evidence": {
+        "currentLoopLat0": 15,
+        "currentLoopLat1": 35,
+        "transitionEntryWindDeltaMs": 0,
+        "jetBandStormTrackDelta": 0
+      }
+    }
+  ],
+  "currentLaneGeometry": {
+    "subtropicalSubsidenceLat0": 15,
+    "subtropicalSubsidenceLat1": 35,
+    "bridgeUsesSameColumnLatShape": true,
+    "implication": "The current same-step bridge is confined to the 15-35N subtropical loop, so it cannot directly seed the 41.25-56.25N jet band."
+  },
+  "patchDesign": {
+    "primaryFiles": [
+      "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js",
+      "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/core5.js"
+    ],
+    "mechanism": "Split the current bridge into a capped local share plus a capped same-hemisphere poleward-projected share that redistributes part of the proved dry-belt response into the 30-45N transition / jet-entry rows.",
+    "insertionPoints": [
+      "vertical5.js: keep the current dryDriver/source gate as the source selector, but accumulate a same-hemisphere projected bridge reservoir from source rows centered on roughly 20-30N.",
+      "vertical5.js: redistribute the projected share into target rows centered on roughly 30-45N before later same-step consumers read low-level omega.",
+      "vertical5.js: apply a strong equatorward leak penalty below about 20-22N so the tropical shoulder does not absorb the bridge gain.",
+      "core5.js: expose separate source-band, target-band, local-share, projected-share, and max-Pa/s caps so the design can be tuned without broad circulation retunes."
+    ],
+    "suggestedParams": {
+      "enableProjectedDryingOmegaBridge": false,
+      "dryingOmegaBridgeLocalShareMaxFrac": 0.35,
+      "dryingOmegaBridgeProjectedShareMaxFrac": 0.65,
+      "dryingOmegaBridgeSourceLat0": 20,
+      "dryingOmegaBridgeSourceLat1": 30,
+      "dryingOmegaBridgeTargetLat0": 30,
+      "dryingOmegaBridgeTargetLat1": 45,
+      "dryingOmegaBridgeEquatorwardLeakLat0": 18,
+      "dryingOmegaBridgeEquatorwardLeakLat1": 22,
+      "dryingOmegaBridgeProjectedMaxPaS": 0.006
+    },
+    "targetSignature": {
+      "positiveTransitionEntryWindDeltaMs": 0.01,
+      "positiveJetBandStormTrackDelta": 0.00002,
+      "maxAllowedTropicalShoulderCondensationDeltaKgM2": 0.005,
+      "maxAllowedItczWidthDeltaDeg": 0.02,
+      "maxAllowedNorthDryRatioDelta": 0.01
+    },
+    "designRules": [
+      "Do not increase total bridge amplitude first; redistribute where the existing response lands.",
+      "Keep the response same-hemisphere and row-limited so the patch behaves like a placement correction, not a new global circulation forcing.",
+      "Preserve the kept Phase 1K marine-maintenance win and the kept Phase 1M transition-containment win."
+    ]
+  },
+  "recommendation": "Use a poleward-projected jet-entry bridge design. The current bridge is climate-live, but its gain is being spent in the dry-belt core and tropical shoulder instead of the 30-45N transition lane."
+}

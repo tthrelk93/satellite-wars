@@ -1,0 +1,253 @@
+{
+  "schema": "satellite-wars.phase1f-maintenance-loop-patch-design.v1",
+  "generatedAt": "2026-04-14T00:40:41.937Z",
+  "inputs": {
+    "phase1eReport": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1e-proof-vs-climate-delta-attribution",
+    "baselineSummaryPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1e-proof-vs-climate-delta-attribution-baseline-off.json",
+    "patchedSummaryPath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/weather-validation/output/phase1e-proof-vs-climate-delta-attribution-patched-on.json"
+  },
+  "keyEvidence": {
+    "largeScaleCondensation": {
+      "baseline": 0.16079,
+      "patched": 0.17069,
+      "delta": 0.0099
+    },
+    "oceanLargeScaleCondensation": {
+      "baseline": 0.18314,
+      "patched": 0.19722,
+      "delta": 0.01408
+    },
+    "landLargeScaleCondensation": {
+      "baseline": 0.10854,
+      "patched": 0.10867,
+      "delta": 0.00013
+    },
+    "importedAnvilPersistence": {
+      "baseline": 0.24428,
+      "patched": 0.21583,
+      "delta": -0.02845
+    },
+    "carriedOverUpperCloud": {
+      "baseline": 0.24445,
+      "patched": 0.21598,
+      "delta": -0.02847
+    },
+    "weakErosionCloudSurvival": {
+      "baseline": 0.24133,
+      "patched": 0.21337,
+      "delta": -0.02796
+    },
+    "surfaceOceanEvaporation": {
+      "baseline": 0.241,
+      "patched": 0.239,
+      "delta": -0.002
+    },
+    "surfaceLandEvaporation": {
+      "baseline": 0.013,
+      "patched": 0.013,
+      "delta": 0
+    },
+    "boundaryLayerRh": {
+      "baseline": 0.61436,
+      "patched": 0.61368,
+      "delta": -0.00068
+    },
+    "midTroposphereRh": {
+      "baseline": 0.45478,
+      "patched": 0.44885,
+      "delta": -0.00593
+    },
+    "upperTroposphericImport": {
+      "baseline": 6.308,
+      "patched": 6.09383,
+      "delta": -0.21417
+    },
+    "radiativePersistenceSupport": {
+      "baseline": 46.13692,
+      "patched": 43.74402,
+      "delta": -2.3929
+    },
+    "weakAscentCloudBirthMass": {
+      "baseline": 4574.27741,
+      "patched": 4573.61148,
+      "delta": -0.66593
+    },
+    "strongAscentCloudBirthMass": {
+      "baseline": 25016.77624,
+      "patched": 24820.05447,
+      "delta": -196.72177
+    }
+  },
+  "proofAnswers": {
+    "addedLargeScaleCondensationOrigin": {
+      "answer": "The residual added large-scale condensation is ocean-side, not land-side.",
+      "evidence": {
+        "northDryBeltLargeScaleCondensationMeanKgM2": {
+          "baseline": 0.16079,
+          "patched": 0.17069,
+          "delta": 0.0099
+        },
+        "northDryBeltOceanLargeScaleCondensationMeanKgM2": {
+          "baseline": 0.18314,
+          "patched": 0.19722,
+          "delta": 0.01408
+        },
+        "northDryBeltLandLargeScaleCondensationMeanKgM2": {
+          "baseline": 0.10854,
+          "patched": 0.10867,
+          "delta": 0.00013
+        }
+      }
+    },
+    "humidificationPath": {
+      "answer": "The maintenance loop is not being driven by stronger surface evaporation, stronger import, or stronger radiative support. The remaining humidification path is structural marine moisture retention feeding saturation adjustment.",
+      "evidence": {
+        "northDryBeltOceanEvapMeanMmHr": {
+          "baseline": 0.241,
+          "patched": 0.239,
+          "delta": -0.002
+        },
+        "northDryBeltBoundaryLayerRhMeanFrac": {
+          "baseline": 0.61436,
+          "patched": 0.61368,
+          "delta": -0.00068
+        },
+        "northDryBeltMidTroposphereRhMeanFrac": {
+          "baseline": 0.45478,
+          "patched": 0.44885,
+          "delta": -0.00593
+        },
+        "dominantUpperTroposphericImportKgM_1S": {
+          "baseline": 6.308,
+          "patched": 6.09383,
+          "delta": -0.21417
+        },
+        "upperCloudRadiativePersistenceSupportMeanWm2": {
+          "baseline": 46.13692,
+          "patched": 43.74402,
+          "delta": -2.3929
+        }
+      }
+    },
+    "localVsCirculationAssessment": {
+      "answer": "The remaining blocker is better explained by local maintenance than by the previously dominant import/retention owner. Circulation remains biased on the branch, but the next patch should target local maintenance first.",
+      "evidence": {
+        "importedAnvilPersistenceMeanKgM2": {
+          "baseline": 0.24428,
+          "patched": 0.21583,
+          "delta": -0.02845
+        },
+        "weakErosionCloudSurvivalMeanKgM2": {
+          "baseline": 0.24133,
+          "patched": 0.21337,
+          "delta": -0.02796
+        },
+        "carriedOverUpperCloudMeanKgM2": {
+          "baseline": 0.24445,
+          "patched": 0.21598,
+          "delta": -0.02847
+        },
+        "largeScaleCondensationMeanKgM2": {
+          "baseline": 0.16079,
+          "patched": 0.17069,
+          "delta": 0.0099
+        },
+        "itczWidthDeg": {
+          "baseline": 27.36,
+          "patched": 26.415,
+          "delta": -0.945
+        }
+      }
+    }
+  },
+  "patchTarget": {
+    "primaryModule": "stepMicrophysics5",
+    "primaryFile": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/microphysics5.js",
+    "primaryRegion": "saturation-adjustment condensation branch",
+    "primaryLines": "313-345",
+    "primaryReason": "This branch condenses all supersaturated vapor immediately, but does not currently suppress condensation in weak-engine, subtropically suppressed marine columns. After the carry-input patch reduces imported cloud, this is the one pathway that still moves in the wrong direction.",
+    "secondaryModule": "stepVertical5",
+    "secondaryFile": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass/src/weather/v2/vertical5.js",
+    "secondaryRegion": "weak-erosion support diagnostics",
+    "secondaryLines": "1478-1498",
+    "secondaryReason": "This region already computes the regime information that distinguishes weakly ventilated subtropical maintenance columns. It should provide the microphysics gating signal, but should not be the first direct climate lever again.",
+    "ruledOutFirstMoves": [
+      {
+        "module": "stepRadiation2D5",
+        "reason": "Radiative support decreases in the improved patch-on state, so radiation is secondary support rather than the first corrective lever."
+      },
+      {
+        "module": "transport/carry-input override",
+        "reason": "Imported carryover and weak-erosion survival both decrease with patch-on, so more carryover-clear tuning is not the right first move."
+      },
+      {
+        "module": "surface moisture source throttling",
+        "reason": "Ocean evaporation is effectively unchanged across the apples-to-apples compare."
+      }
+    ]
+  },
+  "patchMechanism": {
+    "label": "Regime-selective saturation-adjustment maintenance suppression",
+    "description": "Reduce or defer saturation-adjustment cloud birth only when a column is weakly organized, subtropically suppressed, and marine-maintained, while leaving organized and strong-ascent condensation largely unchanged.",
+    "implementationSketch": [
+      "Use existing microphysics regime terms (`marginalSubsiding`, `organizedOutflow`, `convMassFluxStrength`, `subtropicalDryingStrength`) to compute a maintenance-suppression factor inside the `qvVal > qsat` branch.",
+      "Apply the suppression only in weakly organized subtropical columns so the strong/organized ascent bins are preserved.",
+      "Prefer a reduction in cloud birth efficiency or a delay threshold in weak-engine marine columns instead of a global reduction in condensation."
+    ]
+  },
+  "predictedSignature": {
+    "shouldDecrease": [
+      {
+        "key": "northDryBeltLargeScaleCondensationMeanKgM2",
+        "target": "< 0.16079 from current 0.17069"
+      },
+      {
+        "key": "northDryBeltOceanLargeScaleCondensationMeanKgM2",
+        "target": "< 0.18314 from current 0.19722"
+      },
+      {
+        "key": "northDryBeltBoundaryLayerRhMeanFrac",
+        "target": "< 0.61368"
+      },
+      {
+        "key": "northDryBeltMidTroposphereRhMeanFrac",
+        "target": "< 0.44885"
+      },
+      {
+        "key": "itczWidthDeg",
+        "target": "< 26.415"
+      },
+      {
+        "key": "subtropicalDryNorthRatio",
+        "target": "< 1.704"
+      },
+      {
+        "key": "subtropicalDrySouthRatio",
+        "target": "< 1.296"
+      }
+    ],
+    "shouldHoldOrImprove": [
+      {
+        "key": "northDryBeltImportedAnvilPersistenceMeanKgM2",
+        "target": "<= 0.21583"
+      },
+      {
+        "key": "northDryBeltWeakErosionCloudSurvivalMeanKgM2",
+        "target": "<= 0.21337"
+      },
+      {
+        "key": "midlatitudeWesterliesNorthU10Ms",
+        "target": ">= 0.532"
+      },
+      {
+        "key": "midlatitudeWesterliesSouthU10Ms",
+        "target": ">= 0.851"
+      }
+    ],
+    "antiPattern": "Do not globally suppress saturation-adjustment condensation. Strong/organized ascent bins still dominate cumulative cloud birth, so a blanket microphysics reduction would likely damage the tropical engine."
+  },
+  "decision": {
+    "nextPhase": "Phase 1G: implement regime-selective saturation-adjustment maintenance patch",
+    "exitCriteriaPass": true
+  }
+}

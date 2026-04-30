@@ -1,0 +1,53 @@
+{
+  "schema": "satellite-wars.earth-weather-architecture-c19-zonal-mean-preserving-eddy-export-attribution.v1",
+  "generatedAt": "2026-04-16T07:49:25.910Z",
+  "decision": {
+    "verdict": "shared_preserve_layer_not_primary_blocker_vertical_overlay_eddy_export_coupling",
+    "nextMove": "Architecture C20: zonal-mean-preserving eddy nudge softening experiment"
+  },
+  "quickComparison": {
+    "c13CrossEq": -330.9854,
+    "c17CrossEq": -353.31687,
+    "c13ItczWidth": 23.884,
+    "c17ItczWidth": 23.454,
+    "c13DryNorth": 1.152,
+    "c17DryNorth": 1.121,
+    "c13DrySouth": 0.585,
+    "c17DrySouth": 0.511,
+    "c13Westerlies": 1.232,
+    "c17Westerlies": 1.202,
+    "c13OceanCond": 0.12628,
+    "c17OceanCond": 0.14144
+  },
+  "transportComparison": {
+    "c13EquatorZonal": -301.63909,
+    "c17EquatorZonal": -249.95949,
+    "c13EquatorEddy": -34.29106,
+    "c17EquatorEddy": -109.90385,
+    "c13EquatorMidUpper": -203.65605,
+    "c17EquatorMidUpper": -226.72426,
+    "c13EquatorLower": -132.2741,
+    "c17EquatorLower": -133.13908,
+    "c13EquatorVelocity": -19.4512,
+    "c17EquatorVelocity": -20.79729,
+    "c13North35Vapor": -467.08734,
+    "c17North35Vapor": -373.49016
+  },
+  "contractComparison": {
+    "sharedLowLevelPreserveParams": [
+      "nudgeParams.tauQvS",
+      "nudgeParams.tauQvColumn",
+      "nudgeParams organized/subsidence relief quartet",
+      "windNudgeParams.tauSurfaceSeconds"
+    ],
+    "sharedLowLevelPreserveLayer": true
+  },
+  "nextContract": {
+    "focusTargets": [
+      "windEddyParams.tauSeconds",
+      "windEddyParams.scaleClampMin",
+      "windEddyParams.scaleClampMax",
+      "surface-row eddy-energy rescaling in windEddyNudge5.js"
+    ]
+  }
+}

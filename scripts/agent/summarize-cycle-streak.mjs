@@ -1,0 +1,557 @@
+#!/usr/bin/env node
+import fs from 'fs';
+import path from 'path';
+import { execFileSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const defaultRepoRoot = path.resolve(__dirname, '..', '..');
+const repoRoot = process.env.SATELLITE_WARS_REPO_ROOT
+  ? path.resolve(process.env.SATELLITE_WARS_REPO_ROOT)
+  : defaultRepoRoot;
+const outputDir = process.env.SATELLITE_WARS_OUTPUT_DIR
+  ? path.resolve(process.env.SATELLITE_WARS_OUTPUT_DIR)
+  : path.join(repoRoot, 'weather-validation', 'output');
+const statusJsonPath = process.env.SATELLITE_WARS_STATUS_JSON_PATH
+  ? path.resolve(process.env.SATELLITE_WARS_STATUS_JSON_PATH)
+  : path.join(repoRoot, 'weather-validation', 'reports', 'world-class-weather-status.json');
+
+const argv = process.argv.slice(2);
+let limit = 12;
+let outPath = null;
+
+for (let i = 0; i < argv.length; i += 1) {
+  const arg = argv[i];
+  if (arg === '--limit' && argv[i + 1]) limit = Number.parseInt(argv[++i], 10);
+  else if (arg.startsWith('--limit=')) limit = Number.parseInt(arg.slice('--limit='.length), 10);
+  else if (arg === '--out' && argv[i + 1]) outPath = path.resolve(argv[++i]);
+  else if (arg.startsWith('--out=')) outPath = path.resolve(arg.slice('--out='.length));
+}
+
+if (!Number.isFinite(limit) || limit <= 0) limit = 12;
+
+const readTextIfExists = (filePath) => {
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch (_) {
+    return null;
+  }
+};
+
+const readJsonIfExists = (filePath) => {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (_) {
+    return null;
+  }
+};
+
+const runGit = (args) => execFileSync(
+  'git',
+  args,
+  {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore']
+  }
+);
+
+const CLIMATE_TARGET_AREAS = [
+  'ITCZ placement and subtropical dry-belt moisture partitioning',
+  'large-scale circulation and jet placement',
+  'storm evolution and cyclone structure',
+  'tropical cyclone / hurricane seasonality',
+  'cloud belts and subtropical stratocumulus structure',
+  'multi-day or seasonal stability',
+  'terrain-flow orientation',
+  'Andes sampling design',
+  'terrain/coupling interaction',
+  'precipitation placement/conversion after upslope moisture transport'
+];
+
+const RUNTIME_TARGET_AREAS = [
+  'live browser realism and runtime telemetry signoff',
+  'worker/core and app sim-clock parity',
+  'earth-update smoothness and worker sync'
+];
+
+const PHYSICS_TARGET_AREAS = [
+  ...CLIMATE_TARGET_AREAS,
+  ...RUNTIME_TARGET_AREAS
+];
+
+const CLIMATE_SOURCE_PREFIXES = [
+  'src/weather/'
+];
+
+const CLIMATE_SOURCE_EXACT_PATHS = new Set([
+  'src/WeatherField.js',
+  'src/workers/weatherCore.worker.js'
+]);
+
+const RUNTIME_SOURCE_EXACT_PATHS = new Set([
+  'src/App.js',
+  'src/Earth.js',
+  'src/WindStreamlineRenderer.js',
+  'src/textureUtils.js',
+  'src/gameModeUi.js',
+  'src/simProbeFastForward.js',
+  'src/windDiagnosticsPerf.js',
+  'src/windParticlePerf.js'
+]);
+
+const CLIMATE_BLOCKER_KEYWORDS = [
+  /dry-belt/i,
+  /\bitcz\b/i,
+  /subtropical/i,
+  /circulation/i,
+  /storm/i,
+  /cyclone/i,
+  /cloud/i,
+  /seasonal/i,
+  /annual/i,
+  /moisture/i,
+  /hydrology/i
+];
+
+const DEFAULT_CLIMATE_FOCUS = 'ITCZ placement and subtropical dry-belt moisture partitioning';
+
+const guessClimateFocusFromBlockingGaps = (blockingGaps) => {
+  const joined = Array.isArray(blockingGaps) ? blockingGaps.join('\n') : '';
+  if (/dry-belt|itcz|subtropical|moisture|hydrology/i.test(joined)) {
+    return 'ITCZ placement and subtropical dry-belt moisture partitioning';
+  }
+  if (/storm|cyclone|front/i.test(joined)) {
+    return 'storm evolution and cyclone structure';
+  }
+  if (/cloud|stratocumulus/i.test(joined)) {
+    return 'cloud belts and subtropical stratocumulus structure';
+  }
+  if (/seasonal|annual|stability/i.test(joined)) {
+    return 'multi-day or seasonal stability';
+  }
+  if (/terrain|orographic|andes|rockies|himalaya/i.test(joined)) {
+    return 'terrain/coupling interaction';
+  }
+  return DEFAULT_CLIMATE_FOCUS;
+};
+
+const guessClimateModeFromBlockingGaps = (blockingGaps) => {
+  const joined = Array.isArray(blockingGaps) ? blockingGaps.join('\n') : '';
+  const explicitSeasonalRequirement = /90-day|seasonal follow|seasonal stability|seasonal evidence|required seasonal/i.test(joined);
+  const explicitAnnualRequirement = /365-day|annual stability|annual evidence|required annual/i.test(joined);
+  if (/dry-belt|itcz|subtropical|moisture|hydrology|circulation|storm|cyclone|cloud/i.test(joined)) {
+    if (explicitSeasonalRequirement) return 'seasonal';
+    return 'quick';
+  }
+  if (explicitAnnualRequirement) return 'annual';
+  if (explicitSeasonalRequirement || /stability/i.test(joined)) return 'seasonal';
+  return 'quick';
+};
+
+const isClimateFocusArea = (focusArea) => CLIMATE_TARGET_AREAS.includes(focusArea || '');
+const isRuntimeFocusArea = (focusArea) => RUNTIME_TARGET_AREAS.includes(focusArea || '');
+
+const isClimateSourcePath = (filePath) => (
+  CLIMATE_SOURCE_EXACT_PATHS.has(filePath)
+  || CLIMATE_SOURCE_PREFIXES.some((prefix) => filePath.startsWith(prefix))
+);
+
+const isRuntimeSourcePath = (filePath) => (
+  filePath.startsWith('src/')
+  && !/\.test\.[cm]?[jt]sx?$/.test(filePath)
+  && !isClimateSourcePath(filePath)
+);
+
+const NON_PHYSICS_PREFIXES = [
+  'scripts/agent/',
+  'weather-validation/tests/',
+  'weather-validation/output/',
+  'weather-validation/reports/'
+];
+
+const NON_PHYSICS_EXACT_PATHS = new Set([
+  'AGENTS.md',
+  'package.json',
+  '.gitignore'
+]);
+
+const isPhysicsSourcePath = (filePath) => isClimateSourcePath(filePath) || isRuntimeSourcePath(filePath);
+
+const isKnownNonPhysicsPath = (filePath) => (
+  NON_PHYSICS_EXACT_PATHS.has(filePath)
+  || NON_PHYSICS_PREFIXES.some((prefix) => filePath.startsWith(prefix))
+);
+
+const parseCommitFiles = (commitHash) => {
+  try {
+    const output = runGit(['-C', repoRoot, 'show', '--name-only', '--format=', commitHash]);
+    return output
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+};
+
+const classifyCommit = (files) => {
+  if (files.some(isClimateSourcePath)) return 'climate_physics';
+  if (files.some(isRuntimeSourcePath)) return 'runtime_physics';
+  if (files.length > 0 && files.every(isKnownNonPhysicsPath)) return 'non_physics';
+  return 'mixed';
+};
+
+const readRecentCommits = (count) => {
+  try {
+    const output = runGit(['-C', repoRoot, 'log', `-n${count}`, '--format=%H%x09%ct%x09%s']);
+    return output
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [hash, unixTs, subject] = line.split('\t');
+        const files = parseCommitFiles(hash);
+        const committedAtMs = Number.parseInt(unixTs, 10) * 1000;
+        return {
+          hash,
+          short: hash.slice(0, 7),
+          subject,
+          committedAt: Number.isFinite(committedAtMs) ? new Date(committedAtMs).toISOString() : null,
+          files,
+          classification: classifyCommit(files)
+        };
+      });
+  } catch (_) {
+    return [];
+  }
+};
+
+const cycleDirs = fs.existsSync(outputDir)
+  ? fs.readdirSync(outputDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith('cycle-'))
+    .map((entry) => entry.name)
+    .sort()
+    .reverse()
+    .slice(0, limit)
+  : [];
+
+const cycleIdToFamily = (cycleId) => {
+  const slug = cycleId.replace(/^cycle-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z-/, '');
+  return slug.split('-')[0] || slug;
+};
+
+const parseOutcome = (checkpointText) => {
+  if (!checkpointText) return 'in_progress';
+  if (checkpointText.includes('NO NEW VERIFIED PROGRESS')) return 'no_new_verified_progress';
+  if (/##\s+Outcome/i.test(checkpointText)) return 'completed_nonzero';
+  return 'completed_unknown';
+};
+
+const parseCycle = (cycleId) => {
+  const cyclePath = path.join(outputDir, cycleId);
+  const planPath = path.join(cyclePath, 'plan.md');
+  const checkpointPath = path.join(cyclePath, 'checkpoint.md');
+  const runtimeSummaryPath = path.join(cyclePath, 'runtime-summary.json');
+  const evidenceSummaryPath = path.join(cyclePath, 'evidence-summary.json');
+  const planText = readTextIfExists(planPath);
+  const checkpointText = readTextIfExists(checkpointPath);
+  const runtimeSummary = readJsonIfExists(runtimeSummaryPath);
+  const evidenceSummary = readJsonIfExists(evidenceSummaryPath);
+  const changedFiles = Array.isArray(evidenceSummary?.changedFiles) ? evidenceSummary.changedFiles : [];
+  const attemptedSrcFiles = changedFiles
+    .filter((entry) => entry?.attempted && typeof entry.path === 'string' && isPhysicsSourcePath(entry.path))
+    .map((entry) => entry.path);
+  const blockerDetails = typeof evidenceSummary?.blocker?.details === 'string'
+    ? evidenceSummary.blocker.details
+    : null;
+  const focusArea = typeof evidenceSummary?.focusArea === 'string'
+    ? evidenceSummary.focusArea
+    : null;
+  const planFocusArea = !focusArea && typeof planText === 'string'
+    ? (planText.match(/(?:focus area|chosen fix area):\s*`?([^`\n]+)`?/i)?.[1] ?? null)
+    : null;
+  const artifactPaths = evidenceSummary?.artifacts && typeof evidenceSummary.artifacts === 'object'
+    ? evidenceSummary.artifacts
+    : {};
+  const hasBlockerNarrowingArtifact = Boolean(
+    blockerDetails
+      && (
+        artifactPaths.prefixAudit
+        || artifactPaths.postfixAudit
+        || artifactPaths.hotspotProfile
+        || artifactPaths.runtimeSummary
+        || artifactPaths.checkpoint
+      )
+  );
+  return {
+    id: cycleId,
+    family: cycleIdToFamily(cycleId),
+    path: cyclePath,
+    outcome: parseOutcome(checkpointText),
+    planPath: fs.existsSync(planPath) ? planPath : null,
+    checkpointPath: fs.existsSync(checkpointPath) ? checkpointPath : null,
+    runtimeSummaryPath: fs.existsSync(runtimeSummaryPath) ? runtimeSummaryPath : null,
+    evidenceSummaryPath: fs.existsSync(evidenceSummaryPath) ? evidenceSummaryPath : null,
+    runtimeLineCount: Number.isFinite(runtimeSummary?.lineCount) ? runtimeSummary.lineCount : null,
+    likelySmoothEnough: runtimeSummary?.runtimeHealth?.likelySmoothEnough ?? null,
+    warnings: Array.isArray(runtimeSummary?.runtimeHealth?.warnings) ? runtimeSummary.runtimeHealth.warnings : [],
+    browserTrouble: Boolean(
+      checkpointText && /hung|timed out|signal SIGKILL|taking longer|stuck on the DevTools\/browser side/i.test(checkpointText)
+    ),
+    focusArea: focusArea ?? planFocusArea,
+    blockerType: typeof evidenceSummary?.blocker?.type === 'string' ? evidenceSummary.blocker.type : null,
+    blockerDetails,
+    attemptedSrcFiles,
+    attemptedRealSrcChange: attemptedSrcFiles.length > 0,
+    hasBlockerNarrowingArtifact,
+    valuableNoProgress: attemptedSrcFiles.length > 0 || hasBlockerNarrowingArtifact,
+    summary: typeof evidenceSummary?.summary === 'string' ? evidenceSummary.summary : null
+  };
+};
+
+const cycles = cycleDirs.map(parseCycle);
+const activeCycle = cycles[0]?.outcome === 'in_progress' ? cycles[0] : null;
+const staleIncompleteCycles = cycles.filter(
+  (cycle, index) => cycle.outcome === 'in_progress' && (!activeCycle || index !== 0)
+);
+const completedCycles = cycles.filter((cycle) => cycle.outcome !== 'in_progress');
+
+const countLeading = (entries, predicate) => {
+  let count = 0;
+  for (const entry of entries) {
+    if (!predicate(entry, count)) break;
+    count += 1;
+  }
+  return count;
+};
+
+const consecutiveNoProgress = countLeading(
+  completedCycles,
+  (cycle) => cycle.outcome === 'no_new_verified_progress'
+);
+
+const noProgressFamily = completedCycles[0]?.outcome === 'no_new_verified_progress'
+  ? completedCycles[0].family
+  : null;
+
+const sameFamilyNoProgress = noProgressFamily
+  ? countLeading(
+      completedCycles,
+      (cycle) => cycle.outcome === 'no_new_verified_progress' && cycle.family === noProgressFamily
+    )
+  : 0;
+
+const noProgressFocusArea = completedCycles[0]?.outcome === 'no_new_verified_progress'
+  ? completedCycles[0].focusArea
+  : null;
+
+const sameFocusNoProgress = noProgressFocusArea
+  ? countLeading(
+      completedCycles,
+      (cycle) => cycle.outcome === 'no_new_verified_progress' && cycle.focusArea === noProgressFocusArea
+    )
+  : 0;
+
+const sameFocusValuableNoProgress = noProgressFocusArea
+  ? countLeading(
+      completedCycles,
+      (cycle) => (
+        cycle.outcome === 'no_new_verified_progress'
+        && cycle.focusArea === noProgressFocusArea
+        && cycle.valuableNoProgress
+      )
+    )
+  : 0;
+
+const emptyRuntimeSummaryStreak = countLeading(
+  completedCycles,
+  (cycle) => cycle.outcome === 'no_new_verified_progress' && cycle.runtimeLineCount === 0
+);
+
+const browserTroubleStreak = countLeading(
+  completedCycles,
+  (cycle) => cycle.outcome === 'no_new_verified_progress' && cycle.browserTrouble
+);
+
+const liveVerificationBlockerStreak = countLeading(
+  completedCycles,
+  (cycle) => cycle.blockerType === 'worker_core_vs_app_sim_clock_live_probe_parity'
+);
+
+const statusJson = readJsonIfExists(statusJsonPath);
+const statusBlockingGaps = Array.isArray(statusJson?.blockingGaps) ? statusJson.blockingGaps : [];
+const broadClimateBlockerPresent = statusBlockingGaps.some(
+  (gap) => CLIMATE_BLOCKER_KEYWORDS.some((pattern) => pattern.test(gap))
+);
+const recommendedClimateFocusArea = guessClimateFocusFromBlockingGaps(statusBlockingGaps);
+const recommendedClimateMode = guessClimateModeFromBlockingGaps(statusBlockingGaps);
+const baselineCommit = typeof statusJson?.baselineCommit === 'string' ? statusJson.baselineCommit : null;
+let baselineCommitInfo = null;
+
+if (baselineCommit) {
+  try {
+    const raw = runGit(['-C', repoRoot, 'show', '-s', '--format=%H%n%ct%n%s', baselineCommit])
+      .trim()
+      .split('\n');
+    const [, unixTs, subject] = raw;
+    const commitTimeMs = Number.parseInt(unixTs, 10) * 1000;
+    baselineCommitInfo = {
+      hash: baselineCommit,
+      subject,
+      committedAt: Number.isFinite(commitTimeMs) ? new Date(commitTimeMs).toISOString() : null,
+      ageHours: Number.isFinite(commitTimeMs)
+        ? Number(((Date.now() - commitTimeMs) / 3600000).toFixed(2))
+        : null
+    };
+  } catch (_) {}
+}
+
+const recentCommits = readRecentCommits(Math.max(limit, 10));
+const isPhysicsClassification = (classification) => (
+  classification === 'climate_physics'
+  || classification === 'runtime_physics'
+  || classification === 'mixed'
+);
+const consecutiveNonPhysicsCommits = countLeading(
+  recentCommits,
+  (commit) => !isPhysicsClassification(commit.classification)
+);
+const lastPhysicsCommit = recentCommits.find((commit) => isPhysicsClassification(commit.classification)) || null;
+const consecutiveNonClimateCommits = countLeading(
+  recentCommits,
+  (commit) => commit.classification !== 'climate_physics'
+);
+const lastClimatePhysicsCommit = recentCommits.find((commit) => commit.classification === 'climate_physics') || null;
+const physicsGuardTriggered = consecutiveNonPhysicsCommits >= 2;
+const runtimeFocusStreak = countLeading(
+  completedCycles,
+  (cycle) => isRuntimeFocusArea(cycle.focusArea)
+);
+const climateFocusStreak = countLeading(
+  completedCycles,
+  (cycle) => isClimateFocusArea(cycle.focusArea)
+);
+const climateGuardTriggered = Boolean(
+  broadClimateBlockerPresent
+  && (
+    consecutiveNonClimateCommits >= 2
+    || runtimeFocusStreak >= 2
+    || liveVerificationBlockerStreak >= 2
+  )
+);
+const physicsRetryBudget = 3;
+const allowPhysicsRetry = Boolean(
+  physicsGuardTriggered
+  && noProgressFocusArea
+  && sameFocusValuableNoProgress > 0
+  && sameFocusValuableNoProgress < physicsRetryBudget
+);
+const shouldDisableForPhysicsStall = Boolean(
+  physicsGuardTriggered
+  && noProgressFocusArea
+  && sameFocusValuableNoProgress >= physicsRetryBudget
+);
+
+const soft = consecutiveNoProgress >= 3 || sameFamilyNoProgress >= 3 || emptyRuntimeSummaryStreak >= 2;
+const hard = consecutiveNoProgress >= 6 || sameFamilyNoProgress >= 5;
+const recommendations = [];
+
+if (staleIncompleteCycles.length) {
+  recommendations.push('Do not treat older incomplete cycle directories as the active run; close the current cycle cleanly and inspect the stale directories separately.');
+}
+if (soft) {
+  recommendations.push('Run a blocker-breaker cycle instead of another ordinary browser-first micro-experiment.');
+}
+if (sameFamilyNoProgress >= 3 && noProgressFamily) {
+  recommendations.push(`Read the last 4 ${noProgressFamily} checkpoints before picking the next change.`);
+}
+if (emptyRuntimeSummaryStreak >= 2) {
+  recommendations.push('Treat runtime-log capture as degraded until it produces non-empty summaries again.');
+}
+if (soft) {
+  recommendations.push('Use a permanent offline harness to screen candidates before the single live browser verification run.');
+  recommendations.push('Reuse the latest clean baseline for the same blocker family unless the code under test changes browser/init/logging behavior.');
+}
+if (hard) {
+  recommendations.push('Do not continue ordinary experimentation. Land a new permanent diagnostic/harness improvement or keep the cron job disabled.');
+}
+if (physicsGuardTriggered) {
+  recommendations.push(`The next cycle must target real weather or performance code under src/ and choose one focus area: ${PHYSICS_TARGET_AREAS.join('; ')}.`);
+  recommendations.push('Diagnostic-only commits are allowed only if they unblock a named physics hypothesis that the same cycle could not test.');
+  recommendations.push('A no-progress physics cycle is acceptable only if it leaves either a real src/ attempt or a blocker-narrowing artifact tied to the named focus area.');
+}
+if (climateGuardTriggered) {
+  recommendations.push(`Broad climate physics is overdue. The next fresh cycle must return to a ${recommendedClimateMode} climate-physics campaign on ${recommendedClimateFocusArea}, not another runtime/parity-only cycle.`);
+  recommendations.push('Do not count runtime signoff, live-probe parity, or renderer-only work as success while planetary blockers still show unresolved circulation/moisture/cloud/storm defects.');
+}
+if (liveVerificationBlockerStreak >= 1) {
+  recommendations.push('Do not let live verification monopolize the next cycle. Either land a direct src-side sim-clock parity fix or use the broader offline realism audits before another browser-helper-only win.');
+}
+if (allowPhysicsRetry) {
+  recommendations.push(`Stay on ${noProgressFocusArea} for up to ${physicsRetryBudget - sameFocusValuableNoProgress} more bounded physics cycle(s) before disabling cron, as long as each cycle produces a real src/ attempt or blocker-narrowing evidence.`);
+}
+if (shouldDisableForPhysicsStall) {
+  recommendations.push(`Disable cron only if the next ${noProgressFocusArea} cycle still cannot land a verified src/ fix after ${sameFocusValuableNoProgress} consecutive valuable no-progress cycles on that same focus area.`);
+}
+
+const summary = {
+  schema: 'satellite-wars.cycle-streak.v1',
+  generatedAt: new Date().toISOString(),
+  limit,
+  activeCycle,
+  staleIncompleteCycles,
+  lastVerifiedBaseline: {
+    cycleId: statusJson?.latestCycle?.id ?? null,
+    baselineCommit: baselineCommitInfo
+  },
+  streaks: {
+    consecutiveNoProgress,
+    sameFamilyNoProgress,
+    noProgressFamily,
+    sameFocusNoProgress,
+    noProgressFocusArea,
+    sameFocusValuableNoProgress,
+    emptyRuntimeSummaryStreak,
+    browserTroubleStreak,
+    liveVerificationBlockerStreak
+  },
+  stallGuardTriggered: {
+    soft,
+    hard
+  },
+  physicsGuard: {
+    triggered: physicsGuardTriggered,
+    consecutiveNonPhysicsCommits,
+    retryBudget: physicsRetryBudget,
+    allowRetry: allowPhysicsRetry,
+    noProgressFocusArea,
+    sameFocusNoProgress,
+    sameFocusValuableNoProgress,
+    shouldDisableForPhysicsStall,
+    requiredTargetAreas: PHYSICS_TARGET_AREAS,
+    lastPhysicsCommit,
+    recentCommits
+  },
+  climateGuard: {
+    triggered: climateGuardTriggered,
+    broadClimateBlockerPresent,
+    consecutiveNonClimateCommits,
+    runtimeFocusStreak,
+    climateFocusStreak,
+    liveVerificationBlockerStreak,
+    recommendedMode: recommendedClimateMode,
+    recommendedFocusArea: recommendedClimateFocusArea,
+    requiredTargetAreas: CLIMATE_TARGET_AREAS,
+    lastClimatePhysicsCommit
+  },
+  recommendations,
+  recentCycles: cycles
+};
+
+if (outPath) {
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(outPath, `${JSON.stringify(summary, null, 2)}\n`);
+}
+
+process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
