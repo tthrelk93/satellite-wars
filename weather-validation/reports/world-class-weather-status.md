@@ -7,11 +7,11 @@ Verdict: WORLD CLASS CERTIFIED
 
 - Clean worker worktree: `codex/world-class-weather-loop`
 - Certified climate commit: `b2d997b`
-- Latest verified cycle: `cycle-2026-04-30T01-41-42Z-visual-weather-renderer`
+- Latest verified cycle: `cycle-2026-04-30T02-57-08Z-visual-cue-regression`
 - Earth accuracy suite: PASS (`weather-validation/reports/earth-accuracy-status.json`)
 - Latest full annual planetary audit: PASS (`weather-validation/output/cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification/annual-current-hash-repro.json`)
 - Live freeze/seam/model-wind blocker: PASS (`weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/runtime-summary-live-day6.json`)
-- Visual renderer signoff: PASS (`weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/runtime-summary-optimized.json`)
+- Visual renderer signoff: PASS (`weather-validation/output/cycle-2026-04-30T02-57-08Z-visual-cue-regression/runtime-summary-final.json`)
 
 ## Certification Evidence
 
@@ -62,21 +62,22 @@ The reported live blockers were verified fixed without weakening warning thresho
 Phase 6 is verified as a model-tied visual-weather renderer rather than a static cloud texture layer.
 
 - Visual modes: visible light, cinematic satellite, infrared, water vapor, radar.
-- State-tied effects: stratocumulus decks, anvils, hurricane spirals, frontal shields, cumulonimbus towers, rain/snow shafts, lightning/tornado markers, dust, fog, sea spray, and storm-surge cues.
-- Runtime telemetry: `runtime-summary-optimized.json`
-  - Earth.update p50/p95/max: `0.20 / 2.60 / 19.30 ms`
+- Default gameplay view: model cloud/rain texture only; literal hurricane/tornado/rain-shaft/lightning/storm-surge cue sprites are analysis-only and no longer render as cheap overlays.
+- Tropical disturbances: rendered as broken convective clusters, not hurricane-like spiral/vortex systems.
+- Mature hurricane visuals: require a cloud-backed hurricane event with tropical-storm winds, rain-shield support, and organized satellite signature.
+- Runtime telemetry: `runtime-summary-final.json`
+  - Earth.update p50/p95/max: `0.10 / 2.50 / 14.80 ms`
   - skipped simulation steps: `0`
   - runtime warnings: none
   - visual warnings: none
   - model-wind warnings: none
 - Browser screenshots:
-  - `weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/live-visible-controls.png`
-  - `weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/live-cinematic-satellite-mode.png`
-  - `weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/live-optimized-visible.png`
+  - `weather-validation/output/cycle-2026-04-30T02-57-08Z-visual-cue-regression/live-no-default-symbol-overlays.png`
+  - `weather-validation/output/cycle-2026-04-30T02-57-08Z-visual-cue-regression/live-fresh-no-symbol-overlays.png`
 
 ## Validation
 
-- `npm run weather:validate:test`: 272/272 pass
+- `npm run weather:validate:test`: 273/273 pass
 - `npm run weather:benchmark`: PASS
 - `npm run agent:claim-guard`: PASS
 

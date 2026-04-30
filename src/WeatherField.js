@@ -6,6 +6,7 @@ import { WeatherLogSink } from './weather/logSink';
 import {
     buildVisualWeatherCueProduct,
     classifyVisualWeatherCell,
+    isCloudBackedHurricaneVisualEvent,
     normalizeWeatherVisualMode,
     renderVisualWeatherColor
 } from './weather/visuals/weatherVisualModes';
@@ -968,7 +969,7 @@ class WeatherField {
                     }
                 }
             }
-            if (paintLow && Array.isArray(region.tornadoTracks) && region.tornadoTracks.length > 0) {
+            if (paintLow && this.visualMode === 'radar' && Array.isArray(region.tornadoTracks) && region.tornadoTracks.length > 0) {
                 this.ctxCloudLow.lineCap = 'round';
                 for (const track of region.tornadoTracks) {
                     const start = track.start;
@@ -996,7 +997,7 @@ class WeatherField {
         if (!Array.isArray(events) || events.length === 0) return;
         if (!paintLow && !paintHigh) return;
         const tropicalEvents = events
-            .filter((event) => event?.type === 'hurricane' || event?.type === 'tropical-disturbance')
+            .filter((event) => isCloudBackedHurricaneVisualEvent(event))
             .slice(0, 8);
         const severeEvents = events
             .filter((event) => event?.severeWeather && (
@@ -1014,6 +1015,7 @@ class WeatherField {
             y: ((90 - lat) / 180) * h
         });
         const drawTropicalOnContext = (ctx, event, wrapOffsetX = 0) => {
+            if (!isCloudBackedHurricaneVisualEvent(event)) return;
             const center = event.hurricane?.center || event.center;
             if (!center) return;
             const lat = Number(center.latDeg);
@@ -1123,6 +1125,14 @@ class WeatherField {
             if (paintLow) {
                 this.ctxCloudLow.save();
                 this.ctxCloudLow.globalCompositeOperation = 'lighter';
+                if (this.visualMode !== 'radar') {
+                    this.ctxCloudLow.beginPath();
+                    this.ctxCloudLow.ellipse(anvilCx, anvilCy, anvilX * 0.62, anvilY * 0.34, Math.atan2(northUnit, eastUnit), 0, Math.PI * 2);
+                    this.ctxCloudLow.fillStyle = `rgba(224, 232, 240, ${0.035 + 0.085 * intensity})`;
+                    this.ctxCloudLow.fill();
+                    this.ctxCloudLow.restore();
+                    return;
+                }
                 drawPolygon(this.ctxCloudLow, severe.warningPolygon, wrapOffsetX, {
                     strokeStyle: `rgba(250, 204, 21, ${0.24 + 0.24 * intensity})`,
                     fillStyle: `rgba(250, 204, 21, ${0.025 + 0.035 * intensity})`,

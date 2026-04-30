@@ -270,7 +270,7 @@ const computeEventPattern = ({ descriptor, point, eastKm, northKm, rFrac, alongK
   let hailRisk = 0;
   let tornadoTrackMask = 0;
   let terrainRainBoost = 0;
-  if (type === 'hurricane' || type === 'tropical-disturbance') {
+  if (type === 'hurricane') {
     const spin = point.latDeg >= 0 ? 1 : -1;
     const eyeFrac = clamp((event?.hurricane?.eyeRadiusKm || 24) / Math.max(1, descriptor.radiusKm), 0.025, 0.16);
     const eyewall = radialRing(rFrac, Math.max(eyeFrac * 2.4, 0.16), 0.045 + 0.035 * (1 - intensity));
@@ -286,6 +286,19 @@ const computeEventPattern = ({ descriptor, point, eastKm, northKm, rFrac, alongK
     windPerturbU = spin * (-northKm / radius) * tangential;
     windPerturbV = spin * (eastKm / radius) * tangential;
     lightningRate = intensity * rainBand * 0.18;
+  } else if (type === 'tropical-disturbance') {
+    const cluster = Math.exp(-(eastKm * eastKm + northKm * northKm) / Math.max(1, 2 * (120 + 140 * intensity) ** 2));
+    const brokenBand = radialRing(rFrac + 0.06 * (noise - 0.5), 0.38 + 0.08 * fine, 0.18);
+    const convection = Math.max(cluster, brokenBand * (0.28 + 0.42 * noise));
+    rainAdd = (0.16 + 2.1 * intensity) * convection;
+    cloudLowAdd = 0.10 + 0.34 * convection;
+    cloudHighAdd = 0.12 + 0.40 * Math.max(cluster, brokenBand);
+    pressureDeltaPa = -180 * intensity * cluster;
+    const radius = Math.max(1, Math.hypot(eastKm, northKm));
+    const inflow = 3.5 * intensity * convection;
+    windPerturbU = -(eastKm / radius) * inflow;
+    windPerturbV = -(northKm / radius) * inflow;
+    lightningRate = intensity * convection * 0.06;
   } else if (type === 'supercell' || type === 'tornado-outbreak' || type === 'tornado-touchdown') {
     const severe = event?.severeWeather || {};
     const hook = lineBand(crossKm + descriptor.radiusKm * 0.12, 22 + 36 * intensity) * smoothstep(-0.35, 0.25, alongKm / descriptor.radiusKm);

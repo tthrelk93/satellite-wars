@@ -24,6 +24,8 @@ const mixColor = (a, b, t) => [
   Math.round(mix(a[2], b[2], t))
 ];
 
+const DEFAULT_VISIBLE_CUE_TYPES = new Set();
+
 const colorRamp = (stops, t) => {
   const x = clamp01(t);
   if (x <= stops[0].t) return stops[0].c;
@@ -39,6 +41,27 @@ const colorRamp = (stops, t) => {
 
 export function normalizeWeatherVisualMode(mode) {
   return MODE_SET.has(mode) ? mode : 'visible';
+}
+
+export function shouldRenderDefaultWeatherCue(cue) {
+  return Boolean(cue)
+    && cue.displayInDefault !== false
+    && DEFAULT_VISIBLE_CUE_TYPES.has(cue.type);
+}
+
+export function isCloudBackedHurricaneVisualEvent(event) {
+  if (!event || event.type !== 'hurricane' || !event.hurricane) return false;
+  const intensity = clamp01(event.hurricane.intensity01 ?? event.intensity01 ?? 0);
+  const maxWindMs = Number(event.hurricane.maxWindMs ?? event.hurricane.windField?.maxWindMs ?? 0);
+  const rainShieldRadiusKm = Number(event.hurricane.rainShieldRadiusKm ?? event.hurricane.rainShield?.radiusKm ?? 0);
+  const spiralBands = Number(event.hurricane.satelliteSignature?.spiralBandCount ?? event.hurricane.rainShield?.spiralBandCount ?? 0);
+  const eyeClarity = clamp01(event.hurricane.satelliteSignature?.eyeClarity01 ?? 0);
+  const eyewallCompleteness = clamp01(event.hurricane.satelliteSignature?.eyewallCompleteness01 ?? 0);
+  const cloudTop = clamp01(event.hurricane.satelliteSignature?.coldCloudTopProxy01 ?? 0);
+  const hasTropicalStormWinds = maxWindMs >= 33;
+  const hasRainShield = rainShieldRadiusKm >= 260 && spiralBands >= 2;
+  const hasOrganizedCloudSignal = eyeClarity >= 0.12 || eyewallCompleteness >= 0.28 || cloudTop >= 0.36;
+  return intensity >= 0.58 && hasTropicalStormWinds && hasRainShield && hasOrganizedCloudSignal;
 }
 
 export function classifyVisualWeatherCell({
@@ -238,8 +261,11 @@ export function renderVisualWeatherColor({
 
 const pushCue = (cues, cue) => {
   if (!cue || !Number.isFinite(cue.latDeg) || !Number.isFinite(cue.lonDeg)) return;
+  const displayInDefault = cue.displayInDefault ?? DEFAULT_VISIBLE_CUE_TYPES.has(cue.type);
   cues.push({
     ...cue,
+    displayInDefault,
+    renderAs: cue.renderAs || (displayInDefault ? 'cloudDetail' : 'analysisMarker'),
     intensity01: clamp01(cue.intensity01 ?? cue.intensity ?? 0.35),
     radiusKm: clamp(cue.radiusKm ?? 120, 12, 1200)
   });
@@ -279,30 +305,43 @@ export function buildVisualWeatherCueProduct({
     const center = event.hurricane?.center || event.severeWeather?.center || event.center;
     if (!center) continue;
     const intensity = clamp01(event.hurricane?.intensity01 ?? event.intensity01 ?? event.severeWeather?.environmentIndex01 ?? 0.35);
-    if (event.type === 'hurricane' || event.type === 'tropical-disturbance') {
-      pushCue(cues, { type: 'hurricaneSpiral', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: event.hurricane?.rainShieldRadiusKm || event.radiusKm || 520, intensity01: intensity, eventId: event.id });
-      pushCue(cues, { type: 'rainShaft', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 95 + 180 * intensity, intensity01: intensity, eventId: event.id });
-      if (event.type === 'hurricane' && intensity > 0.45) {
-        pushCue(cues, { type: 'stormSurgeCue', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 180 + 260 * intensity, intensity01: intensity, eventId: event.id });
-        pushCue(cues, { type: 'seaSpray', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 150 + 220 * intensity, intensity01: intensity, eventId: event.id });
+    if (event.type === 'hurricane') {
+      if (isCloudBackedHurricaneVisualEvent(event)) {
+        pushCue(cues, {
+          type: 'hurricaneSpiral',
+          latDeg: center.latDeg,
+          lonDeg: center.lonDeg,
+          radiusKm: event.hurricane?.rainShieldRadiusKm || event.radiusKm || 520,
+          intensity01: intensity,
+          eventId: event.id,
+          displayInDefault: false,
+          renderAs: 'analysisMarker'
+        });
       }
+      pushCue(cues, { type: 'rainShaft', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 95 + 180 * intensity, intensity01: intensity, eventId: event.id, displayInDefault: false });
+      if (intensity > 0.45) {
+        pushCue(cues, { type: 'stormSurgeCue', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 180 + 260 * intensity, intensity01: intensity, eventId: event.id, displayInDefault: false });
+        pushCue(cues, { type: 'seaSpray', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 150 + 220 * intensity, intensity01: intensity, eventId: event.id, displayInDefault: false });
+      }
+    } else if (event.type === 'tropical-disturbance') {
+      pushCue(cues, { type: 'rainShaft', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 75 + 120 * intensity, intensity01: intensity, eventId: event.id, displayInDefault: false });
     } else if (event.severeWeather) {
-      pushCue(cues, { type: 'cumulonimbusTower', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 80 + 190 * intensity, intensity01: intensity, eventId: event.id });
-      pushCue(cues, { type: 'anvil', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: event.severeWeather?.satelliteSignature?.anvilRadiusKm || 160 + 220 * intensity, intensity01: intensity, eventId: event.id });
-      pushCue(cues, { type: 'lightning', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 52 + 100 * intensity, intensity01: intensity, eventId: event.id });
+      pushCue(cues, { type: 'cumulonimbusTower', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 80 + 190 * intensity, intensity01: intensity, eventId: event.id, displayInDefault: false });
+      pushCue(cues, { type: 'anvil', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: event.severeWeather?.satelliteSignature?.anvilRadiusKm || 160 + 220 * intensity, intensity01: intensity, eventId: event.id, displayInDefault: false });
+      pushCue(cues, { type: 'lightning', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 52 + 100 * intensity, intensity01: intensity, eventId: event.id, displayInDefault: false });
       for (const track of event.severeWeather?.touchdownTracks || []) {
         const midLat = ((track.start?.latDeg || center.latDeg) + (track.end?.latDeg || center.latDeg)) * 0.5;
         const midLon = ((track.start?.lonDeg || center.lonDeg) + (track.end?.lonDeg || center.lonDeg)) * 0.5;
-        pushCue(cues, { type: 'tornadoTrack', latDeg: midLat, lonDeg: midLon, radiusKm: 32, intensity01: intensity, eventId: event.id });
+        pushCue(cues, { type: 'tornadoTrack', latDeg: midLat, lonDeg: midLon, radiusKm: 32, intensity01: intensity, eventId: event.id, displayInDefault: false });
       }
     } else if (['front', 'extratropical-cyclone', 'atmospheric-river', 'blizzard', 'mcs'].includes(event.type)) {
-      pushCue(cues, { type: 'frontalShield', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: event.radiusKm || 520, intensity01: intensity, eventId: event.id });
-      pushCue(cues, { type: event.type === 'blizzard' ? 'snowShaft' : 'rainShaft', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 120 + 240 * intensity, intensity01: intensity, eventId: event.id });
+      pushCue(cues, { type: 'frontalShield', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: event.radiusKm || 520, intensity01: intensity, eventId: event.id, displayInDefault: false });
+      pushCue(cues, { type: event.type === 'blizzard' ? 'snowShaft' : 'rainShaft', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 120 + 240 * intensity, intensity01: intensity, eventId: event.id, displayInDefault: false });
     } else if (event.type === 'dust-event') {
       pushCue(cues, { type: 'dust', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: event.radiusKm || 420, intensity01: intensity, eventId: event.id });
     } else if (event.type === 'monsoon-burst') {
-      pushCue(cues, { type: 'rainShaft', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: event.radiusKm || 420, intensity01: intensity, eventId: event.id });
-      pushCue(cues, { type: 'anvil', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 200 + 260 * intensity, intensity01: intensity, eventId: event.id });
+      pushCue(cues, { type: 'rainShaft', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: event.radiusKm || 420, intensity01: intensity, eventId: event.id, displayInDefault: false });
+      pushCue(cues, { type: 'anvil', latDeg: center.latDeg, lonDeg: center.lonDeg, radiusKm: 200 + 260 * intensity, intensity01: intensity, eventId: event.id, displayInDefault: false });
     }
   }
 
@@ -323,7 +362,8 @@ export function buildVisualWeatherCueProduct({
         lonDeg: rainPoint.lonDeg,
         radiusKm: Math.max(35, Math.min(240, (region.radiusKm || 300) * 0.2)),
         intensity01: smoothstep(0.2, 7.5, rainPoint.score),
-        eventId: region.eventId
+        eventId: region.eventId,
+        displayInDefault: false
       });
     }
     if (lightningPoint && lightningPoint.score > 0.18) {
@@ -333,7 +373,8 @@ export function buildVisualWeatherCueProduct({
         lonDeg: lightningPoint.lonDeg,
         radiusKm: 42 + 110 * clamp01(lightningPoint.score),
         intensity01: clamp01(lightningPoint.score),
-        eventId: region.eventId
+        eventId: region.eventId,
+        displayInDefault: false
       });
     }
     if (region.source === 'focus' && fogPoint && fogPoint.score > 0.32) {
@@ -376,7 +417,7 @@ export function buildVisualWeatherCueProduct({
         } else if (visual.dust > 0.48) {
           pushCue(cues, { type: 'dust', latDeg, lonDeg, radiusKm: 220, intensity01: visual.dust });
         } else if (visual.seaSpray > 0.55) {
-          pushCue(cues, { type: 'seaSpray', latDeg, lonDeg, radiusKm: 150, intensity01: visual.seaSpray });
+          pushCue(cues, { type: 'seaSpray', latDeg, lonDeg, radiusKm: 150, intensity01: visual.seaSpray, displayInDefault: false });
         }
       }
     }

@@ -1,28 +1,28 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-30T02:46:30Z",
+  "updatedAt": "2026-04-30T03:13:34Z",
   "verdict": "world_class_certified",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
   "certifiedCommit": "b2d997ba0023ffd35a7e0c5f8e59907c65bb0852",
   "certifiedCommitShort": "b2d997b",
   "latestCycle": {
-    "id": "cycle-2026-04-30T01-41-42Z-visual-weather-renderer",
-    "goal": "make the live weather renderer visually match the model with state-tied cloud/effect cues and cinematic weather modes",
-    "verifiedImprovement": "Phase 6 visual renderer signoff is cleared: the renderer now exposes model-tied visible/satellite/IR/water-vapor/radar modes, state-derived weather impostor cues, and a clean optimized live runtime summary with no runtime, visual, or model-wind warnings.",
-    "checkpointPath": "weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/checkpoint.md",
-    "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/evidence-summary.json"
+    "id": "cycle-2026-04-30T02-57-08Z-visual-cue-regression",
+    "goal": "remove cheap symbolic tornado/cyclone/rain-shaft overlays from the default live view and stop tropical disturbances from painting fake hurricane spirals",
+    "verifiedImprovement": "Default live gameplay view now renders model cloud/rain texture without literal cyclone, tornado, lightning, rain-shaft, or storm-surge cue sprites; tropical disturbances downscale into broken convective clusters instead of hurricane-like spiral/vortex systems.",
+    "checkpointPath": "weather-validation/output/cycle-2026-04-30T02-57-08Z-visual-cue-regression/checkpoint.md",
+    "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-30T02-57-08Z-visual-cue-regression/evidence-summary.json"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.json",
     "overallPass": true,
-    "generatedAt": "2026-04-30T02:46:20.051Z"
+    "generatedAt": "2026-04-30T03:09:18.166Z"
   },
   "validation": {
     "weatherValidateTest": {
       "command": "npm run weather:validate:test",
       "pass": true,
-      "tests": 272,
+      "tests": 273,
       "failures": 0
     },
     "weatherBenchmark": {
@@ -113,12 +113,11 @@
   },
   "visualRendererSignoff": {
     "url": "http://127.0.0.1:3000/?mode=solo",
-    "cycleId": "cycle-2026-04-30T01-41-42Z-visual-weather-renderer",
-    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/runtime-summary-optimized.json",
+    "cycleId": "cycle-2026-04-30T02-57-08Z-visual-cue-regression",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-30T02-57-08Z-visual-cue-regression/runtime-summary-final.json",
     "screenshots": [
-      "weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/live-visible-controls.png",
-      "weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/live-cinematic-satellite-mode.png",
-      "weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/live-optimized-visible.png"
+      "weather-validation/output/cycle-2026-04-30T02-57-08Z-visual-cue-regression/live-no-default-symbol-overlays.png",
+      "weather-validation/output/cycle-2026-04-30T02-57-08Z-visual-cue-regression/live-fresh-no-symbol-overlays.png"
     ],
     "modes": [
       "visible",
@@ -142,6 +141,20 @@
       "seaSpray",
       "stormSurgeCue"
     ],
+    "defaultGameplayCueSprites": [],
+    "analysisOnlyCueTypes": [
+      "hurricaneSpiral",
+      "frontalShield",
+      "cumulonimbusTower",
+      "anvil",
+      "rainShaft",
+      "snowShaft",
+      "lightning",
+      "tornadoTrack",
+      "seaSpray",
+      "stormSurgeCue"
+    ],
+    "tropicalDisturbanceVisualBehavior": "broken-convective-cluster-no-hurricane-spiral",
     "runtimeHealth": {
       "likelySmoothEnough": true,
       "warnings": []
@@ -155,9 +168,9 @@
       "warnings": []
     },
     "earthUpdateMs": {
-      "p50": 0.19999998807907104,
-      "p95": 2.6000000163912773,
-      "max": 19.30000001192093
+      "p50": 0.10000002384185791,
+      "p95": 2.5,
+      "max": 14.800000011920929
     },
     "stepsSkippedTotal": 0
   },

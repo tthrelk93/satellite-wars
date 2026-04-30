@@ -4,8 +4,10 @@ import {
   WEATHER_VISUAL_MODES,
   buildVisualWeatherCueProduct,
   classifyVisualWeatherCell,
+  isCloudBackedHurricaneVisualEvent,
   normalizeWeatherVisualMode,
-  renderVisualWeatherColor
+  renderVisualWeatherColor,
+  shouldRenderDefaultWeatherCue
 } from '../../src/weather/visuals/weatherVisualModes.js';
 
 const maxAlphaColor = (mode, options = {}) => renderVisualWeatherColor({
@@ -80,8 +82,16 @@ const hurricaneEvent = {
   hurricane: {
     center: { latDeg: 18, lonDeg: -55 },
     intensity01: 0.82,
+    maxWindMs: 52,
     rainShieldRadiusKm: 760,
-    windField: { maxWindMs: 52 }
+    windField: { maxWindMs: 52 },
+    rainShield: { spiralBandCount: 4 },
+    satelliteSignature: {
+      eyeClarity01: 0.62,
+      eyewallCompleteness01: 0.72,
+      spiralBandCount: 4,
+      coldCloudTopProxy01: 0.76
+    }
   }
 };
 
@@ -191,6 +201,52 @@ test('visual weather cue product turns global event and local truth into bounded
   assert.ok(product.countsByType.stratocumulusDeck >= 1);
   assert.ok(product.countsByType.dust >= 1);
   assert.equal(product.cues.every((cue) => cue.radiusKm >= 12 && cue.radiusKm <= 1200), true);
+
+  const symbolicTypes = new Set([
+    'hurricaneSpiral',
+    'stormSurgeCue',
+    'cumulonimbusTower',
+    'anvil',
+    'rainShaft',
+    'lightning',
+    'tornadoTrack'
+  ]);
+  assert.equal(product.cues
+    .filter((cue) => symbolicTypes.has(cue.type))
+    .every((cue) => cue.displayInDefault === false && !shouldRenderDefaultWeatherCue(cue)), true);
+  assert.equal(product.cues.filter(shouldRenderDefaultWeatherCue).length, 0);
+  assert.equal(isCloudBackedHurricaneVisualEvent(hurricaneEvent), true);
+});
+
+test('tropical disturbances and weak hurricane events do not become default hurricane glyphs', () => {
+  const disturbanceEvent = {
+    ...hurricaneEvent,
+    id: 'tropical-disturbance:visual-test',
+    type: 'tropical-disturbance',
+    hurricane: null,
+    intensity01: 0.8
+  };
+  const weakHurricaneEvent = {
+    ...hurricaneEvent,
+    id: 'hurricane:weak-visual-test',
+    intensity01: 0.42,
+    hurricane: {
+      ...hurricaneEvent.hurricane,
+      intensity01: 0.42,
+      maxWindMs: 29,
+      windField: { maxWindMs: 29 },
+      satelliteSignature: { eyeClarity01: 0.02, eyewallCompleteness01: 0.1, spiralBandCount: 2, coldCloudTopProxy01: 0.2 }
+    }
+  };
+  const product = buildVisualWeatherCueProduct({
+    eventProduct: { activeEvents: [disturbanceEvent, weakHurricaneEvent] },
+    maxCues: 20
+  });
+
+  assert.equal(isCloudBackedHurricaneVisualEvent(disturbanceEvent), false);
+  assert.equal(isCloudBackedHurricaneVisualEvent(weakHurricaneEvent), false);
+  assert.equal(product.cues.some((cue) => cue.type === 'hurricaneSpiral'), false);
+  assert.equal(product.cues.every((cue) => !shouldRenderDefaultWeatherCue(cue)), true);
 });
 
 test('cinematic weather modes are validated and render distinct state-tied colors', () => {

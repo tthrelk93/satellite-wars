@@ -22,7 +22,7 @@ import { takeBoundedAccumulatedStep } from './weather/workerStepBudget';
 import { findClosestLevelIndex } from './weather/v2/verticalGrid';
 import { interpolatePressureFieldAtCell } from './weather/v2/analysisData.js';
 import { armAnalysisIncrement5, clearAnalysisIncrement5 } from './weather/v2/analysisIncrement5.js';
-import { normalizeWeatherVisualMode } from './weather/visuals/weatherVisualModes';
+import { normalizeWeatherVisualMode, shouldRenderDefaultWeatherCue } from './weather/visuals/weatherVisualModes';
 import earthmap from './8081_earthmap10k.jpg';
 import earthbump from './8081_earthbump10k.jpg';
 import fogTexture from './fog.png'; // Add your fog texture map here
@@ -3637,8 +3637,8 @@ class Earth {
     this._lastWeatherImpostorRefreshMs = nowMs;
     const cueProduct = this._getActiveWeatherField()?.getVisualCueProduct?.();
     this._clearWeatherImpostors();
-    const cues = Array.isArray(cueProduct?.cues) ? cueProduct.cues : [];
-    cues.slice(0, 48).forEach((cue, index) => this._addWeatherImpostorCue(cue, index, simTimeSeconds));
+    const cues = Array.isArray(cueProduct?.cues) ? cueProduct.cues.filter(shouldRenderDefaultWeatherCue) : [];
+    cues.slice(0, 24).forEach((cue, index) => this._addWeatherImpostorCue(cue, index, simTimeSeconds));
     this.weatherImpostorGroup.visible = this.weatherVisible && cues.length > 0;
     this._lastWeatherCueProduct = cueProduct || null;
   }
