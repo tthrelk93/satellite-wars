@@ -1,28 +1,28 @@
 {
   "schema": "satellite-wars.world-class-status.v1",
-  "updatedAt": "2026-04-28T22:35:00Z",
+  "updatedAt": "2026-04-30T02:46:30Z",
   "verdict": "world_class_certified",
   "worktreePath": "/Users/agentt/.openclaw/workspace/Developer/satellite-wars-worldclass",
   "branch": "codex/world-class-weather-loop",
   "certifiedCommit": "b2d997ba0023ffd35a7e0c5f8e59907c65bb0852",
   "certifiedCommitShort": "b2d997b",
   "latestCycle": {
-    "id": "cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification",
-    "goal": "run a fresh current-hash 365-day annual planetary realism audit with dt/grid repro gates for final world-class certification",
-    "verifiedImprovement": "The final certification blocker is cleared: the current b2d997b annual audit passes overall, carries no planetary warnings, records no changed files, passes the numerical climate contract, passes dt/grid repro gates, and allows a major climate claim.",
-    "checkpointPath": "weather-validation/output/cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification/checkpoint.md",
-    "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification/evidence-summary.json"
+    "id": "cycle-2026-04-30T01-41-42Z-visual-weather-renderer",
+    "goal": "make the live weather renderer visually match the model with state-tied cloud/effect cues and cinematic weather modes",
+    "verifiedImprovement": "Phase 6 visual renderer signoff is cleared: the renderer now exposes model-tied visible/satellite/IR/water-vapor/radar modes, state-derived weather impostor cues, and a clean optimized live runtime summary with no runtime, visual, or model-wind warnings.",
+    "checkpointPath": "weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/checkpoint.md",
+    "evidenceSummaryPath": "weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/evidence-summary.json"
   },
   "benchmarkSuite": {
     "path": "weather-validation/reports/earth-accuracy-status.json",
     "overallPass": true,
-    "generatedAt": "2026-04-28T22:29:29.959Z"
+    "generatedAt": "2026-04-30T02:46:20.051Z"
   },
   "validation": {
     "weatherValidateTest": {
       "command": "npm run weather:validate:test",
       "pass": true,
-      "tests": 253,
+      "tests": 272,
       "failures": 0
     },
     "weatherBenchmark": {
@@ -110,6 +110,56 @@
       "modelMaxMs": 19.860771732822176,
       "thresholdsUnrelaxed": true
     }
+  },
+  "visualRendererSignoff": {
+    "url": "http://127.0.0.1:3000/?mode=solo",
+    "cycleId": "cycle-2026-04-30T01-41-42Z-visual-weather-renderer",
+    "runtimeSummaryPath": "weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/runtime-summary-optimized.json",
+    "screenshots": [
+      "weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/live-visible-controls.png",
+      "weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/live-cinematic-satellite-mode.png",
+      "weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/live-optimized-visible.png"
+    ],
+    "modes": [
+      "visible",
+      "satellite",
+      "infrared",
+      "waterVapor",
+      "radar"
+    ],
+    "stateTiedCueTypes": [
+      "stratocumulusDeck",
+      "anvil",
+      "hurricaneSpiral",
+      "frontalShield",
+      "cumulonimbusTower",
+      "rainShaft",
+      "snowShaft",
+      "lightning",
+      "tornadoTrack",
+      "dust",
+      "fog",
+      "seaSpray",
+      "stormSurgeCue"
+    ],
+    "runtimeHealth": {
+      "likelySmoothEnough": true,
+      "warnings": []
+    },
+    "visualLayerHealth": {
+      "likelyHealthy": true,
+      "warnings": []
+    },
+    "modelWindHealth": {
+      "likelyHealthy": true,
+      "warnings": []
+    },
+    "earthUpdateMs": {
+      "p50": 0.19999998807907104,
+      "p95": 2.6000000163912773,
+      "max": 19.30000001192093
+    },
+    "stepsSkippedTotal": 0
   },
   "blockingGaps": [],
   "residualResearchNotes": [

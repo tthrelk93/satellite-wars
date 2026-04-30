@@ -22,6 +22,7 @@ import { takeBoundedAccumulatedStep } from './weather/workerStepBudget';
 import { findClosestLevelIndex } from './weather/v2/verticalGrid';
 import { interpolatePressureFieldAtCell } from './weather/v2/analysisData.js';
 import { armAnalysisIncrement5, clearAnalysisIncrement5 } from './weather/v2/analysisIncrement5.js';
+import { normalizeWeatherVisualMode } from './weather/visuals/weatherVisualModes';
 import earthmap from './8081_earthmap10k.jpg';
 import earthbump from './8081_earthbump10k.jpg';
 import fogTexture from './fog.png'; // Add your fog texture map here
@@ -368,6 +369,7 @@ const EARTH_GEOMETRY_SEGMENTS = 96;
 const CLOUD_GEOMETRY_SEGMENTS = 128;
 const OVERLAY_GEOMETRY_SEGMENTS = 96;
 const AUX_GEOMETRY_SEGMENTS = 64;
+const WEATHER_IMPOSTOR_RADIUS_OFFSET_KM = 310;
 
 class Earth {
   constructor(camera, players, { weatherSeed } = {}) {
@@ -537,6 +539,13 @@ class Earth {
     });
     this.weatherLowMesh = new THREE.Mesh(this.weatherLowGeometry, this.weatherLowMaterial);
     this.weatherHighMesh = new THREE.Mesh(this.weatherHighGeometry, this.weatherHighMaterial);
+    this.weatherVisualMode = 'visible';
+    this.weatherImpostorGroup = new THREE.Group();
+    this.weatherImpostorGroup.name = 'Weather visual impostors';
+    this.weatherImpostorTextures = this._createWeatherImpostorTextures();
+    this._lastWeatherImpostorRefreshMs = -Infinity;
+    this._weatherImpostorRefreshIntervalMs = 2600;
+    this._lastWeatherCueProduct = null;
 
     this.weatherDebugGeometry = new THREE.SphereGeometry(this.earthRadiusKm + 220, AUX_GEOMETRY_SEGMENTS, AUX_GEOMETRY_SEGMENTS);
     this.weatherDebugMaterial = new THREE.MeshBasicMaterial({
@@ -555,6 +564,7 @@ class Earth {
     this.parentObject.add(this.mesh);
     this.parentObject.add(this.weatherLowMesh);
     this.parentObject.add(this.weatherHighMesh);
+    this.parentObject.add(this.weatherImpostorGroup);
     this.parentObject.add(this.cloudMesh);
     this.parentObject.add(this.weatherDebugMesh);
 
@@ -3458,6 +3468,181 @@ class Earth {
     );
   }
 
+  _createWeatherImpostorTextures() {
+    if (typeof document === 'undefined') return {};
+    const makeTexture = (kind, painter) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 96;
+      canvas.height = 96;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      painter(ctx, canvas.width, canvas.height);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.name = `weather-impostor-${kind}`;
+      return texture;
+    };
+    const softBlob = (ctx, w, h, inner, outer, alpha = 0.92) => {
+      const g = ctx.createRadialGradient(w * 0.5, h * 0.48, w * 0.05, w * 0.5, h * 0.5, w * 0.48);
+      g.addColorStop(0, `rgba(${inner.join(',')}, ${alpha})`);
+      g.addColorStop(0.45, `rgba(${outer.join(',')}, ${alpha * 0.55})`);
+      g.addColorStop(1, `rgba(${outer.join(',')}, 0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    };
+    return {
+      cloudTower: makeTexture('cloud-tower', (ctx, w, h) => {
+        softBlob(ctx, w, h, [255, 255, 255], [204, 214, 224], 0.92);
+        ctx.fillStyle = 'rgba(255,255,255,0.78)';
+        ctx.beginPath();
+        ctx.ellipse(w * 0.5, h * 0.34, w * 0.22, h * 0.30, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }),
+      anvil: makeTexture('anvil', (ctx, w, h) => {
+        softBlob(ctx, w, h, [255, 255, 255], [215, 224, 235], 0.78);
+        ctx.fillStyle = 'rgba(255,255,255,0.62)';
+        ctx.beginPath();
+        ctx.ellipse(w * 0.5, h * 0.44, w * 0.44, h * 0.18, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }),
+      deck: makeTexture('deck', (ctx, w, h) => {
+        softBlob(ctx, w, h, [229, 235, 232], [178, 190, 188], 0.62);
+      }),
+      shaft: makeTexture('shaft', (ctx, w, h) => {
+        const g = ctx.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, 'rgba(225,240,255,0.0)');
+        g.addColorStop(0.25, 'rgba(190,215,235,0.72)');
+        g.addColorStop(1, 'rgba(90,130,165,0.0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(w * 0.28, 0, w * 0.44, h);
+      }),
+      lightning: makeTexture('lightning', (ctx, w, h) => {
+        ctx.strokeStyle = 'rgba(255,246,170,0.95)';
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(w * 0.55, h * 0.05);
+        ctx.lineTo(w * 0.42, h * 0.36);
+        ctx.lineTo(w * 0.58, h * 0.34);
+        ctx.lineTo(w * 0.35, h * 0.88);
+        ctx.stroke();
+      }),
+      dust: makeTexture('dust', (ctx, w, h) => softBlob(ctx, w, h, [218, 160, 93], [117, 79, 42], 0.56)),
+      fog: makeTexture('fog', (ctx, w, h) => softBlob(ctx, w, h, [222, 235, 232], [136, 154, 158], 0.48)),
+      spray: makeTexture('spray', (ctx, w, h) => softBlob(ctx, w, h, [196, 237, 255], [88, 151, 177], 0.55)),
+      surge: makeTexture('surge', (ctx, w, h) => {
+        ctx.strokeStyle = 'rgba(105,220,245,0.62)';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.ellipse(w * 0.5, h * 0.5, w * 0.35, h * 0.18, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }),
+      spiral: makeTexture('spiral', (ctx, w, h) => {
+        ctx.strokeStyle = 'rgba(246,252,255,0.7)';
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        for (let arm = 0; arm < 4; arm += 1) {
+          ctx.beginPath();
+          for (let n = 0; n <= 36; n += 1) {
+            const t = n / 36;
+            const angle = arm * Math.PI * 0.5 + t * 4.2;
+            const r = w * (0.08 + 0.36 * t);
+            const x = w * 0.5 + Math.cos(angle) * r;
+            const y = h * 0.5 + Math.sin(angle) * r;
+            if (n === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+      })
+    };
+  }
+
+  _clearWeatherImpostors() {
+    if (!this.weatherImpostorGroup) return;
+    while (this.weatherImpostorGroup.children.length > 0) {
+      const child = this.weatherImpostorGroup.children[0];
+      this.weatherImpostorGroup.remove(child);
+      child.material?.dispose?.();
+    }
+  }
+
+  _impostorTextureForCue(type) {
+    if (type === 'hurricaneSpiral') return this.weatherImpostorTextures.spiral;
+    if (type === 'cumulonimbusTower') return this.weatherImpostorTextures.cloudTower;
+    if (type === 'anvil') return this.weatherImpostorTextures.anvil;
+    if (type === 'frontalShield' || type === 'stratocumulusDeck') return this.weatherImpostorTextures.deck;
+    if (type === 'rainShaft' || type === 'snowShaft') return this.weatherImpostorTextures.shaft;
+    if (type === 'lightning' || type === 'tornadoTrack') return this.weatherImpostorTextures.lightning;
+    if (type === 'dust') return this.weatherImpostorTextures.dust;
+    if (type === 'fog') return this.weatherImpostorTextures.fog;
+    if (type === 'seaSpray') return this.weatherImpostorTextures.spray;
+    if (type === 'stormSurgeCue') return this.weatherImpostorTextures.surge;
+    return this.weatherImpostorTextures.deck;
+  }
+
+  _impostorColorForCue(type) {
+    if (type === 'rainShaft') return 0x9ec5df;
+    if (type === 'snowShaft') return 0xe6fbff;
+    if (type === 'lightning' || type === 'tornadoTrack') return 0xfff3a1;
+    if (type === 'dust') return 0xc58b4e;
+    if (type === 'fog') return 0xcbd6d8;
+    if (type === 'seaSpray' || type === 'stormSurgeCue') return 0x7ddff5;
+    if (type === 'hurricaneSpiral') return 0xf8fcff;
+    return 0xffffff;
+  }
+
+  _addWeatherImpostorCue(cue, index, simTimeSeconds = 0) {
+    const texture = this._impostorTextureForCue(cue.type);
+    if (!texture) return;
+    const intensity = Math.max(0.05, Math.min(1, cue.intensity01 ?? 0.35));
+    const radiusKm = Math.max(12, cue.radiusKm || 120);
+    const material = new THREE.SpriteMaterial({
+      map: texture,
+      color: this._impostorColorForCue(cue.type),
+      transparent: true,
+      opacity: Math.min(0.78, 0.18 + intensity * 0.58),
+      depthWrite: false,
+      depthTest: true,
+      blending: cue.type === 'lightning' || cue.type === 'tornadoTrack'
+        ? THREE.AdditiveBlending
+        : THREE.NormalBlending,
+      rotation: (index * 1.71 + (simTimeSeconds || 0) / 7200) % (Math.PI * 2)
+    });
+    const sprite = new THREE.Sprite(material);
+    const altitudeKm = cue.type === 'anvil'
+      ? 520
+      : cue.type === 'cumulonimbusTower'
+        ? 430
+        : cue.type === 'hurricaneSpiral'
+          ? 360
+          : cue.type === 'rainShaft' || cue.type === 'snowShaft'
+            ? 260
+            : WEATHER_IMPOSTOR_RADIUS_OFFSET_KM;
+    sprite.position.copy(this._latLonToVector3(cue.latDeg, cue.lonDeg, this.earthRadiusKm + altitudeKm));
+    const wideTypes = new Set(['hurricaneSpiral', 'frontalShield', 'stratocumulusDeck', 'stormSurgeCue']);
+    const shaftTypes = new Set(['rainShaft', 'snowShaft', 'lightning', 'tornadoTrack']);
+    const scaleX = wideTypes.has(cue.type) ? radiusKm * 1.7 : radiusKm * 0.95;
+    const scaleY = shaftTypes.has(cue.type) ? radiusKm * 2.2 : radiusKm * (cue.type === 'anvil' ? 1.0 : 1.25);
+    sprite.scale.set(scaleX, scaleY, 1);
+    sprite.userData.weatherCueType = cue.type;
+    this.weatherImpostorGroup.add(sprite);
+  }
+
+  _syncWeatherImpostors(simTimeSeconds, nowMs = performance.now()) {
+    if (!this.weatherImpostorGroup || !this.weatherVisible) return;
+    if (nowMs - this._lastWeatherImpostorRefreshMs < this._weatherImpostorRefreshIntervalMs) return;
+    this._lastWeatherImpostorRefreshMs = nowMs;
+    const cueProduct = this._getActiveWeatherField()?.getVisualCueProduct?.();
+    this._clearWeatherImpostors();
+    const cues = Array.isArray(cueProduct?.cues) ? cueProduct.cues : [];
+    cues.slice(0, 48).forEach((cue, index) => this._addWeatherImpostorCue(cue, index, simTimeSeconds));
+    this.weatherImpostorGroup.visible = this.weatherVisible && cues.length > 0;
+    this._lastWeatherCueProduct = cueProduct || null;
+  }
+
   _latLonDegToUnitVector(latDeg, lonDeg) {
     const v = this._latLonToVector3(latDeg, lonDeg, 1);
     return v.normalize();
@@ -3661,6 +3846,7 @@ class Earth {
       : simContext;
     this.weatherField?.update(simTimeSeconds, realDtSeconds, weatherSimContext);
     this.analysisWeatherField?.update(simTimeSeconds, realDtSeconds, simContext);
+    this._syncWeatherImpostors(simTimeSeconds, perfStartMs);
     this._syncAnalysisFromTruthIfReady();
     this._updateAnalysisSigma2(simTimeSeconds);
     this._maybeReanchorAnalysisFromTargets(simTimeSeconds);
@@ -4503,9 +4689,21 @@ class Earth {
     this.weatherVisible = visible;
     if (this.weatherLowMesh) this.weatherLowMesh.visible = visible;
     if (this.weatherHighMesh) this.weatherHighMesh.visible = visible;
+    if (this.weatherImpostorGroup) this.weatherImpostorGroup.visible = visible && this.weatherImpostorGroup.children.length > 0;
     if (this.weatherDebugMesh) {
       this.weatherDebugMesh.visible = visible && this.weatherDebugMode !== 'clouds';
     }
+  }
+
+  setWeatherVisualMode(mode) {
+    const next = normalizeWeatherVisualMode(mode);
+    if (this.weatherVisualMode === next) return;
+    this.weatherVisualMode = next;
+    this.weatherField?.setVisualMode?.(next);
+    this.analysisWeatherField?.setVisualMode?.(next);
+    this.forecastWeatherField?.setVisualMode?.(next);
+    if (this.weatherLowMaterial) this.weatherLowMaterial.needsUpdate = true;
+    if (this.weatherHighMaterial) this.weatherHighMaterial.needsUpdate = true;
   }
 
   setWeatherDebugMode(mode) {
@@ -4513,6 +4711,9 @@ class Earth {
     this.weatherField?.setDebugMode(this.weatherDebugMode);
     this.analysisWeatherField?.setDebugMode(this.weatherDebugMode);
     this.forecastWeatherField?.setDebugMode(this.weatherDebugMode);
+    this.weatherField?.setVisualMode(this.weatherVisualMode);
+    this.analysisWeatherField?.setVisualMode(this.weatherVisualMode);
+    this.forecastWeatherField?.setVisualMode(this.weatherVisualMode);
     this._applyWeatherViewSourceMaps();
     if (this.weatherDebugMesh) {
       this.weatherDebugMesh.visible = this.weatherVisible && this.weatherDebugMode !== 'clouds';

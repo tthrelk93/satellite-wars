@@ -14,6 +14,7 @@ import { solarDeclination } from './weather/solar';
 import { clampSimAdvanceByTruthBudget, computeFixedStepBudget } from './weather/simAdvanceBudget';
 import { loadNullschoolWind } from './weather/reference/loadNullschoolWind';
 import { showMinimapOverlayForGameMode } from './gameModeUi';
+import { WEATHER_VISUAL_MODES } from './weather/visuals/weatherVisualModes';
 
 import { EventBus } from './EventBus';
 import { TurnManager, AP_MAX } from './TurnManager';
@@ -366,7 +367,9 @@ const App = () => {
     const showFogLayerRef = useRef(false);
     const showWeatherLayerRef = useRef(true);
     const [weatherDebugMode, setWeatherDebugMode] = useState('clouds');
+    const [weatherVisualMode, setWeatherVisualMode] = useState('visible');
     const weatherDebugModeRef = useRef('clouds');
+    const weatherVisualModeRef = useRef('visible');
     const [simPausedUI, setSimPausedUI] = useState(false);
     const [simSpeedUI, setSimSpeedUI] = useState(SIM_SPEED_DEFAULT);
     const [simTimeLabel, setSimTimeLabel] = useState('Day 0, 00:00');
@@ -955,6 +958,7 @@ const App = () => {
             };
         }
         earth.setWeatherDebugMode(weatherDebugModeRef.current);
+        earth.setWeatherVisualMode?.(weatherVisualModeRef.current);
         earth.setWeatherVisible(showWeatherLayerRef.current);
         earth.setFogVisible(sensorOnlyWeather ? false : showFogLayerRef.current);
         earth.setCloudObsVisible(false);
@@ -1998,6 +2002,10 @@ const App = () => {
         updateWeatherDebugNow();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [weatherDebugMode]);
+    useEffect(() => {
+        weatherVisualModeRef.current = weatherVisualMode;
+        if (earthRef.current) earthRef.current.setWeatherVisualMode?.(weatherVisualMode);
+    }, [weatherVisualMode]);
     useEffect(() => {
         simClockRef.current.setPaused(simPausedUI);
     }, [simPausedUI]);
@@ -8739,6 +8747,24 @@ const App = () => {
                                     }}
                                 >
                                     {WEATHER_DEBUG_OPTIONS.map((option) => (
+                                        <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Box>
+                        <Box mt={1}>
+                            <FormControl size="small" fullWidth variant="outlined">
+                                <InputLabel style={{ color: 'white' }}>Visual Mode</InputLabel>
+                                <Select
+                                    value={weatherVisualMode}
+                                    onChange={(e) => setWeatherVisualMode(e.target.value)}
+                                    label="Visual Mode"
+                                    sx={{
+                                        color: 'white',
+                                        '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' }
+                                    }}
+                                >
+                                    {WEATHER_VISUAL_MODES.map((option) => (
                                         <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
                                     ))}
                                 </Select>

@@ -61,11 +61,13 @@ These features may be described as visualized or downscaled from model/event sta
 - cloud towers, anvils, frontal shields, stratocumulus decks, fog, dust, lightning, rain shafts, snow bands
 - radar, satellite visible/IR/water-vapor products
 - local gusts and storm-scale texture near the camera/player
+- sea spray, storm-surge hints, and weather-impostor cloud structures when backed by an active event or model field
 
 Allowed claim language:
 
 - "visual detail is generated from model state, event ledgers, and deterministic local downscaling"
 - "radar and satellite products reflect the simulated state"
+- "cloud, precipitation, hazard, and cinematic weather layers are model-tied visualizations"
 
 ## Evidence Requirements
 

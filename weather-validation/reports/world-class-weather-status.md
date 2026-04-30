@@ -1,16 +1,17 @@
 # World-Class Weather Status
 
-Updated: 2026-04-28
+Updated: 2026-04-30
 Verdict: WORLD CLASS CERTIFIED
 
 ## Current Baseline
 
 - Clean worker worktree: `codex/world-class-weather-loop`
-- Certified commit: `b2d997b`
-- Latest verified cycle: `cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification`
+- Certified climate commit: `b2d997b`
+- Latest verified cycle: `cycle-2026-04-30T01-41-42Z-visual-weather-renderer`
 - Earth accuracy suite: PASS (`weather-validation/reports/earth-accuracy-status.json`)
 - Latest full annual planetary audit: PASS (`weather-validation/output/cycle-2026-04-28T16-01-52Z-final-current-hash-annual-certification/annual-current-hash-repro.json`)
 - Live freeze/seam/model-wind blocker: PASS (`weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/runtime-summary-live-day6.json`)
+- Visual renderer signoff: PASS (`weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/runtime-summary-optimized.json`)
 
 ## Certification Evidence
 
@@ -56,9 +57,26 @@ The reported live blockers were verified fixed without weakening warning thresho
   - `weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/live-90s.png`
   - `weather-validation/output/cycle-2026-04-28T06-42-54Z-final-certification-live-freeze-seam-wind-fix/live-day6-proof.png`
 
+## Visual Renderer Signoff
+
+Phase 6 is verified as a model-tied visual-weather renderer rather than a static cloud texture layer.
+
+- Visual modes: visible light, cinematic satellite, infrared, water vapor, radar.
+- State-tied effects: stratocumulus decks, anvils, hurricane spirals, frontal shields, cumulonimbus towers, rain/snow shafts, lightning/tornado markers, dust, fog, sea spray, and storm-surge cues.
+- Runtime telemetry: `runtime-summary-optimized.json`
+  - Earth.update p50/p95/max: `0.20 / 2.60 / 19.30 ms`
+  - skipped simulation steps: `0`
+  - runtime warnings: none
+  - visual warnings: none
+  - model-wind warnings: none
+- Browser screenshots:
+  - `weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/live-visible-controls.png`
+  - `weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/live-cinematic-satellite-mode.png`
+  - `weather-validation/output/cycle-2026-04-30T01-41-42Z-visual-weather-renderer/live-optimized-visible.png`
+
 ## Validation
 
-- `npm run weather:validate:test`: 253/253 pass
+- `npm run weather:validate:test`: 272/272 pass
 - `npm run weather:benchmark`: PASS
 - `npm run agent:claim-guard`: PASS
 

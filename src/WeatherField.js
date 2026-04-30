@@ -3,6 +3,12 @@ import { createWeatherKernel } from './weather/kernel';
 import WeatherLogger from './weather/WeatherLogger';
 import { bilinear } from './weather/shared/bilinear';
 import { WeatherLogSink } from './weather/logSink';
+import {
+    buildVisualWeatherCueProduct,
+    classifyVisualWeatherCell,
+    normalizeWeatherVisualMode,
+    renderVisualWeatherColor
+} from './weather/visuals/weatherVisualModes';
 
 const AUTO_LOG_CADENCE_SECONDS = 6 * 3600;
 const AUTO_LOG_MAX_ENTRIES = 20000;
@@ -44,6 +50,7 @@ class WeatherField {
         this._lastSimTimeSeconds = null;
         this.paused = false;
         this.debugMode = debugMode;
+        this.visualMode = 'visible';
         this._debugScratch = new Float32Array(this.core.grid.count);
         this._percentileScratch = new Float32Array(this.core.grid.count);
         this._simContext = { simSpeed: null, paused: null };
@@ -474,6 +481,17 @@ class WeatherField {
         }
     }
 
+    setVisualMode(mode) {
+        const next = normalizeWeatherVisualMode(mode);
+        if (this.visualMode === next) return;
+        this.visualMode = next;
+        this._paintAccumSeconds = Math.max(this._paintAccumSeconds, this.tickSeconds);
+    }
+
+    getVisualMode() {
+        return this.visualMode;
+    }
+
     getDebugMode() {
         return this.debugMode;
     }
@@ -584,6 +602,14 @@ class WeatherField {
 
     getLocalDownscaleProduct() {
         return this.localDownscaleProduct || this.kernel?.getLocalDownscaleProduct?.({ eventProduct: this.eventProduct }) || null;
+    }
+
+    getVisualCueProduct() {
+        return buildVisualWeatherCueProduct({
+            core: this.core,
+            eventProduct: this.eventProduct,
+            localDownscale: this.getLocalDownscaleProduct()
+        });
     }
 
     setLocalDownscaleProduct(product) {
@@ -711,10 +737,16 @@ class WeatherField {
         }) => {
             const w = ctx.canvas.width;
             const h = ctx.canvas.height;
+            const visualMode = this.visualMode;
+            const precipField = fields.precipRate;
+            const temperatureField = fields.Ts || this.core.state?.Ts;
+            const landMaskField = this.core.geo?.landMask;
+            const soilMoistureField = this.core.state?.soilMoistureFraction;
             data.fill(0);
             for (let y = 0; y < h; y++) {
                 const lat = (y / h) * grid.ny;
                 const j = Math.max(0, Math.min(grid.ny - 1, Math.floor(lat)));
+                const latDeg = grid.latDeg?.[j] ?? (90 - ((j + 0.5) / Math.max(1, grid.ny)) * 180);
                 const kmPerDegLat = 111.0;
                 const kmPerDegLon = Math.max(1.0, kmPerDegLat * grid.cosLat[j]);
                 for (let x = 0; x < w; x++) {
@@ -728,6 +760,13 @@ class WeatherField {
                     const tau = bilinear(tauField, lon - dLonCells, lat - dLatCells, grid.nx, grid.ny);
                     const advLon = lon - dLonCells;
                     const advLat = lat - dLatCells;
+                    const sampleI = ((Math.floor(advLon) % grid.nx) + grid.nx) % grid.nx;
+                    const sampleJ = Math.max(0, Math.min(grid.ny - 1, Math.floor(advLat)));
+                    const sampleK = sampleJ * grid.nx + sampleI;
+                    const precipRateMmHr = Math.max(0, precipField?.[sampleK] || 0);
+                    const temperatureK = temperatureField?.[sampleK] || 288;
+                    const landMask = landMaskField?.[sampleK] || 0;
+                    const soilMoisture01 = soilMoistureField?.[sampleK] || 0.35;
                     const n = this._sampleCloudNoise(noiseField, advLon, advLat, grid);
                     const tauEff = Math.max(0, tau);
                     const aBase = Math.pow(cloud, isHigh ? renderParams.gammaHigh : renderParams.gammaLow) *
@@ -759,11 +798,45 @@ class WeatherField {
 
                     const idx = (y * w + x) * 4;
                     const shade = shadeBase + Math.floor(shadeVar * (n - 0.5));
-                    const color = Math.max(0, Math.min(255, Math.floor(shade * value)));
-                    data[idx] = color;
-                    data[idx + 1] = color;
-                    data[idx + 2] = color;
-                    data[idx + 3] = Math.floor(255 * alpha);
+                    const baseShadeValue = Math.max(0, Math.min(255, Math.floor(shade * value)));
+                    if (alpha < 0.008 && precipRateMmHr < 0.02 && visualMode !== 'radar') {
+                        data[idx] = 0;
+                        data[idx + 1] = 0;
+                        data[idx + 2] = 0;
+                        data[idx + 3] = 0;
+                        continue;
+                    }
+                    const windSpeedMs = Math.hypot(u, v);
+                    const visual = classifyVisualWeatherCell({
+                        cloudLow: isHigh ? 0 : cloud,
+                        cloudHigh: isHigh ? cloud : 0,
+                        tauLow: isHigh ? 0 : tauEff,
+                        tauHigh: isHigh ? tauEff : 0,
+                        precipRateMmHr,
+                        windSpeedMs,
+                        temperatureK,
+                        landMask,
+                        soilMoisture01,
+                        latDeg
+                    });
+                    const visualColor = renderVisualWeatherColor({
+                        mode: this.visualMode,
+                        isHigh,
+                        cloud,
+                        tau: tauEff,
+                        precipRateMmHr,
+                        temperatureK,
+                        windSpeedMs,
+                        visual,
+                        noise: n,
+                        baseShade: baseShadeValue,
+                        baseValue: value,
+                        baseAlpha: alpha
+                    });
+                    data[idx] = visualColor.r;
+                    data[idx + 1] = visualColor.g;
+                    data[idx + 2] = visualColor.b;
+                    data[idx + 3] = Math.floor(255 * visualColor.a);
                 }
             }
             this._blendTextureLongitudeSeam(data, w, h);

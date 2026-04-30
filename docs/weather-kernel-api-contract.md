@@ -143,6 +143,14 @@ Kernel worker payloads may include a deterministic event product. It may include
 
 The event product must not mutate global climate state. Renderers, forecast systems, gameplay warnings, and future local downscalers may consume it, but they must not reach into `WeatherCore5` internals to recreate the same objects.
 
+## Visual Weather Product Contract
+
+Visual cue product schema: `satellite-wars.visual-weather-cues.v1`
+
+Renderers may build a visual cue product from public grid fields, event products, and local downscale products. Cue products may include bounded impostor/volume hints such as cloud towers, anvils, stratocumulus decks, hurricane spirals, frontal shields, rain/snow shafts, lightning, tornado tracks, dust, fog, sea spray, and storm-surge cues. Each cue must include latitude, longitude, radius, type, and normalized intensity.
+
+Visual cue products are renderer aids. They do not mutate the global model, event ledger, or downscaled truth fields, and they must remain reproducible from the parent products.
+
 ## Deterministic Replay Contract
 
 Replay schema: `satellite-wars.weather-kernel.replay.v1`

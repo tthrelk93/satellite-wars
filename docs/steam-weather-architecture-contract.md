@@ -66,6 +66,8 @@ Current local downscale regions include bounded wind, rain, cloud, visibility, p
 
 The renderer consumes public kernel fields, event objects, and downscaled fields. It must not import weather internals directly. It may use GPU-native representations, particle systems, impostors, volumes, shaders, or engine-specific assets.
 
+Current renderer contract: global cloud textures are now colorized through a model-derived visual classifier, active event/downscale/global cues are rendered as lightweight weather impostors, and the app exposes visible-light, cinematic satellite, infrared, water-vapor, and radar modes. Renderer cues include stratocumulus decks, anvils, hurricane spirals, frontal shields, cumulonimbus towers, rain/snow shafts, lightning/tornado markers, dust, fog, sea spray, and storm-surge cues. These cues must be derived from public weather fields, event products, or local downscale products.
+
 ### Gameplay
 
 Gameplay consumes stable products rather than raw internals:
