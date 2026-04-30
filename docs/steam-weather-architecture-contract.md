@@ -46,7 +46,7 @@ The event layer consumes kernel snapshots and diagnostics. The first implementat
 
 The event layer may feed lightweight influence fields back to visuals and gameplay. It must not rewrite global climate state unless a future contract explicitly allows two-way coupling.
 
-Current event objects include deterministic lifecycle, history, physical environment justification, and hurricane-specific forecast/satellite/radar signatures. Hurricanes are parameterized systems with center, radius, pressure proxy, wind field, rain shield, eye/eyewall, track, and intensity; they are rendered as lightweight cloud signatures tied to active event products.
+Current event objects include deterministic lifecycle, history, physical environment justification, and storm-specific forecast/satellite/radar signatures. Hurricanes are parameterized systems with center, radius, pressure proxy, wind field, rain shield, eye/eyewall, track, and intensity; they are rendered as lightweight cloud signatures tied to active event products. Severe-weather systems include an explicit ingredient index, supercell/outbreak/touchdown objects, hook-echo and velocity-couplet radar signatures, satellite anvil signatures, warning polygons, and damage swaths.
 
 ### Local Downscaler
 

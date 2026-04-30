@@ -753,14 +753,25 @@ class WeatherField {
     _paintEventCloudSignatures(simTimeSeconds) {
         const events = this.eventProduct?.activeEvents;
         if (!Array.isArray(events) || events.length === 0) return;
-        const drawEvents = events
+        const tropicalEvents = events
             .filter((event) => event?.type === 'hurricane' || event?.type === 'tropical-disturbance')
             .slice(0, 8);
-        if (drawEvents.length === 0) return;
+        const severeEvents = events
+            .filter((event) => event?.severeWeather && (
+                event.type === 'supercell'
+                || event.type === 'tornado-outbreak'
+                || event.type === 'tornado-touchdown'
+            ))
+            .slice(0, 12);
+        if (tropicalEvents.length === 0 && severeEvents.length === 0) return;
         const w = this.canvasCloudHigh.width;
         const h = this.canvasCloudHigh.height;
         const kmPerPixelLat = (180 * 111) / Math.max(1, h);
-        const drawOnContext = (ctx, event, wrapOffsetX = 0) => {
+        const projectLatLon = (lat, lon, wrapOffsetX = 0) => ({
+            x: ((lon + 180) / 360) * w + wrapOffsetX,
+            y: ((90 - lat) / 180) * h
+        });
+        const drawTropicalOnContext = (ctx, event, wrapOffsetX = 0) => {
             const center = event.hurricane?.center || event.center;
             if (!center) return;
             const lat = Number(center.latDeg);
@@ -768,8 +779,7 @@ class WeatherField {
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
             const intensity = Math.max(0.1, Math.min(1, event.hurricane?.intensity01 ?? event.intensity01 ?? 0.2));
             const radiusKm = Math.max(120, event.hurricane?.rainShieldRadiusKm ?? event.radiusKm ?? 260);
-            const cx = ((lon + 180) / 360) * w + wrapOffsetX;
-            const cy = ((90 - lat) / 180) * h;
+            const { x: cx, y: cy } = projectLatLon(lat, lon, wrapOffsetX);
             const radiusY = Math.max(5, radiusKm / kmPerPixelLat);
             const radiusX = radiusY / Math.max(0.35, Math.cos((lat * Math.PI) / 180));
             const spiralCount = Math.max(2, Math.min(6, event.hurricane?.rainShield?.spiralBandCount ?? Math.round(2 + intensity * 4)));
@@ -812,10 +822,112 @@ class WeatherField {
             }
             ctx.restore();
         };
-        for (const event of drawEvents) {
+        const drawPolygon = (ctx, polygon, wrapOffsetX, { strokeStyle, fillStyle, lineWidth = 1 }) => {
+            if (!Array.isArray(polygon) || polygon.length < 3) return;
+            ctx.beginPath();
+            polygon.forEach((point, index) => {
+                const lat = Number(point.latDeg);
+                const lon = Number(point.lonDeg);
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+                const { x, y } = projectLatLon(lat, lon, wrapOffsetX);
+                if (index === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.closePath();
+            if (fillStyle) {
+                ctx.fillStyle = fillStyle;
+                ctx.fill();
+            }
+            if (strokeStyle) {
+                ctx.strokeStyle = strokeStyle;
+                ctx.lineWidth = lineWidth;
+                ctx.stroke();
+            }
+        };
+        const drawSevereOnContext = (event, wrapOffsetX = 0) => {
+            const severe = event.severeWeather;
+            const center = severe?.center || event.center;
+            if (!center) return;
+            const lat = Number(center.latDeg);
+            const lon = Number(center.lonDeg);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+            const intensity = Math.max(0.15, Math.min(1, event.intensity01 ?? severe.environmentIndex01 ?? 0.25));
+            const { x: cx, y: cy } = projectLatLon(lat, lon, wrapOffsetX);
+            const motion = severe.motionVector || event.motionVector || { uMs: 10, vMs: 2 };
+            const speed = Math.max(1, Math.hypot(motion.uMs || 0, motion.vMs || 0));
+            const eastUnit = (motion.uMs || 0) / speed;
+            const northUnit = (motion.vMs || 0) / speed;
+            const anvilKm = severe.satelliteSignature?.anvilRadiusKm ?? (70 + 220 * intensity);
+            const anvilY = Math.max(4, anvilKm / kmPerPixelLat);
+            const anvilX = anvilY / Math.max(0.45, Math.cos((lat * Math.PI) / 180));
+            const anvilCx = cx + eastUnit * anvilX * 0.35;
+            const anvilCy = cy - northUnit * anvilY * 0.35;
+            this.ctxCloudHigh.save();
+            this.ctxCloudHigh.globalCompositeOperation = 'lighter';
+            this.ctxCloudHigh.beginPath();
+            this.ctxCloudHigh.ellipse(anvilCx, anvilCy, anvilX * 1.25, anvilY * 0.72, Math.atan2(northUnit, eastUnit), 0, Math.PI * 2);
+            this.ctxCloudHigh.fillStyle = `rgba(245, 250, 255, ${0.10 + 0.22 * intensity})`;
+            this.ctxCloudHigh.fill();
+            if (severe.satelliteSignature?.overshootingTop) {
+                this.ctxCloudHigh.beginPath();
+                this.ctxCloudHigh.arc(cx, cy, Math.max(1.5, anvilY * 0.13), 0, Math.PI * 2);
+                this.ctxCloudHigh.fillStyle = `rgba(255, 255, 255, ${0.35 + 0.28 * intensity})`;
+                this.ctxCloudHigh.fill();
+            }
+            this.ctxCloudHigh.restore();
+
+            this.ctxCloudLow.save();
+            this.ctxCloudLow.globalCompositeOperation = 'lighter';
+            drawPolygon(this.ctxCloudLow, severe.warningPolygon, wrapOffsetX, {
+                strokeStyle: `rgba(250, 204, 21, ${0.24 + 0.24 * intensity})`,
+                fillStyle: `rgba(250, 204, 21, ${0.025 + 0.035 * intensity})`,
+                lineWidth: Math.max(1, intensity * 2.2)
+            });
+            for (const swath of severe.damageSwaths || []) {
+                drawPolygon(this.ctxCloudLow, swath.polygon, wrapOffsetX, {
+                    strokeStyle: `rgba(248, 113, 113, ${0.16 + 0.22 * intensity})`,
+                    fillStyle: `rgba(127, 29, 29, ${0.05 + 0.08 * intensity})`,
+                    lineWidth: Math.max(1, intensity * 1.6)
+                });
+            }
+            const hookRadius = Math.max(3, (25 + 70 * intensity) / kmPerPixelLat);
+            const hookSign = lat >= 0 ? 1 : -1;
+            this.ctxCloudLow.beginPath();
+            for (let n = 0; n <= 28; n++) {
+                const t = n / 28;
+                const angle = hookSign * (0.4 + 3.7 * t);
+                const r = hookRadius * (0.35 + 0.75 * t);
+                const px = cx - eastUnit * hookRadius * 0.45 + Math.cos(angle) * r;
+                const py = cy + northUnit * hookRadius * 0.35 + Math.sin(angle) * r;
+                if (n === 0) this.ctxCloudLow.moveTo(px, py);
+                else this.ctxCloudLow.lineTo(px, py);
+            }
+            this.ctxCloudLow.strokeStyle = `rgba(255, 255, 255, ${0.18 + 0.42 * intensity})`;
+            this.ctxCloudLow.lineWidth = Math.max(1.2, hookRadius * 0.14);
+            this.ctxCloudLow.lineCap = 'round';
+            this.ctxCloudLow.stroke();
+            if (severe.radarSignature?.velocityCouplet) {
+                const coupletOffset = Math.max(2.2, hookRadius * 0.38);
+                this.ctxCloudLow.beginPath();
+                this.ctxCloudLow.arc(cx - coupletOffset, cy, Math.max(1.5, hookRadius * 0.16), 0, Math.PI * 2);
+                this.ctxCloudLow.fillStyle = `rgba(56, 189, 248, ${0.18 + 0.25 * intensity})`;
+                this.ctxCloudLow.fill();
+                this.ctxCloudLow.beginPath();
+                this.ctxCloudLow.arc(cx + coupletOffset, cy, Math.max(1.5, hookRadius * 0.16), 0, Math.PI * 2);
+                this.ctxCloudLow.fillStyle = `rgba(248, 113, 113, ${0.18 + 0.25 * intensity})`;
+                this.ctxCloudLow.fill();
+            }
+            this.ctxCloudLow.restore();
+        };
+        for (const event of tropicalEvents) {
             for (const offset of [-w, 0, w]) {
-                drawOnContext(this.ctxCloudLow, event, offset);
-                drawOnContext(this.ctxCloudHigh, event, offset);
+                drawTropicalOnContext(this.ctxCloudLow, event, offset);
+                drawTropicalOnContext(this.ctxCloudHigh, event, offset);
+            }
+        }
+        for (const event of severeEvents) {
+            for (const offset of [-w, 0, w]) {
+                drawSevereOnContext(event, offset);
             }
         }
     }

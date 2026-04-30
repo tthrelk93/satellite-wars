@@ -138,6 +138,7 @@ Kernel worker payloads may include a deterministic event product. It may include
 - counts by type, basin, and region
 - physical environment fields used to justify each event
 - hurricane system signatures: center, radius, pressure proxy, wind field, rain shield, eye/eyewall, track, intensity, satellite signature, radar signature, and forecast signature
+- severe-weather system signatures: environment index, ingredient breakdown, storm mode, radar hook/couplet, satellite anvil, warning polygon, tornado touchdown tracks, and damage swaths
 
 The event product must not mutate global climate state. Renderers, forecast systems, gameplay warnings, and future local downscalers may consume it, but they must not reach into `WeatherCore5` internals to recreate the same objects.
 

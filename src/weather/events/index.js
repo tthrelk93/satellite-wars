@@ -25,3 +25,8 @@ export {
 export {
   buildHurricaneSystem
 } from './hurricaneSystems.js';
+
+export {
+  buildSevereWeatherSystem,
+  computeSevereWeatherEnvironment
+} from './severeWeatherSystems.js';

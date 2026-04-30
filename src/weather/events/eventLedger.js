@@ -1,5 +1,6 @@
 import { WEATHER_KERNEL_CONTRACT_VERSION, createWeatherKernelEventSeed } from '../kernel/contracts.js';
 import { buildHurricaneSystem } from './hurricaneSystems.js';
+import { buildSevereWeatherSystem } from './severeWeatherSystems.js';
 import {
   WEATHER_EVENT_LEDGER_SCHEMA,
   WEATHER_EVENT_MATCH_RADIUS_KM,
@@ -26,6 +27,7 @@ const roundedAnchor = (value, step) => Math.round((Number(value) || 0) / step) *
 const eventSeedDigest = (candidate, seed) => {
   const timeBucketHours = candidate.type === WEATHER_EVENT_TYPES.SUPERCELL
     || candidate.type === WEATHER_EVENT_TYPES.TORNADO_OUTBREAK
+    || candidate.type === WEATHER_EVENT_TYPES.TORNADO_TOUCHDOWN
     ? 3
     : 12;
   const timeBucket = Math.floor((candidate.timeUTC || 0) / (timeBucketHours * 3600));
@@ -243,11 +245,15 @@ export class WeatherEventLedger {
       samples: [firstSample],
       track: [firstSample],
       hurricane: null,
+      severeWeather: null,
       closedReason: null
     };
     if (candidate.type === WEATHER_EVENT_TYPES.HURRICANE) {
       event.hurricane = buildHurricaneSystem(candidate, event);
       event.track = event.hurricane.track;
+    }
+    if (isSevereWeatherType(candidate.type)) {
+      event.severeWeather = buildSevereWeatherSystem(candidate, event);
     }
     return event;
   }
@@ -277,6 +283,9 @@ export class WeatherEventLedger {
     if (candidate.type === WEATHER_EVENT_TYPES.HURRICANE) {
       event.hurricane = buildHurricaneSystem(candidate, event);
       event.track = event.hurricane.track;
+    }
+    if (isSevereWeatherType(candidate.type)) {
+      event.severeWeather = buildSevereWeatherSystem(candidate, event);
     }
   }
 
@@ -335,7 +344,25 @@ export class WeatherEventLedger {
       sourceSnapshotDigest: event.sourceSnapshotDigest,
       track: includeTrack ? [...(event.track || [])] : undefined,
       hurricane: event.hurricane ? { ...event.hurricane, track: [...(event.hurricane.track || [])] } : null,
+      severeWeather: event.severeWeather ? {
+        ...event.severeWeather,
+        warningPolygon: event.severeWeather.warningPolygon ? [...event.severeWeather.warningPolygon] : [],
+        touchdownTracks: event.severeWeather.touchdownTracks ? event.severeWeather.touchdownTracks.map((track) => ({
+          ...track,
+          damageSwath: track.damageSwath ? [...track.damageSwath] : []
+        })) : [],
+        damageSwaths: event.severeWeather.damageSwaths ? event.severeWeather.damageSwaths.map((swath) => ({
+          ...swath,
+          polygon: swath.polygon ? [...swath.polygon] : []
+        })) : []
+      } : null,
       closedReason: event.closedReason
     };
   }
 }
+
+const isSevereWeatherType = (type) => (
+  type === WEATHER_EVENT_TYPES.SUPERCELL
+  || type === WEATHER_EVENT_TYPES.TORNADO_OUTBREAK
+  || type === WEATHER_EVENT_TYPES.TORNADO_TOUCHDOWN
+);

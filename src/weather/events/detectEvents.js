@@ -4,6 +4,7 @@ import {
   WEATHER_EVENT_TYPES,
   WEATHER_EVENT_TYPE_LIST
 } from './eventTypes.js';
+import { computeSevereWeatherEnvironment } from './severeWeatherSystems.js';
 
 const clamp01 = (value) => Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 const smoothstep = (edge0, edge1, value) => {
@@ -44,6 +45,13 @@ export const haversineKm = (a, b) => {
 const sample = (field, index, fallback = 0) => (
   field && Number.isFinite(field[index]) ? field[index] : fallback
 );
+
+const sampleWrapped = (field, grid, i, j, di = 0, dj = 0, fallback = 0) => {
+  if (!field || !grid?.nx || !grid?.ny) return fallback;
+  const ii = ((i + di) % grid.nx + grid.nx) % grid.nx;
+  const jj = Math.max(0, Math.min(grid.ny - 1, j + dj));
+  return sample(field, jj * grid.nx + ii, fallback);
+};
 
 const cellMeta = (grid, index) => {
   const nx = grid?.nx || 1;
@@ -205,6 +213,8 @@ export function detectWeatherEventCandidates({
     tropicalColdOrDry: 0,
     tropicalWrongSurface: 0,
     tornadoWrongSeasonOrRegion: 0,
+    tornadoMissingIngredients: 0,
+    genericRainRejected: 0,
     midlatitudeOutOfBelt: 0,
     absurdPlacement: 0
   };
@@ -397,47 +407,102 @@ export function detectWeatherEventCandidates({
       }
     }
 
-    const tornadoWarmSeason01 = circularSeasonSupport(dayOfYear, latDeg >= 0 ? 150 : 330, 92);
-    const tornadoRisk01 = Math.max(
-      clamp01(sample(state.tornadoRiskPotentialDiag, k)),
-      clamp01(sample(state.tornadoInstabilitySupportDiag, k))
-        * clamp01(sample(state.tornadoShearSupportDiag, k))
-        * clamp01(sample(state.tornadoLiftSupportDiag, k))
-        * clamp01(sample(state.tornadoStormModeSupportDiag, k))
-    );
+    const rhWest = sampleWrapped(rhLow, grid, meta.i, meta.j, -1, 0, sample(rhLow, k, 0.45));
+    const rhEast = sampleWrapped(rhLow, grid, meta.i, meta.j, 1, 0, sample(rhLow, k, 0.45));
+    const drylineMoistureGradient = Math.max(0, rhEast - rhWest);
+    const severeEnvironment = computeSevereWeatherEnvironment({
+      isLand,
+      latDeg,
+      lonDeg,
+      dayOfYear,
+      surfaceTempK: tsK,
+      rhLow: sample(rhLow, k, 0.45),
+      rhUpper: sample(rhUpper, k, 0.38),
+      shearMs,
+      convectiveOrganization: sample(state.convectiveOrganization, k),
+      convectivePrecipRate: convectiveRate,
+      precipRate,
+      lowLevelConvergence: sample(state.lowLevelMoistureConvergence, k),
+      omegaLower: sample(omegaLower, k),
+      frontalSupport,
+      warmSectorSupport: clamp01(sample(state.stormWarmSectorDiag, k)),
+      coldSectorSupport: clamp01(sample(state.stormColdSectorDiag, k)),
+      stormGenesis,
+      tornadoRiskDiag: clamp01(sample(state.tornadoRiskPotentialDiag, k)),
+      instabilityDiag: clamp01(sample(state.tornadoInstabilitySupportDiag, k)),
+      shearDiag: clamp01(sample(state.tornadoShearSupportDiag, k)),
+      liftDiag: clamp01(sample(state.tornadoLiftSupportDiag, k)),
+      stormModeDiag: clamp01(sample(state.tornadoStormModeSupportDiag, k)),
+      drylineMoistureGradient
+    });
+    const tornadoWarmSeason01 = severeEnvironment.warmSeason01;
+    const tornadoRisk01 = severeEnvironment.severeWeatherIndex01;
     const plains = isGreatPlains({ latDeg, lonDeg });
-    const warmSurface01 = smoothstep(292, 305, tsK);
-    if (isLand && plains && tornadoWarmSeason01 >= 0.12 && tornadoRisk01 >= 0.16 && warmSurface01 >= 0.15) {
+    const tornadicIngredientsOk = severeEnvironment.physicallyTornadic
+      && severeEnvironment.ingredientMin01 >= 0.24
+      && severeEnvironment.rainOnlyPenalty01 < 0.42;
+    if (isLand && plains && tornadoWarmSeason01 >= 0.12 && tornadoRisk01 >= 0.18 && tornadicIngredientsOk) {
       buckets[WEATHER_EVENT_TYPES.TORNADO_OUTBREAK].push(makeCandidate({
         type: WEATHER_EVENT_TYPES.TORNADO_OUTBREAK,
         index: k,
         grid,
         timeUTC,
-        score: clamp01(tornadoRisk01 * (0.55 + 0.45 * tornadoWarmSeason01)),
+        score: clamp01(tornadoRisk01 * (0.72 + 0.28 * Math.max(severeEnvironment.frontalSupport01, severeEnvironment.drylineSupport01))),
         intensity: Math.max(tornadoRisk01, convection01),
         radiusKm: 320 + 240 * tornadoRisk01,
         region: 'great-plains',
         motionVector: { uMs: windU, vMs: windV },
         environment: {
-          tornadoRisk01: Number(tornadoRisk01.toFixed(3)),
-          warmSeason01: Number(tornadoWarmSeason01.toFixed(3)),
-          instability01: Number(clamp01(sample(state.tornadoInstabilitySupportDiag, k)).toFixed(3)),
-          shear01: Number(clamp01(sample(state.tornadoShearSupportDiag, k)).toFixed(3)),
-          lift01: Number(clamp01(sample(state.tornadoLiftSupportDiag, k)).toFixed(3)),
-          stormMode01: Number(clamp01(sample(state.tornadoStormModeSupportDiag, k)).toFixed(3))
+          ...Object.fromEntries(Object.entries(severeEnvironment).map(([key, value]) => [
+            key,
+            Number.isFinite(value) ? Number(value.toFixed(3)) : value
+          ])),
+          shearMs: Number(shearMs.toFixed(2)),
+          precipRateMmHr: Number(precipRate.toFixed(3)),
+          drylineMoistureGradient: Number(drylineMoistureGradient.toFixed(3))
         }
       }));
+      if (
+        tornadoRisk01 >= 0.42
+        && severeEnvironment.capeProxy01 >= 0.48
+        && severeEnvironment.shear01 >= 0.48
+        && severeEnvironment.lift01 >= 0.38
+        && severeEnvironment.stormMode01 >= 0.42
+      ) {
+        buckets[WEATHER_EVENT_TYPES.TORNADO_TOUCHDOWN].push(makeCandidate({
+          type: WEATHER_EVENT_TYPES.TORNADO_TOUCHDOWN,
+          index: k,
+          grid,
+          timeUTC,
+          score: clamp01(tornadoRisk01 * 0.92 + severeEnvironment.ingredientMin01 * 0.08),
+          intensity: Math.max(tornadoRisk01, severeEnvironment.ingredientProduct01),
+          radiusKm: 18 + 42 * tornadoRisk01,
+          region: 'great-plains-touchdown',
+          motionVector: { uMs: windU, vMs: windV },
+          environment: {
+            ...Object.fromEntries(Object.entries(severeEnvironment).map(([key, value]) => [
+              key,
+              Number.isFinite(value) ? Number(value.toFixed(3)) : value
+            ])),
+            parentOutbreak: true,
+            shearMs: Number(shearMs.toFixed(2)),
+            drylineMoistureGradient: Number(drylineMoistureGradient.toFixed(3))
+          }
+        }));
+      }
     } else if (tornadoRisk01 > 0.25 && plains) {
-      rejected.tornadoWrongSeasonOrRegion += 1;
+      if (tornadoWarmSeason01 < 0.12) rejected.tornadoWrongSeasonOrRegion += 1;
+      else rejected.tornadoMissingIngredients += 1;
+    } else if (precipRate > 0.18 && isLand && severeEnvironment.rainOnlyPenalty01 >= 0.35) {
+      rejected.genericRainRejected += 1;
     }
 
     const supercellScore = clamp01(
       tornadoRisk01
-        * Math.max(0.25, tornadoWarmSeason01)
-        * smoothstep(25, 52, absLat)
-        * (isLand ? 1 : 0)
+        * Math.max(0.35, severeEnvironment.forcingSupport01)
+        * (severeEnvironment.ingredientMin01 >= 0.20 ? 1 : 0)
     );
-    if (supercellScore >= 0.14) {
+    if (supercellScore >= 0.15) {
       buckets[WEATHER_EVENT_TYPES.SUPERCELL].push(makeCandidate({
         type: WEATHER_EVENT_TYPES.SUPERCELL,
         index: k,
@@ -449,10 +514,13 @@ export function detectWeatherEventCandidates({
         region: plains ? 'great-plains' : 'continental-warm-sector',
         motionVector: { uMs: windU, vMs: windV },
         environment: {
-          tornadoRisk01: Number(tornadoRisk01.toFixed(3)),
+          ...Object.fromEntries(Object.entries(severeEnvironment).map(([key, value]) => [
+            key,
+            Number.isFinite(value) ? Number(value.toFixed(3)) : value
+          ])),
           shearMs: Number(shearMs.toFixed(2)),
-          lift01: Number(clamp01(sample(state.tornadoLiftSupportDiag, k)).toFixed(3)),
-          stormMode01: Number(clamp01(sample(state.tornadoStormModeSupportDiag, k)).toFixed(3))
+          precipRateMmHr: Number(precipRate.toFixed(3)),
+          drylineMoistureGradient: Number(drylineMoistureGradient.toFixed(3))
         }
       }));
     }

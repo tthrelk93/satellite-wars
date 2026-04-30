@@ -5,6 +5,7 @@ import {
   WEATHER_EVENT_PRODUCT_SCHEMA,
   WEATHER_EVENT_TYPES,
   WeatherEventLedger,
+  computeSevereWeatherEnvironment,
   detectWeatherEventCandidates
 } from '../../src/weather/events/index.js';
 import { createWeatherKernel } from '../../src/weather/kernel/index.js';
@@ -116,6 +117,41 @@ const setHurricaneEnvironment = (fixture, k) => {
   fixture.fields.vort[k] = 8e-6;
 };
 
+const setSevereEnvironment = (fixture, k, { dryline = true } = {}) => {
+  const { grid } = fixture;
+  const i = k % grid.nx;
+  const j = Math.floor(k / grid.nx);
+  fixture.state.landMask[k] = 1;
+  setAt(fixture, k, {
+    Ts: 304,
+    RH: 0.78,
+    RHU: 0.62,
+    precipRate: 0.26,
+    precipConvectiveRate: 0.18,
+    convectiveOrganization: 0.82,
+    lowLevelMoistureConvergence: 7.5e-6,
+    stormGenesisPotentialDiag: 0.58,
+    stormWarmSectorDiag: 0.72,
+    frontalAscentSupportDiag: 0.44,
+    tornadoRiskPotentialDiag: 0.76,
+    tornadoInstabilitySupportDiag: 0.88,
+    tornadoShearSupportDiag: 0.82,
+    tornadoLiftSupportDiag: 0.78,
+    tornadoStormModeSupportDiag: 0.84
+  });
+  fixture.fields.u[k] = 16;
+  fixture.fields.v[k] = 5;
+  fixture.fields.uU[k] = 38;
+  fixture.fields.vU[k] = 18;
+  fixture.fields.omegaL[k] = -0.08;
+  if (dryline) {
+    const west = j * grid.nx + ((i - 1 + grid.nx) % grid.nx);
+    const east = j * grid.nx + ((i + 1) % grid.nx);
+    fixture.fields.RH[west] = 0.28;
+    fixture.fields.RH[east] = 0.82;
+  }
+};
+
 test('Atlantic hurricane candidates peak in hurricane season and reject winter/cold/dry setups', () => {
   const peak = makeFixture();
   const k = nearestCell(peak.grid, 18, -55);
@@ -153,41 +189,98 @@ test('Atlantic hurricane candidates peak in hurricane season and reject winter/c
 test('Great Plains tornado outbreaks peak in warm season and reject cool-season false positives', () => {
   const warm = makeFixture();
   const k = nearestCell(warm.grid, 36, -98);
-  warm.state.landMask[k] = 1;
-  setAt(warm, k, {
-    Ts: 304,
-    RH: 0.74,
-    precipRate: 0.24,
-    tornadoRiskPotentialDiag: 0.82,
-    tornadoInstabilitySupportDiag: 0.9,
-    tornadoShearSupportDiag: 0.82,
-    tornadoLiftSupportDiag: 0.78,
-    tornadoStormModeSupportDiag: 0.84
-  });
+  setSevereEnvironment(warm, k);
   const warmResult = detectWeatherEventCandidates({
     ...warm,
     timeUTC: 150 * daySeconds
   });
   assert.ok(warmResult.candidates.some((event) => event.type === WEATHER_EVENT_TYPES.TORNADO_OUTBREAK && event.region === 'great-plains'));
+  assert.ok(warmResult.candidates.some((event) => event.type === WEATHER_EVENT_TYPES.SUPERCELL));
+  assert.ok(warmResult.candidates.some((event) => event.type === WEATHER_EVENT_TYPES.TORNADO_TOUCHDOWN));
 
   const cool = makeFixture();
   const kc = nearestCell(cool.grid, 36, -98);
-  cool.state.landMask[kc] = 1;
-  setAt(cool, kc, {
-    Ts: 304,
-    RH: 0.74,
-    precipRate: 0.24,
-    tornadoRiskPotentialDiag: 0.82,
-    tornadoInstabilitySupportDiag: 0.9,
-    tornadoShearSupportDiag: 0.82,
-    tornadoLiftSupportDiag: 0.78,
-    tornadoStormModeSupportDiag: 0.84
-  });
+  setSevereEnvironment(cool, kc);
   const coolResult = detectWeatherEventCandidates({
     ...cool,
     timeUTC: 20 * daySeconds
   });
   assert.equal(coolResult.candidates.some((event) => event.type === WEATHER_EVENT_TYPES.TORNADO_OUTBREAK), false);
+});
+
+test('severe-weather environment index requires ingredients and rejects generic rain', () => {
+  const favorable = computeSevereWeatherEnvironment({
+    isLand: true,
+    latDeg: 36,
+    lonDeg: -98,
+    dayOfYear: 150,
+    surfaceTempK: 304,
+    rhLow: 0.78,
+    rhUpper: 0.62,
+    shearMs: 27,
+    convectiveOrganization: 0.82,
+    convectivePrecipRate: 0.18,
+    precipRate: 0.26,
+    lowLevelConvergence: 7.5e-6,
+    omegaLower: -0.08,
+    frontalSupport: 0.44,
+    warmSectorSupport: 0.72,
+    stormGenesis: 0.58,
+    instabilityDiag: 0.88,
+    shearDiag: 0.82,
+    liftDiag: 0.78,
+    stormModeDiag: 0.84,
+    drylineMoistureGradient: 0.54
+  });
+  const genericRain = computeSevereWeatherEnvironment({
+    isLand: true,
+    latDeg: 36,
+    lonDeg: -98,
+    dayOfYear: 150,
+    surfaceTempK: 296,
+    rhLow: 0.78,
+    rhUpper: 0.62,
+    shearMs: 4,
+    convectiveOrganization: 0.18,
+    convectivePrecipRate: 0.02,
+    precipRate: 0.75,
+    omegaLower: 0.01,
+    frontalSupport: 0.02,
+    instabilityDiag: 0.04,
+    shearDiag: 0.03,
+    liftDiag: 0.05,
+    stormModeDiag: 0.04
+  });
+  assert.ok(favorable.severeWeatherIndex01 > 0.45);
+  assert.equal(favorable.physicallyTornadic, true);
+  assert.ok(favorable.drylineSupport01 > 0.5);
+  assert.ok(genericRain.severeWeatherIndex01 < favorable.severeWeatherIndex01 * 0.25);
+  assert.equal(genericRain.physicallyTornadic, false);
+});
+
+test('generic rain cannot spawn tornadoes without shear, instability, lift, and storm mode', () => {
+  const fixture = makeFixture();
+  const k = nearestCell(fixture.grid, 36, -98);
+  fixture.state.landMask[k] = 1;
+  setAt(fixture, k, {
+    Ts: 297,
+    RH: 0.82,
+    RHU: 0.70,
+    precipRate: 0.85,
+    precipConvectiveRate: 0.04,
+    convectiveOrganization: 0.12
+  });
+  fixture.fields.u[k] = 4;
+  fixture.fields.v[k] = 1;
+  fixture.fields.uU[k] = 7;
+  fixture.fields.vU[k] = 2;
+  const result = detectWeatherEventCandidates({
+    ...fixture,
+    timeUTC: 150 * daySeconds
+  });
+  assert.equal(result.candidates.some((event) => event.type === WEATHER_EVENT_TYPES.TORNADO_OUTBREAK), false);
+  assert.equal(result.candidates.some((event) => event.type === WEATHER_EVENT_TYPES.TORNADO_TOUCHDOWN), false);
+  assert.ok(result.rejected.genericRainRejected >= 1);
 });
 
 test('fronts and cyclones follow midlatitude storm tracks without polar absurd placements', () => {
@@ -264,6 +357,35 @@ test('event ledger persists lifecycle, history, deterministic ids, and hurricane
   assert.equal(product2.activeEvents.length, 0);
   assert.equal(product2.history.length, 1);
   assert.equal(product2.history[0].closedReason, 'environment-no-longer-valid');
+});
+
+test('event ledger builds severe-weather signatures and tornado touchdown tracks', () => {
+  const fixture = makeFixture();
+  const k = nearestCell(fixture.grid, 36, -98);
+  setSevereEnvironment(fixture, k);
+  const detection = detectWeatherEventCandidates({ ...fixture, timeUTC: 150 * daySeconds });
+  const outbreak = detection.candidates.find((event) => event.type === WEATHER_EVENT_TYPES.TORNADO_OUTBREAK);
+  const touchdown = detection.candidates.find((event) => event.type === WEATHER_EVENT_TYPES.TORNADO_TOUCHDOWN);
+  assert.ok(outbreak, 'expected Great Plains outbreak candidate');
+  assert.ok(touchdown, 'expected local touchdown candidate');
+
+  const ledger = new WeatherEventLedger({ seed: 99 });
+  const product = ledger.update({
+    candidates: [outbreak, touchdown],
+    timeUTC: 150 * daySeconds,
+    dayOfYear: 150
+  });
+  const severeOutbreak = product.activeEvents.find((event) => event.type === WEATHER_EVENT_TYPES.TORNADO_OUTBREAK);
+  const severeTouchdown = product.activeEvents.find((event) => event.type === WEATHER_EVENT_TYPES.TORNADO_TOUCHDOWN);
+  assert.ok(severeOutbreak?.severeWeather);
+  assert.ok(severeOutbreak.severeWeather.radarSignature.hookEcho);
+  assert.ok(severeOutbreak.severeWeather.radarSignature.velocityCouplet);
+  assert.ok(severeOutbreak.severeWeather.satelliteSignature.overshootingTop);
+  assert.ok(severeOutbreak.severeWeather.warningPolygon.length >= 4);
+  assert.ok(severeOutbreak.severeWeather.touchdownTracks.length >= 1);
+  assert.ok(severeOutbreak.severeWeather.damageSwaths.length >= 1);
+  assert.ok(severeTouchdown?.severeWeather?.touchdownTracks?.length === 1);
+  assert.ok(severeTouchdown.severeWeather.damageSwaths[0].polygon.length >= 4);
 });
 
 test('weather kernel payload exposes deterministic event products through the boundary', async () => {
