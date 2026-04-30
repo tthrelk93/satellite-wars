@@ -10,6 +10,12 @@ import UplinkHub from './UplinkHub';
 import Player from './Player';
 import { UPKEEP_PER_SAT, INCOME_PER_COMM_IN_LINK, INCOME_PER_IMAGING_IN_LINK, BASE_INCOME_PER_TURN, MU_EARTH, RE_M, OMEGA_EARTH, LOSSES_MPS, DV_REF_MPS, DV_EXPONENT, COMM_RANGE_KM, SPACE_LOS_EPS, GROUND_LOS_EPS, CLOUD_WATCH_GRID_LON_OFFSET_RAD } from './constants';
 import SimClock from './SimClock';
+import {
+    clampMaxSubstepsForWeatherWorker,
+    getDisplayedSimTimeSeconds,
+    getMaxSimSubsteps,
+    getRenderSimTimeSeconds
+} from './sim/simStepPlanner';
 import { solarDeclination } from './weather/solar';
 import { clampSimAdvanceByTruthBudget, computeFixedStepBudget } from './weather/simAdvanceBudget';
 import { loadNullschoolWind } from './weather/reference/loadNullschoolWind';
@@ -1655,9 +1661,14 @@ const App = () => {
     };
 
     function updateWeatherDebugNow() {
-        const simTime = simClockRef.current?.simTimeSeconds ?? 0;
-        setSimTimeLabel(formatSimTime(simTime));
         const earth = earthRef.current;
+        const simTime = getDisplayedSimTimeSeconds({
+            simTimeSeconds: simClockRef.current?.simTimeSeconds ?? 0,
+            paused: simClockRef.current?.paused ?? false,
+            useWeatherWorker: Boolean(earth?.useWeatherWorker),
+            weatherCoreTimeSeconds: earth?.weatherField?.core?.timeUTC ?? null
+        });
+        setSimTimeLabel(formatSimTime(simTime));
         if (!earth) return;
         const seed = earth.getWeatherSeed();
         if (seed !== undefined && seed !== null) {
@@ -1715,6 +1726,19 @@ const App = () => {
         if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return;
         simAdvanceQueueSecondsRef.current += deltaSeconds;
         if (burst) simBurstActiveRef.current = true;
+    };
+
+    const stepPausedWeatherDebugSeconds = (deltaSeconds) => {
+        if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return false;
+        const simClock = simClockRef.current;
+        const earth = earthRef.current;
+        if (!simClock || !earth || !simClock.paused) return false;
+        const targetSimTimeSeconds = (simClock.simTimeSeconds ?? 0) + deltaSeconds;
+        earth.stepPausedWeatherSimulation?.(deltaSeconds, { targetSimTimeSeconds });
+        simClock.stepSeconds(deltaSeconds);
+        earth.setRotationForSimTime?.(targetSimTimeSeconds);
+        updateWeatherDebugNow();
+        return true;
     };
 
     const skipToNextDay = () => {
@@ -5894,16 +5918,25 @@ const App = () => {
                 simBurstActiveRef.current = true;
             }
 
+            const earthForStepBudget = earthRef.current;
+            const stepsAvailable = Math.floor(simAccumSeconds / FIXED_SIM_STEP_SECONDS);
             const useBurst = simBurstActiveRef.current && simAccumSeconds >= FIXED_SIM_STEP_SECONDS;
-            const maxSteps = useBurst ? MAX_SIM_SUBSTEPS_BURST : MAX_SIM_SUBSTEPS;
-            const stepBudget = computeFixedStepBudget(
-                simAccumSeconds,
-                FIXED_SIM_STEP_SECONDS,
-                maxSteps,
-                FIXED_SIM_STEP_EPSILON_SECONDS
-            );
-            const { stepsToRun, stepsSkipped, deltaSimSeconds } = stepBudget;
-            simAccumSeconds = stepBudget.remainingSeconds;
+            const burstMaxSteps = getMaxSimSubsteps({
+                paused: simClock.paused,
+                burstActive: useBurst,
+                fixedSimStepSeconds: FIXED_SIM_STEP_SECONDS,
+                maxSubsteps: MAX_SIM_SUBSTEPS,
+                maxSubstepsBurst: MAX_SIM_SUBSTEPS_BURST,
+                pausedBurstHorizonSeconds: 7200
+            });
+            const maxSteps = clampMaxSubstepsForWeatherWorker({
+                maxSteps: burstMaxSteps,
+                paused: simClock.paused,
+                useWeatherWorker: Boolean(earthForStepBudget?.useWeatherWorker),
+                weatherWorkerBusy: Boolean(earthForStepBudget?._weatherWorkerBusy)
+            });
+            const stepsToRun = Math.min(stepsAvailable, maxSteps);
+            const stepsSkipped = Math.max(0, stepsAvailable - stepsToRun);
             simAccumSecondsRef.current = simAccumSeconds;
             if (simAccumSeconds < FIXED_SIM_STEP_SECONDS * 0.5) {
                 simBurstActiveRef.current = false;
@@ -5921,7 +5954,11 @@ const App = () => {
                 lastSimTimeSeconds = simClock.simTimeSeconds;
             }
 
-            const renderSimTimeSeconds = simClock.simTimeSeconds + simAccumSeconds;
+            const renderSimTimeSeconds = getRenderSimTimeSeconds({
+                simTimeSeconds: simClock.simTimeSeconds,
+                simAccumSeconds,
+                paused: simClock.paused
+            });
             const didAdvanceSim = deltaSimSeconds > 0;
             if (earthRef.current) {
                 earthRef.current.setRotationForSimTime?.(renderSimTimeSeconds);
@@ -8769,6 +8806,7 @@ const App = () => {
                                 variant="outlined"
                                 color="inherit"
                                 onClick={() => {
+                                    if (stepPausedWeatherDebugSeconds(3600)) return;
                                     queueSimAdvanceSeconds(3600, { burst: true });
                                 }}
                             >
@@ -8779,6 +8817,7 @@ const App = () => {
                                 variant="outlined"
                                 color="inherit"
                                 onClick={() => {
+                                    if (stepPausedWeatherDebugSeconds(86400)) return;
                                     queueSimAdvanceSeconds(86400, { burst: true });
                                 }}
                             >
@@ -8789,6 +8828,7 @@ const App = () => {
                                 variant="outlined"
                                 color="inherit"
                                 onClick={() => {
+                                    if (stepPausedWeatherDebugSeconds(MONTH_SECONDS)) return;
                                     queueSimAdvanceSeconds(MONTH_SECONDS, { burst: true });
                                 }}
                             >

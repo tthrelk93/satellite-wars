@@ -6,8 +6,8 @@ let kernel = null;
 let snapshotMode = 'compact';
 
 const postSnapshot = (type) => {
-  if (!kernel) return;
-  const payload = kernel.getWorkerPayload({ mode: snapshotMode });
+  if (!core) return;
+  const payload = core.getStateSnapshot({ mode: snapshotMode });
   const message = { type, payload };
   self.postMessage(message, collectWeatherKernelTransferBuffers(payload));
 };
@@ -27,9 +27,11 @@ self.onmessage = async (event) => {
         seed: payload.seed,
         instrumentationMode: payload.instrumentationMode === 'disabled' ? 'disabled' : 'full'
       });
-      await kernel.whenReady();
-      if (Number.isFinite(payload.startTimeSeconds)) {
-        kernel.setTimeUTC(payload.startTimeSeconds);
+      await core._initPromise;
+      if (payload.startSnapshot && typeof core.applyStateSnapshot === 'function') {
+        core.applyStateSnapshot(payload.startSnapshot, { restoreRuntime: true });
+      } else if (Number.isFinite(payload.startTimeSeconds)) {
+        core.setTimeUTC(payload.startTimeSeconds);
       }
       postSnapshot('ready');
       return;

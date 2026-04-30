@@ -2,6 +2,12 @@ import { Re } from '../constants.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const smoothstep = (edge0, edge1, x) => {
+  const span = edge1 - edge0;
+  if (!(span > 1e-6)) return x >= edge1 ? 1 : 0;
+  const t = clamp01((x - edge0) / span);
+  return t * t * (3 - 2 * t);
+};
 
 export function stepWinds5({ dt, grid, state, geo, params = {}, scratch }) {
   if (!grid || !state || !scratch) return;
@@ -9,6 +15,12 @@ export function stepWinds5({ dt, grid, state, geo, params = {}, scratch }) {
     maxWind = 70,
     tauDragSurface = 4 * 3600,
     tauDragTop = 2 * 86400,
+    dragSigmaStart = 0.72,
+    dragSigmaEnd = 0.98,
+    dragSigmaExponent = 2.0,
+    roughnessSigmaStart = 0.82,
+    roughnessSigmaEnd = 1.0,
+    roughnessSigmaExponent = 1.5,
     nuLaplacian = 4_000_000,
     quadDragAlphaSurface = 0.02,
     tropicsDragBoost = 0.5,
@@ -28,7 +40,7 @@ export function stepWinds5({ dt, grid, state, geo, params = {}, scratch }) {
   } = params;
 
   const { nx, ny, invDx, invDy, f, latDeg, polarWeight, sinLat, cosLat } = grid;
-  const { N, nz, u, v, phiMid, landMask } = state;
+  const { N, nz, u, v, phiMid, landMask, sigmaHalf } = state;
   const elevField = geo?.elev && geo.elev.length === N ? geo.elev : null;
   const { lapU, lapV, lapLapU, lapLapV, rowA, rowB } = scratch;
   if (!lapU || !lapV || !lapLapU || !lapLapV || !rowA || !rowB) return;
@@ -104,7 +116,14 @@ export function stepWinds5({ dt, grid, state, geo, params = {}, scratch }) {
     laplacianLevel(lapU, 0, lapLapU);
     laplacianLevel(lapV, 0, lapLapV);
     const t = nz > 1 ? lev / (nz - 1) : 0;
-    const tauDragLev = lerp(tauDragTop, tauDragSurface, t);
+    const sigmaMid = sigmaHalf?.length > lev + 1
+      ? 0.5 * (sigmaHalf[lev] + sigmaHalf[lev + 1])
+      : t;
+    const dragBlendBase = smoothstep(dragSigmaStart, dragSigmaEnd, sigmaMid);
+    const dragBlend = Math.pow(dragBlendBase, Math.max(0.25, dragSigmaExponent));
+    const roughnessBlendBase = smoothstep(roughnessSigmaStart, roughnessSigmaEnd, sigmaMid);
+    const roughnessBlend = Math.pow(roughnessBlendBase, Math.max(0.25, roughnessSigmaExponent));
+    const tauDragLev = lerp(tauDragTop, tauDragSurface, dragBlend);
     const nuHyper = nuLaplacian;
     const nuLapSmall = nuLaplacian * 0.05;
 
@@ -146,8 +165,9 @@ export function stepWinds5({ dt, grid, state, geo, params = {}, scratch }) {
         const u0 = u[idx0];
         const v0 = v[idx0];
         const speed0 = Math.hypot(u0, v0);
-        const quadAlphaLev = quadDragAlphaSurface * t;
-        const dragFactor = (1 + quadAlphaLev * speed0) * tropicsFactor * (1 + terrainDragBoost * terrainFactor + landFactor * t);
+        const quadAlphaLev = quadDragAlphaSurface * dragBlend;
+        const roughnessFactor = 1 + roughnessBlend * (terrainDragBoost * terrainFactor + landFactor);
+        const dragFactor = (1 + quadAlphaLev * speed0) * tropicsFactor * roughnessFactor;
         const dragU = -(dragFactor * u0) / tauDragLev;
         const dragV = -(dragFactor * v0) / tauDragLev;
         const diffU = (-nuHyper * lapLapU[k]) + (nuLapSmall * lapU[k]);

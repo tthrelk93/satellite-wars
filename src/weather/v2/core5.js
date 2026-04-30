@@ -414,8 +414,14 @@ export class WeatherCore5 {
     };
     this.dynParams = {
       maxWind: 70,
-      tauDragSurface: 5 * 3600,
-      tauDragTop: 6 * 3600,
+      tauDragSurface: 6 * 3600,
+      tauDragTop: 24 * 3600,
+      dragSigmaStart: 0.72,
+      dragSigmaEnd: 0.98,
+      dragSigmaExponent: 2.0,
+      roughnessSigmaStart: 0.82,
+      roughnessSigmaEnd: 1.0,
+      roughnessSigmaExponent: 1.5,
       nuLaplacian: 4_000_000,
       quadDragAlphaSurface: 0.02,
       tropicsDragBoost: 0.5,
@@ -531,7 +537,8 @@ export class WeatherCore5 {
       enable: true,
       tauSurfaceSeconds: 3 * 3600,
       tauUpperSeconds: 1 * 3600,
-      tauVSeconds: 1 * 3600,
+      tauVSeconds: 2 * 3600,
+      surfaceDeficitRelaxBoostMax: 8,
       upperWindCapFactor: 1.35,
       upperWindCapOffset: 0,
       upperWindCapMin: 0,
@@ -543,11 +550,12 @@ export class WeatherCore5 {
     };
     this.windEddyParams = {
       enable: true,
-      tauSeconds: 1 * 3600,
+      enableWithSpatialTargets: true,
+      tauSeconds: 5 * 86400,
       scaleClampMin: 0.5,
-      scaleClampMax: 5.0,
-      eps: 1e-6,
-      allowWithSpatialTargets: true
+      scaleClampMax: 3.0,
+      deficitRelaxBoostMax: 24.0,
+      eps: 1e-6
     };
     this._windNudgeMaxAbsCorrection = 0;
     this._windNudgeSpinupSeconds = 0;
@@ -593,182 +601,37 @@ export class WeatherCore5 {
        tauConv: 2 * 3600,
        tauPblUnstable: 6 * 3600,
        tauPblStable: 2 * 86400,
-      pblDepthFrac: 0.35,
-      maxMixFracPbl: 0.2,
-      pblTaper: 0.85,
-      pblMixCondensate: true,
-      pblCondMixScale: 0.35,
-      rhTrig: 0.72,
-      rhMidMin: 0.22,
-      omegaTrig: 0.2,
-      instabTrig: 2.5,
-      qvTrig: 0.0018,
-      thetaeCoeff: 10.5,
-      thetaeQvCap: 0.03,
-      convPotentialGrowTau: 90 * 60,
-      convPotentialDecayTau: 8 * 3600,
-      convOrganizationGrowTau: 90 * 60,
-      convOrganizationDecayTau: 12 * 3600,
-      convMinPotential: 0.12,
-      convMinOrganization: 0.14,
-      pblWarmRain: true,
+       pblDepthFrac: 0.22,
+       pblDepthFracStable: 0.14,
+       pblDepthFracUnstable: 0.22,
+       pblDepthFracLandBonus: 0.02,
+       pblDepthFracOceanPenalty: 0.02,
+       maxMixFracPbl: 0.2,
+       pblTaper: 0.85,
+       pblMixCondensate: true,
+       pblCondMixScale: 0.35,
+       rhTrig: 0.75,
+       rhMidMin: 0.25,
+       omegaTrig: 0.3,
+       instabTrig: 3,
+       qvTrig: 0.002,
+       thetaeCoeff: 10,
+       thetaeQvCap: 0.03,
+       pblWarmRain: true,
        qcAuto0: 7e-4,
        tauAuto: 4 * 3600,
        autoMaxFrac: 0.2,
        entrainFrac: 0.2,
-      detrainTopFrac: 0.7,
-      convRainoutBase: 0.28,
-      convRainoutOrganizationWeight: 0.32,
-      convRainoutHumidityWeight: 0.2,
-      tropicalCoreConvectiveMuBoost: 0.55,
-      tropicalCoreRainoutBoost: 0.2,
-      equatorialCoreConvectiveMuBoost: 0.3,
-      equatorialCoreRainoutBoost: 0.14,
-      equatorialCoreWidthDeg: 6,
-      rainforestSurfaceConvectionBoost: 1.2,
-      rainforestSurfaceOrganizationBoost: 0.7,
-      rainforestSurfaceMuBoost: 0.55,
-      rainforestSurfaceRainoutBoost: 0.18,
-      buoyTrigK: 0.0,
-      dThetaMaxConvPerStep: 2.5,
-      enableLargeScaleVerticalAdvection: true,
-      verticalAdvectionCflMax: 0.4,
-      verticalAdvectionMaxSubsteps: 8,
-      dThetaMaxVertAdvPerStep: 2.0,
-      enableOmegaMassFix: true,
-      orographicLiftScale: 0.5,
-      orographicLeeSubsidenceScale: 0.35,
-      terrainDirectionalBlend: 0.05,
-      terrainLeeOmega0: 0.15,
-      terrainLeeOmega1: 1.2,
-      terrainLeeAscentDamp: 1.0,
-      terrainLeeOmegaFloorBlend: 1.0,
-      terrainDeliveryProtectExposure0: 0.5,
-      terrainDeliveryProtectExposure1: 8.0,
-      tropicalOrganizationBandDeg: 13,
-      subtropicalSubsidenceLat0: 15,
-      subtropicalSubsidenceLat1: 35,
-      subtropicalSubsidenceTau: 8 * 3600,
-      subtropicalSubsidenceMaxDryFrac: 0.28,
-      subtropicalSubsidenceThetaStepK: 0.85,
-      subtropicalSubsidenceTopSigma: 0.35,
-      subtropicalSubsidenceBottomSigma: 0.85,
-      subtropicalSubsidenceCrossHemiFloorFrac: 0.58,
-      subtropicalSubsidenceWeakHemiBoost: 0.35,
-      enableSubtropicalDescentVentilation: false,
-      subtropicalDescentVentilationSource0: 0.12,
-      subtropicalDescentVentilationSource1: 0.22,
-      subtropicalDescentVentilationMaxPaS: 0.045,
-      subtropicalDescentVentilationMaxStepPaS: 0.018,
-      subtropicalDescentVentilationOrganizationMax: 0.14,
-      subtropicalDescentVentilationPotentialMax: 0.38,
-      enableCirculationReboundContainment: true,
-      circulationReboundContainmentScale: 1.35,
-      circulationReboundOrganizationScale: 0.6,
-      circulationReboundActivityScale: 0.35,
-      circulationReboundSourceScale: 0.75,
-      enableTransitionReturnFlowCoupling: true,
-      circulationReturnFlowCouplingOpportunity0: 0.00004,
-      circulationReturnFlowCouplingOpportunity1: 0.00032,
-      circulationReturnFlowCouplingMaxFrac: 0.32,
-      enableHadleyReturnFlowWindCoupling: true,
-      hadleyReturnFlowWindTau: 3 * 3600,
-      hadleyReturnFlowWindMaxMs: 5.8,
-      hadleyReturnFlowWindMaxStepMs: 1.2,
-      hadleyReturnFlowWindSigmaTop: 0.62,
-      hadleyReturnFlowWindSigmaBottom: 0.98,
-      hadleyReturnFlowWindSource0: 0.05,
-      hadleyReturnFlowWindSource1: 0.2,
-      hadleyReturnFlowWindDry0: 0.05,
-      hadleyReturnFlowWindDry1: 0.2,
-      enableWalkerLongitudinalCoupling: true,
-      walkerLongitudinalCouplingScale: 0.25,
-      enableDryingOmegaBridge: false,
-      dryingOmegaBridgeDry0: 0.08,
-      dryingOmegaBridgeDry1: 0.16,
-      dryingOmegaBridgeSuppressedSource0: 0.0007,
-      dryingOmegaBridgeSuppressedSource1: 0.0016,
-      dryingOmegaBridgeMaxPaS: 0.018,
-      dryingOmegaBridgeProjectedShareMaxFrac: 0.65,
-      dryingOmegaBridgeSourceLat0: 20,
-      dryingOmegaBridgeSourceLat1: 30,
-      dryingOmegaBridgeTargetLat0: 30,
-      dryingOmegaBridgeTargetLat1: 45,
-      dryingOmegaBridgeEquatorwardLeakLat0: 18,
-      dryingOmegaBridgeEquatorwardLeakLat1: 22,
-      dryingOmegaBridgeProjectedMaxPaS: 0.006,
-      enableFrontalAscentConcentration: true,
-      frontalAscentPeakLatDeg: 47,
-      frontalAscentSeasonalShiftDeg: 5,
-      frontalAscentWidthDeg: 10,
-      frontalAscentMinLatDeg: 30,
-      frontalAscentMaxLatDeg: 62,
-      frontalAscentMaxPaS: 0.055,
-      frontalAscentMaxStepPaS: 0.035,
-      frontalAscentSigmaTop: 0.42,
-      frontalAscentSigmaBottom: 0.98,
-      frontalAscentConcentrationPower: 1.35,
-      frontalAscentCompensationFloor: 0.28,
-      frontalAscentMinSupport: 0.025,
-      frontalAscentDiffuseDampingFrac: 0,
-      frontalAscentDiffuseDampingMaxStepPaS: 0.045,
-      frontalAscentCoreGatherSupport: 0.08,
-      enableSevereWeatherEnvironments: true,
-      tropicalCycloneGenesisScale: 1.0,
-      tropicalCycloneEmbeddedVortexThreshold: 0.24,
-      tornadoRiskScale: 1.0,
-      enableEquatorialEdgeSubsidenceGuard: false,
-      equatorialEdgeSubsidenceGuardMaxPaS: 0.007,
-      equatorialEdgeSubsidenceGuardSourceLat0: 8,
-      equatorialEdgeSubsidenceGuardSourceLat1: 14,
-      equatorialEdgeSubsidenceGuardTargetLat0: 2,
-      equatorialEdgeSubsidenceGuardTargetLat1: 6,
-      equatorialEdgeSubsidenceGuardProjectedMaxPaS: 0.0035,
-      enableNorthsideFanoutLeakPenalty: false,
-      northsideFanoutLeakPenaltyMaxFrac: 0.28,
-      northsideFanoutLeakPenaltyLat0: 9,
-      northsideFanoutLeakPenaltyLat1: 13,
-      northsideFanoutLeakPenaltyRisk0: 0.32,
-      northsideFanoutLeakPenaltyRisk1: 0.5,
-      enableNorthSourceConcentrationPenalty: false,
-      northSourceConcentrationPenaltySignal0: 0.035,
-      northSourceConcentrationPenaltySignal1: 0.065,
-      northSourceConcentrationPenaltySupport0: 0.08,
-      northSourceConcentrationPenaltySupport1: 0.16,
-      northSourceConcentrationPenaltyMaxFrac: 0.14,
-      enableAtlanticDryCoreReceiverTaper: false,
-      atlanticDryCoreReceiverTaperSignal0: 0.04,
-      atlanticDryCoreReceiverTaperSignal1: 0.075,
-      atlanticDryCoreReceiverTaperLat0: 22,
-      atlanticDryCoreReceiverTaperLat1: 30,
-      atlanticDryCoreReceiverTaperDry0: 0.12,
-      atlanticDryCoreReceiverTaperDry1: 0.24,
-      atlanticDryCoreReceiverTaperOmega0: 0.12,
-      atlanticDryCoreReceiverTaperOmega1: 0.26,
-      atlanticDryCoreReceiverTaperMaxFrac: 0.16,
-      enableAtlanticTransitionCarryoverContainment: false,
-      atlanticTransitionCarryoverContainmentSignal0: 0.04,
-      atlanticTransitionCarryoverContainmentSignal1: 0.075,
-      atlanticTransitionCarryoverContainmentLat0: 18,
-      atlanticTransitionCarryoverContainmentLat1: 22.5,
-      atlanticTransitionCarryoverContainmentOverlap0: 0.08,
-      atlanticTransitionCarryoverContainmentOverlap1: 0.18,
-      atlanticTransitionCarryoverContainmentDry0: 0.12,
-      atlanticTransitionCarryoverContainmentDry1: 0.24,
-      atlanticTransitionCarryoverContainmentOmega0: 0.12,
-      atlanticTransitionCarryoverContainmentOmega1: 0.26,
-      atlanticTransitionCarryoverContainmentMaxFrac: 0.18,
-      enableWeakHemiCrossHemiFloorTaper: false,
-      weakHemiCrossHemiFloorTaperPenalty0: 0.02,
-      weakHemiCrossHemiFloorTaperPenalty1: 0.06,
-      weakHemiCrossHemiFloorTaperOverhang0: 0.06,
-      weakHemiCrossHemiFloorTaperOverhang1: 0.12,
-      weakHemiCrossHemiFloorTaperMaxFrac: 0.145,
-      upperCloudWeakErosionSupportScale: 1.0,
-      upperCloudPersistenceSupportScale: 1.0,
-      eps: 1e-12,
-      debugConservation: false
-    };
+       detrainTopFrac: 0.7,
+       buoyTrigK: 0.0,
+       dThetaMaxConvPerStep: 2.5,
+       enableLargeScaleVerticalAdvection: true,
+       verticalAdvectionCflMax: 0.4,
+       dThetaMaxVertAdvPerStep: 2.0,
+       enableOmegaMassFix: true,
+       eps: 1e-12,
+       debugConservation: false
+     };
     this.microParams = {
       p0: 100000,
       pTop: P_TOP,
@@ -1187,76 +1050,20 @@ export class WeatherCore5 {
     return field;
   }
 
-  _serializePressureLevelFieldMap(map) {
-    if (!(map instanceof Map)) return null;
-    return Array.from(map.entries()).map(([pressurePa, field]) => ([
-      Number(pressurePa),
-      this._copySnapshotField(field)
-    ]));
-  }
-
-  _restorePressureLevelFieldMap(entries) {
-    if (!Array.isArray(entries)) return null;
-    const restored = new Map();
-    for (const [pressurePa, field] of entries) {
-      if (!(field instanceof Float32Array || field instanceof Uint8Array || field instanceof Uint16Array)) continue;
-      restored.set(Number(pressurePa), this._copySnapshotField(field));
+  _copySnapshotIntoField(src, dst) {
+    if (src instanceof Float32Array && dst instanceof Float32Array && src.length === dst.length) {
+      dst.set(src);
+      return true;
     }
-    return restored;
-  }
-
-  _serializeAnalysisTargets() {
-    const analysisTargets = this.state?.analysisTargets;
-    if (!analysisTargets || typeof analysisTargets !== 'object') return null;
-    return {
-      source: analysisTargets.source ?? null,
-      surfacePressurePa: this._copySnapshotField(analysisTargets.surfacePressurePa),
-      surfaceTemperatureK: this._copySnapshotField(analysisTargets.surfaceTemperatureK),
-      uByPressurePa: this._serializePressureLevelFieldMap(analysisTargets.uByPressurePa),
-      vByPressurePa: this._serializePressureLevelFieldMap(analysisTargets.vByPressurePa),
-      temperatureKByPressurePa: this._serializePressureLevelFieldMap(analysisTargets.temperatureKByPressurePa),
-      thetaKByPressurePa: this._serializePressureLevelFieldMap(analysisTargets.thetaKByPressurePa),
-      specificHumidityKgKgByPressurePa: this._serializePressureLevelFieldMap(analysisTargets.specificHumidityKgKgByPressurePa)
-    };
-  }
-
-  _restoreAnalysisTargets(snapshot) {
-    const analysisTargets = snapshot?.analysisTargets;
-    if (!analysisTargets) {
-      this.state.analysisTargets = null;
-      return;
+    if (src instanceof Uint8Array && dst instanceof Uint8Array && src.length === dst.length) {
+      dst.set(src);
+      return true;
     }
-    this.state.analysisTargets = {
-      source: analysisTargets.source ?? null,
-      surfacePressurePa: analysisTargets.surfacePressurePa instanceof Float32Array
-        ? new Float32Array(analysisTargets.surfacePressurePa)
-        : null,
-      surfaceTemperatureK: analysisTargets.surfaceTemperatureK instanceof Float32Array
-        ? new Float32Array(analysisTargets.surfaceTemperatureK)
-        : null,
-      uByPressurePa: this._restorePressureLevelFieldMap(analysisTargets.uByPressurePa),
-      vByPressurePa: this._restorePressureLevelFieldMap(analysisTargets.vByPressurePa),
-      temperatureKByPressurePa: this._restorePressureLevelFieldMap(analysisTargets.temperatureKByPressurePa),
-      thetaKByPressurePa: this._restorePressureLevelFieldMap(analysisTargets.thetaKByPressurePa),
-      specificHumidityKgKgByPressurePa: this._restorePressureLevelFieldMap(analysisTargets.specificHumidityKgKgByPressurePa)
-    };
-  }
-
-  _serializeDiagnosticState() {
-    return {
-      vertMetrics: this.state?.vertMetrics ? { ...this.state.vertMetrics } : null,
-      vertMetricsContinuous: this.state?.vertMetricsContinuous ? { ...this.state.vertMetricsContinuous } : null
-    };
-  }
-
-  _restoreDiagnosticState(snapshot) {
-    const diagnosticState = snapshot?.diagnosticState || null;
-    this.state.vertMetrics = diagnosticState?.vertMetrics
-      ? { ...diagnosticState.vertMetrics }
-      : null;
-    this.state.vertMetricsContinuous = diagnosticState?.vertMetricsContinuous
-      ? { ...diagnosticState.vertMetricsContinuous }
-      : null;
+    if (src instanceof Uint16Array && dst instanceof Uint16Array && src.length === dst.length) {
+      dst.set(src);
+      return true;
+    }
+    return false;
   }
 
   getStateSnapshot({ mode = 'compact' } = {}) {
@@ -1349,7 +1156,16 @@ export class WeatherCore5 {
       diagnosticState: this._serializeDiagnosticState(),
       fields: Object.fromEntries(
         Object.entries(compactFields).map(([key, field]) => [key, this._copySnapshotField(field)])
-      )
+      ),
+      runtime: {
+        accumSeconds: this._accum,
+        lastAdvanceSteps: this._lastAdvanceSteps,
+        dynStepIndex: this._dynStepIndex,
+        nudgeAccumSeconds: this._nudgeAccumSeconds,
+        climoAccumSeconds: this._climoAccumSeconds,
+        windNudgeSpinupSeconds: this._windNudgeSpinupSeconds,
+        simSpeed: this.simSpeed
+      }
     };
 
     if (mode === 'full') {
@@ -1363,108 +1179,49 @@ export class WeatherCore5 {
     return snapshot;
   }
 
-  loadStateSnapshot(snapshot) {
-    if (!snapshot || !snapshot.state) {
-      throw new Error('A full state snapshot is required to restore WeatherCore5.');
-    }
-    if (snapshot?.grid?.nx !== this.grid.nx || snapshot?.grid?.ny !== this.grid.ny) {
-      throw new Error('Snapshot grid does not match WeatherCore5 grid.');
-    }
-    if (snapshot?.vertical?.nz !== this.nz) {
-      throw new Error('Snapshot vertical layout does not match WeatherCore5 vertical resolution.');
-    }
+  applyStateSnapshot(snapshot, { restoreRuntime = true } = {}) {
+    if (!snapshot || typeof snapshot !== 'object') return false;
 
-    for (const [key, value] of Object.entries(snapshot?.climo?.fields || {})) {
-      const target = this.climo[key] || this.geo[key];
-      if (target instanceof Float32Array || target instanceof Uint8Array || target instanceof Uint16Array) {
-        if (!value || value.length !== target.length) continue;
-        target.set(value);
+    if (snapshot.state && this.state) {
+      for (const [key, value] of Object.entries(snapshot.state)) {
+        this._copySnapshotIntoField(value, this.state[key]);
       }
     }
-    Object.assign(this.climo, snapshot?.climo?.flags || {});
-
-    for (const [key, value] of Object.entries(snapshot.state)) {
-      const target = this.state[key];
-      if (target instanceof Float32Array || target instanceof Uint8Array || target instanceof Uint16Array) {
-        if (!value || value.length !== target.length) continue;
-        target.set(value);
-        continue;
-      }
-      if (value instanceof Float32Array) {
-        this.state[key] = new Float32Array(value);
-      } else if (value instanceof Uint8Array) {
-        this.state[key] = new Uint8Array(value);
-      } else if (value instanceof Uint16Array) {
-        this.state[key] = new Uint16Array(value);
+    if (snapshot.fields && this.fields) {
+      for (const [key, value] of Object.entries(snapshot.fields)) {
+        this._copySnapshotIntoField(value, this.fields[key]);
       }
     }
-    this._restoreAnalysisTargets(snapshot);
-    this._restoreDiagnosticState(snapshot);
-    this.setInstrumentationMode(snapshot?.runtime?.instrumentationMode || this.getInstrumentationMode());
 
-    Object.assign(this.surfaceParams, snapshot?.params?.surfaceParams || {});
-    Object.assign(this.advectParams, snapshot?.params?.advectParams || {});
-    Object.assign(this.vertParams, snapshot?.params?.vertParams || {});
-    Object.assign(this.microParams, snapshot?.params?.microParams || {});
-    Object.assign(this.nudgeParams, snapshot?.params?.nudgeParams || {});
-    Object.assign(this.windNudgeParams, snapshot?.params?.windNudgeParams || {});
-    Object.assign(this.windEddyParams, snapshot?.params?.windEddyParams || {});
-    Object.assign(this.windNudgeSpinupParams, snapshot?.params?.windNudgeSpinupParams || {});
-    Object.assign(this.dynParams, snapshot?.params?.dynParams || {});
-    Object.assign(this.massParams, snapshot?.params?.massParams || {});
-    Object.assign(this.analysisIncrementParams, snapshot?.params?.analysisIncrementParams || {});
-    Object.assign(this.radParams, snapshot?.params?.radParams || {});
-    Object.assign(this.diagParams, snapshot?.params?.diagParams || {});
-    Object.assign(this.lodParams, snapshot?.params?.lodParams || {});
-
-    this.timeUTC = Number(snapshot?.runtime?.timeUTC) || 0;
-    this.modelDt = Number(snapshot?.runtime?.modelDt) || this.modelDt;
-    this.maxInternalDt = Math.max(1, Math.min(this.modelDt, Number(snapshot?.runtime?.maxInternalDt) || this.maxInternalDt || this.modelDt));
-    this._accum = Number(snapshot?.runtime?.accumSeconds) || 0;
-    this._dynStepIndex = Number(snapshot?.runtime?.dynStepIndex) || 0;
-    this._nudgeAccumSeconds = Number(snapshot?.runtime?.nudgeAccumSeconds) || 0;
-    this._climoAccumSeconds = Number(snapshot?.runtime?.climoAccumSeconds) || 0;
-    this._windNudgeSpinupSeconds = Number(snapshot?.runtime?.windNudgeSpinupSeconds) || 0;
-    this._metricsCounter = Number(snapshot?.runtime?.metricsCounter) || 0;
-    this._nextModuleLogSimTime = Number.isFinite(snapshot?.runtime?.nextModuleLogSimTime)
-      ? snapshot.runtime.nextModuleLogSimTime
-      : null;
-    this.simSpeed = Number(snapshot?.runtime?.simSpeed) || 1;
-    this._windNudgeMaxAbsCorrection = Number(snapshot?.runtime?.windNudgeMaxAbsCorrection) || 0;
-    Object.assign(this._nudgeParamsRuntime, this.nudgeParams);
-    if (this._climoUpdateArgs) {
-      this._climoUpdateArgs.timeUTC = this.timeUTC;
+    if (Number.isFinite(snapshot.timeUTC)) {
+      this.timeUTC = snapshot.timeUTC;
     }
-    this.clearReplayDisabledModules();
-  }
 
-  resetModuleTimingDiagnostics() {
-    this._moduleTiming = createModuleTimingAccumulator();
-  }
-
-  getModuleTimingSummary() {
-    return JSON.parse(JSON.stringify(this._moduleTiming));
-  }
-
-  resetConservationDiagnostics() {
-    this._conservationBudget = createConservationBudgetAccumulator();
-    if (this.state) {
-      this.state.numericalAdvectionWaterRepairMassMeanKgM2 = 0;
-      this.state.numericalAdvectionWaterAddedMassMeanKgM2 = 0;
-      this.state.numericalAdvectionWaterRemovedMassMeanKgM2 = 0;
-      this.state.numericalAdvectionWaterResidualMassMeanKgM2 = 0;
-      this.state.numericalAdvectionWaterRepairMass?.fill?.(0);
-      this.state.numericalAdvectionWaterAddedMass?.fill?.(0);
-      this.state.numericalAdvectionWaterRemovedMass?.fill?.(0);
-      this.state.verticalSubtropicalDryingDemandMass?.fill?.(0);
-      this.state.verticalCloudErosionToVaporMass?.fill?.(0);
+    const runtime = snapshot.runtime || null;
+    if (restoreRuntime && runtime) {
+      this._accum = Number.isFinite(runtime.accumSeconds) ? runtime.accumSeconds : 0;
+      this._lastAdvanceSteps = Number.isFinite(runtime.lastAdvanceSteps) ? runtime.lastAdvanceSteps : 0;
+      this._dynStepIndex = Number.isFinite(runtime.dynStepIndex) ? runtime.dynStepIndex : 0;
+      this._nudgeAccumSeconds = Number.isFinite(runtime.nudgeAccumSeconds) ? runtime.nudgeAccumSeconds : 0;
+      this._climoAccumSeconds = Number.isFinite(runtime.climoAccumSeconds) ? runtime.climoAccumSeconds : 0;
+      this._windNudgeSpinupSeconds = Number.isFinite(runtime.windNudgeSpinupSeconds)
+        ? runtime.windNudgeSpinupSeconds
+        : 0;
+      if (Number.isFinite(runtime.simSpeed)) {
+        this.simSpeed = Math.max(0, runtime.simSpeed);
+      }
+    } else {
+      this._accum = 0;
+      this._lastAdvanceSteps = 0;
+      this._dynStepIndex = 0;
+      this._nudgeAccumSeconds = 0;
+      this._climoAccumSeconds = 0;
+      this._windNudgeSpinupSeconds = 0;
     }
-  }
 
-  getConservationSummary() {
-    const summary = JSON.parse(JSON.stringify(this._conservationBudget));
-    summary.waterCycle = buildWaterCycleClosureSummary(summary);
-    return summary;
+    this._updateClimoNow(0, true);
+    this._updateHydrostatic();
+    return true;
   }
 
   _bindFieldViews() {
@@ -2324,6 +2081,8 @@ export class WeatherCore5 {
             source: windNudgeResult.source ?? null,
             rmseSurface: windNudgeResult.rmseSurface ?? null,
             rmseUpper: windNudgeResult.rmseUpper ?? null,
+            surfaceRelaxBoostMean: windNudgeResult.surfaceRelaxBoostMean ?? null,
+            surfaceRelaxBoostMax: windNudgeResult.surfaceRelaxBoostMax ?? null,
             maxAbsCorrection: this._windNudgeMaxAbsCorrection,
             spinupSeconds: this._windNudgeSpinupSeconds,
             effectiveTaus: {
